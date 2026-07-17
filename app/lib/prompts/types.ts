@@ -1,4 +1,4 @@
-export type PromptProvider = 'openai' | 'claude' | 'gemini';
+export type PromptProvider = 'gemini';
 
 import type {
   MovieInfo,

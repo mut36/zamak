@@ -2,24 +2,23 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { parseFilename, type FilenameMetadata } from '../utils/metadataInference';
-import { downloadFile } from '../utils/downloadFile';
 import {
   requestChunkTranslation,
   type TranslationApiKeys,
 } from '../lib/client/translationApi';
 import {
   buildOutputFilename,
+  chunkSrtBlocks,
   parseSrtBlocks,
 } from '../lib/srt';
+import { runOrderedPool } from '../lib/client/concurrency';
 import type {
   MovieInfo,
   TranslationStyle,
   TranslationProgress,
+  TranslationResult,
 } from '../types/translation';
-import {
-  ANALYSIS_BLOCKS,
-  TIMING,
-} from '../config/constants';
+import { CHUNK_SIZE, CONCURRENCY, TIMING } from '../config/constants';
 
 interface TranslationState {
   isTranslating: boolean;
@@ -47,25 +46,23 @@ function isSrtFile(file: File): boolean {
 
 const EMPTY_ANALYSIS = { title: '', year: '' };
 
+// Title/year inference from the filename only. If nothing is found the info
+// screen drops into manual input — we intentionally don't sample subtitle
+// text (unreliable, and an extra AI call) to guess a title.
 async function analyzeContent(
   filenameHint: string,
-  subtitleSample?: string,
 ): Promise<{ title: string; year: string }> {
   try {
     const response = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filenameHint, content: subtitleSample ?? '' }),
+      body: JSON.stringify({ filenameHint, content: '' }),
     });
     if (!response.ok) return EMPTY_ANALYSIS;
     return await response.json();
   } catch {
     return EMPTY_ANALYSIS;
   }
-}
-
-function isAnalysisSufficient(result: { title: string }): boolean {
-  return !!result.title;
 }
 
 const IDLE_PROGRESS: TranslationProgress = {
@@ -80,7 +77,6 @@ const IDLE_PROGRESS: TranslationProgress = {
 export function useTranslation(
   onMetaUpdate?: (meta: FilenameMetadata) => void,
   messages?: TranslationMessages,
-  siteLang?: string,
 ) {
   const msg: TranslationMessages = messages ?? {
     serverError: (status: number) => `Server error (${status})`,
@@ -100,6 +96,7 @@ export function useTranslation(
     completed: false,
   });
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress>(IDLE_PROGRESS);
+  const [result, setResult] = useState<TranslationResult | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const processFileIdRef = useRef(0);
   const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -121,6 +118,7 @@ export function useTranslation(
     setFile(selectedFile);
     setState((prev) => ({ ...prev, error: '' }));
     setTranslationProgress(IDLE_PROGRESS);
+    setResult(null);
 
     // 1. Immediate: parse filename metadata
     const meta = parseFilename(selectedFile.name);
@@ -131,22 +129,10 @@ export function useTranslation(
     if (processFileIdRef.current !== fileId) return;
     setFileContent(content);
 
-    // 3. Background: analyze — filename first, subtitle sample as fallback
+    // 3. Background: infer title/year from the filename.
     setAnalysis({ isAnalyzing: true, completed: false });
-
-    // Step 1: filename only
-    let result = await analyzeContent(selectedFile.name);
+    const result = await analyzeContent(selectedFile.name);
     if (processFileIdRef.current !== fileId) return;
-
-    // Step 2: fallback to subtitle sample if title not found
-    if (!isAnalysisSufficient(result)) {
-      const blocks = parseSrtBlocks(content);
-      if (blocks.length > 0) {
-        const sample = blocks.slice(0, ANALYSIS_BLOCKS).join('\n\n');
-        result = await analyzeContent(selectedFile.name, sample);
-        if (processFileIdRef.current !== fileId) return;
-      }
-    }
 
     const updatedMeta: FilenameMetadata = {
       ...meta,
@@ -156,7 +142,7 @@ export function useTranslation(
     onMetaUpdate?.(updatedMeta);
     setAnalysis({ isAnalyzing: false, completed: true });
     return result;
-  }, [cancelScheduledReset, onMetaUpdate, siteLang]);
+  }, [cancelScheduledReset, onMetaUpdate]);
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,11 +178,12 @@ export function useTranslation(
     translationStyle: TranslationStyle,
     onSuccess?: () => void,
     apiKeys?: TranslationApiKeys,
-  ) => {
-    if (!file) return;
+  ): Promise<boolean> => {
+    if (!file) return false;
 
-    const activeFileId = processFileIdRef.current;
     setState({ isTranslating: true, error: '' });
+    setResult(null);
+    const startedAt = Date.now();
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -209,74 +196,98 @@ export function useTranslation(
         throw new Error(msg.emptyFile);
       }
 
-      const fullContent = blocks.join('\n\n');
-      const initialEstimateMs = TIMING.PRO_BATCH_MS;
+      // Split into chunks of CHUNK_SIZE blocks and translate them with up to
+      // CONCURRENCY parallel requests. A very large CHUNK_SIZE yields a single
+      // chunk (no parallelism) — the knob for testing parallel translation.
+      const chunks = chunkSrtBlocks(blocks, CHUNK_SIZE);
+      const totalChunks = chunks.length;
+      // Rough estimate: number of concurrency "waves" × per-chunk time.
+      const waves = Math.max(1, Math.ceil(totalChunks / CONCURRENCY));
+      const totalEstimateMs = waves * TIMING.FLASH_BATCH_MS;
 
       setTranslationProgress({
         stage: 'translating',
         currentChunk: 0,
-        totalChunks: 1,
-        estimatedRemainingMs: initialEstimateMs,
+        totalChunks,
+        estimatedRemainingMs: totalEstimateMs,
         lastUpdateTimestamp: Date.now(),
-        totalEstimateMs: initialEstimateMs,
+        totalEstimateMs,
       });
 
-      const result = await requestChunkTranslation(
-        {
-          chunk: fullContent,
-          chunkIndex: 1,
-          totalChunks: 1,
-          movieInfo,
-          model,
-          targetLang,
-          translationStyle,
+      const results = await runOrderedPool<string, string>({
+        items: chunks,
+        concurrency: CONCURRENCY,
+        signal: controller.signal,
+        worker: (chunk, index) =>
+          requestChunkTranslation(
+            {
+              chunk,
+              chunkIndex: index + 1,
+              totalChunks,
+              movieInfo,
+              model,
+              targetLang,
+              translationStyle,
+            },
+            controller.signal,
+            apiKeys,
+          ),
+        onCompleted: (completed) => {
+          setTranslationProgress((prev) => ({
+            ...prev,
+            currentChunk: completed,
+            estimatedRemainingMs:
+              totalEstimateMs * (1 - completed / totalChunks),
+            lastUpdateTimestamp: Date.now(),
+          }));
         },
-        controller.signal,
-        apiKeys,
-      );
-
-      const outputFilename = buildOutputFilename(file.name, targetLang);
+      });
 
       if (controller.signal.aborted) {
         setTranslationProgress(IDLE_PROGRESS);
-        return;
+        return false;
       }
+      if (results.some((chunk) => chunk === undefined)) {
+        throw new Error(msg.noResponse);
+      }
+
+      const translated = (results as string[]).join('\n\n');
+      const outputFilename = buildOutputFilename(file.name, targetLang);
 
       setTranslationProgress({
         stage: 'finalizing',
-        currentChunk: 1,
-        totalChunks: 1,
+        currentChunk: totalChunks,
+        totalChunks,
         estimatedRemainingMs: 0,
         lastUpdateTimestamp: 0,
         totalEstimateMs: 0,
       });
 
-      if (!result) throw new Error(msg.noResponse);
-      downloadFile(result, outputFilename);
+      // Persist the result for the completion screen — no auto-download,
+      // no auto-reset. The user downloads explicitly and can start over.
+      setResult({
+        content: translated,
+        filename: outputFilename,
+        lineCount: parseSrtBlocks(translated).length,
+        durationMs: Date.now() - startedAt,
+      });
 
       setTranslationProgress({
         stage: 'done',
-        currentChunk: 1,
-        totalChunks: 1,
+        currentChunk: totalChunks,
+        totalChunks,
         estimatedRemainingMs: 0,
         lastUpdateTimestamp: 0,
         totalEstimateMs: 0,
       });
 
       onSuccess?.();
-      resetTimeoutRef.current = setTimeout(() => {
-        if (processFileIdRef.current !== activeFileId) return;
-        setTranslationProgress(IDLE_PROGRESS);
-        setFile(null);
-        setFileContent('');
-        setAnalysis({ isAnalyzing: false, completed: false });
-        resetTimeoutRef.current = null;
-      }, TIMING.SUCCESS_RESET_MS);
+      return true;
     } catch (err) {
       // Don't show error for abort
       if (err instanceof Error && err.name === 'AbortError') {
         setTranslationProgress(IDLE_PROGRESS);
-        return;
+        return false;
       }
       console.error('[translate] Translation failed:', err);
       setState((prev) => ({
@@ -284,6 +295,7 @@ export function useTranslation(
         error: err instanceof Error ? err.message : msg.generalError,
       }));
       setTranslationProgress(IDLE_PROGRESS);
+      return false;
     } finally {
       setState((prev) => ({ ...prev, isTranslating: false }));
       abortControllerRef.current = null;
@@ -302,13 +314,16 @@ export function useTranslation(
     setAnalysis({ isAnalyzing: false, completed: false });
     setState((prev) => ({ ...prev, error: '' }));
     setTranslationProgress(IDLE_PROGRESS);
+    setResult(null);
   };
 
   return {
     file,
+    fileContent,
     ...state,
     analysis,
     translationProgress,
+    result,
     handleFileChange,
     handleFileDrop,
     clearFile,

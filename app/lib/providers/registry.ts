@@ -1,60 +1,38 @@
 import 'server-only';
 
-import {
-  ALLOWED_MODELS,
-  MODEL_PROVIDERS,
-  type AllowedModel,
-} from '../../config/constants';
-import { claudeProvider } from './claude';
+import { ALLOWED_MODELS, type AllowedModel } from '../../config/constants';
 import { geminiProvider } from './gemini';
-import { openAIProvider } from './openai';
 import type {
   GenerateTextRequest,
   ModelProvider,
   ProviderApiKeys,
 } from './types';
 
-const providers = {
-  openai: {
-    provider: openAIProvider,
-    getApiKey: (keys: ProviderApiKeys) => keys.openai,
-  },
-  claude: {
-    provider: claudeProvider,
-    getApiKey: (keys: ProviderApiKeys) => keys.claude,
-  },
-  gemini: {
-    provider: geminiProvider,
-    getApiKey: () => undefined,
-  },
-} as const;
-
-function getRegistration(model: string) {
+// Single provider (Gemini). The registry indirection is kept minimal so a
+// second provider could be reintroduced without touching call sites.
+function assertAllowed(model: string): void {
   if (!ALLOWED_MODELS.includes(model as AllowedModel)) {
-    throw new Error(`Unsupported model provider: ${model}`);
+    throw new Error(`Unsupported model: ${model}`);
   }
-  return providers[MODEL_PROVIDERS[model as AllowedModel]];
 }
 
 export function getModelProvider(model: string): ModelProvider {
-  return getRegistration(model).provider;
+  assertAllowed(model);
+  return geminiProvider;
 }
 
 export function isModelProviderConfigured(
   model: string,
   apiKeys: ProviderApiKeys = {},
 ): boolean {
-  const registration = getRegistration(model);
-  return registration.provider.isConfigured(registration.getApiKey(apiKeys));
+  assertAllowed(model);
+  return geminiProvider.isConfigured(apiKeys.gemini);
 }
 
 export async function generateModelText(
   request: Omit<GenerateTextRequest, 'apiKey'>,
   apiKeys: ProviderApiKeys = {},
 ): Promise<string> {
-  const registration = getRegistration(request.model);
-  return registration.provider.generateText({
-    ...request,
-    apiKey: registration.getApiKey(apiKeys),
-  });
+  assertAllowed(request.model);
+  return geminiProvider.generateText({ ...request, apiKey: apiKeys.gemini });
 }

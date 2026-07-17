@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
+import { AUX_MODEL } from '../../config/constants';
 
 export const maxDuration = 30;
 
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite',
+      model: AUX_MODEL,
       contents: `"${titleStr}"를 인터넷에서 검색해. 마크다운 없이 아래 형식의 일반 텍스트로만 출력해.
 
 영화나 드라마인 경우:

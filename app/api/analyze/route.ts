@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { composeAnalysisPrompt } from '../../lib/prompts/analysis';
+import { AUX_MODEL } from '../../config/constants';
 
 export const maxDuration = 30;
 
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
       filenameHint: body.filenameHint,
     });
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite',
+      model: AUX_MODEL,
       contents: prompt,
       config: {
         thinkingConfig: { includeThoughts: false },

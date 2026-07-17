@@ -11,15 +11,16 @@ const defaultClient = process.env.GOOGLE_GENAI_API_KEY
 export const geminiProvider: ModelProvider = {
   name: 'gemini',
 
-  isConfigured() {
-    return Boolean(process.env.GOOGLE_GENAI_API_KEY);
+  // Configured if the caller supplies a BYOK key OR the server env key exists.
+  isConfigured(apiKey) {
+    return Boolean(apiKey || process.env.GOOGLE_GENAI_API_KEY);
   },
 
-  async generateText({ model, prompt }) {
-    const apiKey = process.env.GOOGLE_GENAI_API_KEY;
-    if (!apiKey) throw new Error('Google AI API key not configured');
-
-    const client = defaultClient;
+  async generateText({ model, prompt, apiKey }) {
+    // Prefer the caller's BYOK key; fall back to the server env key.
+    const client = apiKey
+      ? new GoogleGenAI({ apiKey })
+      : defaultClient;
     if (!client) throw new Error('Google AI API key not configured');
     const isFlash = model.toLowerCase().includes('flash');
     const response = await client.models.generateContent({

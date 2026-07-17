@@ -1,10 +1,27 @@
 export interface MovieInfo {
   title: string;
-  genre: string;
   year: string;
-  country: string;
-  era: string;
   notes: string;
+  /** Legacy metadata fields — still consumed by the translation prompt when
+   * present, but no longer surfaced in the Simple UI. Optional. */
+  genre?: string;
+  country?: string;
+  era?: string;
+}
+
+/** Content type chosen on the upload screen — drives the info-step branch. */
+export type ContentType = 'movie' | 'other';
+
+/** Final translation result, surfaced on the completion screen. */
+export interface TranslationResult {
+  /** Translated SRT content (for download + preview). */
+  content: string;
+  /** Suggested output filename, e.g. `movie_ko.srt`. */
+  filename: string;
+  /** Number of translated subtitle blocks. */
+  lineCount: number;
+  /** Wall-clock duration in milliseconds. */
+  durationMs: number;
 }
 
 export type TranslationMode = 'chunk';

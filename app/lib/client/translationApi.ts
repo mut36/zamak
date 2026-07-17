@@ -2,16 +2,15 @@ import type { ChunkTranslationRequest } from '../../types/translation';
 import { readTranslationEvent } from './sse';
 
 export interface TranslationApiKeys {
-  openai?: string;
-  anthropic?: string;
+  /** User-provided Gemini key (BYOK); translation calls only. */
+  gemini?: string;
 }
 
 function buildHeaders(apiKeys?: TranslationApiKeys): HeadersInit {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  if (apiKeys?.openai) headers['x-openai-key'] = apiKeys.openai;
-  if (apiKeys?.anthropic) headers['x-anthropic-key'] = apiKeys.anthropic;
+  if (apiKeys?.gemini) headers['x-gemini-key'] = apiKeys.gemini;
   return headers;
 }
 

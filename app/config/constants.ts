@@ -2,52 +2,66 @@
 // Centralized configuration constants
 // ============================================
 
-/** SRT chunking & concurrency */
-export const CHUNK_SIZE = (() => {
-  const raw = process.env.NEXT_PUBLIC_CHUNK_SIZE;
-  if (!raw) return 200;
+/**
+ * SRT chunking & concurrency — the two knobs for testing parallel translation.
+ * Set a very large CHUNK_SIZE to force a single request (no chunking).
+ * Both overridable via env for quick tuning.
+ */
+function readPositiveIntEnv(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback;
   const parsed = parseInt(raw, 10);
   if (isNaN(parsed) || parsed <= 0) {
-    console.warn(
-      `[config] Invalid NEXT_PUBLIC_CHUNK_SIZE="${raw}", using default 120`,
-    );
-    return 100;
+    console.warn(`[config] Invalid env value "${raw}", using ${fallback}`);
+    return fallback;
   }
   return parsed;
+}
+
+/** Subtitle blocks per translation request. Default 200. */
+export const CHUNK_SIZE = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_CHUNK_SIZE,
+  200,
+);
+
+/** Max concurrent chunk translations. Default 14. */
+export const CONCURRENCY = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_CONCURRENCY,
+  14,
+);
+
+/**
+ * Auxiliary model for lightweight tasks (title/year analysis, web-search
+ * enrichment, non-movie summarization). Kept as a single constant so a
+ * model bump is a one-line change; overridable via env.
+ */
+export const AUX_MODEL = process.env.AUX_MODEL || 'gemini-3.1-flash-lite';
+
+/**
+ * Number of leading subtitle lines sampled to summarize non-movie content.
+ * Developer-tweakable via env for quick tuning.
+ */
+export const SUMMARY_SAMPLE_LINES = (() => {
+  const raw = process.env.SUMMARY_SAMPLE_LINES;
+  const parsed = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 50;
 })();
 
-/** Max concurrent chunk translations */
-export const CONCURRENCY = 14;
-
-/** Number of subtitle blocks sampled for genre/tone analysis */
-export const ANALYSIS_BLOCKS = 50;
-
-/** Allowed AI models */
-export const ALLOWED_MODELS = [
-  'gemini-3.5-flash',
-  'gemini-3.1-pro-preview',
-  'gpt-5.6-terra',
-  'claude-haiku-4-5-20251001',
-] as const;
+/**
+ * Allowed translation models. Unified on a single Gemini model; kept as an
+ * array so validation still works and adding a model later is one line.
+ */
+export const ALLOWED_MODELS = ['gemini-3.5-flash'] as const;
 
 export type AllowedModel = (typeof ALLOWED_MODELS)[number];
-export type ModelProviderName = 'openai' | 'claude' | 'gemini';
 
 export const DEFAULT_MODEL: AllowedModel = 'gemini-3.5-flash';
 
-export const MODEL_PROVIDERS: Record<AllowedModel, ModelProviderName> = {
-  'gemini-3.5-flash': 'gemini',
-  'gemini-3.1-pro-preview': 'gemini',
-  'gpt-5.6-terra': 'openai',
-  'claude-haiku-4-5-20251001': 'claude',
-};
-
-export const MODEL_LABELS: Record<AllowedModel, string> = {
-  'gemini-3.5-flash': 'Gemini 3 Flash',
-  'gemini-3.1-pro-preview': 'Gemini 3.1 Pro',
-  'gpt-5.6-terra': 'GPT-5.6 Terra',
-  'claude-haiku-4-5-20251001': 'Claude Haiku 4.5',
-};
+/**
+ * The single translation model. Model updates are a one-line change here
+ * (or via the NEXT_PUBLIC_TRANSLATION_MODEL env var).
+ */
+export const TRANSLATION_MODEL =
+  process.env.NEXT_PUBLIC_TRANSLATION_MODEL || DEFAULT_MODEL;
 
 /** Timing estimates (milliseconds) */
 export const TIMING = {

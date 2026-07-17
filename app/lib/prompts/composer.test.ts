@@ -46,7 +46,7 @@ describe('prompt composition', () => {
   });
 
   it('adds the consolidated philosophy only to the cinematic style', async () => {
-    const prompt = await composeTranslationPrompt('openai', {
+    const prompt = await composeTranslationPrompt('gemini', {
       movieInfo,
       targetLanguage: 'ko',
       translationMode: 'chunk',

@@ -34,6 +34,15 @@ function requireString(
   return value;
 }
 
+/** Returns the string if present & valid, otherwise undefined (optional field). */
+function optionalString(
+  record: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = record[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
 function parseMovieInfo(value: unknown): MovieInfo {
   if (!isRecord(value)) {
     throw new RequestValidationError('Invalid or missing field: movieInfo');
@@ -41,11 +50,12 @@ function parseMovieInfo(value: unknown): MovieInfo {
 
   return {
     title: requireString(value, 'title', { allowEmpty: true }),
-    genre: requireString(value, 'genre', { allowEmpty: true }),
     year: requireString(value, 'year', { allowEmpty: true }),
-    country: requireString(value, 'country', { allowEmpty: true }),
-    era: requireString(value, 'era', { allowEmpty: true }),
     notes: requireString(value, 'notes', { allowEmpty: true }),
+    // Legacy metadata — optional; the Simple UI no longer sends these.
+    genre: optionalString(value, 'genre'),
+    country: optionalString(value, 'country'),
+    era: optionalString(value, 'era'),
   };
 }
 

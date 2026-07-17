@@ -4,8 +4,8 @@ import type {
 } from '../prompts';
 
 export interface ProviderApiKeys {
-  openai?: string | null;
-  claude?: string | null;
+  /** User-provided Gemini key (BYOK) for translation calls. */
+  gemini?: string | null;
 }
 
 export interface GenerateTextRequest {

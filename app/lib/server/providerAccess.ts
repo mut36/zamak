@@ -9,8 +9,7 @@ import {
 
 export function getProviderApiKeys(request: NextRequest): ProviderApiKeys {
   return {
-    openai: request.headers.get('x-openai-key'),
-    claude: request.headers.get('x-anthropic-key'),
+    gemini: request.headers.get('x-gemini-key'),
   };
 }
 
