@@ -1,0 +1,76 @@
+import { GoogleGenAI } from '@google/genai';
+import { NextRequest, NextResponse } from 'next/server';
+import { composeAnalysisPrompt } from '../../lib/prompts/analysis';
+
+export const maxDuration = 30;
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GOOGLE_GENAI_API_KEY || '',
+});
+
+interface AnalyzeRequest {
+  content: string;
+  filenameHint?: string;
+}
+
+export async function POST(request: NextRequest) {
+  if (!process.env.GOOGLE_GENAI_API_KEY) {
+    return NextResponse.json(
+      { error: 'API key not configured' },
+      { status: 500 },
+    );
+  }
+
+  let body: AnalyzeRequest;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  if (typeof body.content !== 'string' && typeof body.filenameHint !== 'string') {
+    return NextResponse.json(
+      { error: 'Filename or content is required' },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const prompt = await composeAnalysisPrompt({
+      content: body.content,
+      filenameHint: body.filenameHint,
+    });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.1-flash-lite',
+      contents: prompt,
+      config: {
+        thinkingConfig: { includeThoughts: false },
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const result = response.text ?? '';
+
+    try {
+      const cleanResult = result.replace(/```json\n?|\n?```/g, '').trim();
+      const analysis = JSON.parse(cleanResult);
+
+      return NextResponse.json({
+        title: typeof analysis.title === 'string' ? analysis.title : '',
+        year: typeof analysis.year === 'string' ? analysis.year : '',
+      });
+    } catch {
+      console.error('Failed to parse analysis response:', result);
+      return NextResponse.json(
+        { error: 'Failed to parse analysis response' },
+        { status: 502 },
+      );
+    }
+  } catch (error) {
+    console.error('Analysis failed:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Analysis failed' },
+      { status: 500 },
+    );
+  }
+}

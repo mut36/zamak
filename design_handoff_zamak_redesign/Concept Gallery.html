@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ZAMAK 리디자인 — 2 시안</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg: oklch(0.965 0.004 250);
+    --surface:#fff;
+    --surface-2: oklch(0.975 0.004 250);
+    --border: oklch(0.91 0.006 250);
+    --ink: oklch(0.24 0.02 258);
+    --ink-2: oklch(0.47 0.018 258);
+    --ink-3: oklch(0.62 0.014 258);
+    --blue: oklch(0.55 0.17 256);
+    --blue-soft: oklch(0.955 0.03 256);
+    --green: oklch(0.57 0.115 162);
+    --green-soft: oklch(0.955 0.035 162);
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --sans:'Pretendard',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:var(--sans);background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono)}
+  a{color:inherit}
+
+  .page{max-width:1320px;margin:0 auto;padding:40px 32px 80px}
+
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:28px;flex-wrap:wrap}
+  .brandblock{display:flex;align-items:center;gap:12px}
+  .mark{width:30px;height:30px;position:relative;flex:none}
+  .mark i{position:absolute;inset:0;border-radius:6px;background:var(--blue);transform:rotate(45deg) scale(0.62)}
+  .mark i:last-child{background:var(--ink);opacity:.9;transform:rotate(45deg) scale(0.62) translate(5px,5px);mix-blend-mode:multiply}
+  .brandblock h1{font-size:22px;font-weight:800;letter-spacing:-0.02em;margin:0}
+  .brandblock .sub{font-size:13px;color:var(--ink-3);margin-top:3px}
+  .vertag{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+
+  .intro{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 26px;margin-bottom:30px;box-shadow:0 1px 2px oklch(0.4 0 0 /.04)}
+  .intro h2{font-size:14px;font-weight:700;margin:0 0 12px;letter-spacing:-0.01em}
+  .intro p{font-size:14px;line-height:1.7;color:var(--ink-2);margin:0 0 16px;max-width:920px}
+  .intro p b{color:var(--ink);font-weight:600}
+  .sysrow{display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:16px}
+  .sysitem{font-size:12px;color:var(--ink-2)}
+  .sysitem .k{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:4px}
+  .sysitem{border:1px solid var(--border);border-radius:9px;padding:9px 13px;background:var(--surface-2)}
+  .swatch{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:5px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  @media(max-width:1120px){.grid{grid-template-columns:1fr}}
+
+  .cc{background:var(--surface);border:1px solid var(--border);border-radius:18px;overflow:hidden;box-shadow:0 1px 2px oklch(0.4 0 0 /.04),0 14px 40px oklch(0.4 0.02 258 /.05)}
+  .cc-head{padding:22px 24px 18px}
+  .cc-badge-row{display:flex;align-items:center;gap:10px;margin-bottom:13px}
+  .badge{font-size:11px;font-weight:700;letter-spacing:0.04em;padding:4px 10px;border-radius:999px;font-family:var(--mono)}
+  .badge.a{color:var(--blue);background:var(--blue-soft)}
+  .badge.b{color:var(--green);background:var(--green-soft)}
+  .audience{font-size:12px;color:var(--ink-3);font-weight:500}
+  .cc-title{font-size:21px;font-weight:800;letter-spacing:-0.02em;margin:0 0 5px}
+  .cc-tag{font-size:14px;color:var(--ink-2);margin:0 0 16px;line-height:1.55}
+  .moves{display:flex;flex-direction:column;gap:8px;margin:0 0 4px;padding:0;list-style:none}
+  .moves li{font-size:13px;color:var(--ink-2);line-height:1.5;display:flex;gap:9px;align-items:flex-start}
+  .moves li:before{content:"";width:6px;height:6px;border-radius:2px;flex:none;margin-top:6px}
+  .cc.a .moves li:before{background:var(--blue)}
+  .cc.b .moves li:before{background:var(--green)}
+  .moves li b{color:var(--ink);font-weight:600}
+
+  .open-link{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;text-decoration:none;padding:8px 14px;border-radius:9px;border:1px solid var(--border)}
+  .cc.a .open-link{color:var(--blue)}
+  .cc.b .open-link{color:var(--green)}
+  .open-link:hover{background:var(--surface-2)}
+  .open-link svg{width:14px;height:14px}
+
+  .preview-link{display:block;text-decoration:none}
+  .preview{position:relative;height:404px;overflow:hidden;border-top:1px solid var(--border);background:oklch(0.99 0.003 250)}
+  .preview img{display:block;width:100%;height:100%;object-fit:cover;object-position:top center;transition:transform .5s cubic-bezier(.2,.7,.2,1)}
+  .preview-link:hover .preview img{transform:scale(1.025)}
+  .preview .overlay{position:absolute;left:0;right:0;bottom:0;padding:34px 18px 14px;display:flex;justify-content:center;background:linear-gradient(to top, oklch(0.22 0.02 258 / 0.55), transparent);opacity:0;transition:.2s}
+  .preview-link:hover .overlay{opacity:1}
+  .preview .overlay span{font-size:12.5px;font-weight:700;color:#fff;background:oklch(0.24 0.02 258 / 0.7);backdrop-filter:blur(4px);padding:7px 16px;border-radius:999px}
+
+  footer{margin-top:40px;text-align:center;font-size:12px;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <div class="brandblock">
+      <span class="mark"><i></i><i></i></span>
+      <div>
+        <h1>ZAMAK · 리디자인 시안</h1>
+        <div class="sub">자막 번역기 → AI 자막 번역 엔진 · 2개 방향 비교</div>
+      </div>
+    </div>
+    <span class="vertag">v0.13.0 → 1.0 redesign</span>
+  </header>
+
+  <section class="intro">
+    <h2>방향 메모</h2>
+    <p>
+      덕질 요소(이모지·밈)를 걷어내고 <b>“ZAMAK = 정밀하게 합금된 자막 번역 엔진”</b>이라는 한 줄로 재정의했어요.
+      두 시안은 같은 브랜드·같은 4단계 플로우(<b>업로드 → 정보 → 진행 → 완료</b>)를 공유하되,
+      <b>누구를 먼저 모실지</b>가 다릅니다. 공통 개선점: 도착어 선택을 전면에 배치(다국어 확장 대비),
+      메타데이터 <b>AI 자동 감지</b> 표시, 진행 화면에 실시간 번역 스트림, 완료 화면에 요약·미리보기·원클릭 다운로드.
+    </p>
+    <div class="sysrow">
+      <div class="sysitem"><span class="k">Type</span> Pretendard · JetBrains&nbsp;Mono</div>
+      <div class="sysitem"><span class="k">시안 A 액센트</span><span class="swatch" style="background:var(--blue)"></span>쿨 블루</div>
+      <div class="sysitem"><span class="k">시안 B 액센트</span><span class="swatch" style="background:var(--green)"></span>웜 그린</div>
+      <div class="sysitem"><span class="k">Mode</span> 라이트 우선 (다크 추후)</div>
+      <div class="sysitem"><span class="k">Screens</span> 4 × 2 · 인터랙티브</div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <!-- Concept A -->
+    <article class="cc a">
+      <div class="cc-head">
+        <div class="cc-badge-row">
+          <span class="badge a">시안 A</span>
+          <span class="audience">전문가 · B2B 우선</span>
+          <a class="open-link" href="concepts/ZAMAK Pro.html">전체 화면 ↗</a>
+        </div>
+        <h3 class="cc-title">ZAMAK Pro — 워크스페이스형</h3>
+        <p class="cc-tag">반복·대량 작업에 최적. 상단 내비, 최근 작업 기록, 우측 설정 레일이 한 화면에. 모노 타이포와 비용·토큰 readout으로 “도구”의 신뢰감을 줍니다.</p>
+        <ul class="moves">
+          <li><b>2단계를 1워크스페이스로</b> — 정보 입력과 번역 설정을 좌우로 통합</li>
+          <li><b>기술적 readout</b> — 예상 소요·줄 수·토큰, 모델별 품질 미터</li>
+          <li><b>배치·용어집·팀</b> 등 B2B 확장을 전제로 한 내비게이션</li>
+        </ul>
+      </div>
+      <a class="preview-link" href="concepts/ZAMAK Pro.html">
+        <div class="preview pro">
+          <img src="screenshots/preview-pro.png" alt="ZAMAK Pro 업로드 화면" />
+          <div class="overlay"><span>클릭하면 인터랙티브 프로토타입으로 ↗</span></div>
+        </div>
+      </a>
+    </article>
+
+    <!-- Concept B -->
+    <article class="cc b">
+      <div class="cc-head">
+        <div class="cc-badge-row">
+          <span class="badge b">시안 B</span>
+          <span class="audience">일반 사용자 우선</span>
+          <a class="open-link" href="concepts/ZAMAK Simple.html">전체 화면 ↗</a>
+        </div>
+        <h3 class="cc-title">ZAMAK Simple — 가이드 스텝형</h3>
+        <p class="cc-tag">처음 와도 헤매지 않게. 한 번에 하나씩, 큰 타이포와 안심 카피로 안내하고, 어려운 옵션은 ‘고급 설정’에 접어 둡니다. 추천값이 기본.</p>
+        <ul class="moves">
+          <li><b>4스텝 프로그레스</b> — 지금 어디인지·뭘 하면 되는지 항상 명확</li>
+          <li><b>안심 카피 + 스마트 기본값</b> — 모델/방식은 ‘추천’으로 미리 선택</li>
+          <li><b>원형 진행 + 격려 문구</b>, 완료 화면은 가볍게 축하하고 바로 다운로드</li>
+        </ul>
+      </div>
+      <a class="preview-link" href="concepts/ZAMAK Simple.html">
+        <div class="preview simple">
+          <img src="screenshots/preview-simple.png" alt="ZAMAK Simple 업로드 화면" />
+          <div class="overlay"><span>클릭하면 인터랙티브 프로토타입으로 ↗</span></div>
+        </div>
+      </a>
+    </article>
+  </div>
+
+  <footer>각 시안 카드의 “전체 화면 ↗”으로 실제 크기에서 클릭해 보실 수 있어요. · ZAMAK redesign</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,64 @@
+@import 'tailwindcss';
+
+/* Enable class-based dark mode instead of system preference */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Gmarket Sans Font */
+@font-face {
+  font-family: 'Gmarket Sans';
+  font-weight: 300;
+  font-style: normal;
+  src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/GmarketSansLight.woff')
+    format('woff');
+}
+
+@font-face {
+  font-family: 'Gmarket Sans';
+  font-weight: 500;
+  font-style: normal;
+  src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/GmarketSansMedium.woff')
+    format('woff');
+}
+
+@font-face {
+  font-family: 'Gmarket Sans';
+  font-weight: 700;
+  font-style: normal;
+  src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/GmarketSansBold.woff')
+    format('woff');
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-gmarket: 'Gmarket Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  line-height: 1.7;
+}
+
+@keyframes fadeSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
