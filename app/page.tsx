@@ -17,6 +17,8 @@ import type { ContentType, MovieInfo } from './types/translation';
 import { COPY } from './i18n/simpleCopy';
 
 const EMPTY_MOVIE_INFO: MovieInfo = { title: '', year: '', notes: '' };
+// Keep in sync with package.json version.
+const APP_VERSION = '0.2.0';
 
 function isSrt(file: File): boolean {
   return file.name.toLowerCase().endsWith('.srt');
@@ -188,12 +190,12 @@ export default function Home() {
 
   return (
     <div className='min-h-screen'>
-      <header className='flex items-center justify-between max-w-[600px] mx-auto px-5 h-16'>
+      <header className='flex items-center justify-between w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 h-16'>
         <BrandMark />
         <span className='lang-pill'>{COPY.langPill}</span>
       </header>
 
-      <main className='max-w-[600px] mx-auto px-5 pt-4 pb-24'>
+      <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
         <StepTracker current={step} />
 
         {step === 0 && (
@@ -253,6 +255,11 @@ export default function Home() {
           />
         )}
       </main>
+
+      <footer className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pb-10 text-center text-ink-3'>
+        <p className='mono text-[12px]'>v{APP_VERSION} · Beta</p>
+        <p className='text-[12px] mt-1'>© 2026 ZAMAK. All rights reserved.</p>
+      </footer>
     </div>
   );
 }

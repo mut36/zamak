@@ -1,8 +1,8 @@
 'use client';
 
 import { useRef, useState, type DragEvent } from 'react';
-import { UploadIcon, FilmIcon, VideoIcon } from '../icons';
-import { TARGET_LANGS } from '../../config/languages';
+import { UploadIcon, FilmIcon, VideoIcon, ArrowRightIcon } from '../icons';
+import { LanguageSelect } from './LanguageSelect';
 import type { ContentType } from '../../types/translation';
 import { COPY } from '../../i18n/simpleCopy';
 
@@ -39,6 +39,29 @@ export function UploadStep({
       <div className='head text-center mb-7'>
         <h1>{c.title}</h1>
         <p>{c.subtitle}</p>
+      </div>
+
+      {/* Content type — above the dropzone */}
+      <div className='card qcard mb-[14px]'>
+        <p className='qlabel'>{c.typeLabel}</p>
+        <div className='seg'>
+          <button
+            type='button'
+            onClick={() => onContentType('movie')}
+            className={`segbtn${contentType === 'movie' ? ' on' : ''}`}
+          >
+            <FilmIcon />
+            {c.typeMovie}
+          </button>
+          <button
+            type='button'
+            onClick={() => onContentType('other')}
+            className={`segbtn${contentType === 'other' ? ' on' : ''}`}
+          >
+            <VideoIcon />
+            {c.typeOther}
+          </button>
+        </div>
       </div>
 
       {/* Dropzone */}
@@ -95,49 +118,11 @@ export function UploadStep({
         </p>
       )}
 
-      {/* Target language */}
-      <div className='card qcard mt-[18px]'>
-        <p className='qlabel'>{c.langLabel}</p>
-        <div className='langgrid'>
-          {TARGET_LANGS.map((lang) => (
-            <button
-              key={lang.code}
-              type='button'
-              disabled={!lang.enabled}
-              onClick={() => lang.enabled && onTargetLang(lang.code)}
-              className={`langbtn${targetLang === lang.code ? ' on' : ''}${
-                lang.enabled ? '' : ' opacity-45 cursor-not-allowed'
-              }`}
-              title={lang.enabled ? undefined : c.comingSoon}
-            >
-              <span>{lang.label}</span>
-              <span className='lc'>{lang.mono}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Content type */}
-      <div className='card qcard mt-[14px]'>
-        <p className='qlabel'>{c.typeLabel}</p>
-        <div className='seg'>
-          <button
-            type='button'
-            onClick={() => onContentType('movie')}
-            className={`segbtn${contentType === 'movie' ? ' on' : ''}`}
-          >
-            <FilmIcon />
-            {c.typeMovie}
-          </button>
-          <button
-            type='button'
-            onClick={() => onContentType('other')}
-            className={`segbtn${contentType === 'other' ? ' on' : ''}`}
-          >
-            <VideoIcon />
-            {c.typeOther}
-          </button>
-        </div>
+      {/* Target language — chromeless "detected → target" flow */}
+      <div className='langflow'>
+        <span className='langflow-src'>{c.langDetect}</span>
+        <ArrowRightIcon className='langflow-arrow' />
+        <LanguageSelect value={targetLang} onChange={onTargetLang} />
       </div>
 
       {/* Reassurance */}

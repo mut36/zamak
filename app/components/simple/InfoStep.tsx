@@ -147,7 +147,7 @@ function MovieInfo({
       )}
 
       {!busy && (
-        <div className='field'>
+        <div className='field mt-6'>
           <label>{c.notesLabel}</label>
           <p className='text-[12px] text-ink-3 mb-2'>{c.notesHint}</p>
           <textarea

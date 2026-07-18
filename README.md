@@ -1,6 +1,6 @@
 # SRT Translator Web
 
-**v0.16.0 Beta**
+**v0.2.0 Beta**
 
 AI 기반 SRT 자막 번역 웹 애플리케이션입니다. Gemini Flash 모델을 사용해 SRT 구조를 유지하면서 자막을 한국어 중심으로 번역합니다.
 

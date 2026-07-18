@@ -15,6 +15,7 @@ export const COPY = {
     browse: '파일 선택',
     formats: 'SRT 파일 · 최대 5MB',
     langLabel: '어떤 언어로 바꿔드릴까요?',
+    langDetect: '언어 감지',
     comingSoon: '곧 지원',
     typeLabel: '무엇을 번역하나요?',
     typeMovie: '영화 · 드라마',
