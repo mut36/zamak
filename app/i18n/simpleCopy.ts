@@ -23,6 +23,14 @@ export const COPY = {
     typeOtherHint: '유튜브 · 인터뷰 · 강연 등',
     reassure: ['평균 2분 소요', '타임코드 100% 보존', '설치 없이 바로'],
     invalidFile: 'SRT 파일만 올릴 수 있어요.',
+    // First-screen BYOK key (required — no server key in the free tier)
+    keyLabel: '번역에 사용할 Gemini API 키',
+    keyRequired: '필수',
+    keyPlaceholder: 'AIza…',
+    keyHint: '무료 키는 Google AI Studio에서 발급받을 수 있어요. 브라우저에만 저장되고 서버엔 남지 않아요.',
+    keyGetLink: 'API 키 발급받기',
+    keyNeededError: '먼저 Gemini API 키를 입력해주세요.',
+    dropDisabledHint: 'API 키를 입력하면 파일을 올릴 수 있어요.',
   },
 
   info: {
@@ -58,11 +66,11 @@ export const COPY = {
   apiKey: {
     toggle: '내 API 키로 번역',
     saved: '저장됨',
-    label: 'Gemini API 키 · 선택',
+    label: 'Gemini API 키',
     placeholder: 'AIza…',
-    hint: '입력하면 번역이 이 키로 청구돼요. 브라우저에만 저장되고 서버엔 남지 않아요. 비워두면 기본 키로 번역해요.',
+    hint: '번역은 이 키로 청구돼요. 브라우저에만 저장되고 서버엔 남지 않아요.',
     clear: '지우기',
-    invalid: '입력한 Gemini API 키가 올바르지 않아요. 키를 확인하거나, 비워두면 기본 키로 번역해요.',
+    invalid: '입력한 Gemini API 키가 올바르지 않아요. 키를 다시 확인해주세요.',
   },
 
   progress: {
@@ -88,5 +96,7 @@ export const COPY = {
     summaryTimecode: '타임코드 보존',
     previewTitle: '번역 미리보기',
     startOver: '새 파일 번역하기',
+    partialWarning: (failed: number) =>
+      `일부 구간(${failed.toLocaleString()}개)은 번역에 실패해 원문 그대로 남아 있어요. 해당 부분만 다시 번역하거나 직접 손봐주세요.`,
   },
 } as const;

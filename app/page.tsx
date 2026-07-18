@@ -7,7 +7,6 @@ import { UploadStep } from './components/simple/UploadStep';
 import { InfoStep } from './components/simple/InfoStep';
 import { ProgressStep } from './components/simple/ProgressStep';
 import { DoneStep } from './components/simple/DoneStep';
-import { ApiKeyField } from './components/simple/ApiKeyField';
 import { useTranslation } from './hooks/useTranslation';
 import { useEnrich } from './hooks/useEnrich';
 import { parseSrtBlocks } from './lib/srt';
@@ -84,17 +83,19 @@ export default function Home() {
   // live in the orchestrator (surviving step changes) without stale closures.
   const movieInfoRef = useRef(movieInfo);
   const fileContentRef = useRef(fileContent);
+  const geminiKeyRef = useRef(geminiKey);
   useEffect(() => {
     movieInfoRef.current = movieInfo;
     fileContentRef.current = fileContent;
-  }, [movieInfo, fileContent]);
+    geminiKeyRef.current = geminiKey;
+  }, [movieInfo, fileContent, geminiKey]);
 
   const enrichStartedRef = useRef(false);
   const summarizeStartedRef = useRef(false);
 
   const runEnrich = useCallback(async () => {
     const { title, year } = movieInfoRef.current;
-    const data = await enrich(title, year);
+    const data = await enrich(title, year, geminiKeyRef.current);
     if (data?.isMovie && data.notes) {
       setMovieInfo((prev) => ({
         ...prev,
@@ -122,7 +123,12 @@ export default function Home() {
         try {
           const res = await fetch('/api/summarize', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(geminiKeyRef.current
+                ? { 'x-gemini-key': geminiKeyRef.current }
+                : {}),
+            },
             body: JSON.stringify({ content: fileContentRef.current }),
           });
           const data = res.ok ? await res.json() : { summary: '' };
@@ -150,10 +156,16 @@ export default function Home() {
       setUploadError(COPY.upload.invalidFile);
       return;
     }
+    // Free tier is BYOK-only: refuse to start without the user's key.
+    const key = geminiKey.trim();
+    if (!key) {
+      setUploadError(COPY.upload.keyNeededError);
+      return;
+    }
     setUploadError('');
     setMovieInfo(EMPTY_MOVIE_INFO);
     resetAnalysis();
-    handleFileDrop(selected);
+    handleFileDrop(selected, key);
     setStep(1);
   };
 
@@ -204,6 +216,8 @@ export default function Home() {
             onTargetLang={setTargetLang}
             contentType={contentType}
             onContentType={setContentType}
+            apiKey={geminiKey}
+            onApiKey={updateGeminiKey}
             error={uploadError}
             onFile={handleFile}
           />
@@ -230,9 +244,6 @@ export default function Home() {
               analysisAnalyzing={analysis.isAnalyzing}
               onReEnrich={runEnrich}
               summarizing={summarizing}
-              beforeActions={
-                <ApiKeyField value={geminiKey} onChange={updateGeminiKey} />
-              }
               onBack={resetAll}
               onTranslate={handleTranslate}
             />

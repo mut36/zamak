@@ -5,22 +5,21 @@ import { AUX_MODEL } from '../../config/constants';
 
 export const maxDuration = 30;
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GOOGLE_GENAI_API_KEY || '',
-});
-
 interface AnalyzeRequest {
   content: string;
   filenameHint?: string;
 }
 
 export async function POST(request: NextRequest) {
-  if (!process.env.GOOGLE_GENAI_API_KEY) {
+  // Free tier is BYOK-only: require the caller's key, never the server key.
+  const apiKey = request.headers.get('x-gemini-key')?.trim();
+  if (!apiKey) {
     return NextResponse.json(
-      { error: 'API key not configured' },
-      { status: 500 },
+      { error: 'Gemini API 키가 필요합니다.' },
+      { status: 400 },
     );
   }
+  const ai = new GoogleGenAI({ apiKey });
 
   let body: AnalyzeRequest;
   try {

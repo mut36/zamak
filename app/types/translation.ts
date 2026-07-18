@@ -22,6 +22,10 @@ export interface TranslationResult {
   lineCount: number;
   /** Wall-clock duration in milliseconds. */
   durationMs: number;
+  /** Chunks that failed and kept their original text (0 = fully translated). */
+  failedChunks?: number;
+  /** Total chunks the file was split into. */
+  totalChunks?: number;
 }
 
 export type TranslationMode = 'chunk';

@@ -36,9 +36,21 @@ function isQuotaError(error: unknown): boolean {
   return message.includes('429') || message.toLowerCase().includes('quota');
 }
 
-function isOutputValidationEnabled(): boolean {
-  const setting = process.env.TRANSLATION_OUTPUT_VALIDATION?.toLowerCase();
-  return setting !== 'false' && setting !== '0';
+/**
+ * Strict mode (opt-in, default OFF). When enabled, the model output is
+ * validated block-by-block and retried up to RETRY.MAX_ATTEMPTS, and a
+ * block-count mismatch triggers per-block re-translation.
+ *
+ * This is disabled by default because the validation → retry → per-block-split
+ * path could balloon a single chunk into hundreds of API calls (20+ min, real
+ * money) when the model returns a slightly-off SRT. The default path makes
+ * exactly one call per chunk and returns the raw output; the caller keeps the
+ * original chunk if that call fails. The strict code is kept, not deleted —
+ * flip TRANSLATION_STRICT_MODE=true to re-enable it.
+ */
+function isStrictModeEnabled(): boolean {
+  const setting = process.env.TRANSLATION_STRICT_MODE?.toLowerCase();
+  return setting === 'true' || setting === '1';
 }
 
 function toUserMessage(error: unknown): string {
@@ -216,9 +228,8 @@ export async function translateSubtitle({
 }: TranslateOptions): Promise<string> {
   const provider = getModelProvider(model);
 
-  async function translateContent(content: string): Promise<string> {
-    const sourceBlocks = parseSrtBlocksByHeader(content);
-    const prompt = await composeTranslationPrompt(provider.name, {
+  function composePrompt(content: string): Promise<string> {
+    return composeTranslationPrompt(provider.name, {
       movieInfo,
       targetLanguage,
       translationMode,
@@ -226,6 +237,27 @@ export async function translateSubtitle({
       subtitleContent: content,
       chunkPosition,
     });
+  }
+
+  // Default path: one model call per chunk, raw output, no validation/retry/
+  // split. Cost is capped at a single API call. On failure it throws so the
+  // caller can keep the original (untranslated) chunk and still deliver a
+  // complete file.
+  async function translateOnce(content: string): Promise<string> {
+    const prompt = await composePrompt(content);
+    try {
+      return await generateModelText({ model, prompt, translationMode }, apiKeys);
+    } catch (error) {
+      console.error(`[translation] ${provider.name} call failed`, error);
+      throw new Error(toUserMessage(error));
+    }
+  }
+
+  // Strict path (opt-in via TRANSLATION_STRICT_MODE): validate the output,
+  // retry with backoff, and re-translate block-by-block on a count mismatch.
+  async function translateContentStrict(content: string): Promise<string> {
+    const sourceBlocks = parseSrtBlocksByHeader(content);
+    const prompt = await composePrompt(content);
 
     let lastError: unknown;
     for (let attempt = 1; attempt <= RETRY.MAX_ATTEMPTS; attempt++) {
@@ -234,11 +266,7 @@ export async function translateSubtitle({
           { model, prompt, translationMode },
           apiKeys,
         );
-        // Diagnostic escape hatch: return the model response unchanged when
-        // validation is disabled. This does not guarantee a valid SRT file.
-        return isOutputValidationEnabled()
-          ? validateTranslatedSrt(content, translatedContent)
-          : translatedContent;
+        return validateTranslatedSrt(content, translatedContent);
       } catch (error) {
         lastError = error;
         console.error(
@@ -275,7 +303,7 @@ export async function translateSubtitle({
     ) {
       const translatedBlocks: string[] = [];
       for (const sourceBlock of sourceBlocks) {
-        translatedBlocks.push(await translateContent(sourceBlock));
+        translatedBlocks.push(await translateContentStrict(sourceBlock));
       }
       return translatedBlocks.join('\n\n');
     }
@@ -283,5 +311,7 @@ export async function translateSubtitle({
     throw new Error(toUserMessage(lastError));
   }
 
-  return translateContent(subtitleContent);
+  return isStrictModeEnabled()
+    ? translateContentStrict(subtitleContent)
+    : translateOnce(subtitleContent);
 }

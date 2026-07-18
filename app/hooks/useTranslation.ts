@@ -51,11 +51,15 @@ const EMPTY_ANALYSIS = { title: '', year: '' };
 // text (unreliable, and an extra AI call) to guess a title.
 async function analyzeContent(
   filenameHint: string,
+  apiKey?: string,
 ): Promise<{ title: string; year: string }> {
   try {
     const response = await fetch('/api/analyze', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { 'x-gemini-key': apiKey } : {}),
+      },
       body: JSON.stringify({ filenameHint, content: '' }),
     });
     if (!response.ok) return EMPTY_ANALYSIS;
@@ -111,7 +115,7 @@ export function useTranslation(
   useEffect(() => cancelScheduledReset, [cancelScheduledReset]);
 
   // On file upload: parse filename + read content + analyze genre/tone in background
-  const processFile = useCallback(async (selectedFile: File) => {
+  const processFile = useCallback(async (selectedFile: File, apiKey?: string) => {
     cancelScheduledReset();
     const fileId = ++processFileIdRef.current;
 
@@ -131,7 +135,7 @@ export function useTranslation(
 
     // 3. Background: infer title/year from the filename.
     setAnalysis({ isAnalyzing: true, completed: false });
-    const result = await analyzeContent(selectedFile.name);
+    const result = await analyzeContent(selectedFile.name, apiKey);
     if (processFileIdRef.current !== fileId) return;
 
     const updatedMeta: FilenameMetadata = {
@@ -160,9 +164,9 @@ export function useTranslation(
   );
 
   const handleFileDrop = useCallback(
-    (droppedFile: File) => {
+    (droppedFile: File, apiKey?: string) => {
       if (isSrtFile(droppedFile)) {
-        processFile(droppedFile);
+        processFile(droppedFile, apiKey);
       } else {
         setState((prev) => ({ ...prev, error: msg.invalidFile }));
         setFile(null);
@@ -214,24 +218,45 @@ export function useTranslation(
         totalEstimateMs,
       });
 
+      // A failed chunk keeps its original (untranslated) text so the output
+      // file stays complete. We never retry here — one call per chunk — and
+      // only cancellation aborts the whole job.
+      let failedChunks = 0;
       const results = await runOrderedPool<string, string>({
         items: chunks,
         concurrency: CONCURRENCY,
         signal: controller.signal,
-        worker: (chunk, index) =>
-          requestChunkTranslation(
-            {
-              chunk,
-              chunkIndex: index + 1,
-              totalChunks,
-              movieInfo,
-              model,
-              targetLang,
-              translationStyle,
-            },
-            controller.signal,
-            apiKeys,
-          ),
+        worker: async (chunk, index) => {
+          try {
+            return await requestChunkTranslation(
+              {
+                chunk,
+                chunkIndex: index + 1,
+                totalChunks,
+                movieInfo,
+                model,
+                targetLang,
+                translationStyle,
+              },
+              controller.signal,
+              apiKeys,
+            );
+          } catch (err) {
+            // Let cancellation propagate so the pool can abort.
+            if (
+              controller.signal.aborted ||
+              (err instanceof Error && err.name === 'AbortError')
+            ) {
+              throw err;
+            }
+            failedChunks++;
+            console.error(
+              `[translate] chunk ${index + 1}/${totalChunks} failed, keeping original`,
+              err,
+            );
+            return chunk;
+          }
+        },
         onCompleted: (completed) => {
           setTranslationProgress((prev) => ({
             ...prev,
@@ -270,6 +295,8 @@ export function useTranslation(
         filename: outputFilename,
         lineCount: parseSrtBlocks(translated).length,
         durationMs: Date.now() - startedAt,
+        failedChunks,
+        totalChunks,
       });
 
       setTranslationProgress({

@@ -11,6 +11,8 @@ interface UploadStepProps {
   onTargetLang: (code: string) => void;
   contentType: ContentType;
   onContentType: (type: ContentType) => void;
+  apiKey: string;
+  onApiKey: (value: string) => void;
   error: string;
   onFile: (file: File) => void;
 }
@@ -20,6 +22,8 @@ export function UploadStep({
   onTargetLang,
   contentType,
   onContentType,
+  apiKey,
+  onApiKey,
   error,
   onFile,
 }: UploadStepProps) {
@@ -27,9 +31,13 @@ export function UploadStep({
   const [over, setOver] = useState(false);
   const c = COPY.upload;
 
+  // Free tier is BYOK-only: no key, no upload. Both are required up front.
+  const hasKey = apiKey.trim().length > 0;
+
   const handleDrop = (e: DragEvent) => {
     e.preventDefault();
     setOver(false);
+    if (!hasKey) return;
     const file = e.dataTransfer.files[0];
     if (file) onFile(file);
   };
@@ -39,6 +47,36 @@ export function UploadStep({
       <div className='head text-center mb-7'>
         <h1>{c.title}</h1>
         <p>{c.subtitle}</p>
+      </div>
+
+      {/* Required BYOK key — must be entered before uploading */}
+      <div className='card qcard mb-[14px]'>
+        <p className='qlabel'>
+          {c.keyLabel}
+          <span className='ml-1.5 text-[11px] font-semibold text-accent'>
+            · {c.keyRequired}
+          </span>
+        </p>
+        <input
+          type='password'
+          className='input mono'
+          placeholder={c.keyPlaceholder}
+          value={apiKey}
+          autoComplete='off'
+          spellCheck={false}
+          onChange={(e) => onApiKey(e.target.value)}
+        />
+        <p className='text-[12px] text-ink-3 leading-relaxed mt-2'>
+          {c.keyHint}{' '}
+          <a
+            href='https://aistudio.google.com/apikey'
+            target='_blank'
+            rel='noopener noreferrer'
+            className='text-accent underline'
+          >
+            {c.keyGetLink}
+          </a>
+        </p>
       </div>
 
       {/* Content type — above the dropzone */}
@@ -64,23 +102,28 @@ export function UploadStep({
         </div>
       </div>
 
-      {/* Dropzone */}
+      {/* Dropzone — disabled until an API key is entered */}
       <div
         className={`drop${over ? ' over' : ''}`}
+        aria-disabled={!hasKey}
+        style={
+          hasKey ? undefined : { opacity: 0.5, cursor: 'not-allowed' }
+        }
         onDragOver={(e) => {
           e.preventDefault();
-          setOver(true);
+          if (hasKey) setOver(true);
         }}
         onDragLeave={(e) => {
           e.preventDefault();
           setOver(false);
         }}
         onDrop={handleDrop}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => hasKey && inputRef.current?.click()}
         role='button'
-        tabIndex={0}
+        tabIndex={hasKey ? 0 : -1}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click();
+          if (hasKey && (e.key === 'Enter' || e.key === ' '))
+            inputRef.current?.click();
         }}
       >
         <div className='drop-ico'>
@@ -91,14 +134,15 @@ export function UploadStep({
         <button
           type='button'
           className='btn btn-primary btn-lg'
+          disabled={!hasKey}
           onClick={(e) => {
             e.stopPropagation();
-            inputRef.current?.click();
+            if (hasKey) inputRef.current?.click();
           }}
         >
           {c.browse}
         </button>
-        <p className='fmt'>{c.formats}</p>
+        <p className='fmt'>{hasKey ? c.formats : c.dropDisabledHint}</p>
         <input
           ref={inputRef}
           type='file'

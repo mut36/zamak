@@ -37,7 +37,15 @@ const sourceContent = [
   'World',
 ].join('\n');
 
-const outputValidationSetting = process.env.TRANSLATION_OUTPUT_VALIDATION;
+const strictSetting = process.env.TRANSLATION_STRICT_MODE;
+
+function restoreStrict() {
+  if (strictSetting === undefined) {
+    delete process.env.TRANSLATION_STRICT_MODE;
+    return;
+  }
+  process.env.TRANSLATION_STRICT_MODE = strictSetting;
+}
 
 async function translate() {
   return translateSubtitle({
@@ -50,20 +58,15 @@ async function translate() {
   });
 }
 
-describe('translateSubtitle output validation', () => {
+describe('translateSubtitle strict mode (opt-in validation)', () => {
   beforeEach(() => {
-    delete process.env.TRANSLATION_OUTPUT_VALIDATION;
+    // Strict mode is off by default; these tests cover the opt-in path.
+    process.env.TRANSLATION_STRICT_MODE = 'true';
     mocks.composeTranslationPrompt.mockResolvedValue('prompt');
     mocks.generateModelText.mockReset();
   });
 
-  afterEach(() => {
-    if (outputValidationSetting === undefined) {
-      delete process.env.TRANSLATION_OUTPUT_VALIDATION;
-      return;
-    }
-    process.env.TRANSLATION_OUTPUT_VALIDATION = outputValidationSetting;
-  });
+  afterEach(restoreStrict);
 
   it('returns valid translated SRT', async () => {
     const translatedContent = [
@@ -86,8 +89,8 @@ describe('translateSubtitle output validation', () => {
     await expect(translate()).rejects.toThrow('AI가 빈 번역 결과를 반환했습니다');
   });
 
-  it('returns the model response unchanged when output validation is disabled', async () => {
-    process.env.TRANSLATION_OUTPUT_VALIDATION = 'false';
+  it('returns the model response unchanged in default (non-strict) mode', async () => {
+    delete process.env.TRANSLATION_STRICT_MODE;
     const untranslatedSrt = '모델이 반환한 형식 그대로';
     mocks.generateModelText.mockResolvedValue(untranslatedSrt);
 
@@ -226,5 +229,35 @@ describe('translateSubtitle output validation', () => {
     ].join('\n'));
 
     await expect(translate()).rejects.toThrow('결과=');
+  });
+});
+
+describe('translateSubtitle default mode (single call, no cost bomb)', () => {
+  beforeEach(() => {
+    delete process.env.TRANSLATION_STRICT_MODE;
+    mocks.composeTranslationPrompt.mockResolvedValue('prompt');
+    mocks.generateModelText.mockReset();
+  });
+
+  afterEach(restoreStrict);
+
+  it('does NOT split on a block-count mismatch — exactly one call, raw output', async () => {
+    // The old cost bomb: a mismatch here would trigger per-block re-translation.
+    const missingBlockResult = [
+      '1',
+      '00:00:01,000 --> 00:00:02,000',
+      '안녕',
+    ].join('\n');
+    mocks.generateModelText.mockResolvedValue(missingBlockResult);
+
+    await expect(translate()).resolves.toBe(missingBlockResult);
+    expect(mocks.generateModelText).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry — a failed call throws after exactly one attempt', async () => {
+    mocks.generateModelText.mockRejectedValue(new Error('boom'));
+
+    await expect(translate()).rejects.toThrow();
+    expect(mocks.generateModelText).toHaveBeenCalledTimes(1);
   });
 });

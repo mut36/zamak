@@ -4,10 +4,6 @@ import { AUX_MODEL, SUMMARY_SAMPLE_LINES } from '../../config/constants';
 
 export const maxDuration = 30;
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GOOGLE_GENAI_API_KEY || '',
-});
-
 interface SummarizeRequest {
   /** Raw subtitle content (SRT). Only the leading portion is used. */
   content: string;
@@ -29,9 +25,12 @@ function sampleLines(content: string, limit: number): string {
 }
 
 export async function POST(request: NextRequest) {
-  if (!process.env.GOOGLE_GENAI_API_KEY) {
-    return NextResponse.json({ error: 'API key not configured' }, { status: 500 });
+  // Free tier is BYOK-only: require the caller's key, never the server key.
+  const apiKey = request.headers.get('x-gemini-key')?.trim();
+  if (!apiKey) {
+    return NextResponse.json({ error: 'Gemini API 키가 필요합니다.' }, { status: 400 });
   }
+  const ai = new GoogleGenAI({ apiKey });
 
   let body: SummarizeRequest;
   try {

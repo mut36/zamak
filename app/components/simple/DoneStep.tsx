@@ -47,6 +47,19 @@ export function DoneStep({ result, originalContent, onStartOver }: DoneStepProps
         </div>
       </div>
 
+      {/* Partial-failure notice — some chunks kept their original text */}
+      {result.failedChunks ? (
+        <div
+          className='card p-4 mt-6 text-[13px] leading-relaxed'
+          style={{
+            color: 'oklch(0.5 0.13 75)',
+            background: 'oklch(0.97 0.03 85)',
+          }}
+        >
+          {c.partialWarning(result.failedChunks)}
+        </div>
+      ) : null}
+
       {/* Download card */}
       <div className='card dl-card mt-6'>
         <div className='dl-file'>
