@@ -42,3 +42,6 @@ next-env.d.ts
 
 # claude code
 .claude/
+
+# tuning samples — subtitles are third-party content, keep them local
+/samples/subtitles/*.srt
