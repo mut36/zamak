@@ -26,19 +26,28 @@ function readPositiveIntEnv(raw: string | undefined, fallback: number): number {
 export type Tier = 'free' | 'server';
 
 /**
- * TODO: the FREE_* numbers below are placeholders. Derive them from Gemini's
- * published free-tier RPM/TPM limits (requests and tokens per minute for the
- * translation model) rather than guessing — chunk size drives tokens per
- * request and concurrency drives requests per minute, so both fall out of the
- * same calculation.
+ * Free tier, derived in `docs/tuning/chunk-size-model.md` (calculator at
+ * `scripts/chunk-model.mjs`).
+ *
+ * 150 is the wall-clock optimum. Subtitle body tokens don't depend on chunk
+ * size, so the only things that move with it are the prompt we repeat per
+ * chunk and the thinking spent per request — both favour bigger chunks — while
+ * free-tier RPM caps concurrency at roughly D/4, which cancels the head start
+ * smaller chunks would otherwise get. The curve is flat between 100 and 200
+ * even when thinking is 5x or generation half as fast, so this survives the
+ * estimates it was built on being wrong.
+ *
+ * 6 keeps ~15% headroom under the 15 RPM ceiling (7 would sit exactly on it).
+ * Gemini sends no Retry-After and we never retry, so a 429 costs untranslated
+ * subtitles — worth the margin.
  */
 export const FREE_CHUNK_SIZE = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_FREE_CHUNK_SIZE,
-  40,
+  150,
 );
 export const FREE_CONCURRENCY = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_FREE_CONCURRENCY,
-  4,
+  6,
 );
 
 /** Paid server key — the original knobs, kept under their existing env names. */
