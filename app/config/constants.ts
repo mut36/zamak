@@ -102,6 +102,28 @@ export function resolveTier(): Tier {
 }
 
 /**
+ * Blocks a single credit covers. One credit buys "one title", and a feature
+ * film runs about 850 blocks, so 1,500 leaves generous headroom while still
+ * stopping someone from spending one credit on a ten-hour concatenation.
+ */
+export const MAX_BLOCKS_PER_CREDIT = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_MAX_BLOCKS_PER_CREDIT,
+  1500,
+);
+
+/**
+ * How long a paid-for job stays usable, in minutes.
+ *
+ * A job is opened once per file and every chunk request is checked against it.
+ * The window only has to outlast one translation (tens of seconds) — it exists
+ * so a job id cannot be replayed indefinitely as a free pass.
+ */
+export const JOB_VALIDITY_MINUTES = readPositiveIntEnv(
+  process.env.JOB_VALIDITY_MINUTES,
+  60,
+);
+
+/**
  * Auxiliary model for lightweight tasks (title/year analysis, web-search
  * enrichment, non-movie summarization). Kept as a single constant so a
  * model bump is a one-line change; overridable via env.

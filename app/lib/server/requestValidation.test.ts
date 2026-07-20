@@ -15,7 +15,20 @@ const movieInfo = {
   notes: '',
 };
 
+const jobId = '00000000-0000-4000-8000-000000000000';
+
 describe('translation request validation', () => {
+  it('requires a job id, since that is the proof a credit was spent', () => {
+    expect(() =>
+      parseChunkTranslationRequest({
+        chunk: 'subtitle',
+        chunkIndex: 1,
+        totalChunks: 1,
+        movieInfo,
+      }),
+    ).toThrow('jobId');
+  });
+
   it('rejects unsupported models instead of silently falling back', () => {
     expect(() =>
       parseChunkTranslationRequest({
@@ -45,9 +58,11 @@ describe('translation request validation', () => {
       chunkIndex: 1,
       totalChunks: 1,
       movieInfo,
+      jobId,
     });
 
     expect(result.translationStyle).toBe('meaning');
+    expect(result.jobId).toBe(jobId);
   });
 
   it('accepts only known translation styles', () => {
@@ -56,6 +71,7 @@ describe('translation request validation', () => {
       chunkIndex: 1,
       totalChunks: 1,
       movieInfo,
+      jobId,
       translationStyle: 'cinematic',
     });
     expect(cinematic.translationStyle).toBe('cinematic');
@@ -66,6 +82,7 @@ describe('translation request validation', () => {
         chunkIndex: 1,
         totalChunks: 1,
         movieInfo,
+        jobId,
         translationStyle: 'literal',
       }),
     ).toThrow('Invalid translation style');

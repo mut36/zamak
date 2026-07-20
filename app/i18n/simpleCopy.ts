@@ -7,6 +7,35 @@ export const COPY = {
 
   steps: ['파일', '정보', '번역', '완료'],
 
+  auth: {
+    // Sign-in wall. The pitch has to carry the whole page, so it leads with
+    // what the product does rather than with the login itself.
+    gateTitle: '자막 한 편, 무료로 번역해보세요',
+    gateSubtitle:
+      '로그인하면 번역권 1편을 바로 드려요. 타임코드는 100% 그대로 유지돼요.',
+    signIn: 'Google로 계속하기',
+    signingIn: '로그인 중…',
+    gateNote: '로그인은 번역권을 지급하고 사용량을 확인하는 데만 쓰여요.',
+    signOut: '로그아웃',
+    loading: '불러오는 중…',
+    failed: '로그인에 실패했어요. 다시 시도해주세요.',
+    notConfigured:
+      '로그인이 아직 설정되지 않았어요. 서버 환경 변수를 확인해주세요.',
+    /** Header chip. */
+    creditsLeft: (n: number) => `번역권 ${n}편`,
+  },
+
+  credits: {
+    emptyTitle: '번역권을 모두 사용했어요',
+    emptyBody:
+      '무료로 드린 1편을 다 쓰셨어요. 추가 번역권은 준비 중이에요 — 곧 찾아뵐게요.',
+    emptyCta: '준비 중',
+    tooLargeTitle: '파일이 너무 커요',
+    tooLargeBody: (max: number, actual: number) =>
+      `번역권 1편은 자막 ${max.toLocaleString()}줄까지 커버해요. 이 파일은 ${actual.toLocaleString()}줄이에요.`,
+    startOver: '다른 파일 올리기',
+  },
+
   upload: {
     title: '자막을 올려주세요',
     subtitle: '한 번의 업로드로 끝. 평균 2분이면 자연스러운 번역 자막을 받아요.',

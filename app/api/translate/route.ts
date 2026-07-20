@@ -9,12 +9,29 @@ import {
 } from '../../lib/server/providerAccess';
 import { createTranslationStream } from '../../lib/server/sse';
 import { translateSubtitle } from '../../lib/server/translationService';
+import { requireUser } from '../../lib/server/auth';
+import { isJobUsable } from '../../lib/server/translationJob';
+import { createClient } from '../../lib/supabase/server';
 
 export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+
   try {
     const body = parseChunkTranslationRequest(await request.json());
+
+    // The credit was spent when the job opened. Proving it here is what keeps
+    // this endpoint from being an unlimited free tier for anyone signed in.
+    const supabase = await createClient();
+    if (!(await isJobUsable(supabase, body.jobId, auth.user.id))) {
+      return NextResponse.json(
+        { error: 'invalid_or_expired_job' },
+        { status: 403 },
+      );
+    }
+
     const apiKeys = getProviderApiKeys();
     // Runs on the server key; throws if GOOGLE_GENAI_API_KEY is unset.
     assertProviderConfigured(body.model, apiKeys);

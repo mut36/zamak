@@ -4,6 +4,10 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { parseFilename, type FilenameMetadata } from '../utils/metadataInference';
 import { requestChunkTranslation } from '../lib/client/translationApi';
 import {
+  beginTranslationJob,
+  JobRefusedError,
+} from '../lib/client/translationJob';
+import {
   buildOutputFilename,
   chunkSrtBlocks,
   parseSrtBlocks,
@@ -114,6 +118,8 @@ export function useTranslation(
   });
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress>(IDLE_PROGRESS);
   const [result, setResult] = useState<TranslationResult | null>(null);
+  /** Set when the server declined to open a job (out of credits, file too big). */
+  const [refusal, setRefusal] = useState<JobRefusedError | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const processFileIdRef = useRef(0);
   const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -204,6 +210,7 @@ export function useTranslation(
 
     setState({ isTranslating: true, error: '' });
     setResult(null);
+    setRefusal(null);
     const startedAt = Date.now();
 
     const controller = new AbortController();
@@ -216,6 +223,11 @@ export function useTranslation(
       if (blocks.length === 0) {
         throw new Error(msg.emptyFile);
       }
+
+      // Spend the credit before any chunk goes out. Doing it here — once per
+      // file rather than once per chunk — is what makes a credit worth one
+      // title, and it means a refusal costs nothing.
+      const jobId = await beginTranslationJob(blocks.length);
 
       // Chunk size and concurrency both come from the tier, which is the one
       // place the billing/session gate will hook into.
@@ -254,6 +266,7 @@ export function useTranslation(
                 model,
                 targetLang,
                 translationStyle,
+                jobId,
               },
               controller.signal,
             );
@@ -332,6 +345,13 @@ export function useTranslation(
         setTranslationProgress(IDLE_PROGRESS);
         return false;
       }
+      // A refused job means nothing was spent and nothing ran; the screen has
+      // a dedicated state for it, so keep the code rather than a raw message.
+      if (err instanceof JobRefusedError) {
+        setRefusal(err);
+        setTranslationProgress(IDLE_PROGRESS);
+        return false;
+      }
       console.error('[translate] Translation failed:', err);
       setState((prev) => ({
         ...prev,
@@ -358,6 +378,7 @@ export function useTranslation(
     setState((prev) => ({ ...prev, error: '' }));
     setTranslationProgress(IDLE_PROGRESS);
     setResult(null);
+    setRefusal(null);
   };
 
   return {
@@ -367,6 +388,7 @@ export function useTranslation(
     analysis,
     translationProgress,
     result,
+    refusal,
     handleFileChange,
     handleFileDrop,
     clearFile,

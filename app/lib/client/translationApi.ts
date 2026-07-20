@@ -3,7 +3,7 @@ import { readTranslationEvent } from './sse';
 
 async function requestTranslation(
   endpoint: string,
-  payload: ChunkTranslationRequest,
+  payload: ChunkTranslationRequest & { jobId: string },
   signal: AbortSignal,
 ): Promise<string> {
   const response = await fetch(endpoint, {
@@ -31,7 +31,7 @@ async function requestTranslation(
 }
 
 export function requestChunkTranslation(
-  payload: ChunkTranslationRequest,
+  payload: ChunkTranslationRequest & { jobId: string },
   signal: AbortSignal,
 ): Promise<string> {
   return requestTranslation('/api/translate', payload, signal);

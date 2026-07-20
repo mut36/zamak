@@ -1,10 +1,15 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { AUX_MODEL } from '../../config/constants';
+import { requireUser } from '../../lib/server/auth';
 
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
+  // Signed-in only; no credit charged (see /api/analyze).
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+
   // Server key only. Grounding (googleSearch below) is unavailable on
   // free-tier Gemini projects, so this route requires the server key to be on
   // a billing-linked project.

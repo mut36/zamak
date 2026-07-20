@@ -7,10 +7,14 @@ import { UploadStep } from './components/simple/UploadStep';
 import { InfoStep } from './components/simple/InfoStep';
 import { ProgressStep } from './components/simple/ProgressStep';
 import { DoneStep } from './components/simple/DoneStep';
+import { SignInGate } from './components/simple/SignInGate';
+import { CreditWall } from './components/simple/CreditWall';
 import { useTranslation } from './hooks/useTranslation';
 import { useEnrich } from './hooks/useEnrich';
+import { useAuth } from './hooks/useAuth';
 import { fetchMoviePoster } from './lib/client/tmdb';
 import { parseSrtBlocks } from './lib/srt';
+import { isSupabaseConfigured } from './lib/supabase/env';
 import { DEFAULT_TARGET_LANG } from './config/languages';
 import { TRANSLATION_MODEL } from './config/constants';
 import type { ContentType, MovieInfo } from './types/translation';
@@ -31,6 +35,26 @@ export default function Home() {
   const [movieInfo, setMovieInfo] = useState<MovieInfo>(EMPTY_MOVIE_INFO);
   const [uploadError, setUploadError] = useState('');
   const [summarizing, setSummarizing] = useState(false);
+  const [authError, setAuthError] = useState('');
+
+  const {
+    user,
+    balance,
+    loading: authLoading,
+    signIn,
+    signOut,
+    refreshBalance,
+  } = useAuth();
+
+  // The OAuth callback reports failures by redirecting back with a query
+  // param; surface it and clean the URL so a refresh does not re-show it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('auth_error')) {
+      setAuthError(COPY.auth.failed);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const onMetaUpdate = useCallback(
     (meta: { inferredTitle?: string; inferredYear?: string }) => {
@@ -49,6 +73,7 @@ export default function Home() {
     analysis,
     translationProgress,
     result,
+    refusal,
     handleFileDrop,
     translate,
     cancelTranslation,
@@ -152,13 +177,16 @@ export default function Home() {
 
   const handleTranslate = async () => {
     setStep(2);
-    // translate() resolves true on success, false on error/abort.
+    // translate() resolves true on success, false on error/abort/refusal.
     const ok = await translate(
       movieInfo,
       TRANSLATION_MODEL,
       targetLang,
       'meaning',
     );
+    // The balance moved either way: a success spent the credit, and a refusal
+    // means our cached number was stale.
+    refreshBalance();
     setStep(ok ? 3 : 1);
   };
 
@@ -179,17 +207,75 @@ export default function Home() {
     setStep(0);
   };
 
+  const header = (
+    <header className='flex items-center justify-between w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 h-16'>
+      <BrandMark onClick={resetAll} />
+      <div className='flex items-center gap-2.5'>
+        {user && balance !== null && (
+          <span className='lang-pill'>{COPY.auth.creditsLeft(balance)}</span>
+        )}
+        {user ? (
+          <button
+            type='button'
+            className='text-[12px] text-ink-3 underline'
+            onClick={signOut}
+          >
+            {COPY.auth.signOut}
+          </button>
+        ) : (
+          <span className='lang-pill'>{COPY.langPill}</span>
+        )}
+      </div>
+    </header>
+  );
+
+  // Auth is the outermost gate: every route that spends the server key is
+  // closed to anonymous callers, so there is nothing to show behind it.
+  if (authLoading) {
+    return (
+      <div className='min-h-screen'>
+        {header}
+        <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
+          <p className='text-center text-sm text-ink-3 py-16'>
+            {COPY.auth.loading}
+          </p>
+        </main>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className='min-h-screen'>
+        {header}
+        <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
+          <SignInGate
+            onSignIn={signIn}
+            error={authError}
+            configured={isSupabaseConfigured}
+          />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className='min-h-screen'>
-      <header className='flex items-center justify-between w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 h-16'>
-        <BrandMark onClick={resetAll} />
-        <span className='lang-pill'>{COPY.langPill}</span>
-      </header>
+      {header}
 
       <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
-        <StepTracker current={step} />
+        {!refusal && <StepTracker current={step} />}
 
-        {step === 0 && (
+        {refusal && (
+          <CreditWall
+            code={refusal.code}
+            maxBlocks={refusal.maxBlocks}
+            totalBlocks={totalLines}
+            onStartOver={resetAll}
+          />
+        )}
+
+        {!refusal && step === 0 && (
           <UploadStep
             targetLang={targetLang}
             onTargetLang={setTargetLang}
@@ -200,7 +286,7 @@ export default function Home() {
           />
         )}
 
-        {step === 1 && (
+        {!refusal && step === 1 && (
           <>
             {error && (
               <div
@@ -226,7 +312,7 @@ export default function Home() {
           </>
         )}
 
-        {step === 2 && (
+        {!refusal && step === 2 && (
           <ProgressStep
             progress={translationProgress}
             totalLines={totalLines}
@@ -234,7 +320,7 @@ export default function Home() {
           />
         )}
 
-        {step === 3 && result && (
+        {!refusal && step === 3 && result && (
           <DoneStep
             result={result}
             originalContent={fileContent}

@@ -92,6 +92,7 @@ export function parseChunkTranslationRequest(
   model: AllowedModel;
   targetLang: string;
   translationStyle: TranslationStyle;
+  jobId: string;
 } {
   if (!isRecord(value)) throw new RequestValidationError('Invalid JSON body');
 
@@ -114,5 +115,8 @@ export function parseChunkTranslationRequest(
     model: parseModel(value.model),
     targetLang: parseTargetLanguage(value.targetLang),
     translationStyle: parseTranslationStyle(value.translationStyle),
+    // The job this chunk was paid for; validated against the caller's own
+    // rows before any model call happens.
+    jobId: requireString(value, 'jobId'),
   };
 }

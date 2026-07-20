@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { composeAnalysisPrompt } from '../../lib/prompts/analysis';
 import { AUX_MODEL } from '../../config/constants';
+import { requireUser } from '../../lib/server/auth';
 
 export const maxDuration = 30;
 
@@ -11,6 +12,11 @@ interface AnalyzeRequest {
 }
 
 export async function POST(request: NextRequest) {
+  // Signed-in only. No credit is charged: this is a cheap flash-lite call, and
+  // charging for metadata a user might discard would be indefensible.
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+
   // Server key only — callers never supply their own.
   const apiKey = process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) {

@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { AUX_MODEL, SUMMARY_SAMPLE_LINES } from '../../config/constants';
+import { requireUser } from '../../lib/server/auth';
 
 export const maxDuration = 30;
 
@@ -25,6 +26,10 @@ function sampleLines(content: string, limit: number): string {
 }
 
 export async function POST(request: NextRequest) {
+  // Signed-in only; no credit charged (see /api/analyze).
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+
   // Server key only — callers never supply their own.
   const apiKey = process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) {
