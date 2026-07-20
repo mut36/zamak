@@ -16,13 +16,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = parseChunkTranslationRequest(await request.json());
     const apiKeys = getProviderApiKeys(request);
-    // Free tier is BYOK-only: never fall back to the server key.
-    if (!apiKeys.gemini?.trim()) {
-      return NextResponse.json(
-        { error: 'Gemini API 키가 필요합니다. 키를 입력해주세요.' },
-        { status: 400 },
-      );
-    }
+    // BYOK is optional: geminiProvider falls back to GOOGLE_GENAI_API_KEY
+    // when the caller supplies no key. assertProviderConfigured throws if
+    // neither is set.
     assertProviderConfigured(body.model, apiKeys);
 
     return createTranslationStream(() =>

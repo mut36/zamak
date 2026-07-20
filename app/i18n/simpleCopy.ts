@@ -23,16 +23,14 @@ export const COPY = {
     typeOtherHint: '유튜브 · 인터뷰 · 강연 등',
     reassure: ['평균 2분 소요', '타임코드 100% 보존', '설치 없이 바로'],
     invalidFile: 'SRT 파일만 올릴 수 있어요.',
-    // First-screen BYOK key (required — no server key in the free tier)
-    keyLabel: '번역에 사용할 Gemini API 키',
-    keyRequired: '필수',
+    // First-screen BYOK key — optional. Uploads run on our key by default.
+    keyLabel: '내 Gemini API 키로 번역하기',
+    keyOptional: '선택',
     keyPlaceholder: 'AIza…',
-    keyHint: '무료 키는 Google AI Studio에서 발급받을 수 있어요. 브라우저에만 저장되고 서버엔 남지 않아요.',
+    keyHint: '키가 없어도 바로 업로드할 수 있어요. 직접 키를 쓰고 싶다면 Google AI Studio에서 무료로 발급받을 수 있어요. 브라우저에만 저장되고 서버엔 남지 않아요.',
     keyGetLink: 'API 키 발급받기',
-    keyNeededError: '먼저 Gemini API 키를 입력해주세요.',
     keyInvalidError:
-      'Gemini가 이 키를 거부했어요. Google AI Studio에서 발급받은 Gemini 키가 맞는지 확인하고 다시 입력해주세요.',
-    dropDisabledHint: 'API 키를 입력하면 파일을 올릴 수 있어요.',
+      'Gemini가 이 키를 거부했어요. Google AI Studio에서 발급받은 Gemini 키가 맞는지 확인하고 다시 입력하거나, 비워두고 계속하세요.',
   },
 
   info: {

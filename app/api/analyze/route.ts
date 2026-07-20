@@ -11,12 +11,14 @@ interface AnalyzeRequest {
 }
 
 export async function POST(request: NextRequest) {
-  // Free tier is BYOK-only: require the caller's key, never the server key.
-  const apiKey = request.headers.get('x-gemini-key')?.trim();
+  // BYOK is optional: fall back to the server key when the caller has none.
+  const apiKey =
+    request.headers.get('x-gemini-key')?.trim() ||
+    process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'Gemini API 키가 필요합니다.' },
-      { status: 400 },
+      { error: 'Gemini API key not configured' },
+      { status: 500 },
     );
   }
   const ai = new GoogleGenAI({ apiKey });

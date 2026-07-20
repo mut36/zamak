@@ -31,13 +31,9 @@ export function UploadStep({
   const [over, setOver] = useState(false);
   const c = COPY.upload;
 
-  // Free tier is BYOK-only: no key, no upload. Both are required up front.
-  const hasKey = apiKey.trim().length > 0;
-
   const handleDrop = (e: DragEvent) => {
     e.preventDefault();
     setOver(false);
-    if (!hasKey) return;
     const file = e.dataTransfer.files[0];
     if (file) onFile(file);
   };
@@ -49,12 +45,12 @@ export function UploadStep({
         <p>{c.subtitle}</p>
       </div>
 
-      {/* Required BYOK key — must be entered before uploading */}
+      {/* Optional BYOK key — runs on our server key when left blank */}
       <div className='card qcard mb-[14px]'>
         <p className='qlabel'>
           {c.keyLabel}
-          <span className='ml-1.5 text-[11px] font-semibold text-accent'>
-            · {c.keyRequired}
+          <span className='ml-1.5 text-[11px] font-semibold text-ink-3'>
+            · {c.keyOptional}
           </span>
         </p>
         <input
@@ -110,28 +106,22 @@ export function UploadStep({
         </div>
       </div>
 
-      {/* Dropzone — disabled until an API key is entered */}
       <div
         className={`drop${over ? ' over' : ''}`}
-        aria-disabled={!hasKey}
-        style={
-          hasKey ? undefined : { opacity: 0.5, cursor: 'not-allowed' }
-        }
         onDragOver={(e) => {
           e.preventDefault();
-          if (hasKey) setOver(true);
+          setOver(true);
         }}
         onDragLeave={(e) => {
           e.preventDefault();
           setOver(false);
         }}
         onDrop={handleDrop}
-        onClick={() => hasKey && inputRef.current?.click()}
+        onClick={() => inputRef.current?.click()}
         role='button'
-        tabIndex={hasKey ? 0 : -1}
+        tabIndex={0}
         onKeyDown={(e) => {
-          if (hasKey && (e.key === 'Enter' || e.key === ' '))
-            inputRef.current?.click();
+          if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click();
         }}
       >
         <div className='drop-ico'>
@@ -142,15 +132,14 @@ export function UploadStep({
         <button
           type='button'
           className='btn btn-primary btn-lg'
-          disabled={!hasKey}
           onClick={(e) => {
             e.stopPropagation();
-            if (hasKey) inputRef.current?.click();
+            inputRef.current?.click();
           }}
         >
           {c.browse}
         </button>
-        <p className='fmt'>{hasKey ? c.formats : c.dropDisabledHint}</p>
+        <p className='fmt'>{c.formats}</p>
         <input
           ref={inputRef}
           type='file'

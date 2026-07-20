@@ -167,24 +167,22 @@ export default function Home() {
       setUploadError(COPY.upload.invalidFile);
       return;
     }
-    // Free tier is BYOK-only: refuse to start without the user's key.
+    // BYOK is optional: an empty key omits the header and the server falls
+    // back to its own key.
     const key = geminiKey.trim();
-    if (!key) {
-      setUploadError(COPY.upload.keyNeededError);
-      return;
-    }
     setUploadError('');
     setMovieInfo(EMPTY_MOVIE_INFO);
     resetAnalysis();
     // Step 1 goes up immediately so the "분석 중" spinner covers the wait.
-    const analyzing = handleFileDrop(selected, key);
+    const analyzing = handleFileDrop(selected, key || undefined);
     setStep(1);
     const analyzed = await analyzing;
 
-    // Analysis is the first call the key ever makes, so a bad key surfaces
-    // here. Send the user back to the field that can fix it and drop the key
-    // — the input is a password field, so leaving it in place would just show
-    // dots that look correct.
+    // A user-supplied key is the first thing analysis tries, so a bad one
+    // surfaces here. Send the user back to the field that can fix it and drop
+    // the key — the input is a password field, so leaving it in place would
+    // just show dots that look correct. A blank key skips this entirely since
+    // the server key is always valid.
     if (analyzed?.error && isInvalidKeyError(analyzed.error)) {
       updateGeminiKey('');
       clearFile();
