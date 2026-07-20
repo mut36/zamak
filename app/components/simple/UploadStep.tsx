@@ -66,6 +66,14 @@ export function UploadStep({
           spellCheck={false}
           onChange={(e) => onApiKey(e.target.value)}
         />
+        {error && (
+          <p
+            className='text-sm mt-2'
+            style={{ color: 'oklch(0.6 0.2 25)' }}
+          >
+            {error}
+          </p>
+        )}
         <p className='text-[12px] text-ink-3 leading-relaxed mt-2'>
           {c.keyHint}{' '}
           <a
@@ -155,12 +163,6 @@ export function UploadStep({
           }}
         />
       </div>
-
-      {error && (
-        <p className='text-center text-sm mt-3' style={{ color: 'oklch(0.6 0.2 25)' }}>
-          {error}
-        </p>
-      )}
 
       {/* Target language — chromeless "detected → target" flow */}
       <div className='langflow'>

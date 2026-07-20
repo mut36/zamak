@@ -30,6 +30,8 @@ export const COPY = {
     keyHint: '무료 키는 Google AI Studio에서 발급받을 수 있어요. 브라우저에만 저장되고 서버엔 남지 않아요.',
     keyGetLink: 'API 키 발급받기',
     keyNeededError: '먼저 Gemini API 키를 입력해주세요.',
+    keyInvalidError:
+      'Gemini가 이 키를 거부했어요. Google AI Studio에서 발급받은 Gemini 키가 맞는지 확인하고 다시 입력해주세요.',
     dropDisabledHint: 'API 키를 입력하면 파일을 올릴 수 있어요.',
   },
 

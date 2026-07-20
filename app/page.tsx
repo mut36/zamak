@@ -11,6 +11,7 @@ import { useTranslation } from './hooks/useTranslation';
 import { useEnrich } from './hooks/useEnrich';
 import { fetchMoviePoster } from './lib/client/tmdb';
 import { parseSrtBlocks } from './lib/srt';
+import { isInvalidKeyError } from './utils/apiKeyError';
 import { DEFAULT_TARGET_LANG } from './config/languages';
 import { TRANSLATION_MODEL } from './config/constants';
 import type { ContentType, MovieInfo } from './types/translation';
@@ -156,7 +157,7 @@ export default function Home() {
     setSummarizing(false);
   };
 
-  const handleFile = (selected: File) => {
+  const handleFile = async (selected: File) => {
     if (!isSrt(selected)) {
       setUploadError(COPY.upload.invalidFile);
       return;
@@ -170,8 +171,23 @@ export default function Home() {
     setUploadError('');
     setMovieInfo(EMPTY_MOVIE_INFO);
     resetAnalysis();
-    handleFileDrop(selected, key);
+    // Step 1 goes up immediately so the "분석 중" spinner covers the wait.
+    const analyzing = handleFileDrop(selected, key);
     setStep(1);
+    const analyzed = await analyzing;
+
+    // Analysis is the first call the key ever makes, so a bad key surfaces
+    // here. Send the user back to the field that can fix it and drop the key
+    // — the input is a password field, so leaving it in place would just show
+    // dots that look correct.
+    if (analyzed?.error && isInvalidKeyError(analyzed.error)) {
+      updateGeminiKey('');
+      clearFile();
+      resetAnalysis();
+      setMovieInfo(EMPTY_MOVIE_INFO);
+      setUploadError(COPY.upload.keyInvalidError);
+      setStep(0);
+    }
   };
 
   const handleTranslate = async () => {
@@ -197,6 +213,7 @@ export default function Home() {
   };
 
   const resetAll = () => {
+    cancelTranslation();
     clearFile();
     resetAnalysis();
     setMovieInfo(EMPTY_MOVIE_INFO);
@@ -208,7 +225,7 @@ export default function Home() {
   return (
     <div className='min-h-screen'>
       <header className='flex items-center justify-between w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 h-16'>
-        <BrandMark />
+        <BrandMark onClick={resetAll} />
         <span className='lang-pill'>{COPY.langPill}</span>
       </header>
 
@@ -235,7 +252,7 @@ export default function Home() {
                 className='card p-4 mb-4 text-sm'
                 style={{ color: 'oklch(0.55 0.2 25)' }}
               >
-                {/^.*(API key not valid|API_KEY_INVALID).*$/.test(error)
+                {isInvalidKeyError(error)
                   ? COPY.apiKey.invalid
                   : error}
               </div>

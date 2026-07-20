@@ -46,13 +46,24 @@ function isSrtFile(file: File): boolean {
 
 const EMPTY_ANALYSIS = { title: '', year: '' };
 
+interface AnalysisOutcome {
+  title: string;
+  year: string;
+  /** Raw server error, when the call failed. Empty on success. */
+  error?: string;
+}
+
 // Title/year inference from the filename only. If nothing is found the info
 // screen drops into manual input — we intentionally don't sample subtitle
 // text (unreliable, and an extra AI call) to guess a title.
+//
+// A failure here still falls back to manual input, but we carry the server's
+// error up: an invalid API key used to look identical to "title not found",
+// which sent people hunting for a bad filename instead of a bad key.
 async function analyzeContent(
   filenameHint: string,
   apiKey?: string,
-): Promise<{ title: string; year: string }> {
+): Promise<AnalysisOutcome> {
   try {
     const response = await fetch('/api/analyze', {
       method: 'POST',
@@ -62,10 +73,21 @@ async function analyzeContent(
       },
       body: JSON.stringify({ filenameHint, content: '' }),
     });
-    if (!response.ok) return EMPTY_ANALYSIS;
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      return {
+        ...EMPTY_ANALYSIS,
+        error:
+          (body && typeof body.error === 'string' && body.error) ||
+          `Server error (${response.status})`,
+      };
+    }
     return await response.json();
-  } catch {
-    return EMPTY_ANALYSIS;
+  } catch (error) {
+    return {
+      ...EMPTY_ANALYSIS,
+      error: error instanceof Error ? error.message : 'Analysis failed',
+    };
   }
 }
 
@@ -138,6 +160,10 @@ export function useTranslation(
     const result = await analyzeContent(selectedFile.name, apiKey);
     if (processFileIdRef.current !== fileId) return;
 
+    if (result.error) {
+      setState((prev) => ({ ...prev, error: result.error as string }));
+    }
+
     const updatedMeta: FilenameMetadata = {
       ...meta,
       ...(result.title ? { inferredTitle: result.title } : {}),
@@ -166,7 +192,9 @@ export function useTranslation(
   const handleFileDrop = useCallback(
     (droppedFile: File, apiKey?: string) => {
       if (isSrtFile(droppedFile)) {
-        processFile(droppedFile, apiKey);
+        // Returned so the caller can react to an analysis failure — notably a
+        // bad API key, which belongs back on the upload screen.
+        return processFile(droppedFile, apiKey);
       } else {
         setState((prev) => ({ ...prev, error: msg.invalidFile }));
         setFile(null);
