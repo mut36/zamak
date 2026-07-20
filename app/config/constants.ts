@@ -3,9 +3,9 @@
 // ============================================
 
 /**
- * SRT chunking & concurrency — the two knobs for testing parallel translation.
- * Set a very large CHUNK_SIZE to force a single request (no chunking).
- * Both overridable via env for quick tuning.
+ * SRT chunking & concurrency — the two knobs for parallel translation, split
+ * per tier. Set a very large chunk size to force a single request (no
+ * chunking). All four overridable via env for quick tuning.
  */
 function readPositiveIntEnv(raw: string | undefined, fallback: number): number {
   if (!raw) return fallback;
@@ -17,17 +17,62 @@ function readPositiveIntEnv(raw: string | undefined, fallback: number): number {
   return parsed;
 }
 
-/** Subtitle blocks per translation request. Default 200. */
-export const CHUNK_SIZE = readPositiveIntEnv(
+/**
+ * Translation tier. `free` = the user's own key (BYOK) on Gemini's free tier,
+ * which caps both output size and requests-per-minute. `server` = our paid
+ * server key, no user-visible rate ceiling. Everyone is `free` today because
+ * BYOK is mandatory; `server` activates with the Phase 3 billing gate.
+ */
+export type Tier = 'free' | 'server';
+
+/**
+ * TODO: the FREE_* numbers below are placeholders. Derive them from Gemini's
+ * published free-tier RPM/TPM limits (requests and tokens per minute for the
+ * translation model) rather than guessing — chunk size drives tokens per
+ * request and concurrency drives requests per minute, so both fall out of the
+ * same calculation.
+ */
+export const FREE_CHUNK_SIZE = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_FREE_CHUNK_SIZE,
+  40,
+);
+export const FREE_CONCURRENCY = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_FREE_CONCURRENCY,
+  4,
+);
+
+/** Paid server key — the original knobs, kept under their existing env names. */
+export const SERVER_CHUNK_SIZE = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CHUNK_SIZE,
   200,
 );
-
-/** Max concurrent chunk translations. Default 14. */
-export const CONCURRENCY = readPositiveIntEnv(
+export const SERVER_CONCURRENCY = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CONCURRENCY,
   14,
 );
+
+export interface TierLimits {
+  /** Subtitle blocks per translation request. */
+  chunkSize: number;
+  /** Max concurrent chunk translations. */
+  concurrency: number;
+}
+
+export function getTierLimits(tier: Tier): TierLimits {
+  return tier === 'server'
+    ? { chunkSize: SERVER_CHUNK_SIZE, concurrency: SERVER_CONCURRENCY }
+    : { chunkSize: FREE_CHUNK_SIZE, concurrency: FREE_CONCURRENCY };
+}
+
+/**
+ * The single place that decides a request's tier. BYOK means the call runs on
+ * the user's free-tier key; no key means the server key, which is currently
+ * blocked at every route. Phase 3 swaps the body of this function for a
+ * session/subscription lookup — nothing else needs to change.
+ */
+export function resolveTier(hasUserKey: boolean): Tier {
+  return hasUserKey ? 'free' : 'server';
+}
 
 /**
  * Auxiliary model for lightweight tasks (title/year analysis, web-search

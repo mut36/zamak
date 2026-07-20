@@ -18,7 +18,7 @@ import type {
   TranslationProgress,
   TranslationResult,
 } from '../types/translation';
-import { CHUNK_SIZE, CONCURRENCY, TIMING } from '../config/constants';
+import { getTierLimits, resolveTier, TIMING } from '../config/constants';
 
 interface TranslationState {
   isTranslating: boolean;
@@ -200,13 +200,16 @@ export function useTranslation(
         throw new Error(msg.emptyFile);
       }
 
-      // Split into chunks of CHUNK_SIZE blocks and translate them with up to
-      // CONCURRENCY parallel requests. A very large CHUNK_SIZE yields a single
-      // chunk (no parallelism) — the knob for testing parallel translation.
-      const chunks = chunkSrtBlocks(blocks, CHUNK_SIZE);
+      // Chunk size and concurrency both come from the tier: a BYOK user runs
+      // on Gemini's free tier, which limits output size *and* requests per
+      // minute, so free stays smaller on both knobs to avoid 429s.
+      const { chunkSize, concurrency } = getTierLimits(
+        resolveTier(Boolean(apiKeys?.gemini)),
+      );
+      const chunks = chunkSrtBlocks(blocks, chunkSize);
       const totalChunks = chunks.length;
       // Rough estimate: number of concurrency "waves" × per-chunk time.
-      const waves = Math.max(1, Math.ceil(totalChunks / CONCURRENCY));
+      const waves = Math.max(1, Math.ceil(totalChunks / concurrency));
       const totalEstimateMs = waves * TIMING.FLASH_BATCH_MS;
 
       setTranslationProgress({
@@ -224,7 +227,7 @@ export function useTranslation(
       let failedChunks = 0;
       const results = await runOrderedPool<string, string>({
         items: chunks,
-        concurrency: CONCURRENCY,
+        concurrency,
         signal: controller.signal,
         worker: async (chunk, index) => {
           try {
