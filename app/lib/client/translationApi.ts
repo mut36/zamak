@@ -1,28 +1,14 @@
 import type { ChunkTranslationRequest } from '../../types/translation';
 import { readTranslationEvent } from './sse';
 
-export interface TranslationApiKeys {
-  /** User-provided Gemini key (BYOK); translation calls only. */
-  gemini?: string;
-}
-
-function buildHeaders(apiKeys?: TranslationApiKeys): HeadersInit {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (apiKeys?.gemini) headers['x-gemini-key'] = apiKeys.gemini;
-  return headers;
-}
-
 async function requestTranslation(
   endpoint: string,
   payload: ChunkTranslationRequest,
   signal: AbortSignal,
-  apiKeys?: TranslationApiKeys,
 ): Promise<string> {
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers: buildHeaders(apiKeys),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
     signal,
   });
@@ -47,7 +33,6 @@ async function requestTranslation(
 export function requestChunkTranslation(
   payload: ChunkTranslationRequest,
   signal: AbortSignal,
-  apiKeys?: TranslationApiKeys,
 ): Promise<string> {
-  return requestTranslation('/api/translate', payload, signal, apiKeys);
+  return requestTranslation('/api/translate', payload, signal);
 }

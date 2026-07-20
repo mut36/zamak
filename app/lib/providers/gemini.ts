@@ -11,13 +11,13 @@ const defaultClient = process.env.GOOGLE_GENAI_API_KEY
 export const geminiProvider: ModelProvider = {
   name: 'gemini',
 
-  // Configured if the caller supplies a BYOK key OR the server env key exists.
   isConfigured(apiKey) {
     return Boolean(apiKey || process.env.GOOGLE_GENAI_API_KEY);
   },
 
   async generateText({ model, prompt, apiKey }) {
-    // Prefer the caller's BYOK key; fall back to the server env key.
+    // Routes pass no key today, so this is the server client. The parameter is
+    // the seam a future per-account key would use.
     const client = apiKey
       ? new GoogleGenAI({ apiKey })
       : defaultClient;

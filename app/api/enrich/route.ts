@@ -5,12 +5,10 @@ import { AUX_MODEL } from '../../config/constants';
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
-  // BYOK is optional: fall back to the server key when the caller has none.
-  // Grounding (googleSearch below) only works on a billing-linked project, so
-  // this route's real quality depends on the server key already being one.
-  const apiKey =
-    request.headers.get('x-gemini-key')?.trim() ||
-    process.env.GOOGLE_GENAI_API_KEY;
+  // Server key only. Grounding (googleSearch below) is unavailable on
+  // free-tier Gemini projects, so this route requires the server key to be on
+  // a billing-linked project.
+  const apiKey = process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       { error: 'Gemini API key not configured' },

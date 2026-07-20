@@ -4,7 +4,7 @@ import type {
 } from '../prompts';
 
 export interface ProviderApiKeys {
-  /** User-provided Gemini key (BYOK) for translation calls. */
+  /** Per-request Gemini key override; unset means the server key. */
   gemini?: string | null;
 }
 

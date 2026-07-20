@@ -15,10 +15,8 @@ export const maxDuration = 300;
 export async function POST(request: NextRequest) {
   try {
     const body = parseChunkTranslationRequest(await request.json());
-    const apiKeys = getProviderApiKeys(request);
-    // BYOK is optional: geminiProvider falls back to GOOGLE_GENAI_API_KEY
-    // when the caller supplies no key. assertProviderConfigured throws if
-    // neither is set.
+    const apiKeys = getProviderApiKeys();
+    // Runs on the server key; throws if GOOGLE_GENAI_API_KEY is unset.
     assertProviderConfigured(body.model, apiKeys);
 
     return createTranslationStream(() =>

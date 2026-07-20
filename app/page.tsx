@@ -11,7 +11,6 @@ import { useTranslation } from './hooks/useTranslation';
 import { useEnrich } from './hooks/useEnrich';
 import { fetchMoviePoster } from './lib/client/tmdb';
 import { parseSrtBlocks } from './lib/srt';
-import { isInvalidKeyError } from './utils/apiKeyError';
 import { DEFAULT_TARGET_LANG } from './config/languages';
 import { TRANSLATION_MODEL } from './config/constants';
 import type { ContentType, MovieInfo } from './types/translation';
@@ -32,23 +31,6 @@ export default function Home() {
   const [movieInfo, setMovieInfo] = useState<MovieInfo>(EMPTY_MOVIE_INFO);
   const [uploadError, setUploadError] = useState('');
   const [summarizing, setSummarizing] = useState(false);
-  // Optional BYOK Gemini key for translation; held in sessionStorage only.
-  const [geminiKey, setGeminiKey] = useState('');
-
-  useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem('geminiKey');
-      if (saved) setGeminiKey(saved);
-    } catch {}
-  }, []);
-
-  const updateGeminiKey = useCallback((value: string) => {
-    setGeminiKey(value);
-    try {
-      if (value) sessionStorage.setItem('geminiKey', value);
-      else sessionStorage.removeItem('geminiKey');
-    } catch {}
-  }, []);
 
   const onMetaUpdate = useCallback(
     (meta: { inferredTitle?: string; inferredYear?: string }) => {
@@ -90,12 +72,10 @@ export default function Home() {
   // live in the orchestrator (surviving step changes) without stale closures.
   const movieInfoRef = useRef(movieInfo);
   const fileContentRef = useRef(fileContent);
-  const geminiKeyRef = useRef(geminiKey);
   useEffect(() => {
     movieInfoRef.current = movieInfo;
     fileContentRef.current = fileContent;
-    geminiKeyRef.current = geminiKey;
-  }, [movieInfo, fileContent, geminiKey]);
+  }, [movieInfo, fileContent]);
 
   const enrichStartedRef = useRef(false);
   const summarizeStartedRef = useRef(false);
@@ -106,7 +86,7 @@ export default function Home() {
   const runEnrich = useCallback(async () => {
     const { title, year } = movieInfoRef.current;
     const [data, posterUrl] = await Promise.all([
-      enrich(title, year, geminiKeyRef.current),
+      enrich(title, year),
       fetchMoviePoster(title, year),
     ]);
     setMovieInfo((prev) => ({
@@ -134,12 +114,7 @@ export default function Home() {
         try {
           const res = await fetch('/api/summarize', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(geminiKeyRef.current
-                ? { 'x-gemini-key': geminiKeyRef.current }
-                : {}),
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: fileContentRef.current }),
           });
           const data = res.ok ? await res.json() : { summary: '' };
@@ -167,43 +142,22 @@ export default function Home() {
       setUploadError(COPY.upload.invalidFile);
       return;
     }
-    // BYOK is optional: an empty key omits the header and the server falls
-    // back to its own key.
-    const key = geminiKey.trim();
     setUploadError('');
     setMovieInfo(EMPTY_MOVIE_INFO);
     resetAnalysis();
     // Step 1 goes up immediately so the "분석 중" spinner covers the wait.
-    const analyzing = handleFileDrop(selected, key || undefined);
+    handleFileDrop(selected);
     setStep(1);
-    const analyzed = await analyzing;
-
-    // A user-supplied key is the first thing analysis tries, so a bad one
-    // surfaces here. Send the user back to the field that can fix it and drop
-    // the key — the input is a password field, so leaving it in place would
-    // just show dots that look correct. A blank key skips this entirely since
-    // the server key is always valid.
-    if (analyzed?.error && isInvalidKeyError(analyzed.error)) {
-      updateGeminiKey('');
-      clearFile();
-      resetAnalysis();
-      setMovieInfo(EMPTY_MOVIE_INFO);
-      setUploadError(COPY.upload.keyInvalidError);
-      setStep(0);
-    }
   };
 
   const handleTranslate = async () => {
     setStep(2);
     // translate() resolves true on success, false on error/abort.
-    // Pass the BYOK key only when set; otherwise the server key is used.
     const ok = await translate(
       movieInfo,
       TRANSLATION_MODEL,
       targetLang,
       'meaning',
-      undefined,
-      geminiKey ? { gemini: geminiKey } : undefined,
     );
     setStep(ok ? 3 : 1);
   };
@@ -241,8 +195,6 @@ export default function Home() {
             onTargetLang={setTargetLang}
             contentType={contentType}
             onContentType={setContentType}
-            apiKey={geminiKey}
-            onApiKey={updateGeminiKey}
             error={uploadError}
             onFile={handleFile}
           />
@@ -255,9 +207,7 @@ export default function Home() {
                 className='card p-4 mb-4 text-sm'
                 style={{ color: 'oklch(0.55 0.2 25)' }}
               >
-                {isInvalidKeyError(error)
-                  ? COPY.apiKey.invalid
-                  : error}
+                {error}
               </div>
             )}
             <InfoStep

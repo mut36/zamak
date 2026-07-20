@@ -2,10 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { parseFilename, type FilenameMetadata } from '../utils/metadataInference';
-import {
-  requestChunkTranslation,
-  type TranslationApiKeys,
-} from '../lib/client/translationApi';
+import { requestChunkTranslation } from '../lib/client/translationApi';
 import {
   buildOutputFilename,
   chunkSrtBlocks,
@@ -60,17 +57,11 @@ interface AnalysisOutcome {
 // A failure here still falls back to manual input, but we carry the server's
 // error up: an invalid API key used to look identical to "title not found",
 // which sent people hunting for a bad filename instead of a bad key.
-async function analyzeContent(
-  filenameHint: string,
-  apiKey?: string,
-): Promise<AnalysisOutcome> {
+async function analyzeContent(filenameHint: string): Promise<AnalysisOutcome> {
   try {
     const response = await fetch('/api/analyze', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(apiKey ? { 'x-gemini-key': apiKey } : {}),
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filenameHint, content: '' }),
     });
     if (!response.ok) {
@@ -137,7 +128,7 @@ export function useTranslation(
   useEffect(() => cancelScheduledReset, [cancelScheduledReset]);
 
   // On file upload: parse filename + read content + analyze genre/tone in background
-  const processFile = useCallback(async (selectedFile: File, apiKey?: string) => {
+  const processFile = useCallback(async (selectedFile: File) => {
     cancelScheduledReset();
     const fileId = ++processFileIdRef.current;
 
@@ -157,7 +148,7 @@ export function useTranslation(
 
     // 3. Background: infer title/year from the filename.
     setAnalysis({ isAnalyzing: true, completed: false });
-    const result = await analyzeContent(selectedFile.name, apiKey);
+    const result = await analyzeContent(selectedFile.name);
     if (processFileIdRef.current !== fileId) return;
 
     if (result.error) {
@@ -190,11 +181,10 @@ export function useTranslation(
   );
 
   const handleFileDrop = useCallback(
-    (droppedFile: File, apiKey?: string) => {
+    (droppedFile: File) => {
       if (isSrtFile(droppedFile)) {
-        // Returned so the caller can react to an analysis failure — notably a
-        // bad API key, which belongs back on the upload screen.
-        return processFile(droppedFile, apiKey);
+        // Returned so the caller can react to an analysis failure.
+        return processFile(droppedFile);
       } else {
         setState((prev) => ({ ...prev, error: msg.invalidFile }));
         setFile(null);
@@ -209,7 +199,6 @@ export function useTranslation(
     targetLang: string,
     translationStyle: TranslationStyle,
     onSuccess?: () => void,
-    apiKeys?: TranslationApiKeys,
   ): Promise<boolean> => {
     if (!file) return false;
 
@@ -228,12 +217,9 @@ export function useTranslation(
         throw new Error(msg.emptyFile);
       }
 
-      // Chunk size and concurrency both come from the tier: a BYOK user runs
-      // on Gemini's free tier, which limits output size *and* requests per
-      // minute, so free stays smaller on both knobs to avoid 429s.
-      const { chunkSize, concurrency } = getTierLimits(
-        resolveTier(Boolean(apiKeys?.gemini)),
-      );
+      // Chunk size and concurrency both come from the tier, which is the one
+      // place the billing/session gate will hook into.
+      const { chunkSize, concurrency } = getTierLimits(resolveTier());
       const chunks = chunkSrtBlocks(blocks, chunkSize);
       const totalChunks = chunks.length;
       // Rough estimate: number of concurrency "waves" × per-chunk time.
@@ -270,7 +256,6 @@ export function useTranslation(
                 translationStyle,
               },
               controller.signal,
-              apiKeys,
             );
           } catch (err) {
             // Let cancellation propagate so the pool can abort.

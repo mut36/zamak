@@ -29,11 +29,7 @@ export function useEnrich() {
   const [error, setError] = useState('');
 
   const enrich = useCallback(
-    async (
-      title: string,
-      year: string,
-      apiKey?: string,
-    ): Promise<EnrichResult | null> => {
+    async (title: string, year: string): Promise<EnrichResult | null> => {
       setError('');
       if (!title.trim()) {
         setDirector('');
@@ -44,10 +40,7 @@ export function useEnrich() {
       try {
         const res = await fetch('/api/enrich', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(apiKey ? { 'x-gemini-key': apiKey } : {}),
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: title.trim(), year: year.trim() }),
         });
         if (!res.ok) {

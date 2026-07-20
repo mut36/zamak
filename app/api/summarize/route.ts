@@ -25,10 +25,8 @@ function sampleLines(content: string, limit: number): string {
 }
 
 export async function POST(request: NextRequest) {
-  // BYOK is optional: fall back to the server key when the caller has none.
-  const apiKey =
-    request.headers.get('x-gemini-key')?.trim() ||
-    process.env.GOOGLE_GENAI_API_KEY;
+  // Server key only — callers never supply their own.
+  const apiKey = process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       { error: 'Gemini API key not configured' },

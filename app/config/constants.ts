@@ -18,10 +18,10 @@ function readPositiveIntEnv(raw: string | undefined, fallback: number): number {
 }
 
 /**
- * Translation tier. `free` = the user's own key (BYOK) on Gemini's free tier,
- * which caps both output size and requests-per-minute. `server` = our paid
- * server key, no user-visible rate ceiling. Everyone is `free` today because
- * BYOK is mandatory; `server` activates with the Phase 3 billing gate.
+ * Translation tier. `server` = our server key, no user-visible rate ceiling —
+ * everyone runs here today. `free` keeps the smaller knobs that Gemini's
+ * free-tier rate limits require; it is unused until the Phase 3 login gate
+ * introduces a signed-in-but-uncredited tier.
  */
 export type Tier = 'free' | 'server';
 
@@ -89,13 +89,16 @@ export function getTierLimits(tier: Tier): TierLimits {
 }
 
 /**
- * The single place that decides a request's tier. BYOK means the call runs on
- * the user's free-tier key; no key means the server key, which is currently
- * blocked at every route. Phase 3 swaps the body of this function for a
- * session/subscription lookup — nothing else needs to change.
+ * The single place that decides a request's tier. Every call now runs on the
+ * server key, so this is unconditionally 'server'. Phase 3 swaps the body for a
+ * session/credit lookup — nothing else needs to change.
+ *
+ * The 'free' tier's smaller knobs are kept because they are what Gemini's
+ * free-tier rate limits require, and a signed-in-but-uncredited tier will want
+ * them again.
  */
-export function resolveTier(hasUserKey: boolean): Tier {
-  return hasUserKey ? 'free' : 'server';
+export function resolveTier(): Tier {
+  return 'server';
 }
 
 /**

@@ -23,14 +23,6 @@ export const COPY = {
     typeOtherHint: '유튜브 · 인터뷰 · 강연 등',
     reassure: ['평균 2분 소요', '타임코드 100% 보존', '설치 없이 바로'],
     invalidFile: 'SRT 파일만 올릴 수 있어요.',
-    // First-screen BYOK key — optional. Uploads run on our key by default.
-    keyLabel: '내 Gemini API 키로 번역하기',
-    keyOptional: '선택',
-    keyPlaceholder: 'AIza…',
-    keyHint: '키가 없어도 바로 업로드할 수 있어요. 직접 키를 쓰고 싶다면 Google AI Studio에서 무료로 발급받을 수 있어요. 브라우저에만 저장되고 서버엔 남지 않아요.',
-    keyGetLink: 'API 키 발급받기',
-    keyInvalidError:
-      'Gemini가 이 키를 거부했어요. Google AI Studio에서 발급받은 Gemini 키가 맞는지 확인하고 다시 입력하거나, 비워두고 계속하세요.',
   },
 
   info: {
@@ -51,11 +43,9 @@ export const COPY = {
     cancel: '취소',
     notFoundHint: '제목과 연도를 입력하면 다시 검색해볼게요.',
     // Shown when the search failed outright, rather than simply finding
-    // nothing. The raw server message follows — it is what distinguishes a
-    // rejected key from a Google Search tool that the key's project cannot use.
+    // nothing. The raw server message follows so the cause is visible instead
+    // of hiding behind "자동으로 못 찾았어요".
     enrichFailed: '작품 정보 검색에 실패했어요.',
-    enrichKeyInvalid:
-      'Gemini가 이 키를 거부했어요. 아래에 제목·연도를 직접 입력하면 그대로 번역할 수 있어요.',
     notesLabel: '참고할 내용',
     notesHint: '번역에 반영할 톤·인물 말투 지침이에요. 자유롭게 다듬어도 좋아요.',
     // other branch
@@ -69,16 +59,6 @@ export const COPY = {
     back: '이전',
     translate: '번역 시작',
     startOver: '처음부터',
-  },
-
-  apiKey: {
-    toggle: '내 API 키로 번역',
-    saved: '저장됨',
-    label: 'Gemini API 키',
-    placeholder: 'AIza…',
-    hint: '번역은 이 키로 청구돼요. 브라우저에만 저장되고 서버엔 남지 않아요.',
-    clear: '지우기',
-    invalid: '입력한 Gemini API 키가 올바르지 않아요. 키를 다시 확인해주세요.',
   },
 
   progress: {

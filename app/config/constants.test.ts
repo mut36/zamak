@@ -9,12 +9,8 @@ import {
 } from './constants';
 
 describe('resolveTier', () => {
-  it('puts BYOK users on the free tier', () => {
-    expect(resolveTier(true)).toBe('free');
-  });
-
-  it('falls back to the server tier without a user key', () => {
-    expect(resolveTier(false)).toBe('server');
+  it('puts every request on the server tier', () => {
+    expect(resolveTier()).toBe('server');
   });
 });
 

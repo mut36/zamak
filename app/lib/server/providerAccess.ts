@@ -1,16 +1,18 @@
 import 'server-only';
 
-import type { NextRequest } from 'next/server';
 import {
   getModelProvider,
   isModelProviderConfigured,
   type ProviderApiKeys,
 } from '../providers';
 
-export function getProviderApiKeys(request: NextRequest): ProviderApiKeys {
-  return {
-    gemini: request.headers.get('x-gemini-key'),
-  };
+/**
+ * Callers no longer supply keys — every request runs on the server key, which
+ * each provider reads from the environment itself. Kept as the one seam a
+ * future per-account key would slot into.
+ */
+export function getProviderApiKeys(): ProviderApiKeys {
+  return {};
 }
 
 export function assertProviderConfigured(

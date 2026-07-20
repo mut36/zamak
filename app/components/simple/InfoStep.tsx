@@ -4,7 +4,6 @@ import { useState, type ReactNode } from 'react';
 import { SpinnerIcon, SparkleIcon, PencilIcon, ArrowRightIcon } from '../icons';
 import type { EnrichStatus } from '../../hooks/useEnrich';
 import type { ContentType, MovieInfo } from '../../types/translation';
-import { isInvalidKeyError } from '../../utils/apiKeyError';
 import { COPY } from '../../i18n/simpleCopy';
 
 interface InfoStepProps {
@@ -21,7 +20,7 @@ interface InfoStepProps {
   onReEnrich: () => void;
   // other branch
   summarizing: boolean;
-  /** Optional content rendered just above the action buttons (e.g. BYOK). */
+  /** Optional content rendered just above the action buttons. */
   beforeActions?: ReactNode;
   onBack: () => void;
   onTranslate: () => void;
@@ -85,9 +84,7 @@ function MovieInfo({
               this informs rather than blocks. */}
           {enrichError && !editing && (
             <p className='text-[13px] mb-3' style={{ color: 'oklch(0.55 0.2 25)' }}>
-              {isInvalidKeyError(enrichError)
-                ? c.enrichKeyInvalid
-                : `${c.enrichFailed} (${enrichError})`}
+              {`${c.enrichFailed} (${enrichError})`}
             </p>
           )}
           <p className='text-[13px] text-ink-3 mb-3'>{c.notFoundHint}</p>
