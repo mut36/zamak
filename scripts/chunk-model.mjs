@@ -30,6 +30,14 @@ const P = {
   rpdFree: 1500,
   timeout: 300,  // route maxDuration seconds
 
+  // Concurrency ceiling we impose ourselves. Gemini has no separate concurrent
+  // request limit (see gemini-limits.md §2), so on the paid tier this — not the
+  // API — is what bounds K: every in-flight chunk holds a serverless function
+  // open for the whole model call, and the cap has to cover ALL users at once,
+  // not one. UNKNOWN until the deployment plan's concurrent-execution limit is
+  // looked up; 14 below is an undertermined legacy value, not a derived one.
+  kmax: 14,
+
   // Latency ESTIMATES — measure from real runs
   ttft: 2,       // seconds to first token
   v: 120,        // output tokens/second generation speed
@@ -61,10 +69,14 @@ function evaluate(B, rpm) {
   const outTokens = B * P.tout + P.th;
   const D = P.ttft + outTokens / P.v;
 
-  // Concurrency ceiling from RPM. Two binds: the launch burst (K requests hit
-  // the same 60s window) and the steady-state rate 60K/D. Also never more
-  // than the number of chunks.
-  const K = Math.max(1, Math.min(m, rpm, Math.floor((D * rpm) / 60) || 1));
+  // Concurrency ceiling. Three binds: the number of chunks, the rate Gemini
+  // allows (the launch burst plus the steady-state 60K/D), and the cap we
+  // impose ourselves. On the free tier RPM dominates; on the paid tier it
+  // never binds, so kmax is the only thing holding K down.
+  const K = Math.max(
+    1,
+    Math.min(m, P.kmax, rpm, Math.floor((D * rpm) / 60) || 1),
+  );
 
   const waves = Math.ceil(m / K);
   const T = waves * D;

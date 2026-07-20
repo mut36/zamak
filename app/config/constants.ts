@@ -50,7 +50,22 @@ export const FREE_CONCURRENCY = readPositiveIntEnv(
   6,
 );
 
-/** Paid server key — the original knobs, kept under their existing env names. */
+/**
+ * Paid server key — the original knobs, kept under their existing env names.
+ *
+ * PROVISIONAL. Unlike the free values these are not derived from anything: 14
+ * has been carried since the first commit as a chunking-test default. It can't
+ * be derived from Gemini either, which imposes no concurrent-request limit of
+ * its own (gemini-limits.md §2) and whose 1000 RPM never binds here — what
+ * actually bounds paid concurrency is our own serverless concurrent-execution
+ * limit, since each in-flight chunk holds a function open for the whole model
+ * call, summed across all users at once rather than one.
+ *
+ * That number decides the chunk size too: the paid optimum is N/kmax, the
+ * smallest chunk that still finishes in a single wave. Look the limit up
+ * (gemini-limits.md §7-1) before the billing gate makes this path live, then
+ * re-run scripts/chunk-model.mjs with kmax= to set both.
+ */
 export const SERVER_CHUNK_SIZE = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CHUNK_SIZE,
   200,
