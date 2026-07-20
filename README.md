@@ -1,30 +1,29 @@
-# SRT Translator Web
+# ZAMAK
 
 **v0.2.0 Beta**
 
-AI 기반 SRT 자막 번역 웹 애플리케이션입니다. Gemini Flash 모델을 사용해 SRT 구조를 유지하면서 자막을 한국어 중심으로 번역합니다.
+SRT 자막을 Gemini로 번역하는 웹 애플리케이션입니다. 타임코드는 코드가 관리하고 AI는 대사만 다루는 구조라, 번역 결과가 원본 싱크를 그대로 유지합니다.
 
 ## Features
 
-- **AI 자막 번역** — Gemini 3.5 Flash 모델로 의미보존형 번역
-- **청크 기반 병렬 번역** — 200개 SRT 블록 단위로 나누고 최대 14개 청크를 병렬 처리
-- **출력 복구 및 검증** — AI 응답에서 번역 본문만 추출하고 원본 SRT 번호·타임스탬프를 복원
-- **블록 수 불일치 자동 복구** — 청크 번역 결과가 원본 블록 수와 다르면 재시도 후 원본 블록 단위로 fallback 번역
-- **자동 메타데이터 분석** — 파일명과 자막 샘플로 제목·연도를 추출한 후 Google Search로 작품 정보를 자동 검색
-- **작품 확인 플로우** — 검색된 제목/연도/감독을 확인하는 카드를 표시하고, 확인 시 톤·인물 말투 지침이 담긴 번역 컨텍스트를 자동 구성
-- **실시간 진행률** — 완료된 청크 수 기준 진행바와 예상 남은 시간 표시
-- **번역 취소** — 진행 중 취소 및 완료된 연속 청크의 부분 다운로드 지원
-- **다국어 UI** — 한국어/영어 인터페이스 전환
-- **다크 모드** — 시스템 설정 연동 및 수동 전환
+- **AI 자막 번역** — Gemini 3.5 Flash 단일 모델. 의미보존형(meaning)과 영화적(cinematic) 두 가지 스타일
+- **BYOK 필수** — 사용자가 자기 Gemini API 키를 입력합니다. 키는 서버에 저장되지 않고 요청 헤더로만 전달되며, 브라우저 sessionStorage에 임시 보관됩니다
+- **타임코드 무결성** — AI에게는 번호와 대사만 보내고(타임스탬프는 토큰 낭비), 응답을 **번호로 대조해 원본 타임코드와 재결합**합니다. AI가 자막을 합치거나 빠뜨려도 이후 자막이 밀리지 않습니다
+- **티어별 청크 병렬 번역** — 자막을 청크로 나눠 동시 번역. 크기와 동시성은 티어별로 다릅니다 ([산출 근거](docs/tuning/chunk-size-model.md))
+- **부분 실패 허용** — 실패한 청크는 원문을 유지하고 나머지는 번역해, 항상 재생 가능한 완전한 SRT를 반환합니다. 완료 화면에 실패 개수가 표시됩니다
+- **작품 정보 자동 수집** — 파일명·자막 샘플에서 제목/연도를 추출하고, Google Search로 감독·톤·인물 말투 지침을 생성하며, TMDB에서 포스터를 가져옵니다
+- **영화 아닌 영상 지원** — 자막 앞부분을 샘플링해 AI가 내용을 요약하는 분기
+- **번역 취소** — 진행 중 중단
 
 ## Tech Stack
 
 | 분류 | 기술 |
 |------|------|
-| Framework | Next.js (App Router, Turbopack) |
+| Framework | Next.js 16 (App Router, Turbopack) |
 | UI | React 19, Tailwind CSS v4 |
 | Language | TypeScript 5 |
-| AI | Google Gemini API (`@google/genai`) — 번역·분석·검색 |
+| AI | Google Gemini API (`@google/genai`) |
+| 메타데이터 | TMDB API (포스터) |
 | Hosting | Vercel |
 
 ## Getting Started
@@ -32,20 +31,22 @@ AI 기반 SRT 자막 번역 웹 애플리케이션입니다. Gemini Flash 모델
 ### Prerequisites
 
 - Node.js 18+
-- Google Gemini API key
+- TMDB API 키 (포스터용, 서버 전용)
+- Gemini API 키는 **서버에 필요 없습니다** — 사용자가 UI에서 직접 입력합니다
 
 ### Installation
 
 ```bash
-git clone https://github.com/kaia-lee/srt-translator-web.git
-cd srt-translator-web
+git clone https://github.com/mut36/zamak.git
+cd zamak
 npm install
 ```
 
-`.env.local` 파일을 생성하고 API 키를 추가합니다:
+`.env.local` 생성:
 
 ```env
-GOOGLE_GENAI_API_KEY=your_google_genai_api_key
+# TMDB — 포스터 조회 (서버 전용, 클라이언트에 노출되지 않음)
+TMDB_API_KEY=your_tmdb_v3_api_key
 ```
 
 개발 서버 실행:
@@ -54,128 +55,122 @@ GOOGLE_GENAI_API_KEY=your_google_genai_api_key
 npm run dev
 ```
 
-[http://localhost:3000](http://localhost:3000) 에서 확인할 수 있습니다.
+[http://localhost:3000](http://localhost:3000)
+
+### 검증
+
+```bash
+npx tsc --noEmit && npx eslint app && npx vitest run
+```
 
 ## Configuration
 
-주요 설정은 `app/config/constants.ts`에서 관리합니다.
+설정은 `app/config/constants.ts`에 모여 있습니다.
 
-```typescript
-export const CHUNK_SIZE = 200;   // 청크당 자막 블록 수
-export const CONCURRENCY = 14;   // 최대 동시 번역 청크 수
+### 티어별 청크·동시성
 
-export const ALLOWED_MODELS = [
-  'gemini-3.5-flash',
-  'gemini-3.1-pro-preview',
-  'gpt-5.6-terra',
-  'claude-sonnet-5',
-] as const;
+번역 요청의 티어는 `resolveTier()` 한 곳에서 결정됩니다. 현재는 BYOK가 필수라 **전원 free**이고, 결제 게이트가 붙으면 이 함수 본문만 교체하면 됩니다.
 
-export const DEFAULT_MODEL = 'gemini-3.5-flash';
+| | 청크 크기 | 동시성 | 근거 |
+|---|---|---|---|
+| free (BYOK) | 150 | 6 | Gemini 무료 등급 RPM 15에서 유도 |
+| server (유료) | 200 | 14 | **잠정값** — 배포 플랜의 동시 실행 한도 조회 후 재산정 |
+
+값의 유도 과정과 계산기는 [docs/tuning/](docs/tuning/)에 있습니다.
+
+```bash
+node scripts/chunk-model.mjs                    # 현재 파라미터로 비용·시간 표
+node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 ```
 
-`NEXT_PUBLIC_CHUNK_SIZE` 환경변수로 청크 크기를 오버라이드할 수 있습니다.  
-Gemini 번역 모델은 `thinkingLevel: "MEDIUM"` 설정으로 호출됩니다.
+### 환경 변수
 
-기본 동작은 청크당 모델 호출을 **한 번만** 수행하고 그 응답을 그대로 사용합니다.
-검증·재시도·블록 단위 재번역은 하지 않으므로 청크당 비용이 1회 호출로 고정됩니다.
-어떤 청크의 호출이 실패하면 그 청크는 원문(미번역) 그대로 남고 나머지는 번역되어,
-타임코드가 온전한 완전한 SRT 파일이 반환됩니다. 실패한 청크가 있으면 완료 화면에
-안내가 표시됩니다.
+| 변수 | 기본값 | 용도 |
+|---|---|---|
+| `TMDB_API_KEY` | — | **필수.** 포스터 조회 |
+| `TMDB_LANGUAGE` | `ko-KR` | TMDB 메타데이터 언어 |
+| `THINKING_LEVEL` | `MINIMAL` | `MINIMAL`\|`LOW`\|`MEDIUM`\|`HIGH`. thinking 토큰은 출력 단가(입력의 6배)로 요청마다 과금되는 최대 비용 레버입니다 |
+| `NEXT_PUBLIC_FREE_CHUNK_SIZE` / `_FREE_CONCURRENCY` | 150 / 6 | 무료 티어 청킹 |
+| `NEXT_PUBLIC_CHUNK_SIZE` / `NEXT_PUBLIC_CONCURRENCY` | 200 / 14 | 유료 티어 청킹 |
+| `TRANSLATION_STRICT_MODE` | `false` | 아래 참조 |
+| `GOOGLE_GENAI_API_KEY` | — | **현재 무시됨.** 서버 키 폴백은 4개 라우트 전부에서 차단돼 있습니다 (유료 모드 대비 휴면 상태) |
 
-엄격 모드(strict)를 켜면 예전처럼 출력 검증 + 재시도 + 블록 단위 재번역을 수행해
-블록 수와 SRT 형식을 보장합니다. 다만 모델이 형식을 조금이라도 어긋나게 반환하면
-한 청크가 수백 번의 호출로 불어날 수 있어 기본적으로 꺼져 있습니다. 되살리려면 서버
-환경 변수에 아래를 설정한 뒤 서버를 재시작합니다.
+### 번역 실행 경로
 
-```env
-TRANSLATION_STRICT_MODE=true
-```
+기본 경로는 **청크당 모델 호출 1회**입니다. 검증·재시도·블록 단위 재번역을 하지 않으므로 청크당 비용이 고정됩니다. 응답을 받으면 번호로 대조해 원본 타임코드와 재결합하며, 이 과정에 API 호출이 추가되지 않습니다.
+
+엄격 모드(`TRANSLATION_STRICT_MODE=true`)는 출력 검증 + 재시도 + 블록 단위 재번역을 수행합니다. 모델이 형식을 조금만 어긋나게 반환해도 한 청크가 수백 번 호출로 불어날 수 있어 **기본적으로 꺼져 있습니다.** 코드는 삭제하지 않고 플래그 뒤에 보존돼 있습니다.
 
 ## Usage
 
-1. `.srt` 자막 파일을 업로드합니다.
-2. 파일명과 자막 샘플에서 제목·연도가 자동 추출되고, Google Search로 작품 정보가 검색됩니다.
-3. "이 영화가 맞나요?" 카드에서 제목·연도·감독을 확인합니다.
-   - **Sì**: 검색된 번역 컨텍스트(톤·인물 말투 지침)를 확인하고 필요시 수정합니다.
-   - **No**: 제목·연도를 수정하거나 추가 정보를 직접 입력한 후 재검색합니다.
-4. **번역하기** 버튼을 누르면 Gemini Flash로 의미보존형 번역이 시작됩니다.
-5. 번역이 끝나면 `.ko.meaning.srt` 형식의 파일이 자동 다운로드됩니다.
+1. Gemini API 키를 입력하고 `.srt` 파일을 올립니다 (키가 없으면 업로드가 잠깁니다)
+2. 영상 유형을 고릅니다 — 영화·드라마 / 기타 영상
+3. 영화·드라마면 제목·연도·감독·포스터가 담긴 카드가 뜹니다. 틀리면 수정 후 재검색합니다
+4. 도착어와 번역 스타일을 고르고 번역을 시작합니다
+5. 완료 후 **다운로드** 버튼으로 `.ko.srt` 파일을 받습니다
 
 ## Project Structure
 
 ```text
 app/
 ├── api/
-│   ├── analyze/route.ts            # 파일명/자막 샘플 → 제목·연도 추출
-│   ├── enrich/route.ts             # Google Search로 작품 정보 검색 및 번역 컨텍스트 생성
-│   └── translate/route.ts          # 청크 번역 API (SSE)
-├── components/                     # 업로드, 폼, 진행률, 성공 모달
+│   ├── analyze/route.ts        # 파일명/자막 샘플 → 제목·연도 (BYOK)
+│   ├── enrich/route.ts         # Google Search → 감독·톤·인물 지침 (BYOK)
+│   ├── summarize/route.ts      # 영화 아닌 영상의 내용 요약 (BYOK)
+│   ├── tmdb/route.ts           # 포스터 조회 (서버 키, BYOK 불필요)
+│   └── translate/route.ts      # 청크 번역, SSE (BYOK)
+├── components/simple/          # 위저드 스텝 (업로드/정보/진행/완료)
 ├── config/
-│   └── constants.ts                # 모델, 청크, 동시성, 타이밍 설정
+│   ├── constants.ts            # 모델, 티어별 청킹, thinking, TMDB
+│   └── languages.ts            # 도착어 (enabled 플래그로 확장)
 ├── hooks/
-│   ├── useTranslation.ts           # 파일 처리, 분석, 청크 번역, 취소
-│   ├── useProgressDisplay.ts       # 진행률/남은 시간 표시 계산
-│   └── useDarkMode.ts              # 다크 모드 토글
-├── i18n/                           # 한국어/영어 UI 문구
+│   ├── useTranslation.ts       # 파일 처리, 청킹, 병렬 번역, 취소
+│   └── useEnrich.ts            # 작품 정보 + 포스터 병렬 조회
+├── i18n/simpleCopy.ts          # UI 문구 (하드코딩 금지)
 ├── lib/
-│   ├── client/                     # SSE, API 요청, 병렬 실행 유틸
-│   ├── prompts/                    # 프롬프트 로더/조합
-│   ├── providers/                  # AI provider registry
-│   ├── server/                     # 요청 검증, SSE, 번역 서비스
-│   └── srt.ts                      # SRT 파싱, 청크, 출력 파일명 유틸
-├── types/translation.ts
-├── utils/
-│   ├── downloadFile.ts
-│   └── metadataInference.ts
-├── layout.tsx
-├── page.tsx
-└── globals.css
+│   ├── client/                 # SSE, API 요청, 병렬 실행 풀
+│   ├── prompts/                # 프롬프트 로더·조합
+│   ├── providers/              # Gemini provider
+│   ├── server/                 # 요청 검증, SSE, 번역 서비스, TMDB
+│   └── srt.ts                  # 파싱, 청킹, 타임코드 재조립
+└── types/translation.ts
+docs/tuning/                    # 청크 크기 산출 근거
 prompts/
-├── common/
-│   ├── content_analysis.txt
-│   ├── subtitle_translation.txt
-│   ├── translation_rules_ko.txt
-│   └── cinematic_translation_philosophy_ko.txt
-├── gemini/adapter.txt
-├── openai/adapter.txt
-└── claude/adapter.txt
+├── common/                     # 번역 규칙·철학·분석 프롬프트
+└── gemini/adapter.txt
+samples/subtitles/              # 튜닝용 샘플 자막 (.srt는 gitignore)
+scripts/chunk-model.mjs         # 청크 크기 계산기
 ```
 
 ## Architecture
 
 ```text
-[사용자]
-  → page.tsx
-  → useTranslation
-      ├── /api/analyze
-      │     → Gemini Flash Lite로 파일명/자막 샘플에서 제목·연도 추출
-      ├── /api/enrich
-      │     → Gemini Flash Lite + Google Search로 작품 정보 검색
-      │     → 번역 컨텍스트(톤·인물 말투 지침) 자동 생성
-      └── /api/translate
-            → Gemini Flash로 청크 번역 (200블록 × 14 동시)
-            → parseSrtBlocksByHeader로 블록 경계 파싱
-            → 원본 SRT 번호·타임스탬프 복원
-            → 블록 수 불일치 시 청크 재시도 후 블록 단위 fallback 번역
-            → 완료된 청크 병합 후 파일 다운로드
+[사용자] → UploadStep (BYOK 키 + .srt)
+   → useTranslation.processFile
+        └── /api/analyze          제목·연도 추출
+   → InfoStep (useEnrich)
+        ├── /api/enrich           감독·톤·인물 지침 (Google Search)
+        └── /api/tmdb             포스터                      ← 병렬
+   → useTranslation.translate
+        ├── resolveTier()         BYOK 유무 → 청크 크기·동시성
+        ├── chunkSrtBlocks        자막을 청크로 분할
+        └── runOrderedPool        청크별 /api/translate 병렬 호출
+             └── translateSubtitle
+                  ├── composeTranslationPrompt   타임스탬프 제거, 번호+대사만 전송
+                  ├── Gemini 호출 (청크당 1회)
+                  └── reassembleTranslatedChunk  번호 대조 → 원본 타임코드 복원
+   → DoneStep                     명시적 다운로드
 ```
 
 ## Deploy
-
-Vercel에 배포:
 
 ```bash
 npm run build
 vercel deploy
 ```
 
-Vercel Project Settings → Environment Variables에 필요한 키를 추가합니다.
-
-```env
-GOOGLE_GENAI_API_KEY=...
-```
+Vercel Project Settings → Environment Variables에 `TMDB_API_KEY`를 추가합니다. Gemini 키는 서버에 두지 않습니다.
 
 ## License
 
-현재 저장소에는 별도 라이선스 파일이나 `package.json` 라이선스 필드가 명시되어 있지 않습니다.
+라이선스 파일과 `package.json` 라이선스 필드가 아직 명시돼 있지 않습니다.
