@@ -41,6 +41,8 @@ export const COPY = {
     searching: '작품 정보를 검색하고 있어요…',
     detectedBadge: 'AI가 자동으로 찾았어요',
     notFoundBadge: '자동으로 못 찾았어요',
+    posterAlt: (title: string) => `${title} 포스터`,
+    posterEmpty: '포스터 없음',
     labelTitle: '제목',
     labelYear: '개봉 연도',
     labelDirector: '감독',

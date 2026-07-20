@@ -9,6 +9,7 @@ import { ProgressStep } from './components/simple/ProgressStep';
 import { DoneStep } from './components/simple/DoneStep';
 import { useTranslation } from './hooks/useTranslation';
 import { useEnrich } from './hooks/useEnrich';
+import { fetchMoviePoster } from './lib/client/tmdb';
 import { parseSrtBlocks } from './lib/srt';
 import { DEFAULT_TARGET_LANG } from './config/languages';
 import { TRANSLATION_MODEL } from './config/constants';
@@ -93,22 +94,26 @@ export default function Home() {
   const enrichStartedRef = useRef(false);
   const summarizeStartedRef = useRef(false);
 
+  // Movie branch: AI enrich (director + tone/character notes) and the TMDB
+  // poster fetch run in parallel, then land in a single state update. Metadata
+  // comes from the AI; TMDB contributes the poster image only.
   const runEnrich = useCallback(async () => {
     const { title, year } = movieInfoRef.current;
-    const data = await enrich(title, year, geminiKeyRef.current);
-    if (data?.isMovie && data.notes) {
-      setMovieInfo((prev) => ({
-        ...prev,
-        notes: data.notes,
-        year: prev.year || data.year || '',
-      }));
-    } else {
-      setMovieInfo((prev) => ({ ...prev, notes: '' }));
-    }
+    const [data, posterUrl] = await Promise.all([
+      enrich(title, year, geminiKeyRef.current),
+      fetchMoviePoster(title, year),
+    ]);
+    setMovieInfo((prev) => ({
+      ...prev,
+      posterUrl: posterUrl ?? undefined,
+      ...(data?.isMovie && data.notes
+        ? { notes: data.notes, year: prev.year || data.year || '' }
+        : { notes: '' }),
+    }));
   }, [enrich]);
 
-  // Auto-analyze once per file: movie → web-search enrich, other → summarize.
-  // Guarded by refs so returning to the info step never re-triggers.
+  // Auto-analyze once per file: movie → web-search enrich + TMDB poster,
+  // other → summarize. Guarded by refs so returning never re-triggers.
   useEffect(() => {
     if (step !== 1) return;
     if (contentType === 'movie') {

@@ -123,7 +123,16 @@ function MovieInfo({
       ) : (
         <div className='card detected'>
           <div className='poster'>
-            <span>POSTER</span>
+            {movieInfo.posterUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={movieInfo.posterUrl}
+                alt={c.posterAlt(movieInfo.title || '')}
+                className='w-full h-full object-cover'
+              />
+            ) : (
+              <span>{c.posterEmpty}</span>
+            )}
           </div>
           <div className='min-w-0'>
             <div className='dtitle truncate'>{movieInfo.title || '—'}</div>

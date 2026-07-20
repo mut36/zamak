@@ -37,6 +37,18 @@ export const CONCURRENCY = readPositiveIntEnv(
 export const AUX_MODEL = process.env.AUX_MODEL || 'gemini-3.1-flash-lite';
 
 /**
+ * TMDB (The Movie Database) — movie/drama metadata + posters. Server-only key
+ * (never exposed to the client; the /api/tmdb route proxies all calls).
+ * Get the value from TMDB → Settings → API → "API Key (v3 auth)".
+ */
+export const TMDB_API_KEY = process.env.TMDB_API_KEY || '';
+export const TMDB_API_BASE = 'https://api.themoviedb.org/3';
+/** Poster CDN base — append a poster_path like `/abc.jpg`. w500 ≈ card size. */
+export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
+/** Preferred metadata language; overview falls back to en-US when empty. */
+export const TMDB_LANGUAGE = process.env.TMDB_LANGUAGE || 'ko-KR';
+
+/**
  * Number of leading subtitle lines sampled to summarize non-movie content.
  * Developer-tweakable via env for quick tuning.
  */

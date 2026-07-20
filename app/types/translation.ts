@@ -2,6 +2,8 @@ export interface MovieInfo {
   title: string;
   year: string;
   notes: string;
+  /** TMDB poster URL for the detected work (movie branch), when available. */
+  posterUrl?: string;
   /** Legacy metadata fields — still consumed by the translation prompt when
    * present, but no longer surfaced in the Simple UI. Optional. */
   genre?: string;
