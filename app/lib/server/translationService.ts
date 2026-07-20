@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { RETRY } from '../../config/constants';
-import { parseSrtBlocks } from '../srt';
+import { parseSrtBlocks, reassembleTranslatedChunk } from '../srt';
 import { composeTranslationPrompt } from '../prompts/composer';
 import {
   generateModelText,
@@ -239,18 +239,50 @@ export async function translateSubtitle({
     });
   }
 
-  // Default path: one model call per chunk, raw output, no validation/retry/
-  // split. Cost is capped at a single API call. On failure it throws so the
-  // caller can keep the original (untranslated) chunk and still deliver a
-  // complete file.
+  // Default path: one model call per chunk, then a local reassembly. Cost is
+  // capped at a single API call — no validation retries, no per-block splits.
+  // On failure it throws so the caller can keep the original (untranslated)
+  // chunk and still deliver a complete file.
   async function translateOnce(content: string): Promise<string> {
     const prompt = await composePrompt(content);
+    let modelOutput: string;
     try {
-      return await generateModelText({ model, prompt, translationMode }, apiKeys);
+      modelOutput = await generateModelText(
+        { model, prompt, translationMode },
+        apiKeys,
+      );
     } catch (error) {
       console.error(`[translation] ${provider.name} call failed`, error);
       throw new Error(toUserMessage(error));
     }
+
+    // The model is sent subtitles without timestamps, so its output has none
+    // to give back. Rejoin the translated text with the source timecodes by
+    // sequence number — this is what makes line shifting impossible, and it
+    // costs no extra API call. Blocks the model merged or skipped keep their
+    // original text instead of dragging every later subtitle out of sync.
+    const { content: rebuilt, matched, unmatched, total } =
+      reassembleTranslatedChunk(content, modelOutput);
+    const position = chunkPosition
+      ? `${chunkPosition.index}/${chunkPosition.total}`
+      : '1/1';
+
+    if (matched === 0 && total > 0) {
+      // Nothing lined up — treat it as a failed call so the caller counts it.
+      console.error(
+        `[translation] chunk ${position}: model output matched none of ${total} blocks`,
+      );
+      throw new Error(
+        '번역 결과를 자막 형식으로 복원하지 못했습니다. 잠시 후 다시 시도해주세요.',
+      );
+    }
+    if (unmatched > 0) {
+      console.warn(
+        `[translation] chunk ${position}: ${unmatched}/${total} blocks kept the original text (model output did not line up)`,
+      );
+    }
+
+    return rebuilt;
   }
 
   // Strict path (opt-in via TRANSLATION_STRICT_MODE): validate the output,

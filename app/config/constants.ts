@@ -81,6 +81,31 @@ export function resolveTier(hasUserKey: boolean): Tier {
  */
 export const AUX_MODEL = process.env.AUX_MODEL || 'gemini-3.1-flash-lite';
 
+const THINKING_LEVELS = ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH'] as const;
+export type ThinkingLevelName = (typeof THINKING_LEVELS)[number];
+
+/**
+ * Thinking effort for every model call.
+ *
+ * Gemini bills thinking tokens at the *output* rate — 6× the input rate — and
+ * spends them once per request, which makes this the largest single cost lever
+ * we have. Subtitle translation is a mechanical 1:1 mapping that needs little
+ * deliberation, so we sit at the floor. The model does not allow disabling
+ * thinking outright; MINIMAL is as low as it goes.
+ *
+ * Env-tunable so comparing MINIMAL/LOW/MEDIUM/HIGH for translation quality is a
+ * restart rather than a code change.
+ */
+export const THINKING_LEVEL: ThinkingLevelName = (() => {
+  const raw = process.env.THINKING_LEVEL?.trim().toUpperCase();
+  if (!raw) return 'MINIMAL';
+  if ((THINKING_LEVELS as readonly string[]).includes(raw)) {
+    return raw as ThinkingLevelName;
+  }
+  console.warn(`[config] Invalid THINKING_LEVEL "${raw}", using MINIMAL`);
+  return 'MINIMAL';
+})();
+
 /**
  * TMDB (The Movie Database) — movie/drama metadata + posters. Server-only key
  * (never exposed to the client; the /api/tmdb route proxies all calls).

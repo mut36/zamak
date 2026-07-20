@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { GoogleGenAI, FinishReason } from '@google/genai';
-import type { ThinkingLevel } from '@google/genai';
+import { GoogleGenAI, FinishReason, ThinkingLevel } from '@google/genai';
+import { THINKING_LEVEL } from '../../config/constants';
 import type { ModelProvider } from './types';
 
 const defaultClient = process.env.GOOGLE_GENAI_API_KEY
@@ -22,19 +22,23 @@ export const geminiProvider: ModelProvider = {
       ? new GoogleGenAI({ apiKey })
       : defaultClient;
     if (!client) throw new Error('Google AI API key not configured');
-    const isFlash = model.toLowerCase().includes('flash');
+    // thinkingBudget: 0 used to sit here, but this model does not allow
+    // disabling thinking — the budget was ignored and we paid for the default
+    // level. thinkingLevel is the knob it actually honours.
     const response = await client.models.generateContent({
       model,
       contents: prompt,
-      config: isFlash
-        ? { thinkingConfig: { thinkingBudget: 0 } }
-        : { thinkingConfig: { thinkingLevel: 'MEDIUM' as ThinkingLevel } },
+      config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel[THINKING_LEVEL] },
+      },
     });
 
+    // thoughts are billed at the output rate and spent once per request, so
+    // they drive the per-chunk cost that decides chunk size. Log them.
     const usage = response.usageMetadata;
     const cached = usage?.cachedContentTokenCount ?? 0;
     console.log(
-      `[gemini] model=${model} prompt=${usage?.promptTokenCount} cached=${cached} output=${usage?.candidatesTokenCount}${cached > 0 ? ' ✅ cache hit' : ' ❌ no cache'}`,
+      `[gemini] model=${model} thinking=${THINKING_LEVEL} prompt=${usage?.promptTokenCount} cached=${cached} thoughts=${usage?.thoughtsTokenCount ?? 0} output=${usage?.candidatesTokenCount}`,
     );
 
     const candidate = response.candidates?.[0];

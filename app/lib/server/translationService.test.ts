@@ -89,12 +89,11 @@ describe('translateSubtitle strict mode (opt-in validation)', () => {
     await expect(translate()).rejects.toThrow('AI가 빈 번역 결과를 반환했습니다');
   });
 
-  it('returns the model response unchanged in default (non-strict) mode', async () => {
+  it('rejects unmappable output in default (non-strict) mode', async () => {
     delete process.env.TRANSLATION_STRICT_MODE;
-    const untranslatedSrt = '모델이 반환한 형식 그대로';
-    mocks.generateModelText.mockResolvedValue(untranslatedSrt);
+    mocks.generateModelText.mockResolvedValue('형식을 무시하고 뱉은 산문');
 
-    await expect(translate()).resolves.toBe(untranslatedSrt);
+    await expect(translate()).rejects.toThrow('자막 형식으로 복원하지 못했습니다');
     expect(mocks.generateModelText).toHaveBeenCalledTimes(1);
   });
 
@@ -241,16 +240,42 @@ describe('translateSubtitle default mode (single call, no cost bomb)', () => {
 
   afterEach(restoreStrict);
 
-  it('does NOT split on a block-count mismatch — exactly one call, raw output', async () => {
-    // The old cost bomb: a mismatch here would trigger per-block re-translation.
-    const missingBlockResult = [
-      '1',
-      '00:00:01,000 --> 00:00:02,000',
-      '안녕',
-    ].join('\n');
-    mocks.generateModelText.mockResolvedValue(missingBlockResult);
+  it('restores source timecodes onto the timestamp-free model output', async () => {
+    // The model never receives timestamps, so it returns number + text only.
+    mocks.generateModelText.mockResolvedValue(
+      ['1', '안녕', '', '2', '세계'].join('\n'),
+    );
 
-    await expect(translate()).resolves.toBe(missingBlockResult);
+    await expect(translate()).resolves.toBe(
+      [
+        '1',
+        '00:00:01,000 --> 00:00:02,000',
+        '안녕',
+        '',
+        '2',
+        '00:00:03,000 --> 00:00:04,000',
+        '세계',
+      ].join('\n'),
+    );
+  });
+
+  it('keeps one call on a block-count mismatch and falls back per block', async () => {
+    // The old cost bomb: a mismatch here would trigger per-block re-translation.
+    // Now the block the model skipped just keeps its original text, and block 2
+    // still gets block 2's timecode — no shifting.
+    mocks.generateModelText.mockResolvedValue(['1', '안녕'].join('\n'));
+
+    await expect(translate()).resolves.toBe(
+      [
+        '1',
+        '00:00:01,000 --> 00:00:02,000',
+        '안녕',
+        '',
+        '2',
+        '00:00:03,000 --> 00:00:04,000',
+        'World',
+      ].join('\n'),
+    );
     expect(mocks.generateModelText).toHaveBeenCalledTimes(1);
   });
 
