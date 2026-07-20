@@ -52,6 +52,12 @@ export const COPY = {
     research: '다시 검색',
     cancel: '취소',
     notFoundHint: '제목과 연도를 입력하면 다시 검색해볼게요.',
+    // Shown when the search failed outright, rather than simply finding
+    // nothing. The raw server message follows — it is what distinguishes a
+    // rejected key from a Google Search tool that the key's project cannot use.
+    enrichFailed: '작품 정보 검색에 실패했어요.',
+    enrichKeyInvalid:
+      'Gemini가 이 키를 거부했어요. 아래에 제목·연도를 직접 입력하면 그대로 번역할 수 있어요.',
     notesLabel: '참고할 내용',
     notesHint: '번역에 반영할 톤·인물 말투 지침이에요. 자유롭게 다듬어도 좋아요.',
     // other branch

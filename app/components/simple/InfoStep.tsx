@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { SpinnerIcon, SparkleIcon, PencilIcon, ArrowRightIcon } from '../icons';
 import type { EnrichStatus } from '../../hooks/useEnrich';
 import type { ContentType, MovieInfo } from '../../types/translation';
+import { isInvalidKeyError } from '../../utils/apiKeyError';
 import { COPY } from '../../i18n/simpleCopy';
 
 interface InfoStepProps {
@@ -13,6 +14,8 @@ interface InfoStepProps {
   // movie branch (enrich lifecycle owned by the orchestrator so it survives
   // step navigation — no re-search when returning from a failed translate)
   enrichStatus: EnrichStatus;
+  /** Non-empty when the search failed rather than found nothing. */
+  enrichError: string;
   director: string;
   analysisAnalyzing: boolean;
   onReEnrich: () => void;
@@ -40,6 +43,7 @@ function MovieInfo({
   movieInfo,
   setMovieInfo,
   enrichStatus,
+  enrichError,
   director,
   analysisAnalyzing,
   onReEnrich,
@@ -76,6 +80,15 @@ function MovieInfo({
             >
               {c.notFoundBadge}
             </div>
+          )}
+          {/* Why it failed, when it failed. Manual input below still works, so
+              this informs rather than blocks. */}
+          {enrichError && !editing && (
+            <p className='text-[13px] mb-3' style={{ color: 'oklch(0.55 0.2 25)' }}>
+              {isInvalidKeyError(enrichError)
+                ? c.enrichKeyInvalid
+                : `${c.enrichFailed} (${enrichError})`}
+            </p>
           )}
           <p className='text-[13px] text-ink-3 mb-3'>{c.notFoundHint}</p>
           <div className='frow'>

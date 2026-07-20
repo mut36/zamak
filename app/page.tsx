@@ -73,8 +73,13 @@ export default function Home() {
     clearFile,
   } = useTranslation(onMetaUpdate);
 
-  const { status: enrichStatus, director, enrich, reset: resetEnrich } =
-    useEnrich();
+  const {
+    status: enrichStatus,
+    director,
+    error: enrichError,
+    enrich,
+    reset: resetEnrich,
+  } = useEnrich();
 
   const totalLines = useMemo(
     () => (fileContent ? parseSrtBlocks(fileContent).length : 0),
@@ -262,6 +267,7 @@ export default function Home() {
               movieInfo={movieInfo}
               setMovieInfo={setMovieInfo}
               enrichStatus={enrichStatus}
+              enrichError={enrichError}
               director={director}
               analysisAnalyzing={analysis.isAnalyzing}
               onReEnrich={runEnrich}
