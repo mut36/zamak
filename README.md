@@ -91,7 +91,7 @@ npx tsc --noEmit && npx eslint app && npx vitest run
 
 ### 크레딧
 
-크레딧 1개 = 자막 파일 1개(최대 1,500블록). 가입 시 트리거가 1개를 자동 지급합니다.
+크레딧 1개 = 자막 파일 1개(최대 2,000블록). 가입 시 트리거가 1개를 자동 지급합니다.
 
 **차감은 청크가 아니라 파일 단위입니다.** 영화 한 편은 청크 수십 개로 쪼개져 `/api/translate`를 여러 번 호출하므로, 요청마다 차감하면 한 편에 크레딧이 수십 개 날아갑니다. 그래서 번역 시작 시 `/api/translation/begin`이 **크레딧 1개를 차감하며 job을 하나 열고**, 이후 모든 청크 요청은 그 job id를 함께 보내 검증받습니다. 잔액 갱신과 job 생성은 하나의 SQL 함수 안에서 일어나므로 탭 두 개가 마지막 크레딧을 동시에 쓸 수 없습니다.
 
@@ -99,7 +99,7 @@ npx tsc --noEmit && npx eslint app && npx vitest run
 |---|---|
 | 비로그인 | `401` — 모든 모델 라우트 |
 | 크레딧 0 | `402 insufficient_credits` |
-| 1,500블록 초과 | `413 file_too_large` |
+| 2,000블록 초과 | `413 file_too_large` |
 | job이 없거나 만료(기본 60분) | `403 invalid_or_expired_job` |
 
 > 결제가 아직 없으므로 크레딧을 다 쓰면 "준비 중" 안내에서 멈춥니다.
@@ -112,10 +112,12 @@ npx tsc --noEmit && npx eslint app && npx vitest run
 
 | | 청크 크기 | 동시성 | 근거 |
 |---|---|---|---|
-| server (현재 전원) | 125 | 14 | 크레딧 상한 1,500블록을 1웨이브에 끝내는 가장 작은 값 (`⌈1500/14⌉=108` 이상) |
+| server (현재 전원) | 125 | 16 | B는 선택, K는 유도: `K ≥ ⌈2000/125⌉ = 16` (크레딧 상한 파일이 1웨이브) |
 | free (현재 미사용) | 150 | 6 | Gemini 무료 등급 RPM 15에서 유도. 로그인 후 무크레딧 티어용으로 보존 |
 
-측정된 thinking 토큰이 0이라 비용이 B에 거의 무관해졌고(125 vs 851이 6% 차이), 그래서 B는 시간·실패 손실반경·진행률 해상도로 정합니다. Gemini도 Vercel(30,000 자동 스케일)도 동시성을 막지 않으므로 K는 제약이 아니라 "Gemini의 공유 RPM 1,000 중 한 사용자 몫"을 정하는 배분값입니다.
+측정된 thinking 토큰이 0이라 비용이 B에 거의 무관해졌고(125 vs 851이 6% 차이), 그래서 B는 시간·실패 손실반경·진행률 해상도로 정합니다 — 셋 다 작은 B를 선호하고, 125는 정렬 실패율 실측 기준선을 가진 유일한 값이라 여기서 멈춥니다.
+
+**K는 고르는 값이 아닙니다.** Gemini도 Vercel(30,000 자동 스케일)도 동시성을 막지 않으므로 K를 정당화하는 외부 제약이 없고, 그래서 "우리가 받는 모든 파일이 1웨이브에 끝난다"는 규칙에서 유도합니다. 크레딧 상한을 바꾸면 `⌈상한/125⌉`로 K를 다시 계산하세요 — `app/config/constants.test.ts`가 이 부등식을 강제합니다. (K=14는 최초 커밋에서 근거 없이 물려받은 값이었고, 2026-07-22에 이 의존 방향을 뒤집었습니다.)
 
 값의 유도 과정과 계산기는 [docs/tuning/](docs/tuning/)에, **"왜 이렇게 되어 있는가"는 [docs/decisions.md](docs/decisions.md)**에 있습니다.
 
@@ -132,11 +134,11 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 | `TMDB_LANGUAGE` | `ko-KR` | TMDB 메타데이터 언어 |
 | `THINKING_LEVEL` | `LOW` | `MINIMAL`\|`LOW`\|`MEDIUM`\|`HIGH`. **실측상 MINIMAL과 LOW 모두 thinking 0** — 비용이 같아 품질이 나은 LOW가 기본값. 변경 시 dev 서버 재시작 필요 |
 | `NEXT_PUBLIC_FREE_CHUNK_SIZE` / `_FREE_CONCURRENCY` | 150 / 6 | 무료 티어 청킹 |
-| `NEXT_PUBLIC_CHUNK_SIZE` / `NEXT_PUBLIC_CONCURRENCY` | 125 / 14 | server 티어 청킹 (현재 전원) |
+| `NEXT_PUBLIC_CHUNK_SIZE` / `NEXT_PUBLIC_CONCURRENCY` | 125 / 16 | server 티어 청킹 (현재 전원) |
 | `TRANSLATION_STRICT_MODE` | `false` | 아래 참조 |
 | `GOOGLE_GENAI_API_KEY` | — | **필수.** analyze/enrich/summarize/translate 4개 라우트 전부가 이 키로 동작. grounding 때문에 결제 연결 프로젝트여야 함 |
 | `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` | — | **필수.** 없으면 모델 라우트가 전부 500으로 닫힘 |
-| `NEXT_PUBLIC_MAX_BLOCKS_PER_CREDIT` | 1500 | 크레딧 1개가 커버하는 자막 블록 수 |
+| `NEXT_PUBLIC_MAX_BLOCKS_PER_CREDIT` | 2000 | 크레딧 1개가 커버하는 자막 블록 수. 바꾸면 `NEXT_PUBLIC_CONCURRENCY`도 `⌈상한/125⌉`로 함께 갱신 |
 | `JOB_VALIDITY_MINUTES` | 60 | 결제된 job이 유효한 시간 |
 
 ### 번역 실행 경로

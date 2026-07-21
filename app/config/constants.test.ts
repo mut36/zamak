@@ -43,9 +43,11 @@ describe('getTierLimits', () => {
     );
   });
 
-  it('sizes server chunks so the largest accepted file fits in one wave', () => {
-    // The rule behind SERVER_CHUNK_SIZE (docs/tuning/chunk-size-model.md §5).
-    // If this breaks, a max-size file silently costs two waves of latency.
+  it('derives server concurrency so the largest accepted file fits in one wave', () => {
+    // The rule SERVER_CONCURRENCY is derived from (chunk-size-model.md §5-2):
+    // K ≥ ⌈MAX_BLOCKS_PER_CREDIT / B⌉. B is chosen on its own merits and K
+    // follows — so if you raise the credit cap, this is what tells you K needs
+    // recomputing. If it breaks, a max-size file silently costs two waves.
     const { chunkSize, concurrency } = getTierLimits('server');
     expect(Math.ceil(MAX_BLOCKS_PER_CREDIT / chunkSize)).toBeLessThanOrEqual(
       concurrency,

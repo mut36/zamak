@@ -49,20 +49,30 @@ export const FREE_CONCURRENCY = readPositiveIntEnv(
 /**
  * Server key knobs — what every request uses today.
  *
- * DERIVED (2026-07-21, docs/tuning/chunk-size-model.md §5): 125 is the smallest
- * chunk size that still finishes the largest file we accept in a single wave.
- * A credit covers MAX_BLOCKS_PER_CREDIT (1,500) blocks, so the binding case is
- * ⌈1500/B⌉ ≤ CONCURRENCY, i.e. B ≥ 108; 125 clears it with two chunks to spare.
+ * CHUNK SIZE is the real decision; concurrency follows from it.
  *
- * Smaller is better here — measured thinking tokens are 0, which flattened the
+ * Nothing external pins B. Measured thinking tokens are 0, which flattened the
  * cost curve (125 vs 851 differs by 6%) and removed the only reason to prefer
- * large chunks. What remains favours small: wall-clock, the blast radius of a
- * failed chunk (B blocks stay untranslated), and progress-ring resolution.
+ * large chunks; the output cap and the 300s route timeout sit orders of
+ * magnitude away (docs/tuning/chunk-size-model.md §3). So B is chosen on what
+ * actually varies with it: wall-clock, the blast radius of a failed chunk (B
+ * blocks stay untranslated, we never retry), and progress-ring resolution —
+ * all three favour small. 125 is also the only value with field data behind it:
+ * every alignment-failure measurement we have was taken at B=125, so moving it
+ * would discard that baseline for a sub-second latency trade.
  *
- * Concurrency is a choice, not a ceiling: Gemini imposes no concurrent-request
- * limit (gemini-limits.md §2) and Vercel auto-scales to 30,000 (§7-1). 14 is
- * how much of Gemini's shared 1,000 RPM we let one user consume — at B=125
- * that is ~38 RPM each, leaving room for ~26 simultaneous translations.
+ * CONCURRENCY is derived, not chosen: every accepted file must finish in one
+ * wave, so K ≥ ⌈MAX_BLOCKS_PER_CREDIT / B⌉ = ⌈2000/125⌉ = 16. Nothing pushes
+ * back — Gemini imposes no concurrent-request limit (gemini-limits.md §2) and
+ * Vercel auto-scales to 30,000 (§7-1) — so K sits exactly at the requirement.
+ * The only real budget is Gemini's shared 1,000 RPM: a max-size file spends
+ * ~87 RPM (16 requests in one ~11s wave), leaving room for ~11 simultaneous
+ * worst-case translations, or ~26 at the typical ~850-block feature.
+ *
+ * NOTE: K was 14 from the initial commit with no derivation — an inherited
+ * value that B was then fitted to. That dependency is now inverted; if you
+ * change B or the credit cap, re-derive K from the inequality above (the test
+ * in constants.test.ts enforces it).
  */
 export const SERVER_CHUNK_SIZE = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CHUNK_SIZE,
@@ -70,7 +80,7 @@ export const SERVER_CHUNK_SIZE = readPositiveIntEnv(
 );
 export const SERVER_CONCURRENCY = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CONCURRENCY,
-  14,
+  16,
 );
 
 export interface TierLimits {
@@ -100,13 +110,20 @@ export function resolveTier(): Tier {
 }
 
 /**
- * Blocks a single credit covers. One credit buys "one title", and a feature
- * film runs about 850 blocks, so 1,500 leaves generous headroom while still
- * stopping someone from spending one credit on a ten-hour concatenation.
+ * Blocks a single credit covers. One credit buys "one title", so this has to
+ * clear real films, not the average one — a typical feature is ~850 blocks but
+ * a dialogue-dense arthouse film measured 1,480, which left only 20 blocks of
+ * headroom under the old 1,500 cap. Raised to 2,000 (2026-07-22) because
+ * exceeding it is a hard 413 with no partial-translation fallback, so the cap
+ * failing is far worse than it being loose. It still stops someone from
+ * spending one credit on a ten-hour concatenation.
+ *
+ * Cost check: a 2,000-block file runs ~$0.36 (~500 KRW) against ~$0.27 at
+ * 1,480. Credit pricing has to clear the cap, not the average.
  */
 export const MAX_BLOCKS_PER_CREDIT = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_MAX_BLOCKS_PER_CREDIT,
-  1500,
+  2000,
 );
 
 /**

@@ -3,6 +3,7 @@
 // chunk sizes B, per tier, under the constraints in docs/tuning/gemini-limits.md.
 //
 //   node scripts/chunk-model.mjs                  # defaults (estimates marked below)
+//   node scripts/chunk-model.mjs N=2000            # credit-cap file
 //   node scripts/chunk-model.mjs N=1400 tout=22 th=150
 //   node scripts/chunk-model.mjs file=samples/subtitles/full-movie.srt tout=22
 //
@@ -35,9 +36,9 @@ const P = {
 
   // Concurrency ceiling we impose ourselves (SERVER_CONCURRENCY). Neither
   // Gemini (no concurrent-request limit, §2) nor Vercel (auto-scales to 30,000,
-  // §7-1) binds this at our scale, so 14 is OUR choice, bounded by how much of
-  // Gemini's 1,000 RPM one user may consume — not by an infrastructure ceiling.
-  kmax: 14,
+  // §7-1) binds this at our scale, so it is DERIVED from the one-wave rule:
+  // ⌈MAX_BLOCKS_PER_CREDIT / B⌉ = ⌈2000/125⌉ = 16.
+  kmax: 16,
 
   // Latency
   ttft: 2,       // ESTIMATE seconds to first token
