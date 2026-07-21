@@ -104,6 +104,8 @@ npx tsc --noEmit && npx eslint app && npx vitest run
 
 > 결제가 아직 없으므로 크레딧을 다 쓰면 "준비 중" 안내에서 멈춥니다.
 
+개발 중 크레딧 충전·페이월 테스트·job 이력 확인은 [`supabase/dev-seed.sql`](supabase/dev-seed.sql)의 스니펫을 SQL Editor에 붙여넣어 처리합니다.
+
 ### 티어별 청크·동시성
 
 번역 요청의 티어는 `resolveTier()` 한 곳에서 결정되고, 현재는 **무조건 `server`**입니다. 로그인/크레딧이 붙으면 이 함수 본문을 세션 조회로 교체하면 됩니다.
@@ -156,6 +158,7 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 ```text
 middleware.ts                   # Supabase 세션 쿠키 갱신 (게이트 아님)
 supabase/migrations/            # 크레딧·job 스키마 + 가입 시 1크레딧 트리거
+supabase/dev-seed.sql           # 개발용 크레딧 조작 스니펫 (프로덕션 금지)
 app/
 ├── auth/callback/route.ts      # Google OAuth 코드 → 세션 쿠키
 ├── api/
