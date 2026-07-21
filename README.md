@@ -196,7 +196,7 @@ scripts/chunk-model.mjs         # 청크 크기 계산기
 ## Architecture
 
 ```text
-[방문자] → SignInGate            Google 로그인 (가입 시 크레딧 1개 지급)
+[방문자] → LandingPage           Google 로그인 (가입 시 크레딧 1개 지급)
    → UploadStep (.srt만)
    → useTranslation.processFile
         └── /api/analyze          제목·연도 추출
