@@ -13,6 +13,12 @@ export interface GenerateTextRequest {
   prompt: string;
   translationMode: TranslationMode;
   apiKey?: string | null;
+  /**
+   * Fixed instructions sent via the API's system-instruction channel instead
+   * of being concatenated into `prompt`. Optional — callers with a single
+   * combined string (e.g. analysis) simply omit it.
+   */
+  systemInstruction?: string;
 }
 
 export interface ModelProvider {

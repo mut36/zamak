@@ -19,3 +19,14 @@ export interface TranslationPromptContext {
     total: number;
   };
 }
+
+/**
+ * A translation prompt split by API channel: `system` carries the fixed
+ * instructions (role, trust boundary, rules), `user` carries this request's
+ * data (content_metadata, user_notes, subtitle_data) — the same three tags
+ * the trust boundary in `system` names.
+ */
+export interface ComposedPrompt {
+  system: string;
+  user: string;
+}

@@ -15,7 +15,7 @@ export const geminiProvider: ModelProvider = {
     return Boolean(apiKey || process.env.GOOGLE_GENAI_API_KEY);
   },
 
-  async generateText({ model, prompt, apiKey }) {
+  async generateText({ model, prompt, apiKey, systemInstruction }) {
     // Routes pass no key today, so this is the server client. The parameter is
     // the seam a future per-account key would use.
     const client = apiKey
@@ -29,6 +29,7 @@ export const geminiProvider: ModelProvider = {
       model,
       contents: prompt,
       config: {
+        ...(systemInstruction ? { systemInstruction } : {}),
         thinkingConfig: { thinkingLevel: ThinkingLevel[THINKING_LEVEL] },
       },
     });

@@ -228,7 +228,7 @@ export async function translateSubtitle({
 }: TranslateOptions): Promise<string> {
   const provider = getModelProvider(model);
 
-  function composePrompt(content: string): Promise<string> {
+  function composePrompt(content: string) {
     return composeTranslationPrompt(provider.name, {
       movieInfo,
       targetLanguage,
@@ -244,11 +244,11 @@ export async function translateSubtitle({
   // On failure it throws so the caller can keep the original (untranslated)
   // chunk and still deliver a complete file.
   async function translateOnce(content: string): Promise<string> {
-    const prompt = await composePrompt(content);
+    const { system, user } = await composePrompt(content);
     let modelOutput: string;
     try {
       modelOutput = await generateModelText(
-        { model, prompt, translationMode },
+        { model, prompt: user, systemInstruction: system, translationMode },
         apiKeys,
       );
     } catch (error) {
@@ -289,13 +289,13 @@ export async function translateSubtitle({
   // retry with backoff, and re-translate block-by-block on a count mismatch.
   async function translateContentStrict(content: string): Promise<string> {
     const sourceBlocks = parseSrtBlocksByHeader(content);
-    const prompt = await composePrompt(content);
+    const { system, user } = await composePrompt(content);
 
     let lastError: unknown;
     for (let attempt = 1; attempt <= RETRY.MAX_ATTEMPTS; attempt++) {
       try {
         const translatedContent = await generateModelText(
-          { model, prompt, translationMode },
+          { model, prompt: user, systemInstruction: system, translationMode },
           apiKeys,
         );
         return validateTranslatedSrt(content, translatedContent);

@@ -19,8 +19,8 @@ function loadPromptFile(relativePath: string): Promise<string> {
   return prompt;
 }
 
-export function loadCommonPrompt(): Promise<string> {
-  return loadPromptFile('common/subtitle_translation.txt');
+export function loadSystemPromptTemplate(): Promise<string> {
+  return loadPromptFile('common/subtitle_translation_system.txt');
 }
 
 export function loadTranslationRules(
