@@ -110,10 +110,12 @@ npx tsc --noEmit && npx eslint app && npx vitest run
 
 | | 청크 크기 | 동시성 | 근거 |
 |---|---|---|---|
-| server (현재 전원) | 200 | 14 | **잠정값** — 배포 플랜의 동시 실행 한도 조회 후 재산정 |
-| free (현재 미사용) | 150 | 6 | Gemini 무료 등급 RPM 15에서 유도. 로그인 후 무료 티어용으로 보존 |
+| server (현재 전원) | 125 | 14 | 크레딧 상한 1,500블록을 1웨이브에 끝내는 가장 작은 값 (`⌈1500/14⌉=108` 이상) |
+| free (현재 미사용) | 150 | 6 | Gemini 무료 등급 RPM 15에서 유도. 로그인 후 무크레딧 티어용으로 보존 |
 
-값의 유도 과정과 계산기는 [docs/tuning/](docs/tuning/)에 있습니다.
+측정된 thinking 토큰이 0이라 비용이 B에 거의 무관해졌고(125 vs 851이 6% 차이), 그래서 B는 시간·실패 손실반경·진행률 해상도로 정합니다. Gemini도 Vercel(30,000 자동 스케일)도 동시성을 막지 않으므로 K는 제약이 아니라 "Gemini의 공유 RPM 1,000 중 한 사용자 몫"을 정하는 배분값입니다.
+
+값의 유도 과정과 계산기는 [docs/tuning/](docs/tuning/)에, **"왜 이렇게 되어 있는가"는 [docs/decisions.md](docs/decisions.md)**에 있습니다.
 
 ```bash
 node scripts/chunk-model.mjs                    # 현재 파라미터로 비용·시간 표
@@ -126,9 +128,9 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 |---|---|---|
 | `TMDB_API_KEY` | — | **필수.** 포스터 조회 |
 | `TMDB_LANGUAGE` | `ko-KR` | TMDB 메타데이터 언어 |
-| `THINKING_LEVEL` | `MINIMAL` | `MINIMAL`\|`LOW`\|`MEDIUM`\|`HIGH`. thinking 토큰은 출력 단가(입력의 6배)로 요청마다 과금되는 최대 비용 레버입니다 |
+| `THINKING_LEVEL` | `LOW` | `MINIMAL`\|`LOW`\|`MEDIUM`\|`HIGH`. **실측상 MINIMAL과 LOW 모두 thinking 0** — 비용이 같아 품질이 나은 LOW가 기본값. 변경 시 dev 서버 재시작 필요 |
 | `NEXT_PUBLIC_FREE_CHUNK_SIZE` / `_FREE_CONCURRENCY` | 150 / 6 | 무료 티어 청킹 |
-| `NEXT_PUBLIC_CHUNK_SIZE` / `NEXT_PUBLIC_CONCURRENCY` | 200 / 14 | 유료 티어 청킹 |
+| `NEXT_PUBLIC_CHUNK_SIZE` / `NEXT_PUBLIC_CONCURRENCY` | 125 / 14 | server 티어 청킹 (현재 전원) |
 | `TRANSLATION_STRICT_MODE` | `false` | 아래 참조 |
 | `GOOGLE_GENAI_API_KEY` | — | **필수.** analyze/enrich/summarize/translate 4개 라우트 전부가 이 키로 동작. grounding 때문에 결제 연결 프로젝트여야 함 |
 | `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` | — | **필수.** 없으면 모델 라우트가 전부 500으로 닫힘 |
@@ -179,7 +181,8 @@ app/
 │   ├── server/                 # 요청 검증, SSE, 번역 서비스, TMDB
 │   └── srt.ts                  # 파싱, 청킹, 타임코드 재조립
 └── types/translation.ts
-docs/tuning/                    # 청크 크기 산출 근거
+docs/decisions.md               # 기획·설계 결정과 그 이유 (뒤집힌 결정 포함)
+docs/tuning/                    # 청크 크기 산출 근거 + API 한도 조회표
 prompts/
 ├── common/                     # 번역 규칙·철학·분석 프롬프트
 └── gemini/adapter.txt

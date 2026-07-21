@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   FREE_CHUNK_SIZE,
   FREE_CONCURRENCY,
+  MAX_BLOCKS_PER_CREDIT,
   SERVER_CHUNK_SIZE,
   SERVER_CONCURRENCY,
   getTierLimits,
@@ -29,10 +30,25 @@ describe('getTierLimits', () => {
     });
   });
 
-  it('keeps free below server on both knobs to respect free-tier rate limits', () => {
-    const free = getTierLimits('free');
-    const server = getTierLimits('server');
-    expect(free.chunkSize).toBeLessThan(server.chunkSize);
-    expect(free.concurrency).toBeLessThan(server.concurrency);
+  it('keeps free concurrency below server, since free-tier RPM is the binding limit', () => {
+    // Only concurrency is ordered between tiers. Gemini's free RPM of 15 is a
+    // hard ceiling, so free must stay well under what the server key can do.
+    //
+    // Chunk size is deliberately NOT compared: the two are derived from
+    // unrelated constraints — free from the wall-clock optimum under RPM 15,
+    // server from fitting MAX_BLOCKS_PER_CREDIT into one concurrent wave — and
+    // server currently lands *below* free (125 vs 150) as a result.
+    expect(getTierLimits('free').concurrency).toBeLessThan(
+      getTierLimits('server').concurrency,
+    );
+  });
+
+  it('sizes server chunks so the largest accepted file fits in one wave', () => {
+    // The rule behind SERVER_CHUNK_SIZE (docs/tuning/chunk-size-model.md §5).
+    // If this breaks, a max-size file silently costs two waves of latency.
+    const { chunkSize, concurrency } = getTierLimits('server');
+    expect(Math.ceil(MAX_BLOCKS_PER_CREDIT / chunkSize)).toBeLessThanOrEqual(
+      concurrency,
+    );
   });
 });

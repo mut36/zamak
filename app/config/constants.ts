@@ -26,20 +26,16 @@ function readPositiveIntEnv(raw: string | undefined, fallback: number): number {
 export type Tier = 'free' | 'server';
 
 /**
- * Free tier, derived in `docs/tuning/chunk-size-model.md` (calculator at
- * `scripts/chunk-model.mjs`).
+ * Free tier — CURRENTLY UNUSED. resolveTier() always returns 'server' now that
+ * BYOK is gone, so nothing reaches these. Kept because the values are still
+ * correct for a Gemini free-tier key, and a signed-in-but-uncredited tier would
+ * want them back (docs/tuning/chunk-size-model.md §6).
  *
- * 150 is the wall-clock optimum. Subtitle body tokens don't depend on chunk
- * size, so the only things that move with it are the prompt we repeat per
- * chunk and the thinking spent per request — both favour bigger chunks — while
- * free-tier RPM caps concurrency at roughly D/4, which cancels the head start
- * smaller chunks would otherwise get. The curve is flat between 100 and 200
- * even when thinking is 5x or generation half as fast, so this survives the
- * estimates it was built on being wrong.
- *
- * 6 keeps ~15% headroom under the 15 RPM ceiling (7 would sit exactly on it).
- * Gemini sends no Retry-After and we never retry, so a 429 costs untranslated
- * subtitles — worth the margin.
+ * 150 is the wall-clock optimum under free-tier limits: free RPM caps
+ * concurrency at roughly D/4, cancelling the head start smaller chunks would
+ * otherwise get. 6 keeps ~15% headroom under the 15 RPM ceiling (7 would sit
+ * exactly on it) — Gemini sends no Retry-After and we never retry, so a 429
+ * costs untranslated subtitles.
  */
 export const FREE_CHUNK_SIZE = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_FREE_CHUNK_SIZE,
@@ -51,24 +47,26 @@ export const FREE_CONCURRENCY = readPositiveIntEnv(
 );
 
 /**
- * Paid server key — the original knobs, kept under their existing env names.
+ * Server key knobs — what every request uses today.
  *
- * PROVISIONAL. Unlike the free values these are not derived from anything: 14
- * has been carried since the first commit as a chunking-test default. It can't
- * be derived from Gemini either, which imposes no concurrent-request limit of
- * its own (gemini-limits.md §2) and whose 1000 RPM never binds here — what
- * actually bounds paid concurrency is our own serverless concurrent-execution
- * limit, since each in-flight chunk holds a function open for the whole model
- * call, summed across all users at once rather than one.
+ * DERIVED (2026-07-21, docs/tuning/chunk-size-model.md §5): 125 is the smallest
+ * chunk size that still finishes the largest file we accept in a single wave.
+ * A credit covers MAX_BLOCKS_PER_CREDIT (1,500) blocks, so the binding case is
+ * ⌈1500/B⌉ ≤ CONCURRENCY, i.e. B ≥ 108; 125 clears it with two chunks to spare.
  *
- * That number decides the chunk size too: the paid optimum is N/kmax, the
- * smallest chunk that still finishes in a single wave. Look the limit up
- * (gemini-limits.md §7-1) before the billing gate makes this path live, then
- * re-run scripts/chunk-model.mjs with kmax= to set both.
+ * Smaller is better here — measured thinking tokens are 0, which flattened the
+ * cost curve (125 vs 851 differs by 6%) and removed the only reason to prefer
+ * large chunks. What remains favours small: wall-clock, the blast radius of a
+ * failed chunk (B blocks stay untranslated), and progress-ring resolution.
+ *
+ * Concurrency is a choice, not a ceiling: Gemini imposes no concurrent-request
+ * limit (gemini-limits.md §2) and Vercel auto-scales to 30,000 (§7-1). 14 is
+ * how much of Gemini's shared 1,000 RPM we let one user consume — at B=125
+ * that is ~38 RPM each, leaving room for ~26 simultaneous translations.
  */
 export const SERVER_CHUNK_SIZE = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CHUNK_SIZE,
-  200,
+  125,
 );
 export const SERVER_CONCURRENCY = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CONCURRENCY,
@@ -137,22 +135,26 @@ export type ThinkingLevelName = (typeof THINKING_LEVELS)[number];
  * Thinking effort for every model call.
  *
  * Gemini bills thinking tokens at the *output* rate — 6× the input rate — and
- * spends them once per request, which makes this the largest single cost lever
- * we have. Subtitle translation is a mechanical 1:1 mapping that needs little
- * deliberation, so we sit at the floor. The model does not allow disabling
- * thinking outright; MINIMAL is as low as it goes.
+ * spends them once per request, so this looked like our largest cost lever.
+ * Measurement said otherwise: on real 200-block chunks both MINIMAL and LOW
+ * report thoughts=0 (docs/tuning/gemini-limits.md §6). LOW therefore costs what
+ * MINIMAL costs while deliberating more, which is why it is the default.
+ *
+ * The model does not allow disabling thinking outright, and thinkingBudget: 0
+ * is silently ignored — thinkingLevel is the knob it honours.
  *
  * Env-tunable so comparing MINIMAL/LOW/MEDIUM/HIGH for translation quality is a
- * restart rather than a code change.
+ * restart rather than a code change. MEDIUM and HIGH are unmeasured; assume
+ * they do spend thinking tokens until a run says otherwise.
  */
 export const THINKING_LEVEL: ThinkingLevelName = (() => {
   const raw = process.env.THINKING_LEVEL?.trim().toUpperCase();
-  if (!raw) return 'MINIMAL';
+  if (!raw) return 'LOW';
   if ((THINKING_LEVELS as readonly string[]).includes(raw)) {
     return raw as ThinkingLevelName;
   }
-  console.warn(`[config] Invalid THINKING_LEVEL "${raw}", using MINIMAL`);
-  return 'MINIMAL';
+  console.warn(`[config] Invalid THINKING_LEVEL "${raw}", using LOW`);
+  return 'LOW';
 })();
 
 /**

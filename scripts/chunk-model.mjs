@@ -11,14 +11,17 @@
 
 import { readFileSync } from 'node:fs';
 
-// ---------- parameters (defaults = best current estimates) ----------------
+// ---------- parameters (defaults = MEASURED unless marked) ----------------
+// Measured 2026-07-21 from a real 461-block run (3 chunks) — see
+// docs/tuning/chunk-size-model.md "실측 파라미터". Back-solved from the
+// [gemini] log lines: prompt = pfixed + blocks*tin, output = blocks*tout.
 const P = {
   // Workload
   N: 851,        // subtitle blocks per file (full-movie.srt measured)
-  tin: 10,       // ESTIMATE input tokens/block (number+dialogue, ~4 chars/token English)
-  tout: 20,      // ESTIMATE output tokens/block (number + Korean body) — MEASURE
-  th: 100,       // ESTIMATE thinking tokens per request at MINIMAL — MEASURE
-  pfixed: 700,   // fixed prompt tokens repeated per chunk (measured ~1385 chars)
+  tin: 15,       // MEASURED input tokens/block (was estimated 10)
+  tout: 16,      // MEASURED output tokens/block (was estimated 20)
+  th: 0,         // MEASURED thinking tokens/request — 0 at both MINIMAL and LOW
+  pfixed: 1028,  // MEASURED fixed prompt tokens/chunk incl. movieInfo notes (est. was 700)
   dens: 1.25,    // p95/mean density factor — densest window vs average (measured ~1.2)
 
   // Model / API (docs/tuning/gemini-limits.md)
@@ -30,17 +33,15 @@ const P = {
   rpdFree: 1500,
   timeout: 300,  // route maxDuration seconds
 
-  // Concurrency ceiling we impose ourselves. Gemini has no separate concurrent
-  // request limit (see gemini-limits.md §2), so on the paid tier this — not the
-  // API — is what bounds K: every in-flight chunk holds a serverless function
-  // open for the whole model call, and the cap has to cover ALL users at once,
-  // not one. UNKNOWN until the deployment plan's concurrent-execution limit is
-  // looked up; 14 below is an undertermined legacy value, not a derived one.
+  // Concurrency ceiling we impose ourselves (SERVER_CONCURRENCY). Neither
+  // Gemini (no concurrent-request limit, §2) nor Vercel (auto-scales to 30,000,
+  // §7-1) binds this at our scale, so 14 is OUR choice, bounded by how much of
+  // Gemini's 1,000 RPM one user may consume — not by an infrastructure ceiling.
   kmax: 14,
 
-  // Latency ESTIMATES — measure from real runs
-  ttft: 2,       // seconds to first token
-  v: 120,        // output tokens/second generation speed
+  // Latency
+  ttft: 2,       // ESTIMATE seconds to first token
+  v: 220,        // MEASURED output tokens/second (was estimated 120)
 
   // Candidate chunk sizes
   B: '25,40,50,100,150,200,300,425,600,851',
