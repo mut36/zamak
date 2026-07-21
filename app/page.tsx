@@ -7,7 +7,7 @@ import { UploadStep } from './components/simple/UploadStep';
 import { InfoStep } from './components/simple/InfoStep';
 import { ProgressStep } from './components/simple/ProgressStep';
 import { DoneStep } from './components/simple/DoneStep';
-import { SignInGate } from './components/simple/SignInGate';
+import { LandingPage } from './components/simple/LandingPage';
 import { CreditWall } from './components/simple/CreditWall';
 import { useTranslation } from './hooks/useTranslation';
 import { useEnrich } from './hooks/useEnrich';
@@ -249,7 +249,7 @@ export default function Home() {
       <div className='min-h-screen'>
         {header}
         <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
-          <SignInGate
+          <LandingPage
             onSignIn={signIn}
             error={authError}
             configured={isSupabaseConfigured}

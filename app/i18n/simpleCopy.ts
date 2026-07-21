@@ -8,11 +8,6 @@ export const COPY = {
   steps: ['파일', '정보', '번역', '완료'],
 
   auth: {
-    // Sign-in wall. The pitch has to carry the whole page, so it leads with
-    // what the product does rather than with the login itself.
-    gateTitle: '자막 한 편, 무료로 번역해보세요',
-    gateSubtitle:
-      '로그인하면 번역권 1편을 바로 드려요. 타임코드는 100% 그대로 유지돼요.',
     signIn: 'Google로 계속하기',
     signingIn: '로그인 중…',
     gateNote: '로그인은 번역권을 지급하고 사용량을 확인하는 데만 쓰여요.',
@@ -23,6 +18,69 @@ export const COPY = {
       '로그인이 아직 설정되지 않았어요. 서버 환경 변수를 확인해주세요.',
     /** Header chip. */
     creditsLeft: (n: number) => `번역권 ${n}편`,
+  },
+
+  // Anonymous landing. Static content only — proving product value in front
+  // of the sign-in wall costs zero API calls. Two claims carry the page:
+  // timecode integrity and work-context-aware tone.
+  landing: {
+    hero: {
+      title: 'SRT 자막, 2분이면 번역돼요',
+      subtitle:
+        '타임코드는 100% 그대로. 작품의 톤과 인물의 말투까지 반영해요.',
+      cta: 'Google로 무료 시작하기',
+      ctaHint: '가입 즉시 번역권 1편 무료 · 카드 등록 없음',
+    },
+    sample: {
+      title: '결과물로 보여드릴게요',
+      subtitle:
+        '자체 제작 예문이에요. 형사물에서 선배와 신입이 나누는 대화로, 타임코드와 말투를 눈으로 확인하세요.',
+      srcLabel: '원본 SRT',
+      dstLabel: 'ZAMAK 번역',
+      blocks: [
+        {
+          no: '24',
+          tc: '00:12:07,332 --> 00:12:09,150',
+          src: 'You called it in yet?',
+          dst: '보고는 올렸어?',
+        },
+        {
+          no: '25',
+          tc: '00:12:09,433 --> 00:12:11,900',
+          src: 'Not yet. I thought you should see it first.',
+          dst: '아직입니다. 선배가 먼저 보셔야 할 것 같아서요.',
+        },
+        {
+          no: '26',
+          tc: '00:12:12,410 --> 00:12:15,224',
+          src: 'Good call. This stays between us for now.',
+          dst: '잘 판단했어. 당분간 우리끼리만 알고 있자.',
+        },
+      ],
+      points: [
+        {
+          title: '타임코드가 한 글자도 안 달라져요',
+          body: '타임코드는 AI가 아니라 코드가 관리해요. AI가 줄을 합치거나 빠뜨려도 이후 자막이 밀리는 일은 구조적으로 일어나지 않아요.',
+        },
+        {
+          title: '누가 누구에게 말하는지 알아요',
+          body: '작품 정보를 검색해 인물 관계와 말투 지침을 만들어요. 선배는 반말, 신입은 존댓말 — 문장마다 흔들리지 않아요.',
+        },
+      ],
+    },
+    how: {
+      title: '쓰는 법은 세 단계예요',
+      steps: [
+        { title: '업로드', body: '.srt 파일을 끌어다 놓아요.' },
+        { title: '확인', body: 'AI가 찾은 작품 정보를 확인하고 시작을 눌러요.' },
+        { title: '다운로드', body: '평균 2분 뒤, 번역된 .srt를 받아요.' },
+      ],
+    },
+    closing: {
+      title: '첫 한 편은 무료예요',
+      body: '로그인하면 번역권 1편을 바로 드려요 — 영화 한 편이 통째로 들어가는 분량이에요. 사람에게 맡기면 편당 15만 원. 먼저 결과물로 판단하세요.',
+    },
+    footerNote: '자막 번역 도구',
   },
 
   credits: {

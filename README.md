@@ -156,7 +156,7 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 ## Project Structure
 
 ```text
-middleware.ts                   # Supabase 세션 쿠키 갱신 (게이트 아님)
+proxy.ts                        # Supabase 세션 쿠키 갱신 (게이트 아님)
 supabase/migrations/            # 크레딧·job 스키마 + 가입 시 1크레딧 트리거
 supabase/dev-seed.sql           # 개발용 크레딧 조작 스니펫 (프로덕션 금지)
 app/
