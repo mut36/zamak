@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "harness": "node --import ./scripts/harness/loader.mjs --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/prompt-ab.mts"
   },
   "dependencies": {
     "@google/genai": "^1.38.0",

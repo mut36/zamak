@@ -45,3 +45,6 @@ next-env.d.ts
 
 # tuning samples — subtitles are third-party content, keep them local
 /samples/subtitles/*.srt
+
+# prompt A/B output — contains translated third-party subtitles
+/.harness
