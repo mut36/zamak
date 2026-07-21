@@ -8,11 +8,11 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
  * Refreshes the Supabase session cookie on every request.
  *
  * This does not gate anything — the routes do that themselves, because a
- * middleware check alone would be bypassed by anything that reaches a route
+ * proxy-level check alone would be bypassed by anything that reaches a route
  * handler directly. Its only job is keeping the access token from expiring
  * mid-session.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const response = NextResponse.next({ request });
 
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return response;

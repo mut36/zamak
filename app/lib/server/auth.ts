@@ -18,7 +18,7 @@ export type AuthOutcome =
 /**
  * Every route that spends the server key calls this first.
  *
- * The gate lives here rather than in middleware because middleware runs before
+ * The gate lives here rather than in the proxy because the proxy runs before
  * routing and can be sidestepped; this is the check that actually stands
  * between an anonymous request and our Gemini bill.
  */

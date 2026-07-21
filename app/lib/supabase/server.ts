@@ -8,8 +8,8 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from './env';
  * Supabase client bound to the request's cookies, for use in route handlers
  * and server components.
  *
- * Writing cookies throws in a server component (only middleware and route
- * handlers may set them). That is expected and ignored here: the middleware
+ * Writing cookies throws in a server component (only the proxy and route
+ * handlers may set them). That is expected and ignored here: the proxy
  * refreshes the session on every request, so a read-only render still sees a
  * valid one.
  */
@@ -27,7 +27,7 @@ export async function createClient() {
             cookieStore.set(name, value, options),
           );
         } catch {
-          /* server component render — middleware handles the refresh */
+          /* server component render — the proxy handles the refresh */
         }
       },
     },
