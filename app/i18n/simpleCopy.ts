@@ -201,4 +201,16 @@ export const COPY = {
     partialWarning: (failed: number) =>
       `일부 구간(${failed.toLocaleString()}개)은 번역에 실패해 원문 그대로 남아 있어요. 해당 부분만 다시 번역하거나 직접 손봐주세요.`,
   },
+
+  notFound: {
+    title: '페이지를 찾을 수 없어요',
+    body: '주소가 바뀌었거나 존재하지 않는 페이지예요.',
+    home: '홈으로 가기',
+  },
+
+  error: {
+    title: '문제가 생겼어요',
+    body: '일시적인 오류일 수 있어요. 다시 시도해주세요.',
+    retry: '다시 시도',
+  },
 } as const;
