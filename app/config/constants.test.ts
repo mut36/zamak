@@ -43,14 +43,40 @@ describe('getTierLimits', () => {
     );
   });
 
-  it('derives server concurrency so the largest accepted file fits in one wave', () => {
-    // The rule SERVER_CONCURRENCY is derived from (chunk-size-model.md §5-2):
-    // K ≥ ⌈MAX_BLOCKS_PER_CREDIT / B⌉. B is chosen on its own merits and K
-    // follows — so if you raise the credit cap, this is what tells you K needs
-    // recomputing. If it breaks, a max-size file silently costs two waves.
-    const { chunkSize, concurrency } = getTierLimits('server');
-    expect(Math.ceil(MAX_BLOCKS_PER_CREDIT / chunkSize)).toBeLessThanOrEqual(
-      concurrency,
+  // The one-wave rule (K ≥ ⌈MAX_BLOCKS_PER_CREDIT / B⌉) used to be asserted
+  // here. Dropped 2026-07-22: extra waves cost seconds on a job that already
+  // finishes well under a minute, and enforcing it pinned K to B for no
+  // benefit. What remains are the only two limits that are actually derivable
+  // — everything else about B is a smooth trade with no optimum
+  // (docs/tuning/chunk-size-model.md §5).
+  it('keeps a chunk inside the per-request output cap', () => {
+    // A chunk that overruns 65,536 output tokens is truncated, which loses the
+    // whole chunk — the densest window carries dens× the average, so budget
+    // for that rather than the mean.
+    const OUT_CAP = 65536;
+    const TOKENS_PER_BLOCK = 16; // measured, chunk-size-model.md §1
+    const DENSITY = 1.25; // p95 densest window vs average
+    expect(
+      getTierLimits('server').chunkSize * TOKENS_PER_BLOCK * DENSITY,
+    ).toBeLessThan(OUT_CAP);
+  });
+
+  it('keeps a chunk inside the route timeout', () => {
+    // maxDuration on /api/translate is 300s; one chunk must generate within it.
+    const TIMEOUT_S = 300;
+    const TOKENS_PER_BLOCK = 16;
+    const TOKENS_PER_S = 220; // measured generation rate
+    const TTFT_S = 2;
+    const duration =
+      TTFT_S + (getTierLimits('server').chunkSize * TOKENS_PER_BLOCK) / TOKENS_PER_S;
+    expect(duration).toBeLessThan(TIMEOUT_S);
+  });
+
+  it('lets one credit cover a file that a wave-sized batch cannot', () => {
+    // Chunking must be able to reach the whole cap; K no longer has to cover
+    // it in a single wave, but B still has to divide it into finite chunks.
+    expect(MAX_BLOCKS_PER_CREDIT).toBeGreaterThan(
+      getTierLimits('server').chunkSize,
     );
   });
 });

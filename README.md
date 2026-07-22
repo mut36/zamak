@@ -112,12 +112,20 @@ npx tsc --noEmit && npx eslint app && npx vitest run
 
 | | 청크 크기 | 동시성 | 근거 |
 |---|---|---|---|
-| server (현재 전원) | 125 | 16 | B는 선택, K는 유도: `K ≥ ⌈2000/125⌉ = 16` (크레딧 상한 파일이 1웨이브) |
+| server (현재 전원) | 125 | 16 | **근거 없는 동결값** — 아래 참조 |
 | free (현재 미사용) | 150 | 6 | Gemini 무료 등급 RPM 15에서 유도. 로그인 후 무크레딧 티어용으로 보존 |
 
-측정된 thinking 토큰이 0이라 비용이 B에 거의 무관해졌고(125 vs 851이 6% 차이), 그래서 B는 시간·실패 손실반경·진행률 해상도로 정합니다 — 셋 다 작은 B를 선호하고, 125는 정렬 실패율 실측 기준선을 가진 유일한 값이라 여기서 멈춥니다.
+**청크 크기는 계산으로 정할 수 없습니다.** 유도되는 건 상한 두 개(출력 상한 65,536 → `B ≤ 3,276`, 라우트 타임아웃 300초 → `B ≤ 4,097`)뿐이고 둘 다 현재값의 26배 이상 떨어져 있습니다. 그 안쪽은 전부 끝점 없는 트레이드입니다 — 비용은 B에 단조 감소하지만 전 구간 6.5% 차이고(thinking 토큰이 0이라), 시간은 단조 증가하지만 영화 한 편이 어느 쪽이든 1분 안에 끝납니다.
 
-**K는 고르는 값이 아닙니다.** Gemini도 Vercel(30,000 자동 스케일)도 동시성을 막지 않으므로 K를 정당화하는 외부 제약이 없고, 그래서 "우리가 받는 모든 파일이 1웨이브에 끝난다"는 규칙에서 유도합니다. 크레딧 상한을 바꾸면 `⌈상한/125⌉`로 K를 다시 계산하세요 — `app/config/constants.test.ts`가 이 부등식을 강제합니다. (K=14는 최초 커밋에서 근거 없이 물려받은 값이었고, 2026-07-22에 이 의존 방향을 뒤집었습니다.)
+실제로 B를 가를 두 양은 **둘 다 미측정이고 방향이 반대**입니다: 정렬 실패율은 방향 불명, 인물 말투 일관성은 큰 B를 선호합니다(청크가 서로를 모른 채 병렬 번역되므로). 그래서 125·16은 **옳아서가 아니라 바꿀 근거가 없어서 두는 값**이고, 결정은 A/B 하네스로 넘겼습니다.
+
+숫자를 바꿔 실험하려면 env로 덮으면 됩니다(하네스도 같은 상수를 읽습니다):
+
+```bash
+NEXT_PUBLIC_CHUNK_SIZE=200 npm run harness -- file=samples/subtitles/full-movie.srt
+```
+
+`app/config/constants.test.ts`는 위 상한 두 개만 강제합니다 — 임의의 값을 꽂아보는 걸 막지 않기 위해서입니다. 자세한 유도 이력(무너진 유도 4개 포함)은 [docs/tuning/chunk-size-model.md](docs/tuning/chunk-size-model.md) §5에 있습니다.
 
 값의 유도 과정과 계산기는 [docs/tuning/](docs/tuning/)에, **"왜 이렇게 되어 있는가"는 [docs/decisions.md](docs/decisions.md)**에 있습니다.
 
@@ -138,7 +146,7 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 | `TRANSLATION_STRICT_MODE` | `false` | 아래 참조 |
 | `GOOGLE_GENAI_API_KEY` | — | **필수.** analyze/enrich/summarize/translate 4개 라우트 전부가 이 키로 동작. grounding 때문에 결제 연결 프로젝트여야 함 |
 | `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` | — | **필수.** 없으면 모델 라우트가 전부 500으로 닫힘 |
-| `NEXT_PUBLIC_MAX_BLOCKS_PER_CREDIT` | 2000 | 크레딧 1개가 커버하는 자막 블록 수. 바꾸면 `NEXT_PUBLIC_CONCURRENCY`도 `⌈상한/125⌉`로 함께 갱신 |
+| `NEXT_PUBLIC_MAX_BLOCKS_PER_CREDIT` | 2000 | 크레딧 1개가 커버하는 자막 블록 수 |
 | `JOB_VALIDITY_MINUTES` | 60 | 결제된 job이 유효한 시간 |
 
 ### 번역 실행 경로

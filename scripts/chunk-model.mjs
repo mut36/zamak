@@ -36,8 +36,8 @@ const P = {
 
   // Concurrency ceiling we impose ourselves (SERVER_CONCURRENCY). Neither
   // Gemini (no concurrent-request limit, §2) nor Vercel (auto-scales to 30,000,
-  // §7-1) binds this at our scale, so it is DERIVED from the one-wave rule:
-  // ⌈MAX_BLOCKS_PER_CREDIT / B⌉ = ⌈2000/125⌉ = 16.
+  // §7-1) binds this at our scale, and the one-wave rule that briefly derived
+  // it was dropped 2026-07-22 — so 16 is frozen, not derived. Override freely.
   kmax: 16,
 
   // Latency
@@ -139,5 +139,9 @@ console.log(`\nNotes:
   chunks are expensive even though the subtitle text itself is B-invariant.
 - Free tier cost is $0; the columns that matter are total time and files/day (RPD ${P.rpdFree}).
 - OUTCAP flag uses the densest-window factor dens=${P.dens}, not the average.
-- Failure blast radius: one failed chunk keeps B blocks untranslated — pick the
-  largest B whose blast radius is still acceptable, not the theoretical optimum.`);
+- Failure blast radius is B-INVARIANT in expectation: one failed chunk costs B
+  blocks, but halving B doubles the chunk count, so expected loss stays ~p*N.
+  Small B lowers variance, not the mean (chunk-size-model.md §5-4).
+- No interior optimum exists for B. Only two hard walls are derivable — the
+  output cap (B <= 3,276) and the route timeout (B <= 4,097) — and everything
+  between is a smooth trade. Deciding B needs the A/B harness, not this script.`);

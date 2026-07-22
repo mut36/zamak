@@ -49,30 +49,32 @@ export const FREE_CONCURRENCY = readPositiveIntEnv(
 /**
  * Server key knobs — what every request uses today.
  *
- * CHUNK SIZE is the real decision; concurrency follows from it.
+ * BOTH VALUES ARE UNJUSTIFIED PLACEHOLDERS. They are frozen, not derived, and
+ * the honest summary (docs/tuning/chunk-size-model.md §5) is that no amount of
+ * modelling picks a chunk size for us:
  *
- * Nothing external pins B. Measured thinking tokens are 0, which flattened the
- * cost curve (125 vs 851 differs by 6%) and removed the only reason to prefer
- * large chunks; the output cap and the 300s route timeout sit orders of
- * magnitude away (docs/tuning/chunk-size-model.md §3). So B is chosen on what
- * actually varies with it: wall-clock, the blast radius of a failed chunk (B
- * blocks stay untranslated, we never retry), and progress-ring resolution —
- * all three favour small. 125 is also the only value with field data behind it:
- * every alignment-failure measurement we have was taken at B=125, so moving it
- * would discard that baseline for a sub-second latency trade.
+ *   - Cost falls monotonically with B, but only 6.5% across the entire usable
+ *     range, because measured thinking tokens are 0. No interior optimum.
+ *   - Wall clock rises monotonically with B, and is no longer a constraint —
+ *     a whole film translates in well under a minute either way.
+ *   - Expected blast radius is B-INVARIANT, contrary to what this comment
+ *     claimed before: losing a chunk costs B blocks, but halving B doubles the
+ *     chunk count, so expected untranslated blocks ≈ p·N either way. Small B
+ *     buys lower variance, not lower loss.
+ *   - The only hard walls are the 65,536-token output cap (B ≤ 3,276) and the
+ *     300s route timeout (B ≤ 4,097) — both ~26x away. constants.test.ts
+ *     asserts these two and nothing else.
  *
- * CONCURRENCY is derived, not chosen: every accepted file must finish in one
- * wave, so K ≥ ⌈MAX_BLOCKS_PER_CREDIT / B⌉ = ⌈2000/125⌉ = 16. Nothing pushes
- * back — Gemini imposes no concurrent-request limit (gemini-limits.md §2) and
- * Vercel auto-scales to 30,000 (§7-1) — so K sits exactly at the requirement.
- * The only real budget is Gemini's shared 1,000 RPM: a max-size file spends
- * ~87 RPM (16 requests in one ~11s wave), leaving room for ~11 simultaneous
- * worst-case translations, or ~26 at the typical ~850-block feature.
+ * What would actually decide B is unmeasured, and the two candidates point in
+ * opposite directions: alignment-failure rate f(B) (direction unknown) and
+ * cross-chunk voice consistency (favours large B, since chunks are translated
+ * blind to each other). Both need the A/B harness, not arithmetic.
  *
- * NOTE: K was 14 from the initial commit with no derivation — an inherited
- * value that B was then fitted to. That dependency is now inverted; if you
- * change B or the credit cap, re-derive K from the inequality above (the test
- * in constants.test.ts enforces it).
+ * History, so nobody re-derives a phantom: K=14 arrived in the initial commit
+ * with no derivation, B=125 was then fitted to it via ⌈1500/14⌉, and the 1,500
+ * cap it referenced is gone. The one-wave rule that briefly re-justified K was
+ * dropped 2026-07-22. Treat both numbers as arbitrary-but-frozen; override via
+ * env to experiment (the harness reads these too).
  */
 export const SERVER_CHUNK_SIZE = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CHUNK_SIZE,
