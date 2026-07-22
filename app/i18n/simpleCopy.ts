@@ -86,12 +86,39 @@ export const COPY = {
   credits: {
     emptyTitle: '번역권을 모두 사용했어요',
     emptyBody:
-      '무료로 드린 1편을 다 쓰셨어요. 추가 번역권은 준비 중이에요 — 곧 찾아뵐게요.',
-    emptyCta: '준비 중',
+      '무료로 드린 1편을 다 쓰셨어요. 번역권을 충전하면 이어서 번역할 수 있어요.',
+    emptyCta: '번역권 충전하기',
     tooLargeTitle: '파일이 너무 커요',
     tooLargeBody: (max: number, actual: number) =>
       `번역권 1편은 자막 ${max.toLocaleString()}줄까지 커버해요. 이 파일은 ${actual.toLocaleString()}줄이에요.`,
     startOver: '다른 파일 올리기',
+  },
+
+  // Prepaid credit packs. The anchor is deliberately the human-translator price
+  // (~150,000원/편), not our cost — see docs/decisions.md.
+  purchase: {
+    title: '번역권 충전',
+    subtitle: '사람에게 맡기면 편당 15만 원. 번역권은 유효기간이 없어요.',
+    creditsUnit: (n: number) => `번역권 ${n}편`,
+    price: (won: number) => `${won.toLocaleString()}원`,
+    perCredit: (won: number) => `편당 ${won.toLocaleString()}원`,
+    coverage: (max: number) => `1편 = 자막 ${max.toLocaleString()}줄까지`,
+    cta: '결제하기',
+    opening: '결제창을 여는 중…',
+    close: '돌아가기',
+    balance: (n: number) => `현재 번역권 ${n}편`,
+    notice: [
+      '카드·간편결제로 결제돼요. 결제는 토스페이먼츠가 처리해요.',
+      '번역권은 유효기간이 없고, 사용하지 않은 번역권은 환불할 수 있어요.',
+    ],
+    terms: '환불 · 이용 안내',
+    done: (n: number) => `번역권 ${n}편이 충전됐어요!`,
+    // Toss error codes are opaque to buyers; only the cause that they can act
+    // on is worth naming, and everything else gets one honest sentence.
+    failed: '결제가 완료되지 않았어요. 다시 시도해주세요.',
+    canceled: '결제를 취소했어요.',
+    failedCode: (code: string) => `오류 코드: ${code}`,
+    notConfigured: '결제가 아직 설정되지 않았어요. 잠시 후 다시 시도해주세요.',
   },
 
   upload: {

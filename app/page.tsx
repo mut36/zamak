@@ -9,6 +9,7 @@ import { ProgressStep } from './components/simple/ProgressStep';
 import { DoneStep } from './components/simple/DoneStep';
 import { LandingPage } from './components/simple/LandingPage';
 import { CreditWall } from './components/simple/CreditWall';
+import { PurchaseStep } from './components/simple/PurchaseStep';
 import { useTranslation } from './hooks/useTranslation';
 import { useEnrich } from './hooks/useEnrich';
 import { useAuth } from './hooks/useAuth';
@@ -36,6 +37,8 @@ export default function Home() {
   const [uploadError, setUploadError] = useState('');
   const [summarizing, setSummarizing] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [purchasing, setPurchasing] = useState(false);
+  const [purchaseNotice, setPurchaseNotice] = useState('');
 
   const {
     user,
@@ -46,15 +49,41 @@ export default function Home() {
     refreshBalance,
   } = useAuth();
 
-  // The OAuth callback reports failures by redirecting back with a query
-  // param; surface it and clean the URL so a refresh does not re-show it.
+  // Both round-trips that leave the app — OAuth and the Toss payment window —
+  // report back through query params. Read them once, then clean the URL so a
+  // refresh does not re-show a stale banner (or re-count a purchase).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const purchase = params.get('purchase');
+    let handled = false;
+
     if (params.get('auth_error')) {
       setAuthError(COPY.auth.failed);
+      handled = true;
+    }
+
+    if (purchase === 'done') {
+      const credits = Number(params.get('credits'));
+      setPurchaseNotice(
+        COPY.purchase.done(Number.isFinite(credits) ? credits : 0),
+      );
+      // The grant already happened server-side; this only catches the header up.
+      refreshBalance();
+      handled = true;
+    } else if (purchase === 'failed') {
+      const code = params.get('code') || '';
+      setPurchaseNotice(
+        code === 'PAY_PROCESS_CANCELED'
+          ? COPY.purchase.canceled
+          : `${COPY.purchase.failed} ${code ? COPY.purchase.failedCode(code) : ''}`.trim(),
+      );
+      handled = true;
+    }
+
+    if (handled) {
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, []);
+  }, [refreshBalance]);
 
   const onMetaUpdate = useCallback(
     (meta: { inferredTitle?: string; inferredYear?: string }) => {
@@ -204,6 +233,8 @@ export default function Home() {
     setMovieInfo(EMPTY_MOVIE_INFO);
     setUploadError('');
     setContentType('movie');
+    setPurchasing(false);
+    setPurchaseNotice('');
     setStep(0);
   };
 
@@ -212,7 +243,15 @@ export default function Home() {
       <BrandMark onClick={resetAll} />
       <div className='flex items-center gap-2.5'>
         {user && balance !== null && (
-          <span className='lang-pill'>{COPY.auth.creditsLeft(balance)}</span>
+          // The balance doubles as the way in to topping it up — there is no
+          // other entry point except running out mid-flow.
+          <button
+            type='button'
+            className='lang-pill'
+            onClick={() => setPurchasing(true)}
+          >
+            {COPY.auth.creditsLeft(balance)}
+          </button>
         )}
         {user ? (
           <button
@@ -264,6 +303,17 @@ export default function Home() {
       {header}
 
       <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
+        {purchaseNotice && (
+          <div className='card p-4 mb-[14px] text-sm'>{purchaseNotice}</div>
+        )}
+
+        {/* Buying credits suspends the wizard rather than replacing it: the
+            file and its analysis survive, so a top-up mid-flow returns to the
+            same step. */}
+        {purchasing ? (
+          <PurchaseStep balance={balance} onClose={() => setPurchasing(false)} />
+        ) : (
+        <>
         {!refusal && <StepTracker current={step} />}
 
         {refusal && (
@@ -272,6 +322,7 @@ export default function Home() {
             maxBlocks={refusal.maxBlocks}
             totalBlocks={totalLines}
             onStartOver={resetAll}
+            onPurchase={() => setPurchasing(true)}
           />
         )}
 
@@ -326,6 +377,8 @@ export default function Home() {
             originalContent={fileContent}
             onStartOver={resetAll}
           />
+        )}
+        </>
         )}
       </main>
 

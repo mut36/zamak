@@ -18,16 +18,14 @@ export interface CreditPack {
   credits: number;
   /** KRW, tax inclusive. Toss charges exactly this. */
   amount: number;
-  /** Shown on the pack card. */
-  label: string;
   /** Optional ribbon — at most one pack should carry one. */
   badge?: string;
 }
 
 export const CREDIT_PACKS: readonly CreditPack[] = [
-  { id: 'starter', credits: 3, amount: 2_900, label: '3편' },
-  { id: 'standard', credits: 10, amount: 7_900, label: '10편', badge: '가장 많이 골라요' },
-  { id: 'bulk', credits: 30, amount: 18_900, label: '30편' },
+  { id: 'starter', credits: 3, amount: 2_900 },
+  { id: 'standard', credits: 10, amount: 7_900, badge: '가장 많이 골라요' },
+  { id: 'bulk', credits: 30, amount: 18_900 },
 ] as const;
 
 export function findPack(id: string): CreditPack | undefined {

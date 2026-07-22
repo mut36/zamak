@@ -10,6 +10,8 @@ interface CreditWallProps {
   maxBlocks?: number;
   totalBlocks: number;
   onStartOver: () => void;
+  /** Opens the pack picker. Not offered when the file is simply too large. */
+  onPurchase: () => void;
 }
 
 /**
@@ -21,6 +23,7 @@ export function CreditWall({
   maxBlocks,
   totalBlocks,
   onStartOver,
+  onPurchase,
 }: CreditWallProps) {
   const tooLarge = code === 'file_too_large';
 
@@ -37,7 +40,11 @@ export function CreditWall({
 
       <div className='card p-[22px] flex flex-col items-center gap-3'>
         {!tooLarge && (
-          <button type='button' className='btn btn-primary btn-lg w-full' disabled>
+          <button
+            type='button'
+            className='btn btn-primary btn-lg w-full'
+            onClick={onPurchase}
+          >
             {c.emptyCta}
           </button>
         )}
