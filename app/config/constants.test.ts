@@ -87,23 +87,40 @@ describe('getTierLimits', () => {
 describe('estimateTranslationMs', () => {
   const { chunkSize, concurrency } = getTierLimits('server');
 
-  it('scales with file size', () => {
+  // These two pin the formula itself with an explicit chunkSize large enough
+  // to hold the whole file in one chunk (i.e. the one-request-per-file case),
+  // rather than SERVER_CHUNK_SIZE — that config has changed twice already
+  // (chunk-size-model.md §5-6, §8) and a fixed value keeps this test honest
+  // about what it is actually asserting.
+  const ONE_CHUNK = 5000;
+
+  it('scales with file size when the file fits in a single chunk', () => {
     // The bug this replaced: a flat per-wave constant meant a 400-block file
     // and a 2,000-block file were quoted the same 60s, so the ring either
     // finished early and stalled at 99% or crawled far behind the result.
-    const short = estimateTranslationMs(400, chunkSize, concurrency);
-    const long = estimateTranslationMs(2000, chunkSize, concurrency);
+    const short = estimateTranslationMs(400, ONE_CHUNK, concurrency);
+    const long = estimateTranslationMs(2000, ONE_CHUNK, concurrency);
     expect(long).toBeGreaterThan(short * 2);
   });
 
-  it('tracks the measured generation rate within a chunk', () => {
+  it('tracks the measured generation rate for a single chunk', () => {
     // 2,000 blocks x 16 tokens / 220 tok/s + 2s TTFT ~= 147s.
-    expect(estimateTranslationMs(2000, chunkSize, concurrency)).toBeGreaterThan(
-      120_000,
-    );
-    expect(estimateTranslationMs(2000, chunkSize, concurrency)).toBeLessThan(
+    expect(
+      estimateTranslationMs(2000, ONE_CHUNK, concurrency),
+    ).toBeGreaterThan(120_000);
+    expect(estimateTranslationMs(2000, ONE_CHUNK, concurrency)).toBeLessThan(
       180_000,
     );
+  });
+
+  it('does not balloon with file size once chunks run in parallel', () => {
+    // The other side of the coin: even the largest file we accept should
+    // finish in a handful of waves rather than scaling linearly with N — that
+    // is what chunking buys over the one-request-per-file config this
+    // replaced (chunk-size-model.md §5-6).
+    expect(
+      estimateTranslationMs(MAX_BLOCKS_PER_CREDIT, chunkSize, concurrency),
+    ).toBeLessThan(60_000);
   });
 
   it('charges extra waves only once concurrency is exhausted', () => {

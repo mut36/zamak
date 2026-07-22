@@ -49,54 +49,41 @@ export const FREE_CONCURRENCY = readPositiveIntEnv(
 /**
  * Server key knobs — what every request uses today.
  *
- * BOTH VALUES ARE UNJUSTIFIED PLACEHOLDERS. They are frozen, not derived, and
- * the honest summary (docs/tuning/chunk-size-model.md §5) is that no amount of
- * modelling picks a chunk size for us:
+ * B=500 IS AN EMPIRICAL SAFETY LIMIT, not a derived optimum — arithmetic
+ * cannot pick B at all (docs/tuning/chunk-size-model.md §5: cost varies only
+ * 6.5% across the whole usable range, wall clock is not a constraint, and
+ * expected blast radius from a whole-chunk API failure is B-invariant).
  *
- *   - Cost falls monotonically with B, but only 6.5% across the entire usable
- *     range, because measured thinking tokens are 0. No interior optimum.
- *   - Wall clock rises monotonically with B, and is no longer a constraint —
- *     a whole film translates in well under a minute either way.
- *   - Expected blast radius is B-INVARIANT, contrary to what this comment
- *     claimed before: losing a chunk costs B blocks, but halving B doubles the
- *     chunk count, so expected untranslated blocks ≈ p·N either way. Small B
- *     buys lower variance, not lower loss.
- *   - The only hard walls are the 65,536-token output cap (B ≤ 3,276) and the
- *     300s route timeout (B ≤ 4,097) — both ~26x away. constants.test.ts
- *     asserts these two and nothing else.
+ * What arithmetic missed is a failure mode observed directly, not modelled:
+ * at B=2000 the model started renumbering mid-chunk — splitting one subtitle
+ * into two and shifting every following sequence number by one. Because
+ * reassembleTranslatedChunk() (srt.ts) only checks that a number is expected,
+ * unused, and increasing, a renumbered block passes all three checks and the
+ * translation lands on the wrong timecode for the rest of the chunk — silent,
+ * not caught by the matched/unmatched counters. Observed to start past ~600
+ * lines in one chunk; B=500 has not reproduced it. This is not proven to be
+ * the mechanism, only that keeping chunks under it empirically avoids the
+ * symptom, so treat 500 as a ceiling pending either a recurrence or the
+ * detection/repair logic sketched in docs/decisions.md §2-3.
  *
- * What would actually decide B is unmeasured, and the two candidates point in
- * opposite directions: alignment-failure rate f(B) (direction unknown) and
- * cross-chunk voice consistency (favours large B, since chunks are translated
- * blind to each other). Both need the A/B harness, not arithmetic.
+ * The output cap (B ≤ 3,276) and 300s route timeout (B ≤ 4,097) are the only
+ * hard walls; constants.test.ts asserts those two and nothing else, so any
+ * B up to 500 here is a deliberate choice, not a constraint violation.
  *
- * CURRENT SETTING (2026-07-22): B = MAX_BLOCKS_PER_CREDIT, i.e. one request per
- * file, no chunking at all. Since no interior optimum exists, this picks the
- * end of the range that is defensible on its own terms: it is the cheapest
- * point, and it gives the model the whole film as context, which is the only
- * lever we have on cross-chunk voice drift short of a voice registry.
- *
- * The costs of that choice, so they are not rediscovered as bugs:
- *   - All-or-nothing. A failed chunk used to leave the rest translated; now one
- *     API failure means the whole file comes back untranslated. Expected loss
- *     is unchanged (~p·N) but the variance is now maximal.
- *   - Chunk-count progress is dead — the ring falls back to a time estimate.
- *   - Headroom is thinner: 61% of the output cap and 49% of the timeout at the
- *     measured English-subtitle t_out of 16. A denser source language (t_out
- *     around 30) would breach the output cap and truncate the whole file.
- *     Re-measure t_out before accepting non-English sources.
- *
- * K is now inert: with one chunk per file, min(m, K) is always 1. It is kept
- * at 16 so lowering B re-enables parallelism without a second edit.
+ * K=16 was sized for B=2000 (⌈2000/2000⌉=1 chunk, K unused) and is now
+ * comfortably oversized for B=500 (⌈2000/500⌉=4 chunks, still one wave) — no
+ * change needed, kept so raising B later doesn't require a second edit.
  *
  * History, so nobody re-derives a phantom: K=14 arrived in the initial commit
  * with no derivation, B=125 was then fitted to it via ⌈1500/14⌉, and the 1,500
  * cap it referenced is gone. The one-wave rule that briefly re-justified K was
- * dropped 2026-07-22. Override via env to experiment (the harness reads these).
+ * dropped 2026-07-22, then B was pushed to 2000 (no chunking) the same day and
+ * reverted to 500 after the renumbering bug above. Override via env to
+ * experiment (the harness reads these).
  */
 export const SERVER_CHUNK_SIZE = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CHUNK_SIZE,
-  2000,
+  500,
 );
 export const SERVER_CONCURRENCY = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CONCURRENCY,
