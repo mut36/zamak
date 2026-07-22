@@ -23,7 +23,7 @@ const SELLER_INFO: { label: string; value: string }[] = [
   { label: '사업자등록번호', value: 'TODO' },
   { label: '통신판매업 신고번호', value: 'TODO' },
   { label: '사업장 주소', value: 'TODO' },
-  { label: '고객문의', value: 'TODO — 이메일 주소' },
+  { label: '고객문의', value: 'hello@mut36.com' },
   { label: '호스팅 제공', value: 'Vercel Inc.' },
   { label: '결제대행', value: '토스페이먼츠(주)' },
 ];

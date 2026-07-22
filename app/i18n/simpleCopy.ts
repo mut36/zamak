@@ -118,7 +118,11 @@ export const COPY = {
     failed: '결제가 완료되지 않았어요. 다시 시도해주세요.',
     canceled: '결제를 취소했어요.',
     failedCode: (code: string) => `오류 코드: ${code}`,
-    notConfigured: '결제가 아직 설정되지 않았어요. 잠시 후 다시 시도해주세요.',
+    // Payments are dark until the Toss merchant review clears (weeks away,
+    // not a retry-in-a-bit situation), so this points at the manual top-up
+    // path instead of implying the button will just work again soon.
+    notConfigured:
+      '결제가 아직 준비 중이에요. hello@mut36.com으로 알려주시면 번역권을 넣어드릴게요.',
   },
 
   upload: {
@@ -200,6 +204,11 @@ export const COPY = {
     startOver: '새 파일 번역하기',
     partialWarning: (failed: number) =>
       `일부 구간(${failed.toLocaleString()}개)은 번역에 실패해 원문 그대로 남아 있어요. 해당 부분만 다시 번역하거나 직접 손봐주세요.`,
+  },
+
+  footer: {
+    feedback: '피드백 보내기',
+    feedbackEmail: 'hello@mut36.com',
   },
 
   notFound: {

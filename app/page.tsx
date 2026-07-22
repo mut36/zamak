@@ -385,6 +385,12 @@ export default function Home() {
       <footer className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pb-10 text-center text-ink-3'>
         <p className='mono text-[12px]'>v{APP_VERSION} · Beta</p>
         <p className='text-[12px] mt-1'>© 2026 ZAMAK. All rights reserved.</p>
+        <a
+          href={`mailto:${COPY.footer.feedbackEmail}`}
+          className='text-[12px] mt-1 inline-block underline'
+        >
+          {COPY.footer.feedback}
+        </a>
       </footer>
     </div>
   );
