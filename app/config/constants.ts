@@ -70,15 +70,33 @@ export const FREE_CONCURRENCY = readPositiveIntEnv(
  * cross-chunk voice consistency (favours large B, since chunks are translated
  * blind to each other). Both need the A/B harness, not arithmetic.
  *
+ * CURRENT SETTING (2026-07-22): B = MAX_BLOCKS_PER_CREDIT, i.e. one request per
+ * file, no chunking at all. Since no interior optimum exists, this picks the
+ * end of the range that is defensible on its own terms: it is the cheapest
+ * point, and it gives the model the whole film as context, which is the only
+ * lever we have on cross-chunk voice drift short of a voice registry.
+ *
+ * The costs of that choice, so they are not rediscovered as bugs:
+ *   - All-or-nothing. A failed chunk used to leave the rest translated; now one
+ *     API failure means the whole file comes back untranslated. Expected loss
+ *     is unchanged (~p·N) but the variance is now maximal.
+ *   - Chunk-count progress is dead — the ring falls back to a time estimate.
+ *   - Headroom is thinner: 61% of the output cap and 49% of the timeout at the
+ *     measured English-subtitle t_out of 16. A denser source language (t_out
+ *     around 30) would breach the output cap and truncate the whole file.
+ *     Re-measure t_out before accepting non-English sources.
+ *
+ * K is now inert: with one chunk per file, min(m, K) is always 1. It is kept
+ * at 16 so lowering B re-enables parallelism without a second edit.
+ *
  * History, so nobody re-derives a phantom: K=14 arrived in the initial commit
  * with no derivation, B=125 was then fitted to it via ⌈1500/14⌉, and the 1,500
  * cap it referenced is gone. The one-wave rule that briefly re-justified K was
- * dropped 2026-07-22. Treat both numbers as arbitrary-but-frozen; override via
- * env to experiment (the harness reads these too).
+ * dropped 2026-07-22. Override via env to experiment (the harness reads these).
  */
 export const SERVER_CHUNK_SIZE = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CHUNK_SIZE,
-  125,
+  2000,
 );
 export const SERVER_CONCURRENCY = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CONCURRENCY,
@@ -215,10 +233,46 @@ export const DEFAULT_MODEL: AllowedModel = 'gemini-3.5-flash';
 export const TRANSLATION_MODEL =
   process.env.NEXT_PUBLIC_TRANSLATION_MODEL || DEFAULT_MODEL;
 
+/**
+ * Measured generation parameters, from docs/tuning/chunk-size-model.md §1.
+ * These drive the progress estimate; they are the same numbers the chunk-size
+ * model uses, so re-measure both together.
+ */
+export const GENERATION = {
+  /** Output tokens per subtitle block (measured on English sources). */
+  OUTPUT_TOKENS_PER_BLOCK: 16,
+  /** Output tokens generated per second. */
+  OUTPUT_TOKENS_PER_SEC: 220,
+  /** Time to first token. */
+  TTFT_MS: 2_000,
+} as const;
+
+/**
+ * How long a translation should take, in milliseconds.
+ *
+ * This replaced a flat 60s-per-wave guess that was independent of both file
+ * size and chunk size — at one request per file it ran 48% fast on a short
+ * file and 146% slow on a full-length one, which is what made the ring stall
+ * at 99%. A chunk's duration is dominated by generating its output tokens, so
+ * estimate that directly and multiply by the number of concurrency waves.
+ */
+export function estimateTranslationMs(
+  totalBlocks: number,
+  chunkSize: number,
+  concurrency: number,
+): number {
+  const chunks = Math.max(1, Math.ceil(totalBlocks / chunkSize));
+  const waves = Math.max(1, Math.ceil(chunks / concurrency));
+  // Blocks in a full chunk, or the whole file when it fits in one.
+  const blocksPerChunk = Math.min(totalBlocks, chunkSize);
+  const generationMs =
+    (blocksPerChunk * GENERATION.OUTPUT_TOKENS_PER_BLOCK * 1000) /
+    GENERATION.OUTPUT_TOKENS_PER_SEC;
+  return waves * (GENERATION.TTFT_MS + generationMs);
+}
+
 /** Timing estimates (milliseconds) */
 export const TIMING = {
-  /** Estimated translation time per batch — flash model */
-  FLASH_BATCH_MS: 60_000,
   /** Estimated translation time per batch — pro model */
   PRO_BATCH_MS: 110_000,
   /** SSE heartbeat interval to prevent gateway timeout */

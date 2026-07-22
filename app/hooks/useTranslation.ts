@@ -19,7 +19,11 @@ import type {
   TranslationProgress,
   TranslationResult,
 } from '../types/translation';
-import { getTierLimits, resolveTier, TIMING } from '../config/constants';
+import {
+  estimateTranslationMs,
+  getTierLimits,
+  resolveTier,
+} from '../config/constants';
 
 interface TranslationState {
   isTranslating: boolean;
@@ -234,9 +238,13 @@ export function useTranslation(
       const { chunkSize, concurrency } = getTierLimits(resolveTier());
       const chunks = chunkSrtBlocks(blocks, chunkSize);
       const totalChunks = chunks.length;
-      // Rough estimate: number of concurrency "waves" × per-chunk time.
-      const waves = Math.max(1, Math.ceil(totalChunks / concurrency));
-      const totalEstimateMs = waves * TIMING.FLASH_BATCH_MS;
+      // Derived from measured generation rate, not a flat per-wave guess —
+      // with one request per file the ring has nothing else to go on.
+      const totalEstimateMs = estimateTranslationMs(
+        blocks.length,
+        chunkSize,
+        concurrency,
+      );
 
       setTranslationProgress({
         stage: 'translating',

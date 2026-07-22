@@ -5,6 +5,7 @@ import {
   MAX_BLOCKS_PER_CREDIT,
   SERVER_CHUNK_SIZE,
   SERVER_CONCURRENCY,
+  estimateTranslationMs,
   getTierLimits,
   resolveTier,
 } from './constants';
@@ -72,11 +73,51 @@ describe('getTierLimits', () => {
     expect(duration).toBeLessThan(TIMEOUT_S);
   });
 
-  it('lets one credit cover a file that a wave-sized batch cannot', () => {
-    // Chunking must be able to reach the whole cap; K no longer has to cover
-    // it in a single wave, but B still has to divide it into finite chunks.
-    expect(MAX_BLOCKS_PER_CREDIT).toBeGreaterThan(
-      getTierLimits('server').chunkSize,
+  it('never splits an accepted file into more chunks than it has blocks', () => {
+    // B currently equals the credit cap (one request per file), so this is an
+    // equality today. It guards the direction that would be a bug: a chunk
+    // size larger than any file we accept means the extra capacity is paid for
+    // in output-cap headroom and bought nothing.
+    expect(getTierLimits('server').chunkSize).toBeLessThanOrEqual(
+      MAX_BLOCKS_PER_CREDIT,
     );
+  });
+});
+
+describe('estimateTranslationMs', () => {
+  const { chunkSize, concurrency } = getTierLimits('server');
+
+  it('scales with file size', () => {
+    // The bug this replaced: a flat per-wave constant meant a 400-block file
+    // and a 2,000-block file were quoted the same 60s, so the ring either
+    // finished early and stalled at 99% or crawled far behind the result.
+    const short = estimateTranslationMs(400, chunkSize, concurrency);
+    const long = estimateTranslationMs(2000, chunkSize, concurrency);
+    expect(long).toBeGreaterThan(short * 2);
+  });
+
+  it('tracks the measured generation rate within a chunk', () => {
+    // 2,000 blocks x 16 tokens / 220 tok/s + 2s TTFT ~= 147s.
+    expect(estimateTranslationMs(2000, chunkSize, concurrency)).toBeGreaterThan(
+      120_000,
+    );
+    expect(estimateTranslationMs(2000, chunkSize, concurrency)).toBeLessThan(
+      180_000,
+    );
+  });
+
+  it('charges extra waves only once concurrency is exhausted', () => {
+    // Small B stays reachable via env override, so the wave term has to keep
+    // working. At B=50, K=16: 800 blocks is 16 chunks (one wave) and 850 is 17
+    // (two). Chunks inside a wave run in parallel, so 400 and 800 blocks cost
+    // the same wall clock — that is the property being pinned, not monotonicity
+    // in file size.
+    const oneWave = estimateTranslationMs(800, 50, 16);
+    expect(estimateTranslationMs(400, 50, 16)).toBe(oneWave);
+    expect(estimateTranslationMs(850, 50, 16)).toBe(oneWave * 2);
+  });
+
+  it('never returns zero for a tiny file', () => {
+    expect(estimateTranslationMs(1, chunkSize, concurrency)).toBeGreaterThan(0);
   });
 });
