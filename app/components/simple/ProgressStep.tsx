@@ -15,51 +15,71 @@ const R = 78;
 const CIRC = 2 * Math.PI * R;
 const c = COPY.progress;
 
+/** Where the linear phase hands off to the saturating one. */
+const KNEE = 75;
+/** The ceiling the estimate crawls toward; only a real result reaches 100. */
+const CEIL = 99;
+
 /**
- * Elapsed-time estimate ring. The backend currently sends one final result
- * (no per-line stream), so the ring animates against the time estimate and
- * eases toward — but never claims — 100% until the result actually lands.
- * When real chunk streaming is wired later, this can bind to true progress.
+ * Maps elapsed-time-as-percent onto what the ring shows.
+ *
+ * Linear while the estimate is holding, then saturating so an underestimate
+ * degrades into a slow crawl instead of parking at 100% before the file
+ * exists. The tail is scaled by exactly (CEIL - KNEE) so its slope at the
+ * handoff is 1 — the previous curve divided by a constant instead, which
+ * dropped the slope 4.4x in a single frame and read as a stall.
+ */
+function ease(raw: number): number {
+  if (raw < KNEE) return raw;
+  const span = CEIL - KNEE;
+  return KNEE + span * (1 - Math.exp(-(raw - KNEE) / span));
+}
+
+/**
+ * Elapsed-time estimate ring. The backend sends one final result rather than a
+ * per-line stream, so the ring animates against the time estimate from
+ * estimateTranslationMs() and eases toward — but never claims — 100% until the
+ * result actually lands.
+ *
+ * The time animation runs even when there are several chunks, and the ring
+ * shows whichever of the two is further along. Chunk completions alone move in
+ * visible steps — one request per file means a single step from 0 to 100 — so
+ * the estimate fills the gaps while chunk counts keep it honest.
  */
 export function ProgressStep({ progress, totalLines, onCancel }: ProgressStepProps) {
   const [pct, setPct] = useState(0);
   const startRef = useRef(0);
   const estimate = progress.totalEstimateMs || 110_000;
   const done = progress.stage === 'finalizing' || progress.stage === 'done';
-  // With multiple chunks we have real progress; a single request has none, so
-  // fall back to a smooth time-based estimate.
-  const chunked = progress.totalChunks > 1;
 
   useEffect(() => {
-    // Time-estimate animation only for the single-request case.
-    if (done || chunked) return;
+    if (done) return;
     if (startRef.current === 0) startRef.current = Date.now();
     const tick = () => {
       const elapsed = Date.now() - startRef.current;
-      const raw = (elapsed / estimate) * 100;
-      // Linear until 90%, then asymptotic crawl toward ~99%.
-      const eased =
-        raw < 90 ? raw : 90 + 9 * (1 - Math.exp(-(raw - 90) / 40));
-      setPct(Math.min(99, eased));
+      setPct(Math.min(CEIL, ease((elapsed / estimate) * 100)));
     };
     tick();
-    const id = window.setInterval(tick, 150);
+    const id = window.setInterval(tick, 100);
     return () => window.clearInterval(id);
-  }, [done, chunked, estimate]);
+  }, [done, estimate]);
 
   const realPct =
     progress.totalChunks > 0
       ? (progress.currentChunk / progress.totalChunks) * 100
       : 0;
-  const displayPct = done ? 100 : chunked ? realPct : pct;
+  // Never let the ring go backwards: a chunk landing early should pull it
+  // forward, but a slow chunk must not undo what the estimate already showed.
+  const displayPct = done ? 100 : Math.min(CEIL, Math.max(realPct, pct));
   const status =
     displayPct < 25 ? c.analyzing : displayPct < 92 ? c.translating : c.finalizing;
   const processed = Math.round((displayPct / 100) * totalLines);
+  // Derive the countdown from whatever the ring is actually showing, so the
+  // two never disagree — the chunk-based estimatedRemainingMs used to drive
+  // this independently and could read 40s while the ring sat at 95%.
   const remainingSec = done
     ? 0
-    : chunked
-      ? Math.max(1, Math.round(progress.estimatedRemainingMs / 1000))
-      : Math.max(1, Math.round((estimate - (estimate * displayPct) / 100) / 1000));
+    : Math.max(1, Math.round((estimate * (1 - displayPct / 100)) / 1000));
 
   return (
     <div className='animate-fade-slide-up flex flex-col items-center'>
