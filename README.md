@@ -111,7 +111,9 @@ npx tsc --noEmit && npx eslint app && npx vitest run
 
 크레딧이 떨어지면 [결제](#결제-토스페이먼츠)로 충전합니다.
 
-개발 중 크레딧 충전·페이월 테스트·job 이력 확인은 [`supabase/dev-seed.sql`](supabase/dev-seed.sql)의 스니펫을 SQL Editor에 붙여넣어 처리합니다.
+개발 중 크레딧 충전·페이월 테스트·job 이력 확인은 [`supabase/dev-seed.sql`](supabase/dev-seed.sql)의 스니펫을 SQL Editor에 붙여넣어 처리합니다. **이 파일은 프로덕션에서 실행하지 않습니다** — 잔액을 덮어쓰기 때문입니다.
+
+결제가 열리기 전(베타 기간) 수동 크레딧 지급은 [`supabase/comp-credit.sql`](supabase/comp-credit.sql)을 씁니다. dev-seed와 달리 잔액을 더하기 때문에 프로덕션에서 실행해도 안전합니다.
 
 ### 결제 (토스페이먼츠)
 
@@ -208,6 +210,7 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 proxy.ts                        # Supabase 세션 쿠키 갱신 (게이트 아님)
 supabase/migrations/            # 크레딧·job 스키마 + 가입 시 1크레딧 트리거, 주문·정산
 supabase/dev-seed.sql           # 개발용 크레딧 조작 스니펫 (프로덕션 금지)
+supabase/comp-credit.sql        # 베타용 수동 크레딧 지급 (프로덕션에서 실행 가능)
 app/
 ├── auth/callback/route.ts      # Google OAuth 코드 → 세션 쿠키
 ├── legal/page.tsx              # 환불 정책 + 전자상거래법 표시사항 (사업자 정보 TODO)
