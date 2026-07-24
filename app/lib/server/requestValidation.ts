@@ -56,6 +56,7 @@ function parseMovieInfo(value: unknown): MovieInfo {
     genre: optionalString(value, 'genre'),
     country: optionalString(value, 'country'),
     era: optionalString(value, 'era'),
+    tone: optionalString(value, 'tone'),
   };
 }
 

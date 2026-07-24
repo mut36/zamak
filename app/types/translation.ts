@@ -9,6 +9,9 @@ export interface MovieInfo {
   genre?: string;
   country?: string;
   era?: string;
+  /** Tone & manner of dialogue (톤앤매너) — keyword field for the translation
+   * prompt. Optional; not yet populated by the Simple UI. */
+  tone?: string;
 }
 
 /** Content type chosen on the upload screen — drives the info-step branch. */

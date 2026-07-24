@@ -13,6 +13,7 @@ const movieInfo = {
   year: '2026',
   country: 'USA',
   era: 'Contemporary',
+  tone: 'Suspenseful, dry humor',
   notes: '등장인물 이름을 바꾸지 마',
 };
 
@@ -55,6 +56,10 @@ describe('prompt composition', () => {
     expect(user).toContain(
       '<user_notes>\n등장인물 이름을 바꾸지 마\n</user_notes>',
     );
+    // Genre/era/tone render as labeled keyword bullets in content_metadata,
+    // not folded into free-text notes.
+    expect(user).toContain('- 배경/시대: Contemporary');
+    expect(user).toContain('- 톤앤매너: Suspenseful, dry humor');
     // Task-at-the-end: the block-count reminder comes after the data it
     // refers to, not before.
     expect(user.indexOf('출력도 반드시')).toBeGreaterThan(

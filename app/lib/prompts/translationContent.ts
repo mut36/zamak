@@ -26,7 +26,8 @@ function formatMovieInfo(movieInfo: MovieInfo): string {
     movieInfo.year && `- 연도: ${movieInfo.year}`,
     movieInfo.genre && `- 장르: ${movieInfo.genre}`,
     movieInfo.country && `- 국가: ${movieInfo.country}`,
-    movieInfo.era && `- 시대/배경: ${movieInfo.era}`,
+    movieInfo.era && `- 배경/시대: ${movieInfo.era}`,
+    movieInfo.tone && `- 톤앤매너: ${movieInfo.tone}`,
   ].filter(Boolean);
 
   return fields.length > 0 ? fields.join('\n') : '- 제공되지 않음';
