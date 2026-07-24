@@ -86,6 +86,33 @@ describe('enrichFromTmdb', () => {
     );
   });
 
+  it('extracts era/tone via grounded search, and tells the model the given year is release year, not the portrayed era', async () => {
+    // Regression: a 2022-released film set in 1978 was getting era="2022"
+    // back — the non-grounded call had no way to know the real setting and
+    // defaulted to echoing the release year it was given.
+    mocks.lookupTitle.mockResolvedValue({
+      found: true,
+      title: '어떤 시대극',
+      year: '2022',
+      director: '어떤감독',
+      genres: ['드라마'],
+      posterUrl: null,
+    });
+    mocks.generateContent.mockResolvedValue(
+      textResponse('배경/시대: 1978년, 지방 소도시\n톤앤매너: 담담'),
+    );
+
+    const result = await enrichFromTmdb('어떤 시대극', '2022');
+
+    expect(result?.era).toBe('1978년, 지방 소도시');
+    expect(mocks.generateContent.mock.calls[0][0].config.tools).toEqual([
+      { googleSearch: {} },
+    ]);
+    expect(mocks.generateContent.mock.calls[0][0].contents).toContain(
+      '개봉·방영 연도',
+    );
+  });
+
   it('uses the aux model transliteration when TMDB has no Korean title', async () => {
     mocks.lookupTitle.mockResolvedValue({
       found: true,
@@ -224,8 +251,6 @@ describe('enrichWithGrounding', () => {
       era: '1980년대 지방 소도시',
       tone: '담담, 애수',
     });
-    // Grounding is what distinguishes this call from the non-grounded
-    // keyword-extraction call in enrichFromTmdb.
     expect(mocks.generateContent.mock.calls[0][0].config.tools).toEqual([
       { googleSearch: {} },
     ]);
@@ -279,7 +304,7 @@ describe('enrichMovie', () => {
     else process.env.GOOGLE_GENAI_API_KEY = originalApiKey;
   });
 
-  it('returns the TMDB result and never calls grounded search when TMDB has a match', async () => {
+  it('returns the TMDB result and never calls the full grounded-identification prompt when TMDB has a match', async () => {
     mocks.lookupTitle.mockResolvedValue({
       found: true,
       title: '괴물',
@@ -295,10 +320,16 @@ describe('enrichMovie', () => {
     const result = await enrichMovie('괴물', '2006');
 
     expect(result?.posterUrl).toBe('https://image.tmdb.org/t/p/w500/abc.jpg');
-    // Exactly one call (the non-grounded keyword extraction) — no
-    // googleSearch-tooled call was made.
+    // Exactly one call — the grounded keyword-extraction call (era/tone
+    // only), never the full grounded-identification prompt (which would ask
+    // "영화여부:" — that one is reserved for a TMDB miss).
     expect(mocks.generateContent).toHaveBeenCalledTimes(1);
-    expect(mocks.generateContent.mock.calls[0][0].config.tools).toBeUndefined();
+    expect(mocks.generateContent.mock.calls[0][0].config.tools).toEqual([
+      { googleSearch: {} },
+    ]);
+    expect(mocks.generateContent.mock.calls[0][0].contents).not.toContain(
+      '영화여부:',
+    );
   });
 
   it('falls back to grounded search when TMDB has no match', async () => {
