@@ -23,7 +23,7 @@ vi.mock('@google/genai', () => ({
   GoogleGenAI: mocks.GoogleGenAI,
 }));
 
-import { enrichFromTmdb } from './enrichMovie';
+import { enrichFromTmdb, enrichMovie, enrichWithGrounding } from './enrichMovie';
 
 const originalApiKey = process.env.GOOGLE_GENAI_API_KEY;
 
@@ -174,5 +174,161 @@ describe('enrichFromTmdb', () => {
     const result = await enrichFromTmdb('괴물', '2006');
 
     expect(result?.year).toBe('2006');
+  });
+
+  it('treats a TMDB lookup failure the same as a miss (returns null)', async () => {
+    mocks.lookupTitle.mockRejectedValue(new Error('TMDB request failed: 500'));
+
+    const result = await enrichFromTmdb('괴물', '2006');
+
+    expect(result).toBeNull();
+    expect(mocks.generateContent).not.toHaveBeenCalled();
+  });
+});
+
+describe('enrichWithGrounding', () => {
+  beforeEach(() => {
+    process.env.GOOGLE_GENAI_API_KEY = 'test-key';
+    mocks.generateContent.mockReset();
+  });
+
+  afterEach(() => {
+    if (originalApiKey === undefined) delete process.env.GOOGLE_GENAI_API_KEY;
+    else process.env.GOOGLE_GENAI_API_KEY = originalApiKey;
+  });
+
+  it('parses a confirmed movie into the unified shape, with no poster', async () => {
+    mocks.generateContent.mockResolvedValue(
+      textResponse(
+        [
+          '영화여부: 영화',
+          '제목: 어떤 마이너 영화',
+          '연도: 1987',
+          '감독: 김감독',
+          '장르: 드라마, 시대극',
+          '배경/시대: 1980년대 지방 소도시',
+          '톤앤매너: 담담, 애수',
+        ].join('\n'),
+      ),
+    );
+
+    const result = await enrichWithGrounding('어떤 마이너 영화', '1987');
+
+    expect(result).toEqual({
+      found: true,
+      title: '어떤 마이너 영화',
+      year: '1987',
+      director: '김감독',
+      posterUrl: null,
+      genre: '드라마, 시대극',
+      era: '1980년대 지방 소도시',
+      tone: '담담, 애수',
+    });
+    // Grounding is what distinguishes this call from the non-grounded
+    // keyword-extraction call in enrichFromTmdb.
+    expect(mocks.generateContent.mock.calls[0][0].config.tools).toEqual([
+      { googleSearch: {} },
+    ]);
+  });
+
+  it('returns null when the search cannot confirm a movie/drama', async () => {
+    mocks.generateContent.mockResolvedValue(textResponse('영화여부: 없음'));
+
+    const result = await enrichWithGrounding('random gibberish filename', '');
+
+    expect(result).toBeNull();
+  });
+
+  it('falls back to the input year when the model omits an unparseable year', async () => {
+    mocks.generateContent.mockResolvedValue(
+      textResponse('영화여부: 영화\n제목: 어떤 영화\n연도: 알수없음'),
+    );
+
+    const result = await enrichWithGrounding('어떤 영화', '1999');
+
+    expect(result?.year).toBe('1999');
+  });
+
+  it('returns null without calling the model when no API key is configured', async () => {
+    delete process.env.GOOGLE_GENAI_API_KEY;
+
+    const result = await enrichWithGrounding('어떤 영화', '1999');
+
+    expect(result).toBeNull();
+    expect(mocks.generateContent).not.toHaveBeenCalled();
+  });
+
+  it('returns null when the grounded call throws', async () => {
+    mocks.generateContent.mockRejectedValue(new Error('quota exceeded'));
+
+    const result = await enrichWithGrounding('어떤 영화', '1999');
+
+    expect(result).toBeNull();
+  });
+});
+
+describe('enrichMovie', () => {
+  beforeEach(() => {
+    process.env.GOOGLE_GENAI_API_KEY = 'test-key';
+    mocks.lookupTitle.mockReset();
+    mocks.generateContent.mockReset();
+  });
+
+  afterEach(() => {
+    if (originalApiKey === undefined) delete process.env.GOOGLE_GENAI_API_KEY;
+    else process.env.GOOGLE_GENAI_API_KEY = originalApiKey;
+  });
+
+  it('returns the TMDB result and never calls grounded search when TMDB has a match', async () => {
+    mocks.lookupTitle.mockResolvedValue({
+      found: true,
+      title: '괴물',
+      year: '2006',
+      director: '봉준호',
+      genres: ['SF'],
+      posterUrl: 'https://image.tmdb.org/t/p/w500/abc.jpg',
+    });
+    mocks.generateContent.mockResolvedValue(
+      textResponse('배경/시대: 2000년대 한강\n톤앤매너: 긴박'),
+    );
+
+    const result = await enrichMovie('괴물', '2006');
+
+    expect(result?.posterUrl).toBe('https://image.tmdb.org/t/p/w500/abc.jpg');
+    // Exactly one call (the non-grounded keyword extraction) — no
+    // googleSearch-tooled call was made.
+    expect(mocks.generateContent).toHaveBeenCalledTimes(1);
+    expect(mocks.generateContent.mock.calls[0][0].config.tools).toBeUndefined();
+  });
+
+  it('falls back to grounded search when TMDB has no match', async () => {
+    mocks.lookupTitle.mockResolvedValue({ found: false });
+    mocks.generateContent.mockResolvedValue(
+      textResponse(
+        '영화여부: 영화\n제목: 마이너 영화\n연도: 2010\n감독: 이감독\n장르: 코미디\n배경/시대: 현대 서울\n톤앤매너: 유쾌',
+      ),
+    );
+
+    const result = await enrichMovie('마이너 영화', '2010');
+
+    expect(result).toEqual({
+      found: true,
+      title: '마이너 영화',
+      year: '2010',
+      director: '이감독',
+      posterUrl: null,
+      genre: '코미디',
+      era: '현대 서울',
+      tone: '유쾌',
+    });
+  });
+
+  it('returns null when neither TMDB nor grounded search can identify the work', async () => {
+    mocks.lookupTitle.mockResolvedValue({ found: false });
+    mocks.generateContent.mockResolvedValue(textResponse('영화여부: 없음'));
+
+    const result = await enrichMovie('완전히 알 수 없는 파일', '');
+
+    expect(result).toBeNull();
   });
 });
