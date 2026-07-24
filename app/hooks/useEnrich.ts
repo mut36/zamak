@@ -4,16 +4,26 @@ import { useCallback, useState } from 'react';
 
 export type EnrichStatus = 'idle' | 'searching' | 'found' | 'notFound';
 
+/**
+ * Unified enrichment result — mirrors MovieEnrichment (lib/server/enrichMovie).
+ * title/year/director/posterUrl are UI-facing; genre/era/tone are AI-facing
+ * keyword fields fed into the translation prompt, never rendered.
+ */
 export interface EnrichResult {
-  isMovie: boolean;
+  found: boolean;
+  title: string;
+  year: string;
   director: string | null;
-  year: string | null;
-  notes: string;
+  posterUrl: string | null;
+  genre: string;
+  era: string;
+  tone: string;
 }
 
 /**
- * Movie/drama enrichment: takes a title (+ year) and web-searches for the
- * work's director and a tone/character translation-context note.
+ * Movie/drama enrichment: takes a title (+ year) and resolves it via TMDB
+ * first, falling back to a Google-grounded search for whatever TMDB has no
+ * record of (see enrichMovie() server-side).
  * If the title is empty or nothing is found, status becomes 'notFound' so the
  * UI can drop into manual-input mode.
  *
@@ -53,7 +63,7 @@ export function useEnrich() {
           );
         }
         const data = (await res.json()) as EnrichResult;
-        if (data.isMovie && data.notes) {
+        if (data.found) {
           setDirector(data.director ?? '');
           setStatus('found');
           return data;

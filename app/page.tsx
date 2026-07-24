@@ -13,7 +13,6 @@ import { PurchaseStep } from './components/simple/PurchaseStep';
 import { useTranslation } from './hooks/useTranslation';
 import { useEnrich } from './hooks/useEnrich';
 import { useAuth } from './hooks/useAuth';
-import { fetchMoviePoster } from './lib/client/tmdb';
 import { parseSrtBlocks } from './lib/srt';
 import { isSupabaseConfigured } from './lib/supabase/env';
 import { DEFAULT_TARGET_LANG } from './config/languages';
@@ -134,21 +133,22 @@ export default function Home() {
   const enrichStartedRef = useRef(false);
   const summarizeStartedRef = useRef(false);
 
-  // Movie branch: AI enrich (director + tone/character notes) and the TMDB
-  // poster fetch run in parallel, then land in a single state update. Metadata
-  // comes from the AI; TMDB contributes the poster image only.
+  // Movie branch: one unified lookup (TMDB first, grounded search fallback —
+  // see enrichMovie() server-side). title/year/director/poster are UI-facing
+  // and overwrite the filename-guessed values with the authoritative ones;
+  // genre/era/tone are AI-facing keyword fields, never rendered. `notes`
+  // stays untouched here — it is the user's own free-text field.
   const runEnrich = useCallback(async () => {
     const { title, year } = movieInfoRef.current;
-    const [data, posterUrl] = await Promise.all([
-      enrich(title, year),
-      fetchMoviePoster(title, year),
-    ]);
+    const data = await enrich(title, year);
     setMovieInfo((prev) => ({
       ...prev,
-      posterUrl: posterUrl ?? undefined,
-      ...(data?.isMovie && data.notes
-        ? { notes: data.notes, year: prev.year || data.year || '' }
-        : { notes: '' }),
+      posterUrl: data?.posterUrl ?? undefined,
+      title: data?.found && data.title ? data.title : prev.title,
+      year: data?.found && data.year ? data.year : prev.year,
+      genre: data?.found ? data.genre : '',
+      era: data?.found ? data.era : '',
+      tone: data?.found ? data.tone : '',
     }));
   }, [enrich]);
 

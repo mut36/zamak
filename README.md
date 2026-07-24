@@ -13,7 +13,7 @@ SRT 자막을 Gemini로 번역하는 웹 애플리케이션입니다. 타임코�
 - **타임코드 무결성** — AI에게는 번호와 대사만 보내고(타임스탬프는 토큰 낭비), 응답을 **번호로 대조해 원본 타임코드와 재결합**합니다. AI가 자막을 합치거나 빠뜨려도 이후 자막이 밀리지 않습니다
 - **티어별 청크 병렬 번역** — 자막을 청크로 나눠 동시 번역. 크기와 동시성은 티어별로 다릅니다 ([산출 근거](docs/tuning/chunk-size-model.md))
 - **부분 실패 허용** — 실패한 청크는 원문을 유지하고 나머지는 번역해, 항상 재생 가능한 완전한 SRT를 반환합니다. 완료 화면에 실패 개수가 표시됩니다
-- **작품 정보 자동 수집** — 파일명·자막 샘플에서 제목/연도를 추출하고, Google Search로 감독·톤·인물 말투 지침을 생성하며, TMDB에서 포스터를 가져옵니다
+- **작품 정보 자동 수집** — 파일명·자막 샘플에서 제목/연도를 추출한 뒤, TMDB에서 공식 제목·연도·감독·장르·포스터를 우선 조회하고, TMDB에 없는 작품은 Google Search 그라운딩으로 대체 조회합니다. 배경/시대·톤앤매너는 AI가 키워드로 보강합니다
 - **영화 아닌 영상 지원** — 자막 앞부분을 샘플링해 AI가 내용을 요약하는 분기
 - **번역 취소** — 진행 중 중단
 
@@ -25,7 +25,7 @@ SRT 자막을 Gemini로 번역하는 웹 애플리케이션입니다. 타임코�
 | UI | React 19, Tailwind CSS v4 |
 | Language | TypeScript 5 |
 | AI | Google Gemini API (`@google/genai`) |
-| 메타데이터 | TMDB API (포스터) |
+| 메타데이터 | TMDB API (제목·연도·감독·장르·포스터), Google Search grounding (TMDB 미스 폴백) |
 | Hosting | Vercel |
 
 ## Getting Started
@@ -35,7 +35,7 @@ SRT 자막을 Gemini로 번역하는 웹 애플리케이션입니다. 타임코�
 - Node.js 18+
 - Supabase 프로젝트 (로그인 + 크레딧 저장) — 아래 [인증 설정](#인증-설정) 참조
 - Google Cloud OAuth 클라이언트 (Google 로그인용)
-- TMDB API 키 (포스터용, 서버 전용)
+- TMDB API 키 (작품 정보 조회용, 서버 전용)
 - 토스페이먼츠 API 키 (크레딧 결제용) — 없어도 번역은 동작합니다. 실키 발급에는 사업자등록과 통신판매업 신고가 필요하고, 그 전까지는 테스트 키로 전 흐름을 확인할 수 있습니다
 - Gemini API 키 (서버 전용) — **필수.** 모든 요청이 이 키로 돌아갑니다. Google Search grounding(`/api/enrich`)은 무료 등급 프로젝트에서 동작하지 않으므로 **결제가 연결된 프로젝트의 키**여야 합니다
 
@@ -50,7 +50,7 @@ npm install
 `.env.local` 생성:
 
 ```env
-# TMDB — 포스터 조회 (서버 전용, 클라이언트에 노출되지 않음)
+# TMDB — 작품 정보 조회 (서버 전용, 클라이언트에 노출되지 않음)
 TMDB_API_KEY=your_tmdb_v3_api_key
 
 # Gemini — 모든 요청이 이 키로 돌아감 (서버 전용, 클라이언트에 노출되지 않음)
@@ -179,7 +179,7 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 
 | 변수 | 기본값 | 용도 |
 |---|---|---|
-| `TMDB_API_KEY` | — | **필수.** 포스터 조회 |
+| `TMDB_API_KEY` | — | **필수.** 작품 정보 조회 (제목·연도·감독·장르·포스터). 미매칭 시 Google Search 그라운딩으로 대체 |
 | `TMDB_LANGUAGE` | `ko-KR` | TMDB 메타데이터 언어 |
 | `THINKING_LEVEL` | `LOW` | `MINIMAL`\|`LOW`\|`MEDIUM`\|`HIGH`. **실측상 MINIMAL과 LOW 모두 thinking 0** — 비용이 같아 품질이 나은 LOW가 기본값. 변경 시 dev 서버 재시작 필요 |
 | `NEXT_PUBLIC_FREE_CHUNK_SIZE` / `_FREE_CONCURRENCY` | 150 / 6 | 무료 티어 청킹 |
@@ -219,12 +219,11 @@ app/
 ├── api/
 │   ├── analyze/route.ts        # 파일명/자막 샘플 → 제목·연도 (로그인 필요)
 │   ├── credits/route.ts        # 잔액 조회
-│   ├── enrich/route.ts         # Google Search → 감독·톤·인물 지침 (로그인 필요)
+│   ├── enrich/route.ts         # TMDB 우선 조회, 미스 시 Google Search 폴백 (로그인 필요)
 │   ├── payments/prepare/       # 팩 → 주문 생성 (가격을 서버가 확정)
 │   ├── payments/confirm/       # Toss successUrl — 승인 + 크레딧 지급 (멱등)
 │   ├── payments/fail/          # Toss failUrl — 주문 종료
 │   ├── summarize/route.ts      # 영화 아닌 영상의 내용 요약 (로그인 필요)
-│   ├── tmdb/route.ts           # 포스터 조회 (TMDB 키, 로그인 불필요)
 │   ├── translation/begin/      # 크레딧 1개 차감 + job 생성
 │   └── translate/route.ts      # 청크 번역, SSE (job 검증)
 ├── components/simple/          # 위저드 스텝 (업로드/정보/진행/완료) + 충전
@@ -234,13 +233,13 @@ app/
 │   └── languages.ts            # 도착어 (enabled 플래그로 확장)
 ├── hooks/
 │   ├── useTranslation.ts       # 파일 처리, 청킹, 병렬 번역, 취소
-│   └── useEnrich.ts            # 작품 정보 + 포스터 병렬 조회
+│   └── useEnrich.ts            # 작품 정보 통합 조회 (TMDB → 그라운딩 폴백)
 ├── i18n/simpleCopy.ts          # UI 문구 (하드코딩 금지)
 ├── lib/
 │   ├── client/                 # SSE, API 요청, 병렬 실행 풀
 │   ├── prompts/                # 프롬프트 로더·조합
 │   ├── providers/              # Gemini provider
-│   ├── server/                 # 요청 검증, SSE, 번역 서비스, TMDB, 토스 결제
+│   ├── server/                 # 요청 검증, SSE, 번역 서비스, enrichMovie(TMDB·그라운딩), TMDB, 토스 결제
 │   └── srt.ts                  # 파싱, 청킹, 타임코드 재조립
 └── types/translation.ts
 docs/decisions.md               # 기획·설계 결정과 그 이유 (뒤집힌 결정 포함)
@@ -260,8 +259,9 @@ scripts/chunk-model.mjs         # 청크 크기 계산기
    → useTranslation.processFile
         └── /api/analyze          제목·연도 추출
    → InfoStep (useEnrich)
-        ├── /api/enrich           감독·톤·인물 지침 (Google Search)
-        └── /api/tmdb             포스터                      ← 병렬
+        └── /api/enrich           enrichMovie(): TMDB 조회 → 매치 시 제목·연도·
+                                   감독·장르·포스터 + AI 키워드(배경/시대·톤앤매너)
+                                   1회, 미스 시 Google Search 그라운딩으로 대체
    → useTranslation.translate
         ├── /api/translation/begin  크레딧 1개 차감 → jobId (파일당 1회)
         ├── resolveTier()         청크 크기·동시성 (현재 항상 server)
