@@ -166,7 +166,45 @@ function MovieInfo({
       )}
 
       {!busy && (
-        <div className='field mt-6'>
+        <div className='mt-6'>
+          <p className='text-[12px] text-ink-3 mb-2'>{c.aiInfoHint}</p>
+          <div className='frow'>
+            <div className='field !mb-0'>
+              <label>{c.genreLabel}</label>
+              <input
+                className='input'
+                value={movieInfo.genre ?? ''}
+                onChange={(e) =>
+                  setMovieInfo((p) => ({ ...p, genre: e.target.value }))
+                }
+              />
+            </div>
+            <div className='field !mb-0'>
+              <label>{c.eraLabel}</label>
+              <input
+                className='input'
+                value={movieInfo.era ?? ''}
+                onChange={(e) =>
+                  setMovieInfo((p) => ({ ...p, era: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+          <div className='field mt-3'>
+            <label>{c.toneLabel}</label>
+            <input
+              className='input'
+              value={movieInfo.tone ?? ''}
+              onChange={(e) =>
+                setMovieInfo((p) => ({ ...p, tone: e.target.value }))
+              }
+            />
+          </div>
+        </div>
+      )}
+
+      {!busy && (
+        <div className='field mt-4'>
           <label>{c.notesLabel}</label>
           <p className='text-[12px] text-ink-3 mb-2'>{c.notesHint}</p>
           <textarea

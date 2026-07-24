@@ -164,8 +164,14 @@ export const COPY = {
     // nothing. The raw server message follows so the cause is visible instead
     // of hiding behind "자동으로 못 찾았어요".
     enrichFailed: '작품 정보 검색에 실패했어요.',
+    // AI-derived keyword fields fed into the translation prompt. Editable so
+    // a wrong AI guess can be corrected before translating.
+    aiInfoHint: 'AI가 자동으로 채운 정보예요. 번역 톤을 잡는 데 쓰이니, 틀리면 고쳐주세요.',
+    genreLabel: '장르',
+    eraLabel: '배경/시대',
+    toneLabel: '톤앤매너',
     notesLabel: '참고할 내용',
-    notesHint: '번역에 반영할 톤·인물 말투 지침이에요. 자유롭게 다듬어도 좋아요.',
+    notesHint: '번역에 참고할 내용을 자유롭게 적어주세요.',
     // other branch
     otherTitle: '어떤 영상인가요?',
     otherSubtitle: '앞부분을 읽고 내용을 요약했어요. 번역 맥락으로 쓰여요.',
