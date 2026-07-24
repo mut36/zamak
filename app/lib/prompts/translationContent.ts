@@ -1,5 +1,5 @@
 import type { MovieInfo } from './types';
-import { loadTranslationRules } from './loader';
+import { loadTranslationExamples, loadTranslationRules } from './loader';
 
 function getLanguageConfig(targetLanguage: string) {
   if (targetLanguage === 'ko' || targetLanguage === 'Korean') {
@@ -39,7 +39,14 @@ export async function buildTranslationVariables(
   chunkPosition?: { index: number; total: number },
 ): Promise<Record<string, string>> {
   const config = getLanguageConfig(targetLanguage);
-  const translationRules = await loadTranslationRules(config.language);
+  // Examples are EN→KO oriented, so they only apply when translating into
+  // Korean. Other targets get no example block.
+  const [translationRules, examples] = await Promise.all([
+    loadTranslationRules(config.language),
+    config.language === 'ko'
+      ? loadTranslationExamples('ko')
+      : Promise.resolve(''),
+  ]);
 
   return {
     translationDirection: config.translationDirection,
@@ -50,7 +57,9 @@ export async function buildTranslationVariables(
         : '',
     movieInfo: formatMovieInfo(movieInfo),
     translationRules,
-    examplesSection: '',
+    examplesSection: examples
+      ? `<translation_examples>\n${examples}\n</translation_examples>`
+      : '',
     notesSection: movieInfo.notes
       ? `<user_notes>\n${movieInfo.notes}\n</user_notes>`
       : '',
