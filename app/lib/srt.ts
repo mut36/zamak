@@ -60,6 +60,44 @@ export function parseBlockTiming(raw: string): BlockTiming | null {
   };
 }
 
+const STYLE_TAG = /<[^>]*>|\{[^}]*\}/g;
+
+export interface CpsResult {
+  /** On-screen duration of the subtitle, in milliseconds. */
+  durationMs: number;
+  /** Visible character count (style tags stripped, line breaks not counted). */
+  charCount: number;
+  /** Characters per second, or null when the display window is non-positive. */
+  cps: number | null;
+}
+
+/**
+ * Reading-speed (characters-per-second) metric for a single subtitle block.
+ *
+ * Not wired to any feature yet — this is a measured primitive kept ready for a
+ * future advanced-translation length-budgeting feature (a subtitle on screen
+ * 1.2s can hold far fewer characters than one on screen 4s). Exposes the raw
+ * durationMs and charCount alongside cps so that feature can pick its own CPS
+ * convention (e.g. whether to count spaces) without re-parsing.
+ *
+ * Counting: HTML (`<i>`) and ASS override (`{\an8}`) style tags are stripped
+ * first (they aren't reading load); characters are counted by code point so
+ * multibyte glyphs count as one; line breaks are dropped, not counted. Returns
+ * null when the block has no parseable timing.
+ */
+export function computeCps(raw: string): CpsResult | null {
+  const timing = parseBlockTiming(raw);
+  if (!timing) return null;
+
+  const durationMs = timing.endMs - timing.startMs;
+  const body = raw.split('\n').slice(2).join('\n');
+  const visible = body.replace(STYLE_TAG, '').replace(/\n/g, '').trim();
+  const charCount = [...visible].length;
+  const cps = durationMs > 0 ? charCount / (durationMs / 1000) : null;
+
+  return { durationMs, charCount, cps };
+}
+
 export interface GapChunkOptions {
   /**
    * How far a cut may drift from targetSize, as a fraction of it.

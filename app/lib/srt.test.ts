@@ -3,6 +3,7 @@ import {
   buildOutputFilename,
   chunkSrtBlocks,
   chunkSrtBlocksAtGaps,
+  computeCps,
   parseBlockTiming,
   parseSrtBlocks,
   reassembleTranslatedChunk,
@@ -249,5 +250,39 @@ describe('chunkSrtBlocksAtGaps', () => {
     expect(() => chunkSrtBlocksAtGaps(['a'], 0)).toThrow();
     expect(() => chunkSrtBlocksAtGaps(['a'], -5)).toThrow();
     expect(() => chunkSrtBlocksAtGaps(['a'], 1.5)).toThrow();
+  });
+});
+
+describe('computeCps', () => {
+  it('computes characters per second over the on-screen duration', () => {
+    expect(computeCps('801\n00:00:00,000 --> 00:00:02,000\n안녕하세요')).toEqual({
+      durationMs: 2000,
+      charCount: 5,
+      cps: 2.5,
+    });
+  });
+
+  it('sums a multi-line body and drops the line break, keeping spaces', () => {
+    const r = computeCps('1\n00:00:00,000 --> 00:00:01,000\nHello there\nworld');
+    // "Hello there" (11, space counted) + "world" (5) = 16, no newline char.
+    expect(r?.charCount).toBe(16);
+    expect(r?.cps).toBe(16);
+  });
+
+  it('strips HTML and ASS style tags before counting', () => {
+    const r = computeCps('1\n00:00:00,000 --> 00:00:01,000\n<i>{\\an8}안녕</i>');
+    expect(r?.charCount).toBe(2);
+  });
+
+  it('returns null when the block has no parseable timing', () => {
+    expect(computeCps('1\nnot a timecode\nhi')).toBeNull();
+  });
+
+  it('returns cps null for a zero-length display window', () => {
+    expect(computeCps('1\n00:00:05,000 --> 00:00:05,000\nhi')).toEqual({
+      durationMs: 0,
+      charCount: 2,
+      cps: null,
+    });
   });
 });
