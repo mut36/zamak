@@ -16,7 +16,7 @@ import { useAuth } from './hooks/useAuth';
 import { parseSrtBlocks } from './lib/srt';
 import { isSupabaseConfigured } from './lib/supabase/env';
 import { DEFAULT_TARGET_LANG } from './config/languages';
-import { TRANSLATION_MODEL } from './config/constants';
+import type { AllowedModel } from './config/constants';
 import type { ContentType, MovieInfo } from './types/translation';
 import { COPY } from './i18n/simpleCopy';
 
@@ -204,12 +204,12 @@ export default function Home() {
     setStep(1);
   };
 
-  const handleTranslate = async () => {
+  const handleTranslate = async (model: AllowedModel) => {
     setStep(2);
     // translate() resolves true on success, false on error/abort/refusal.
     const ok = await translate(
       movieInfo,
-      TRANSLATION_MODEL,
+      model,
       targetLang,
       'meaning',
     );

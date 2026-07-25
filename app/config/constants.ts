@@ -151,11 +151,31 @@ export const JOB_VALIDITY_MINUTES = readPositiveIntEnv(
  */
 export const AUX_MODEL = process.env.AUX_MODEL || 'gemini-3.5-flash-lite';
 
+/**
+ * Translation models offered in the UI (빠른번역 / 고급번역). Kept as an
+ * array so request validation still works and adding a model later is one line.
+ */
+export const FLASH_MODEL = 'gemini-3.6-flash' as const;
+export const PRO_MODEL = 'gemini-3.1-pro-preview' as const;
+
+export const ALLOWED_MODELS = [FLASH_MODEL, PRO_MODEL] as const;
+
+export type AllowedModel = (typeof ALLOWED_MODELS)[number];
+
+export const DEFAULT_MODEL: AllowedModel = FLASH_MODEL;
+
+/**
+ * Default model for harness / env override. The UI picks explicitly via
+ * 고급번역 (PRO_MODEL) / 빠른번역 (FLASH_MODEL).
+ */
+export const TRANSLATION_MODEL =
+  process.env.NEXT_PUBLIC_TRANSLATION_MODEL || DEFAULT_MODEL;
+
 const THINKING_LEVELS = ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH'] as const;
 export type ThinkingLevelName = (typeof THINKING_LEVELS)[number];
 
 /**
- * Thinking effort for every model call.
+ * Default thinking effort for the flash (빠른번역) path.
  *
  * Gemini bills thinking tokens at the *output* rate — 6× the input rate — and
  * spends them once per request, so this looked like our largest cost lever.
@@ -166,9 +186,9 @@ export type ThinkingLevelName = (typeof THINKING_LEVELS)[number];
  * The model does not allow disabling thinking outright, and thinkingBudget: 0
  * is silently ignored — thinkingLevel is the knob it honours.
  *
- * Env-tunable so comparing MINIMAL/LOW/MEDIUM/HIGH for translation quality is a
- * restart rather than a code change. MEDIUM and HIGH are unmeasured; assume
- * they do spend thinking tokens until a run says otherwise.
+ * Env-tunable so comparing MINIMAL/LOW/MEDIUM/HIGH for flash quality is a
+ * restart rather than a code change. Pro (고급번역) always uses MEDIUM via
+ * `thinkingLevelForModel` — not this env.
  */
 export const THINKING_LEVEL: ThinkingLevelName = (() => {
   const raw = process.env.THINKING_LEVEL?.trim().toUpperCase();
@@ -179,6 +199,14 @@ export const THINKING_LEVEL: ThinkingLevelName = (() => {
   console.warn(`[config] Invalid THINKING_LEVEL "${raw}", using LOW`);
   return 'LOW';
 })();
+
+/** Fixed thinking level for the Pro (고급번역) path. */
+export const PRO_THINKING_LEVEL: ThinkingLevelName = 'MEDIUM';
+
+/** Resolve thinking level for a translation model. */
+export function thinkingLevelForModel(model: string): ThinkingLevelName {
+  return model === PRO_MODEL ? PRO_THINKING_LEVEL : THINKING_LEVEL;
+}
 
 /**
  * TMDB (The Movie Database) — movie/drama metadata + posters. Server-only key
@@ -201,23 +229,6 @@ export const SUMMARY_SAMPLE_LINES = (() => {
   const parsed = raw ? parseInt(raw, 10) : NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 50;
 })();
-
-/**
- * Allowed translation models. Unified on a single Gemini model; kept as an
- * array so validation still works and adding a model later is one line.
- */
-export const ALLOWED_MODELS = ['gemini-3.6-flash'] as const;
-
-export type AllowedModel = (typeof ALLOWED_MODELS)[number];
-
-export const DEFAULT_MODEL: AllowedModel = 'gemini-3.6-flash';
-
-/**
- * The single translation model. Model updates are a one-line change here
- * (or via the NEXT_PUBLIC_TRANSLATION_MODEL env var).
- */
-export const TRANSLATION_MODEL =
-  process.env.NEXT_PUBLIC_TRANSLATION_MODEL || DEFAULT_MODEL;
 
 /**
  * Measured generation parameters, from docs/tuning/chunk-size-model.md §1.

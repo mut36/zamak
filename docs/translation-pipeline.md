@@ -153,9 +153,12 @@
 - **코드**: `translateSubtitle` → `app/lib/providers/gemini.ts` (`generateModelText`),
   설정 `app/config/constants.ts`
 - **품질 레버**:
-  - 번역 모델 교체 → `constants.ts` `TRANSLATION_MODEL` (기본 `gemini-3.6-flash`,
-    env `NEXT_PUBLIC_TRANSLATION_MODEL`)
-  - thinking 수준(품질/비용) → `constants.ts` `THINKING_LEVEL` (기본 LOW, env)
+  - 번역 모델 → UI에서 **고급번역** (`PRO_MODEL` = `gemini-3.1-pro-preview`) /
+    **빠른번역** (`FLASH_MODEL` = `gemini-3.6-flash`). 허용 목록은
+    `constants.ts` `ALLOWED_MODELS`. 하니스 기본은 `TRANSLATION_MODEL`(env
+    `NEXT_PUBLIC_TRANSLATION_MODEL`, 기본 flash)
+  - thinking 수준 → `thinkingLevelForModel(model)`: Pro는 고정 **MEDIUM**,
+    flash는 `THINKING_LEVEL`(기본 LOW, env). 로그에 `thinking=`로 찍힘
   - **엄격 모드**(출력 검증+재시도+블록단위 재번역) → `translationService.ts`,
     `TRANSLATION_STRICT_MODE=true`로 켬(기본 off, 비용 폭탄 위험 있어 신중히)
 
@@ -214,7 +217,7 @@
 | 특정 구간에서 자막이 대거 미번역(원문 그대로) | 대사 자체가 숫자인 장면(카운트다운 등) → `srt.ts` `[N]` 표식(§7·§9, `decisions.md` §2-1)이 이미 방지함. 그래도 재발하면 그 청크의 `matched`/`unmatched` 로그 확인 |
 | 청크가 대화 중간을 자름 | `srt.ts` (`chunkSrtBlocksAtGaps` 파라미터) |
 | 한국어 자막이 너무 빨리 지나감(읽기 힘듦) | `srt.ts` (`adjustSubtitleTiming`), `constants.ts` `CPS_TARGET`/`MIN_SUBTITLE_GAP_MS` — §9.5 |
-| 번역이 느림/비쌈 | `constants.ts` `SERVER_CHUNK_SIZE`/`CONCURRENCY`/`THINKING_LEVEL`, 모델 |
+| 번역이 느림/비쌈 | `constants.ts` `SERVER_CHUNK_SIZE`/`CONCURRENCY`/`thinkingLevelForModel`, 모델(고급/빠른) |
 | 특정 청크만 원문 그대로 | 그 청크 호출 실패(원문 폴백) — `gemini.ts` 로그, `translationService.ts` |
 | 화면 문구가 이상함 | `app/i18n/simpleCopy.ts` (하드코딩 금지) |
 

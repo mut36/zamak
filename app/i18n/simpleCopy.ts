@@ -181,7 +181,8 @@ export const COPY = {
     otherNotesHint: '말투(존댓말/반말), 전문 용어 표기 등 참고할 내용을 적어주세요.',
     // shared
     back: '이전',
-    translate: '번역 시작',
+    translatePro: '고급번역',
+    translateFlash: '빠른번역',
     startOver: '처음부터',
   },
 

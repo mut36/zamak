@@ -1,9 +1,14 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { SpinnerIcon, SparkleIcon, PencilIcon, ArrowRightIcon } from '../icons';
+import { SpinnerIcon, SparkleIcon, PencilIcon } from '../icons';
 import type { EnrichStatus } from '../../hooks/useEnrich';
 import type { ContentType, MovieInfo } from '../../types/translation';
+import {
+  FLASH_MODEL,
+  PRO_MODEL,
+  type AllowedModel,
+} from '../../config/constants';
 import { COPY } from '../../i18n/simpleCopy';
 
 interface InfoStepProps {
@@ -23,7 +28,7 @@ interface InfoStepProps {
   /** Optional content rendered just above the action buttons. */
   beforeActions?: ReactNode;
   onBack: () => void;
-  onTranslate: () => void;
+  onTranslate: (model: AllowedModel) => void;
 }
 
 const c = COPY.info;
@@ -284,7 +289,7 @@ function Actions({
   disabled,
 }: {
   onBack: () => void;
-  onTranslate: () => void;
+  onTranslate: (model: AllowedModel) => void;
   disabled: boolean;
 }) {
   return (
@@ -296,10 +301,17 @@ function Actions({
         type='button'
         className='btn btn-primary flex-1'
         disabled={disabled}
-        onClick={onTranslate}
+        onClick={() => onTranslate(PRO_MODEL)}
       >
-        {c.translate}
-        <ArrowRightIcon />
+        {c.translatePro}
+      </button>
+      <button
+        type='button'
+        className='btn btn-ghost flex-1'
+        disabled={disabled}
+        onClick={() => onTranslate(FLASH_MODEL)}
+      >
+        {c.translateFlash}
       </button>
     </div>
   );
