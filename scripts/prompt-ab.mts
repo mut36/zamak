@@ -51,9 +51,10 @@ const P = {
   title: args.title ?? '',
   year: args.year ?? '',
   notes: args.notes ?? '',
-  // docs/tuning/gemini-limits.md §4
+  // docs/tuning/gemini-limits.md §4 — pout dropped from $9.00 to $7.50/1M,
+  // 2026-07-25 flash pricing update.
   pin: Number(args.pin ?? 1.5),
-  pout: Number(args.pout ?? 9.0),
+  pout: Number(args.pout ?? 7.5),
 };
 
 /**

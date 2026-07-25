@@ -49,7 +49,7 @@ export const FREE_CONCURRENCY = readPositiveIntEnv(
 /**
  * Server key knobs — what every request uses today.
  *
- * B=200 IS AN EMPIRICAL SAFETY LIMIT, not a derived optimum — arithmetic
+ * B=100 IS AN EMPIRICAL SAFETY LIMIT, not a derived optimum — arithmetic
  * cannot pick B at all (docs/tuning/chunk-size-model.md §5: cost varies only
  * 6.5% across the whole usable range, wall clock is not a constraint, and
  * expected blast radius from a whole-chunk API failure is B-invariant).
@@ -61,28 +61,41 @@ export const FREE_CONCURRENCY = readPositiveIntEnv(
  * unused, and increasing, a renumbered block passes all three checks and the
  * translation lands on the wrong timecode for the rest of the chunk — silent,
  * not caught by the matched/unmatched counters. Observed to start past ~600
- * lines in one chunk; B=500 avoided it in early testing. B=200 sits further
+ * lines in one chunk; B=500 avoided it in early testing. B=100 sits further
  * under that ceiling with a smaller blast radius pending either a recurrence
  * or the detection/repair logic sketched in docs/decisions.md §2-3.
+ *
+ * B=100 is also where a second, separate failure mode (a marker corrupted by
+ * a stray token bleeding in from elsewhere in the same chunk — the model's
+ * generation, not a parsing bug) stopped reproducing in harness runs at
+ * THINKING_LEVEL=LOW. Single-run evidence, not a derived threshold; see
+ * docs/decisions.md §2-3-3.
  *
  * The output cap (B ≤ 3,276) and 300s route timeout (B ≤ 4,097) are the only
  * hard walls; constants.test.ts asserts those two and nothing else, so any
  * B up to those walls here is a deliberate choice, not a constraint violation.
  *
- * K=16 was sized for B=2000 (⌈2000/2000⌉=1 chunk, K unused) and is now
- * comfortably oversized for B=200 (⌈2000/200⌉=10 chunks, still one wave) — no
- * change needed, kept so raising B later doesn't require a second edit.
+ * K=16 was sized for B=2000 (⌈2000/2000⌉=1 chunk, K unused) and comfortably
+ * covered B=200 in one wave (⌈2000/200⌉=10 ≪ 16). At B=100 a credit-cap-sized
+ * file needs ⌈2000/100⌉=20 chunks, which is now *more* than K — two waves, not
+ * one (our 1874-block sample already crosses this: 19 chunks > 16). The
+ * one-wave rule was already abandoned as a K-derivation basis (2026-07-22,
+ * below), so this isn't a regression against any live constraint — just worth
+ * knowing before assuming "K is always oversized" from the B=200-era comment.
+ * Raise K toward ⌈N_max/B⌉ if 1-wave latency on the largest files matters.
  *
  * History, so nobody re-derives a phantom: K=14 arrived in the initial commit
  * with no derivation, B=125 was then fitted to it via ⌈1500/14⌉, and the 1,500
  * cap it referenced is gone. The one-wave rule that briefly re-justified K was
  * dropped 2026-07-22, then B was pushed to 2000 (no chunking) the same day,
  * reverted to 500 after the renumbering bug above, then tuned through 400/300
- * to 200. Override via env to experiment (the harness reads these).
+ * to 200, then (undocumented at the time) to 150, then to 100 (2026-07-25,
+ * marker-corruption harness runs). Override via env to experiment (the
+ * harness reads these).
  */
 export const SERVER_CHUNK_SIZE = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CHUNK_SIZE,
-  150,
+  100,
 );
 export const SERVER_CONCURRENCY = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CONCURRENCY,
@@ -124,8 +137,13 @@ export function resolveTier(): Tier {
  * failing is far worse than it being loose. It still stops someone from
  * spending one credit on a ten-hour concatenation.
  *
- * Cost check: a 2,000-block file runs ~$0.36 (~500 KRW) against ~$0.27 at
- * 1,480. Credit pricing has to clear the cap, not the average.
+ * Cost check (2026-07-25, current B=100, pricing from docs/tuning/gemini-limits.md
+ * §4): a 2,000-block file costs ~$0.32 (~440 KRW) on flash, ~$0.49 (~670 KRW) on
+ * pro — worst case is pro at the cap, not flash at the average. A 1,480-block
+ * file costs ~$0.23 flash / ~$0.36 pro. Pro's estimate reuses flash's measured
+ * per-block token counts (chunk-size-model.md §1) since pro hasn't been
+ * measured separately — treat it as directional, not exact. Credit pricing has
+ * to clear the worst case (pro, at the cap), not the flash average.
  */
 export const MAX_BLOCKS_PER_CREDIT = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_MAX_BLOCKS_PER_CREDIT,

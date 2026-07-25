@@ -25,10 +25,13 @@ const P = {
   pfixed: 1028,  // MEASURED fixed prompt tokens/chunk incl. movieInfo notes (est. was 700)
   dens: 1.25,    // p95/mean density factor — densest window vs average (measured ~1.2)
 
-  // Model / API (docs/tuning/gemini-limits.md)
+  // Model / API (docs/tuning/gemini-limits.md) — gemini-3.6-flash pricing.
+  // Updated 2026-07-25: pout was $9.00, now $7.50. Pro-preview and flash-lite
+  // have their own pricing (see gemini-limits.md §4) — this script only
+  // models flash, the default translation model.
   outcap: 65536, // max output tokens per request
   pin: 1.5,      // $/1M input
-  pout: 9.0,     // $/1M output (thinking bills here too)
+  pout: 7.5,     // $/1M output (thinking bills here too)
   rpmFree: 15,
   rpmPaid: 1000,
   rpdFree: 1500,

@@ -38,7 +38,7 @@ describe('getTierLimits', () => {
     // Chunk size is deliberately NOT compared: the two are derived from
     // unrelated constraints — free from the wall-clock optimum under RPM 15,
     // server from fitting MAX_BLOCKS_PER_CREDIT into one concurrent wave — and
-    // server currently lands *below* free (125 vs 150) as a result.
+    // server currently lands *below* free (100 vs 150) as a result.
     expect(getTierLimits('free').concurrency).toBeLessThan(
       getTierLimits('server').concurrency,
     );
