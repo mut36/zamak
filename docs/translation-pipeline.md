@@ -166,14 +166,23 @@
 
 ### 9.5. 리딩스피드 타임코드 조정 (CPS)
 - **코드**: **`app/lib/srt.ts` (`adjustSubtitleTiming`)**, `constants.ts`
-  (`CPS_TARGET`/`MIN_SUBTITLE_GAP_MS`), `useTranslation`에서 청크 합친 직후 1회 호출.
-- **하는 일**: 번역된 한국어 블록 중 `cps > CPS_TARGET`(기본 12, Netflix 한국어 상한)인
-  것만, **이웃이 비운 침묵(gap)** 안에서 표시창을 넓혀 읽기 속도를 낮춘다. end를 먼저
-  뒤로 밀고 모자라면 start를 앞으로 당김. **창은 늘리기만 하고 줄이지 않으며, 절대 겹치지
-  않는다** — 앞 블록은 조정된 end, 뒤 블록은 원본 start를 경계로 쓰는 비대칭 + `MIN_SUBTITLE_GAP_MS`.
-  전체 파일에 한 번 돌아 청크 경계 이웃까지 커버. 타임코드를 코드가 소유한다는 원칙의 연장.
-- **품질 레버**: `CPS_TARGET`(낮추면 더 공격적으로 늘림), `MIN_SUBTITLE_GAP_MS`(인접 최소
-  간격). 둘 다 `constants.ts` + env. gap이 부족하면 목표까지 못 내려가고 가능한 만큼만 조정.
+  (`CPS_HARD_MAX`/`CPS_TARGET`/`CPS_RECOMMENDED_MIN`/`MIN_SUBTITLE_GAP_MS`),
+  `useTranslation`에서 청크 합친 직후 1회 호출.
+- **하는 일**: 번역된 한국어 블록 중 **`cps > CPS_HARD_MAX`(기본 12, Netflix 한국어 상한)**
+  인 것만 골라, **이웃이 비운 침묵(gap)** 안에서 표시창을 넓혀 읽기 속도를 **목표
+  `CPS_TARGET`(기본 10, 권장 밴드 8~10의 위쪽 끝)**까지 낮춘다. end를 먼저 뒤로 밀고
+  모자라면 start를 앞으로 당김. 첫 블록은 앞의 빈 프리롤(0초까지)로 start를 당길 수 있다.
+  **창은 늘리기만 하고 줄이지 않으며, 절대 겹치지 않는다** — 앞 블록은 조정된 end, 뒤 블록은
+  원본 start를 경계로 쓰는 비대칭 + `MIN_SUBTITLE_GAP_MS`. 전체 파일에 한 번 돌아 청크 경계
+  이웃까지 커버. 타임코드를 코드가 소유한다는 원칙의 연장.
+- **임계값 3단**: 12 초과 = 손봄(위반), 10 = 착지 목표, 8 = 그 아래로는 안 내림(목표가 10이라
+  자동 보장). 10~12 사이는 상한 밑이라 손대지 않는다.
+- **품질 레버**: `CPS_HARD_MAX`(낮추면 더 많은 블록을 손봄), `CPS_TARGET`(낮추면 더 여유롭게
+  늘리지만 gap을 더 씀), `MIN_SUBTITLE_GAP_MS`(인접 최소 간격). 모두 `constants.ts` + env.
+  gap이 부족하면 목표까지 못 내려가고 가능한 만큼만 조정.
+- **알려진 한계**: 연속 밀집 구간에서 앞 블록이 공유 gap을 end로 먼저 선점하면(greedy) 뒤
+  블록이 backward-room을 못 써 덜 조정된다(decisions §2-5). 실측(1480블록)상 여유가 있는데
+  미조정으로 남는 블록은 2개 수준.
 
 ### 10. 조립 & 다운로드
 - **코드**: `useTranslation`(청크 결과 합치기 + §9.5 조정), `app/lib/srt.ts` (`buildOutputFilename`),

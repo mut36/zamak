@@ -82,7 +82,7 @@ export const FREE_CONCURRENCY = readPositiveIntEnv(
  */
 export const SERVER_CHUNK_SIZE = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CHUNK_SIZE,
-  200,
+  150,
 );
 export const SERVER_CONCURRENCY = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CONCURRENCY,
@@ -258,18 +258,37 @@ export function estimateTranslationMs(
 }
 
 /**
- * Reading-speed post-processing. After a file is fully translated and
- * reassembled, adjustSubtitleTiming() (app/lib/srt.ts) widens the on-screen
- * window of any Korean block that reads faster than CPS_TARGET, borrowing only
- * from the silent gaps its neighbours leave free so nothing can overlap.
+ * Reading-speed post-processing thresholds (characters per second). After a
+ * file is translated and reassembled, adjustSubtitleTiming() (app/lib/srt.ts)
+ * widens any block that reads faster than CPS_HARD_MAX, pulling it down toward
+ * CPS_TARGET, borrowing only from the silent gaps its neighbours leave free so
+ * nothing can overlap.
  *
- * 12 cps matches Netflix's Korean reading-speed ceiling for adult programs.
+ * Three thresholds, one recommended band (8–10) under a hard ceiling (12):
+ *  - CPS_HARD_MAX (12): the ceiling — only blocks reading faster than this are
+ *    touched. 12 = Netflix's Korean adult reading-speed limit.
+ *  - CPS_TARGET (10): where a fixed block should land — the fast edge of the
+ *    8–10 band. Aiming at the top of the band spends the least gap to reach
+ *    "comfortable"; when a block can't reach it, it still gets as close as room
+ *    allows.
+ *  - CPS_RECOMMENDED_MIN (8): the comfortable floor. We never extend past
+ *    CPS_TARGET, so nothing is ever pushed below this — it documents the band's
+ *    lower edge for any future reporting.
+ *
  * MIN_SUBTITLE_GAP_MS keeps a ~2-frame (24fps) silence between adjacent
- * subtitles so a widened line never visually touches the next. Both env-tunable.
+ * subtitles so a widened line never visually touches the next. All env-tunable.
  */
+export const CPS_HARD_MAX = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_CPS_HARD_MAX,
+  12,
+);
 export const CPS_TARGET = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CPS_TARGET,
-  12,
+  10,
+);
+export const CPS_RECOMMENDED_MIN = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_CPS_RECOMMENDED_MIN,
+  8,
 );
 export const MIN_SUBTITLE_GAP_MS = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_MIN_SUBTITLE_GAP_MS,

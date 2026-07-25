@@ -291,26 +291,48 @@ describe('computeCps', () => {
 describe('adjustSubtitleTiming', () => {
   const cpsOf = (block: string) => computeCps(block)?.cps ?? null;
 
-  it('leaves a comfortable (cps <= target) block untouched', () => {
+  it('leaves a block under the hard max untouched', () => {
     // 5 chars over 2s = 2.5 cps.
     const srt = '1\n00:00:00,000 --> 00:00:02,000\n안녕하세요';
     expect(adjustSubtitleTiming(srt)).toBe(srt);
   });
 
-  it('widens a fast block into free surrounding silence to hit the target', () => {
-    // 20 chars over 1s = 20 cps; target 12 needs ~1.667s. Gap after runs to 10s.
+  it('leaves a block between the target and the hard max untouched', () => {
+    // 22 chars over 2s = 11 cps — above the 10 target but under the 12 hard
+    // max, so it is not a violation and must not be touched.
+    const srt = '1\n00:00:00,000 --> 00:00:02,000\n' + '가'.repeat(22);
+    expect(adjustSubtitleTiming(srt)).toBe(srt);
+  });
+
+  it('widens a fast block into free surrounding silence down to the target', () => {
+    // 20 chars over 1s = 20 cps (> 12 hard max); target 10 needs 2.0s. Gap
+    // after runs to 10s, so the end alone can cover the whole deficit.
     const srt =
       '1\n00:00:01,000 --> 00:00:02,000\n' +
-      '가나다라마바사아자차카타파하가나다라마바\n\n' +
+      '가'.repeat(20) + '\n\n' +
       '2\n00:00:10,000 --> 00:00:12,000\n다음';
     const out = adjustSubtitleTiming(srt);
     const blocks = parseSrtBlocks(out);
-    // Reached the target (within rounding).
-    expect(cpsOf(blocks[0])!).toBeLessThanOrEqual(12.01);
+    // Reached the 10 target (within rounding).
+    expect(cpsOf(blocks[0])!).toBeLessThanOrEqual(10.01);
     // End pushed later first; start held (there was no earlier neighbour cost).
-    expect(blocks[0]).toContain('00:00:01,000 --> 00:00:02,667');
+    expect(blocks[0]).toContain('00:00:01,000 --> 00:00:03,000');
     // The comfortable second block is unchanged.
     expect(blocks[1]).toContain('00:00:10,000 --> 00:00:12,000');
+  });
+
+  it('pulls the FIRST block back into the free pre-roll before it', () => {
+    // First block is fast (14 chars / 1s = 14 cps) with a big empty pre-roll
+    // (starts at 5s) and a tight neighbour right after, so the only room is
+    // backward — the first block must be allowed to use it.
+    const srt =
+      '1\n00:00:05,000 --> 00:00:06,000\n' + '가'.repeat(14) + '\n\n' +
+      '2\n00:00:06,050 --> 00:00:08,000\n다음';
+    const out = adjustSubtitleTiming(srt);
+    const blocks = parseSrtBlocks(out);
+    // Start pulled earlier to reach the target; no forward room was available.
+    expect(blocks[0]).toContain('00:00:04,600 --> 00:00:06,000');
+    expect(cpsOf(blocks[0])!).toBeLessThanOrEqual(10.01);
   });
 
   it('never overlaps neighbours and keeps the min gap when silence is tight', () => {
@@ -346,14 +368,14 @@ describe('adjustSubtitleTiming', () => {
   it('passes an unparseable block through and does not extend across it', () => {
     const srt =
       '1\nnot a timecode\n서문\n\n' +
-      '2\n00:00:05,000 --> 00:00:06,000\n' +
-      '가나다라마바사아자차카타파하';
+      '2\n00:00:05,000 --> 00:00:06,000\n' + '가'.repeat(14) + '\n\n' +
+      '3\n00:00:20,000 --> 00:00:22,000\n다음';
     const out = adjustSubtitleTiming(srt);
     const blocks = parseSrtBlocks(out);
     // The malformed block is untouched.
     expect(blocks[0]).toBe('1\nnot a timecode\n서문');
-    // The fast block widened forward but did not pull its start back over the
-    // unknown span of the wall (start stays at 5s).
-    expect(blocks[1]).toContain('00:00:05,000 -->');
+    // The fast block widened forward (room to block 3 at 20s) but did NOT pull
+    // its start back over the unknown span of the wall (start stays at 5s).
+    expect(blocks[1]).toContain('00:00:05,000 --> 00:00:06,400');
   });
 });

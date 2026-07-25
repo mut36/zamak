@@ -120,8 +120,15 @@ export function computeCps(raw: string): CpsResult | null {
 
 export interface TimingAdjustOptions {
   /**
-   * Reading-speed ceiling (characters per second). Blocks above this get their
-   * on-screen window widened toward it; blocks at or under it are untouched.
+   * Hard reading-speed ceiling (characters per second). Only blocks reading
+   * faster than this are adjusted; blocks at or under it are left untouched.
+   * Default 12.
+   */
+  cpsHardMax?: number;
+  /**
+   * Reading speed (characters per second) a widened block aims to reach — the
+   * fast edge of the comfortable band. A triggered block is extended down
+   * toward this, or as close as the free gaps allow. Default 10.
    */
   cpsTarget?: number;
   /** Minimum silence (ms) kept between two adjacent subtitles after adjusting. */
@@ -129,8 +136,9 @@ export interface TimingAdjustOptions {
 }
 
 /**
- * Widen the on-screen window of subtitles that read too fast (cps > target),
- * borrowing only from the silent gaps their neighbours leave free.
+ * Widen the on-screen window of subtitles that read too fast (cps > hard max),
+ * pulling them down toward the target cps, borrowing only from the silent gaps
+ * their neighbours leave free.
  *
  * Runs once over the whole, in-order file so it also protects chunk-boundary
  * neighbours. A single forward pass keeps overlaps impossible: each block's new
@@ -143,8 +151,9 @@ export interface TimingAdjustOptions {
  * deficit is filled by pushing the end later first (holding the line longer
  * reads more naturally than an early lead-in), then pulling the start earlier;
  * when the surrounding gaps are too small it reduces cps as far as they allow
- * rather than forcing the target. Blocks with unparseable timing are passed
- * through untouched and act as hard walls that block extension into them.
+ * rather than forcing the target. The first block can pull its start back into
+ * the free pre-roll before it (down to 0); blocks with unparseable timing are
+ * passed through untouched and act as hard walls that block extension into them.
  *
  * Timecodes are the only thing rewritten — sequence numbers and body text are
  * left exactly as-is, so the block count is preserved.
@@ -153,21 +162,22 @@ export function adjustSubtitleTiming(
   srt: string,
   options: TimingAdjustOptions = {},
 ): string {
-  const cpsTarget = options.cpsTarget ?? 12;
+  const cpsHardMax = options.cpsHardMax ?? 12;
+  const cpsTarget = options.cpsTarget ?? 10;
   const minGapMs = Math.max(0, options.minGapMs ?? 84);
 
   const blocks = parseSrtBlocks(srt);
   const timings = blocks.map(parseBlockTiming);
 
-  // End of the last block we finalized, used as the lower wall for the next
-  // block's start. Null until the first parseable block is seen.
-  let prevEnd: number | null = null;
+  // End of the last block we finalized, the lower wall for the next block's
+  // start. Starts at 0 — the free pre-roll before the first subtitle is
+  // borrowable — and resets to null after an unparseable block, whose unknown
+  // span the following block must not cross.
+  let prevEnd: number | null = 0;
 
   const rewritten = blocks.map((raw, i) => {
     const timing = timings[i];
     if (!timing) {
-      // Unparseable → untouched wall; its unknown span must not be crossed, so
-      // the next block gets no backward extension.
       prevEnd = null;
       return raw;
     }
@@ -177,7 +187,7 @@ export function adjustSubtitleTiming(
     const charCount = visibleCharCount(raw);
     const cps = durationMs > 0 ? charCount / (durationMs / 1000) : Infinity;
 
-    if (cps > cpsTarget && charCount > 0) {
+    if (cps > cpsHardMax && charCount > 0) {
       const requiredMs = (charCount / cpsTarget) * 1000;
       let deficit = Math.max(0, requiredMs - durationMs);
 

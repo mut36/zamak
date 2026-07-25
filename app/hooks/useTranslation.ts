@@ -21,6 +21,7 @@ import type {
   TranslationResult,
 } from '../types/translation';
 import {
+  CPS_HARD_MAX,
   CPS_TARGET,
   estimateTranslationMs,
   getTierLimits,
@@ -325,7 +326,11 @@ export function useTranslation(
       // file so it also covers chunk-boundary neighbours.
       const translated = adjustSubtitleTiming(
         (results as string[]).join('\n\n'),
-        { cpsTarget: CPS_TARGET, minGapMs: MIN_SUBTITLE_GAP_MS },
+        {
+          cpsHardMax: CPS_HARD_MAX,
+          cpsTarget: CPS_TARGET,
+          minGapMs: MIN_SUBTITLE_GAP_MS,
+        },
       );
       const outputFilename = buildOutputFilename(file.name, targetLang);
 
