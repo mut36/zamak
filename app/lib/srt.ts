@@ -335,20 +335,31 @@ function readSourceBlock(raw: string): SourceBlock {
 /**
  * Format a chunk for the model: timestamps dropped (the model never sees or
  * returns them — reassembleTranslatedChunk restores them from the source) and
- * each well-formed block's sequence number wrapped as a `[123]` marker instead
- * of a bare number.
+ * every body line prefixed with its own `[123] ` marker.
  *
- * The bracket is load-bearing, not cosmetic. A bare number is genuinely
- * ambiguous once timestamps are gone — dialogue that is itself a number (a
- * subtitle whose whole line is "8." or "1999") is indistinguishable from a
- * sequence marker by shape alone. That is not a hypothetical: a real source
- * file had a scene where a character counts aloud, giving ~20 consecutive
- * blocks with bodies like "8." "9." "10.", and every one of those numbers fell
- * inside its chunk's expected sequence range — silently swallowed as a false
- * marker and its dialogue lost (see decisions.md §2-1). A bracket is not valid
- * subtitle text on its own, so `[8]` can only ever be the marker and a
- * dialogue line "8." can never be mistaken for one, regardless of what number
- * it contains.
+ * Two properties are load-bearing here.
+ *
+ * **Brackets.** A bare number is genuinely ambiguous once timestamps are gone —
+ * dialogue that is itself a number (a subtitle whose whole line is "8." or
+ * "1999") is indistinguishable from a sequence marker by shape alone. A real
+ * source file had a scene where a character counts aloud, giving ~20
+ * consecutive blocks with bodies like "8." "9." "10.", every one of which fell
+ * inside its chunk's expected sequence range and was silently swallowed as a
+ * false marker. A bracket is not valid subtitle text, so `[8]` can only be a
+ * marker and dialogue "8." can never be mistaken for one.
+ *
+ * **Marker on the same line as the text, repeated per line.** The marker used
+ * to sit on its own line above the body, which made it a pure-structure line
+ * carrying no translatable content — and the model would occasionally just not
+ * emit one. When that happened the orphaned text had nothing tying it to its
+ * identity, so it was absorbed into whichever block was still open, corrupting
+ * that block's body (measured: 1 in 400 blocks, twice, on different blocks).
+ * Fusing the marker onto each line removes the droppable structure-only line
+ * entirely: every output line proves its own identity, and a two-line subtitle
+ * is just the same marker twice. See decisions.md §2-1.
+ *
+ * Blocks stay separated by a blank line, which the parser uses as a "this run
+ * of lines ended" signal when a marker does go missing.
  *
  * Malformed blocks (no parseable sequence+timing) pass through with only a
  * timestamp-shaped line stripped, since there's no reliable index to marker.
@@ -356,15 +367,16 @@ function readSourceBlock(raw: string): SourceBlock {
 export function formatBlocksForModel(content: string): string {
   return parseSrtBlocks(content)
     .map((raw) => {
+      const lines = raw.split('\n');
       const block = readSourceBlock(raw);
       if (block.index === null) {
-        return raw
-          .split('\n')
-          .filter((line) => !TIMING_LINE.test(line.trim()))
-          .join('\n');
+        return lines.filter((line) => !TIMING_LINE.test(line.trim())).join('\n');
       }
-      const body = raw.split('\n').slice(2).join('\n');
-      return `[${block.index}]\n${body}`;
+      const body = lines.slice(2);
+      const bodyLines = body.length > 0 ? body : [''];
+      return bodyLines
+        .map((line) => `[${block.index}] ${line}`.trimEnd())
+        .join('\n');
     })
     .join('\n\n');
 }
@@ -375,69 +387,91 @@ function stripCodeFence(text: string): string {
   return trimmed.replace(/^```[^\n]*\n?/, '').replace(/\n?```$/, '');
 }
 
-const MARKER_LINE = /^\[(\d+)\]$/;
+/** `[123] text` — the marker owns the line it labels; text may be empty. */
+const MARKER_LINE = /^\[(\d+)\]\s?(.*)$/;
 
 /**
  * Index the model's output by sequence number.
  *
- * The model is asked for `[number]\ntranslated text` blocks (see
- * formatBlocksForModel), but it doesn't always oblige: it may drop the blank
- * lines between blocks, wrap everything in a code fence, emit a preamble, or
- * echo timestamps it was told to omit. So rather than splitting on blank
- * lines, we scan for `[number]` marker lines. Unlike a bare digit, a bracketed
- * marker can never collide with dialogue — dialogue that happens to be a
- * number (e.g. "8.") has no brackets, so it always falls straight into the
- * body buffer, whatever value it holds.
+ * Every line the model is asked for carries its own `[number] ` prefix (see
+ * formatBlocksForModel), so attribution is per-line and explicit: a line's
+ * identity travels with its text instead of depending on a separate structural
+ * line above it. Lines sharing a marker are joined in order, which is how a
+ * two-line subtitle comes back.
  *
- * A marker starts a new block only when its number is one we asked for and
- * isn't already finalized and isn't the block already open (a repeated marker
- * for the in-progress block is swallowed as noise and its followers fold into
- * that same block, matching the old repeated-number behaviour). Because the
- * bracket removes the ambiguity a bare digit had, this no longer needs a
- * monotonically-increasing check — a block can legitimately start any marker
- * in `expected`, in any order, which also fixes reversed-order output folding
- * into the wrong block (decisions.md §2-1).
+ * The model doesn't always oblige, so three deviations are absorbed:
+ *
+ * - **Marker alone on its own line** (the previous wire format, and a habit
+ *   the model sometimes falls back into). It matches with empty text and the
+ *   lines under it attach as continuations, so old-style output still parses.
+ * - **An unmarked continuation line**, i.e. the model split a subtitle across
+ *   two lines but only labelled the first. It attaches to the run in progress.
+ * - **A code fence, a preamble, or echoed timestamps** — dropped.
+ *
+ * What is deliberately *not* absorbed: text that appears after a blank line
+ * with no marker of its own. A blank line separates blocks in both directions,
+ * so such text is an orphan whose marker the model dropped, and there is no
+ * evidence about which block it belongs to. Guessing "the block above" is what
+ * used to corrupt that block's body; it is discarded instead, leaving its own
+ * block to fall back to the source text and be counted as unmatched.
+ *
+ * Empty parts are filtered before joining, so a body can never contain a blank
+ * line — which is what makes it impossible for a reassembled block to split
+ * into a second, header-less block when written back out as SRT.
  */
 function indexTranslatedBodies(
   modelOutput: string,
   expected: ReadonlySet<number>,
 ): Map<number, string> {
-  const bodies = new Map<number, string>();
-  let current: number | null = null;
-  let buffer: string[] = [];
-
-  const flush = () => {
-    if (current === null) return;
-    const body = buffer.join('\n').trim();
-    if (body) bodies.set(current, body);
-    buffer = [];
-  };
+  const collected = new Map<number, string[]>();
+  // The marker whose run of lines is still open, and whether the line just
+  // read belonged to it (an intervening blank line ends the run).
+  let openMarker: number | null = null;
+  let runOpen = false;
 
   for (const line of stripCodeFence(modelOutput).split('\n')) {
     const trimmed = line.trim();
-    const marker = trimmed.match(MARKER_LINE);
 
-    if (marker) {
-      const candidate = Number(marker[1]);
-      if (
-        expected.has(candidate) &&
-        candidate !== current &&
-        !bodies.has(candidate)
-      ) {
-        flush();
-        current = candidate;
-      }
-      // A bracketed line is a marker, never dialogue — never let it reach the
-      // subtitle body, whether or not it started a new block.
+    if (!trimmed) {
+      runOpen = false;
       continue;
     }
 
-    if (current === null) continue; // preamble before the first block
-    if (TIMING_LINE.test(trimmed)) continue; // echoed timestamp
-    buffer.push(line);
-  }
-  flush();
+    const marker = trimmed.match(MARKER_LINE);
+    if (marker) {
+      const candidate = Number(marker[1]);
+      if (expected.has(candidate)) {
+        const parts = collected.get(candidate) ?? [];
+        // An echoed timestamp can arrive labelled too — keep the run open so
+        // the real text under it still attaches, but never keep the timestamp.
+        parts.push(TIMING_LINE.test(marker[2].trim()) ? '' : marker[2]);
+        collected.set(candidate, parts);
+        openMarker = candidate;
+        runOpen = true;
+      } else {
+        // A marker for a block outside this chunk — not ours to attribute.
+        runOpen = false;
+      }
+      continue;
+    }
 
+    if (TIMING_LINE.test(trimmed)) continue; // echoed timestamp
+
+    if (runOpen && openMarker !== null) {
+      collected.get(openMarker)!.push(line);
+      continue;
+    }
+    // Preamble, or an orphan whose marker the model dropped — discard.
+  }
+
+  const bodies = new Map<number, string>();
+  for (const [index, parts] of collected) {
+    const body = parts
+      .map((part) => part.trimEnd())
+      .filter((part) => part.trim() !== '')
+      .join('\n');
+    if (body) bodies.set(index, body);
+  }
   return bodies;
 }
 

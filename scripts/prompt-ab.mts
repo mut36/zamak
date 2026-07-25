@@ -108,13 +108,19 @@ console.log = (...params: unknown[]) => {
 
 // ---------- helpers -------------------------------------------------------
 
-const NUMBER_LINE = /^\d+$/;
+const MARKER_LINE = /^\[(\d+)\]/;
 
-/** Blocks the model actually returned, counted the way composer.ts counts. */
+/**
+ * Distinct blocks the model actually labelled. Counts unique markers, not
+ * marker lines — a two-line subtitle repeats its marker by design.
+ */
 function countReturnedBlocks(modelOutput: string): number {
-  return modelOutput
-    .split('\n')
-    .filter((line) => NUMBER_LINE.test(line.trim())).length;
+  const seen = new Set<string>();
+  for (const line of modelOutput.split('\n')) {
+    const match = MARKER_LINE.exec(line.trim());
+    if (match) seen.add(match[1]);
+  }
+  return seen.size;
 }
 
 /** Least-squares fit of promptTokens = pFixed + tIn * blocks. */

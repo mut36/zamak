@@ -243,7 +243,7 @@ describe('translateSubtitle default mode (single call, no cost bomb)', () => {
   it('restores source timecodes onto the timestamp-free model output', async () => {
     // The model never receives timestamps, so it returns a [N] marker + text.
     mocks.generateModelText.mockResolvedValue(
-      ['[1]', '안녕', '', '[2]', '세계'].join('\n'),
+      ['[1] 안녕', '', '[2] 세계'].join('\n'),
     );
 
     await expect(translate()).resolves.toBe(
@@ -263,7 +263,7 @@ describe('translateSubtitle default mode (single call, no cost bomb)', () => {
     // The old cost bomb: a mismatch here would trigger per-block re-translation.
     // Now the block the model skipped just keeps its original text, and block 2
     // still gets block 2's timecode — no shifting.
-    mocks.generateModelText.mockResolvedValue(['[1]', '안녕'].join('\n'));
+    mocks.generateModelText.mockResolvedValue('[1] 안녕');
 
     await expect(translate()).resolves.toBe(
       [

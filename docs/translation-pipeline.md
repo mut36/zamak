@@ -135,9 +135,9 @@
     - `{{translationRules}}` → `prompts/common/translation_rules_ko.txt`
     - `{{examplesSection}}` → `prompts/common/translation_examples_ko.txt` (한국어 타깃)
   - **유저 턴**: `<content_metadata>`(`formatMovieInfo` — 제목/연도/장르/배경·시대/톤앤매너)
-    + `<user_notes>` + 청크 위치 + `<subtitle_data>`(타임스탬프 제거, 번호는 `[N]`
-    표식으로 감쌈 — `formatBlocksForModel`, `srt.ts`) + 블록 수 지시(구조 기반 카운트,
-    `parseSrtBlocks(...).length`)
+    + `<user_notes>` + 청크 위치 + `<subtitle_data>`(타임스탬프 제거, **줄마다
+    `[N] 대사` 표식** — `formatBlocksForModel`, `srt.ts`) + 블록 수 지시(구조 기반
+    카운트, `parseSrtBlocks(...).length`)
 - **품질 레버 (여기가 가장 큰 번역 품질 레버들)**:
   - 번역 규칙(직역 금지·말투·줄길이·마침표 등) → **`translation_rules_ko.txt`**
   - 영화적 번역 철학(인물 목소리·감정·압축) → **`cinematic_translation_philosophy_ko.txt`**
@@ -165,10 +165,12 @@
 ### 9. 타임코드 재조립
 - **코드**: **`app/lib/srt.ts` (`reassembleTranslatedChunk`, `indexTranslatedBodies`,
   `formatBlocksForModel`)**
-- **하는 일**: 모델 출력을 **`[N]` 표식으로 대조**해 원본 타임코드와 재결합. 매칭 안 된
-  블록은 원문 유지 → 이후 자막이 안 밀림. 타임스탬프는 모델에 안 보내므로 여기서 복원됨.
-  대괄호 표식(2026-07-25, `decisions.md` §2-1)이라 대사가 순수 숫자여도("8", "1999")
-  표식과 절대 안 겹침 — 순서 상관없이 아무 마커나 인정.
+- **하는 일**: 모델 출력을 **줄마다 붙은 `[N]` 표식으로 대조**해 원본 타임코드와 재결합.
+  매칭 안 된 블록은 원문 유지 → 이후 자막이 안 밀림. 타임스탬프는 모델에 안 보내므로
+  여기서 복원됨. 표식이 본문과 같은 줄에 있어(2026-07-25, `decisions.md` §2-1)
+  ①대사가 순수 숫자여도("8", "1999") 표식과 안 겹치고 ②모델이 표식을 빠뜨려도 그
+  텍스트가 이웃 블록을 오염시키지 못한다(빈 줄 뒤 표식 없는 고아는 버림). 같은 번호가
+  반복된 줄들은 한 블록의 여러 줄로 합쳐짐. 순서 상관없이 아무 마커나 인정.
 - **품질 레버**: 재번호 밀림 탐지/수리(현재 미구현 — 모델이 스스로 잘못된 `[N]`을
   내보내는 별개의 실패 모드, 표식 방식과 무관) → `srt.ts` + `TODO.md`. 이게 밀림
   버그의 방어선.
