@@ -24,8 +24,8 @@ export const geminiProvider: ModelProvider = {
     if (!client) throw new Error('Google AI API key not configured');
     // thinkingBudget: 0 used to sit here, but this model does not allow
     // disabling thinking — the budget was ignored and we paid for the default
-    // level. thinkingLevel is the knob it actually honours. Pro uses MEDIUM;
-    // flash uses THINKING_LEVEL (default LOW).
+    // level. thinkingLevel is the knob it actually honours. Pro uses
+    // PRO_THINKING_LEVEL (default MEDIUM); flash uses THINKING_LEVEL (default LOW).
     const thinking = thinkingLevelForModel(model);
     const response = await client.models.generateContent({
       model,

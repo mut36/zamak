@@ -181,7 +181,8 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 |---|---|---|
 | `TMDB_API_KEY` | — | **필수.** 작품 정보 조회 (제목·연도·감독·장르·포스터). 미매칭 시 Google Search 그라운딩으로 대체 |
 | `TMDB_LANGUAGE` | `ko-KR` | TMDB 메타데이터 언어 |
-| `THINKING_LEVEL` | `LOW` | `MINIMAL`\|`LOW`\|`MEDIUM`\|`HIGH`. **실측상 MINIMAL과 LOW 모두 thinking 0** — 비용이 같아 품질이 나은 LOW가 기본값. 변경 시 dev 서버 재시작 필요 |
+| `THINKING_LEVEL` | `LOW` | 빠른번역(flash) thinking. `MINIMAL`\|`LOW`\|`MEDIUM`\|`HIGH`. **실측상 MINIMAL과 LOW 모두 thinking 0** — 비용이 같아 품질이 나은 LOW가 기본값. 변경 시 dev 서버 재시작 필요 |
+| `PRO_THINKING_LEVEL` | `MEDIUM` | 고급번역(Pro) thinking. 같은 네 값. 변경 시 dev 서버 재시작 필요 |
 | `NEXT_PUBLIC_FREE_CHUNK_SIZE` / `_FREE_CONCURRENCY` | 150 / 6 | 무료 티어 청킹 |
 | `NEXT_PUBLIC_CHUNK_SIZE` / `NEXT_PUBLIC_CONCURRENCY` | 200 / 16 | server 티어 청킹 (현재 전원). 200은 계산상 최적값이 아니라 재번호 드리프트를 피하려는 경험적 안전선(위 참조) |
 | `TRANSLATION_STRICT_MODE` | `false` | 아래 참조 |

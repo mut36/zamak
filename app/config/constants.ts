@@ -174,8 +174,21 @@ export const TRANSLATION_MODEL =
 const THINKING_LEVELS = ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH'] as const;
 export type ThinkingLevelName = (typeof THINKING_LEVELS)[number];
 
+function readThinkingLevelEnv(
+  envName: string,
+  fallback: ThinkingLevelName,
+): ThinkingLevelName {
+  const raw = process.env[envName]?.trim().toUpperCase();
+  if (!raw) return fallback;
+  if ((THINKING_LEVELS as readonly string[]).includes(raw)) {
+    return raw as ThinkingLevelName;
+  }
+  console.warn(`[config] Invalid ${envName} "${raw}", using ${fallback}`);
+  return fallback;
+}
+
 /**
- * Default thinking effort for the flash (빠른번역) path.
+ * Thinking effort for the flash (빠른번역) path.
  *
  * Gemini bills thinking tokens at the *output* rate — 6× the input rate — and
  * spends them once per request, so this looked like our largest cost lever.
@@ -186,22 +199,22 @@ export type ThinkingLevelName = (typeof THINKING_LEVELS)[number];
  * The model does not allow disabling thinking outright, and thinkingBudget: 0
  * is silently ignored — thinkingLevel is the knob it honours.
  *
- * Env-tunable so comparing MINIMAL/LOW/MEDIUM/HIGH for flash quality is a
- * restart rather than a code change. Pro (고급번역) always uses MEDIUM via
- * `thinkingLevelForModel` — not this env.
+ * Env `THINKING_LEVEL` — restart the dev server after changing (read once at
+ * module load). Pro uses `PRO_THINKING_LEVEL` instead.
  */
-export const THINKING_LEVEL: ThinkingLevelName = (() => {
-  const raw = process.env.THINKING_LEVEL?.trim().toUpperCase();
-  if (!raw) return 'LOW';
-  if ((THINKING_LEVELS as readonly string[]).includes(raw)) {
-    return raw as ThinkingLevelName;
-  }
-  console.warn(`[config] Invalid THINKING_LEVEL "${raw}", using LOW`);
-  return 'LOW';
-})();
+export const THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
+  'THINKING_LEVEL',
+  'LOW',
+);
 
-/** Fixed thinking level for the Pro (고급번역) path. */
-export const PRO_THINKING_LEVEL: ThinkingLevelName = 'MEDIUM';
+/**
+ * Thinking effort for the Pro (고급번역) path.
+ * Env `PRO_THINKING_LEVEL` — default MEDIUM; same restart caveat as flash.
+ */
+export const PRO_THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
+  'PRO_THINKING_LEVEL',
+  'MEDIUM',
+);
 
 /** Resolve thinking level for a translation model. */
 export function thinkingLevelForModel(model: string): ThinkingLevelName {

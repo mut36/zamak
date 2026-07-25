@@ -157,8 +157,9 @@
     **빠른번역** (`FLASH_MODEL` = `gemini-3.6-flash`). 허용 목록은
     `constants.ts` `ALLOWED_MODELS`. 하니스 기본은 `TRANSLATION_MODEL`(env
     `NEXT_PUBLIC_TRANSLATION_MODEL`, 기본 flash)
-  - thinking 수준 → `thinkingLevelForModel(model)`: Pro는 고정 **MEDIUM**,
-    flash는 `THINKING_LEVEL`(기본 LOW, env). 로그에 `thinking=`로 찍힘
+  - thinking 수준 → `thinkingLevelForModel(model)`: flash는
+    `THINKING_LEVEL`(기본 LOW), Pro는 `PRO_THINKING_LEVEL`(기본 MEDIUM).
+    둘 다 env, 변경 시 dev 서버 재시작. 로그에 `thinking=`로 찍힘
   - **엄격 모드**(출력 검증+재시도+블록단위 재번역) → `translationService.ts`,
     `TRANSLATION_STRICT_MODE=true`로 켬(기본 off, 비용 폭탄 위험 있어 신중히)
 
