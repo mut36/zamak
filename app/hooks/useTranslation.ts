@@ -8,6 +8,7 @@ import {
   JobRefusedError,
 } from '../lib/client/translationJob';
 import {
+  adjustSubtitleTiming,
   buildOutputFilename,
   chunkSrtBlocksAtGaps,
   parseSrtBlocks,
@@ -20,8 +21,10 @@ import type {
   TranslationResult,
 } from '../types/translation';
 import {
+  CPS_TARGET,
   estimateTranslationMs,
   getTierLimits,
+  MIN_SUBTITLE_GAP_MS,
   resolveTier,
 } from '../config/constants';
 
@@ -316,7 +319,14 @@ export function useTranslation(
         throw new Error(msg.noResponse);
       }
 
-      const translated = (results as string[]).join('\n\n');
+      // Code owns the timecodes end-to-end: after reassembly, widen any block
+      // that reads too fast (cps > target) into the free gaps its neighbours
+      // leave, without ever overlapping them. Applied on the whole in-order
+      // file so it also covers chunk-boundary neighbours.
+      const translated = adjustSubtitleTiming(
+        (results as string[]).join('\n\n'),
+        { cpsTarget: CPS_TARGET, minGapMs: MIN_SUBTITLE_GAP_MS },
+      );
       const outputFilename = buildOutputFilename(file.name, targetLang);
 
       setTranslationProgress({

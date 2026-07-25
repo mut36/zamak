@@ -257,6 +257,25 @@ export function estimateTranslationMs(
   return waves * (GENERATION.TTFT_MS + generationMs);
 }
 
+/**
+ * Reading-speed post-processing. After a file is fully translated and
+ * reassembled, adjustSubtitleTiming() (app/lib/srt.ts) widens the on-screen
+ * window of any Korean block that reads faster than CPS_TARGET, borrowing only
+ * from the silent gaps its neighbours leave free so nothing can overlap.
+ *
+ * 12 cps matches Netflix's Korean reading-speed ceiling for adult programs.
+ * MIN_SUBTITLE_GAP_MS keeps a ~2-frame (24fps) silence between adjacent
+ * subtitles so a widened line never visually touches the next. Both env-tunable.
+ */
+export const CPS_TARGET = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_CPS_TARGET,
+  12,
+);
+export const MIN_SUBTITLE_GAP_MS = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_MIN_SUBTITLE_GAP_MS,
+  84,
+);
+
 /** Timing estimates (milliseconds) */
 export const TIMING = {
   /** Estimated translation time per batch — pro model */

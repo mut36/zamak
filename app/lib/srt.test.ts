@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  adjustSubtitleTiming,
   buildOutputFilename,
   chunkSrtBlocks,
   chunkSrtBlocksAtGaps,
@@ -284,5 +285,75 @@ describe('computeCps', () => {
       charCount: 2,
       cps: null,
     });
+  });
+});
+
+describe('adjustSubtitleTiming', () => {
+  const cpsOf = (block: string) => computeCps(block)?.cps ?? null;
+
+  it('leaves a comfortable (cps <= target) block untouched', () => {
+    // 5 chars over 2s = 2.5 cps.
+    const srt = '1\n00:00:00,000 --> 00:00:02,000\n안녕하세요';
+    expect(adjustSubtitleTiming(srt)).toBe(srt);
+  });
+
+  it('widens a fast block into free surrounding silence to hit the target', () => {
+    // 20 chars over 1s = 20 cps; target 12 needs ~1.667s. Gap after runs to 10s.
+    const srt =
+      '1\n00:00:01,000 --> 00:00:02,000\n' +
+      '가나다라마바사아자차카타파하가나다라마바\n\n' +
+      '2\n00:00:10,000 --> 00:00:12,000\n다음';
+    const out = adjustSubtitleTiming(srt);
+    const blocks = parseSrtBlocks(out);
+    // Reached the target (within rounding).
+    expect(cpsOf(blocks[0])!).toBeLessThanOrEqual(12.01);
+    // End pushed later first; start held (there was no earlier neighbour cost).
+    expect(blocks[0]).toContain('00:00:01,000 --> 00:00:02,667');
+    // The comfortable second block is unchanged.
+    expect(blocks[1]).toContain('00:00:10,000 --> 00:00:12,000');
+  });
+
+  it('never overlaps neighbours and keeps the min gap when silence is tight', () => {
+    // Two fast blocks with only a 100ms gap between them.
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n' +
+      '가나다라마바사아자차카타파하\n\n' +
+      '2\n00:00:01,100 --> 00:00:02,100\n' +
+      '가나다라마바사아자차카타파하';
+    const out = adjustSubtitleTiming(srt, { cpsTarget: 12, minGapMs: 84 });
+    const [a, b] = parseSrtBlocks(out).map(parseBlockTiming);
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
+    // No overlap, and at least the min gap is preserved.
+    expect(b!.startMs - a!.endMs).toBeGreaterThanOrEqual(84);
+    // Windows only grew, never shrank.
+    expect(a!.endMs - a!.startMs).toBeGreaterThanOrEqual(1000);
+    expect(b!.endMs - b!.startMs).toBeGreaterThanOrEqual(1000);
+  });
+
+  it('preserves block count, sequence numbers, and body text', () => {
+    const srt =
+      '1\n00:00:01,000 --> 00:00:02,000\n<i>빠른 자막입니다 정말로</i>\n\n' +
+      '2\n00:00:20,000 --> 00:00:22,000\n느긋한 자막';
+    const out = adjustSubtitleTiming(srt);
+    const blocks = parseSrtBlocks(out);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].split('\n')[0]).toBe('1');
+    expect(blocks[0]).toContain('<i>빠른 자막입니다 정말로</i>');
+    expect(blocks[1].split('\n')[0]).toBe('2');
+  });
+
+  it('passes an unparseable block through and does not extend across it', () => {
+    const srt =
+      '1\nnot a timecode\n서문\n\n' +
+      '2\n00:00:05,000 --> 00:00:06,000\n' +
+      '가나다라마바사아자차카타파하';
+    const out = adjustSubtitleTiming(srt);
+    const blocks = parseSrtBlocks(out);
+    // The malformed block is untouched.
+    expect(blocks[0]).toBe('1\nnot a timecode\n서문');
+    // The fast block widened forward but did not pull its start back over the
+    // unknown span of the wall (start stays at 5s).
+    expect(blocks[1]).toContain('00:00:05,000 -->');
   });
 });

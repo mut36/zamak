@@ -45,6 +45,18 @@ function hmsToMs(h: string, m: string, s: string, ms: string): number {
   return ((Number(h) * 60 + Number(m)) * 60 + Number(s)) * 1000 + Number(ms);
 }
 
+/** Inverse of hmsToMs: render a millisecond count as `HH:MM:SS,mmm`. */
+function msToHms(totalMs: number): string {
+  const ms = Math.max(0, Math.round(totalMs));
+  const pad = (n: number, width: number) => String(n).padStart(width, '0');
+  const millis = ms % 1000;
+  const totalSeconds = Math.floor(ms / 1000);
+  const seconds = totalSeconds % 60;
+  const minutes = Math.floor(totalSeconds / 60) % 60;
+  const hours = Math.floor(totalSeconds / 3600);
+  return `${pad(hours, 2)}:${pad(minutes, 2)}:${pad(seconds, 2)},${pad(millis, 3)}`;
+}
+
 /**
  * Parse a block's timing line into start/end milliseconds, or null when the
  * block has no well-formed `HH:MM:SS,mmm --> HH:MM:SS,mmm` line (the timing
@@ -85,17 +97,117 @@ export interface CpsResult {
  * multibyte glyphs count as one; line breaks are dropped, not counted. Returns
  * null when the block has no parseable timing.
  */
+/**
+ * Visible character count of a block's body: sequence + timing lines dropped,
+ * style tags stripped, line breaks not counted, counted by code point.
+ */
+function visibleCharCount(raw: string): number {
+  const body = raw.split('\n').slice(2).join('\n');
+  const visible = body.replace(STYLE_TAG, '').replace(/\n/g, '').trim();
+  return [...visible].length;
+}
+
 export function computeCps(raw: string): CpsResult | null {
   const timing = parseBlockTiming(raw);
   if (!timing) return null;
 
   const durationMs = timing.endMs - timing.startMs;
-  const body = raw.split('\n').slice(2).join('\n');
-  const visible = body.replace(STYLE_TAG, '').replace(/\n/g, '').trim();
-  const charCount = [...visible].length;
+  const charCount = visibleCharCount(raw);
   const cps = durationMs > 0 ? charCount / (durationMs / 1000) : null;
 
   return { durationMs, charCount, cps };
+}
+
+export interface TimingAdjustOptions {
+  /**
+   * Reading-speed ceiling (characters per second). Blocks above this get their
+   * on-screen window widened toward it; blocks at or under it are untouched.
+   */
+  cpsTarget?: number;
+  /** Minimum silence (ms) kept between two adjacent subtitles after adjusting. */
+  minGapMs?: number;
+}
+
+/**
+ * Widen the on-screen window of subtitles that read too fast (cps > target),
+ * borrowing only from the silent gaps their neighbours leave free.
+ *
+ * Runs once over the whole, in-order file so it also protects chunk-boundary
+ * neighbours. A single forward pass keeps overlaps impossible: each block's new
+ * start respects the previous block's *already-adjusted* end (+minGap), and its
+ * new end respects the next block's *original* start (−minGap). That asymmetry
+ * means two neighbours can never both claim the same millisecond of silence —
+ * for any pair, start_{i+1} >= end_i + minGap > end_i.
+ *
+ * Windows only ever grow, never shrink (we only add time to fast blocks). The
+ * deficit is filled by pushing the end later first (holding the line longer
+ * reads more naturally than an early lead-in), then pulling the start earlier;
+ * when the surrounding gaps are too small it reduces cps as far as they allow
+ * rather than forcing the target. Blocks with unparseable timing are passed
+ * through untouched and act as hard walls that block extension into them.
+ *
+ * Timecodes are the only thing rewritten — sequence numbers and body text are
+ * left exactly as-is, so the block count is preserved.
+ */
+export function adjustSubtitleTiming(
+  srt: string,
+  options: TimingAdjustOptions = {},
+): string {
+  const cpsTarget = options.cpsTarget ?? 12;
+  const minGapMs = Math.max(0, options.minGapMs ?? 84);
+
+  const blocks = parseSrtBlocks(srt);
+  const timings = blocks.map(parseBlockTiming);
+
+  // End of the last block we finalized, used as the lower wall for the next
+  // block's start. Null until the first parseable block is seen.
+  let prevEnd: number | null = null;
+
+  const rewritten = blocks.map((raw, i) => {
+    const timing = timings[i];
+    if (!timing) {
+      // Unparseable → untouched wall; its unknown span must not be crossed, so
+      // the next block gets no backward extension.
+      prevEnd = null;
+      return raw;
+    }
+
+    let { startMs, endMs } = timing;
+    const durationMs = endMs - startMs;
+    const charCount = visibleCharCount(raw);
+    const cps = durationMs > 0 ? charCount / (durationMs / 1000) : Infinity;
+
+    if (cps > cpsTarget && charCount > 0) {
+      const requiredMs = (charCount / cpsTarget) * 1000;
+      let deficit = Math.max(0, requiredMs - durationMs);
+
+      // Extend the end first, up to just before the next block's ORIGINAL start.
+      const nextStart = timings[i + 1]?.startMs;
+      const endCeiling = nextStart == null ? endMs : nextStart - minGapMs;
+      if (deficit > 0 && endCeiling > endMs) {
+        const grow = Math.min(deficit, endCeiling - endMs);
+        endMs += grow;
+        deficit -= grow;
+      }
+
+      // Then pull the start earlier, no earlier than the PREVIOUS block's
+      // already-adjusted end.
+      const startFloor = prevEnd == null ? startMs : prevEnd + minGapMs;
+      if (deficit > 0 && startFloor < startMs) {
+        const grow = Math.min(deficit, startMs - startFloor);
+        startMs -= grow;
+        deficit -= grow;
+      }
+    }
+
+    prevEnd = endMs;
+
+    const lines = raw.split('\n');
+    lines[1] = `${msToHms(startMs)} --> ${msToHms(endMs)}`;
+    return lines.join('\n');
+  });
+
+  return rewritten.join('\n\n');
 }
 
 export interface GapChunkOptions {

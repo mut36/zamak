@@ -164,8 +164,19 @@
 - **품질 레버**: 재번호 밀림 탐지/수리(현재 미구현) → `srt.ts` + `TODO.md`. 이게 밀림
   버그의 방어선.
 
+### 9.5. 리딩스피드 타임코드 조정 (CPS)
+- **코드**: **`app/lib/srt.ts` (`adjustSubtitleTiming`)**, `constants.ts`
+  (`CPS_TARGET`/`MIN_SUBTITLE_GAP_MS`), `useTranslation`에서 청크 합친 직후 1회 호출.
+- **하는 일**: 번역된 한국어 블록 중 `cps > CPS_TARGET`(기본 12, Netflix 한국어 상한)인
+  것만, **이웃이 비운 침묵(gap)** 안에서 표시창을 넓혀 읽기 속도를 낮춘다. end를 먼저
+  뒤로 밀고 모자라면 start를 앞으로 당김. **창은 늘리기만 하고 줄이지 않으며, 절대 겹치지
+  않는다** — 앞 블록은 조정된 end, 뒤 블록은 원본 start를 경계로 쓰는 비대칭 + `MIN_SUBTITLE_GAP_MS`.
+  전체 파일에 한 번 돌아 청크 경계 이웃까지 커버. 타임코드를 코드가 소유한다는 원칙의 연장.
+- **품질 레버**: `CPS_TARGET`(낮추면 더 공격적으로 늘림), `MIN_SUBTITLE_GAP_MS`(인접 최소
+  간격). 둘 다 `constants.ts` + env. gap이 부족하면 목표까지 못 내려가고 가능한 만큼만 조정.
+
 ### 10. 조립 & 다운로드
-- **코드**: `useTranslation`(청크 결과 합치기), `app/lib/srt.ts` (`buildOutputFilename`),
+- **코드**: `useTranslation`(청크 결과 합치기 + §9.5 조정), `app/lib/srt.ts` (`buildOutputFilename`),
   `app/components/simple/DoneStep.tsx`, `TranslationResult`(`failedChunks`/`totalChunks`)
 - **품질 레버**: 출력 파일명 규칙 → `buildOutputFilename` / `constants.ts` `LANG_SUFFIX`.
   완료 화면 실패 개수 표시 → `DoneStep.tsx`.
@@ -186,6 +197,7 @@
 | 줄이 너무 김/마침표 등 표기 규칙 | `translation_rules_ko.txt` |
 | 자막이 밀림(번호 재배열) | 청크 크기 ↓ `constants.ts` `SERVER_CHUNK_SIZE` (**≥300 금지**), 재조립 `srt.ts`. 조절 절차는 위 §5 |
 | 청크가 대화 중간을 자름 | `srt.ts` (`chunkSrtBlocksAtGaps` 파라미터) |
+| 한국어 자막이 너무 빨리 지나감(읽기 힘듦) | `srt.ts` (`adjustSubtitleTiming`), `constants.ts` `CPS_TARGET`/`MIN_SUBTITLE_GAP_MS` — §9.5 |
 | 번역이 느림/비쌈 | `constants.ts` `SERVER_CHUNK_SIZE`/`CONCURRENCY`/`THINKING_LEVEL`, 모델 |
 | 특정 청크만 원문 그대로 | 그 청크 호출 실패(원문 폴백) — `gemini.ts` 로그, `translationService.ts` |
 | 화면 문구가 이상함 | `app/i18n/simpleCopy.ts` (하드코딩 금지) |
@@ -209,6 +221,7 @@
 
 ## 아직 안 붙은 것 (참고)
 
-- `computeCps` (`srt.ts`) — 자막별 초당 문자수. 고급 번역의 길이 예산용 프리미티브,
-  현재 어떤 기능에도 미연결.
+- `computeCps` (`srt.ts`) — 자막별 초당 문자수. 고급 번역의 길이 예산용 프리미티브.
+  읽기속도 자동 조정(§9.5 `adjustSubtitleTiming`)은 같은 계산을 쓰지만, `computeCps`
+  자체는 아직 다른 기능에 직접 연결돼 있지 않다.
 - 청크 경계 겹침 컨텍스트, 고유명사·호칭 글로사리, 인물별 말투 시트 → 전부 `TODO.md`.
