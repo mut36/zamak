@@ -1,0 +1,199 @@
+# 번역 파이프라인 지도
+
+**품질관리용 지도.** 자막 한 편이 업로드부터 다운로드까지 거치는 전 과정을 순서대로
+적고, **각 단계에서 품질을 바꾸려면 어느 파일/함수를 고치면 되는지**를 표시한다.
+"왜 이렇게 되어 있는가"는 [`decisions.md`](decisions.md), 미착수 개선안은
+[`TODO.md`](TODO.md), 청크 수치 유도는 [`tuning/`](tuning/) 참조.
+
+> 파일 경로 + 함수/심볼 이름으로만 가리킨다(줄 번호는 금방 어긋나서 안 적음).
+> 기준 시점: 2026-07-25. 구조가 바뀌면 이 문서도 같이 고칠 것.
+
+메인 경로는 **영화·드라마 분기**다. "기타 영상" 분기는 3단계에서 갈린다.
+
+---
+
+## 전체 흐름 (한눈에)
+
+```
+업로드
+  → 파일명 파싱 (제목/연도 추측)
+  → /api/analyze         제목·연도 확정 (AUX 모델)
+  → [영화] /api/enrich    TMDB + 그라운딩 → 제목/연도/감독/포스터 + 장르/배경/톤
+    [기타] /api/summarize 자막 앞부분 요약 → notes
+  → InfoStep             사람이 검토·수정
+  → /api/translation/begin  크레딧 1 차감 → jobId
+  → 청킹 (장면 갭 기준)
+  → 청크별 병렬 /api/translate
+       └ 프롬프트 조합 → Gemini 호출 → 타임코드 재조립
+  → 조립 → 다운로드
+```
+
+---
+
+## 단계별 상세 + 품질 레버
+
+### 0. 업로드 & SRT 파싱
+- **코드**: `app/components/simple/UploadStep.tsx`, `app/hooks/useTranslation.ts`
+  (`processFile`), `app/lib/srt.ts` (`parseSrtBlocks`)
+- **하는 일**: `.srt` 검증, 블록 분리(번호/타임코드/본문).
+- **품질 레버**: 거의 없음(형식 파싱). 이상한 SRT가 안 걸러진다면 `isSrt` /
+  `parseSrtBlocks`.
+
+### 1. 파일명 → 제목·연도 추정
+- **코드**: `app/utils/metadataInference.ts` (`parseFilename`) → `app/api/analyze/route.ts`
+  → `app/lib/prompts/analysis.ts` → 프롬프트 `prompts/common/content_analysis.txt`
+  (AUX 모델 = `AUX_MODEL`).
+- **하는 일**: 릴리스 태그(1080p 등) 제거, 제목·연도 추출. 자막 샘플도 보조 참고.
+- **품질 레버**:
+  - 제목/연도 오추출 → **`prompts/common/content_analysis.txt`** (추출 규칙 프롬프트)
+  - 파일명 정규식 문제 → `metadataInference.ts`
+
+### 2-A. 작품 정보 수집 — 영화·드라마 (enrich)
+- **코드**: `app/api/enrich/route.ts` → **`app/lib/server/enrichMovie.ts`**
+  (`enrichMovie` → `enrichFromTmdb` → `lookupTitle` + `extractKeywords`;
+  TMDB 미스 시 `enrichWithGrounding`), TMDB 조회 `app/lib/server/tmdb.ts`.
+- **하는 일 / 두 버킷**:
+  - **UI 버킷** (화면 표시): 제목·연도·감독·포스터 — TMDB 매치 시 TMDB에서, 미스 시 그라운딩.
+  - **AI 버킷** (번역 프롬프트로만 감): 장르(TMDB) + 배경/시대·톤앤매너(그라운딩 검색).
+- **품질 레버**:
+  - 제목/연도/감독/포스터 틀림 → TMDB 매칭 로직 `tmdb.ts` (`lookupTitle`), 또는 미스 시
+    그라운딩 프롬프트 `enrichMovie.ts` (`buildGroundedPrompt`)
+  - 장르/배경·시대/톤앤매너 품질 → **`enrichMovie.ts`의 `buildKeywordPrompt`
+    (TMDB 매치용) / `buildGroundedPrompt` (미스용)**
+  - 한국어 제목 없을 때 음차 → `enrichMovie.ts` (`needsTransliteration` + 프롬프트)
+  - 관련 결정: 배경/시대가 개봉연도로 나오던 버그는 그라운딩 전환으로 해결(커밋
+    `9bf6e1c`). 인물별 말투·글로사리는 의도적으로 보류 → `TODO.md`.
+
+### 2-B. 작품 정보 수집 — 기타 영상 (summarize)
+- **코드**: `app/api/summarize/route.ts` (AUX 모델, 앞 `SUMMARY_SAMPLE_LINES`줄 샘플)
+- **하는 일**: 내용 1~2문장 요약 → `movieInfo.notes`.
+- **품질 레버**: 요약 프롬프트는 `summarize/route.ts` 안에 인라인. 샘플 줄 수는
+  `constants.ts` `SUMMARY_SAMPLE_LINES`.
+
+### 3. 사용자 검토·수정 (InfoStep)
+- **코드**: `app/components/simple/InfoStep.tsx`, 문구 `app/i18n/simpleCopy.ts`
+  (`COPY.info`)
+- **하는 일**: 제목·연도·장르·배경/시대·톤앤매너·notes를 **사람이 편집 가능**. 자동
+  수집이 틀려도 여기서 최종 교정된 값이 번역에 들어간다.
+- **품질 레버**: 어떤 필드를 보여줄지/편집 가능하게 할지 → `InfoStep.tsx`. 필드 라벨/힌트
+  문구 → `simpleCopy.ts`. **자동화가 애매하면 이 사람-교정 단계를 강화하는 게 가장 안전.**
+
+### 4. 번역 시작 & 크레딧 & 스타일 선택
+- **코드**: `app/page.tsx` (`handleTranslate`) → `useTranslation.translate(...)`,
+  `app/api/translation/begin/route.ts`
+- **하는 일**: 크레딧 1 차감 → `jobId` 발급(파일당 1회). 번역 스타일·도착어 결정.
+- **품질 레버**:
+  - **번역 스타일** `meaning`(의미보존) / `cinematic`(영화적) — 현재 `handleTranslate`에서
+    **`'meaning'` 하드코딩**. cinematic 철학 파일은 존재하나 UI에 안 붙어 있음. 스타일을
+    노출/전환하려면 여기 + `InfoStep`.
+  - 도착어 → `app/config/languages.ts` (`TARGET_LANGS` enabled 플래그)
+
+### 5. 청킹 (장면 경계 기준)
+- **코드**: `useTranslation.translate` → **`app/lib/srt.ts` (`chunkSrtBlocksAtGaps`)**,
+  크기·동시성 `app/config/constants.ts` (`getTierLimits` / `resolveTier`)
+- **하는 일**: 목표 크기 ±20% 창에서 가장 큰 2초+ 갭(장면 전환)에 맞춰 자름. 없으면 고정 컷.
+- **품질 레버**:
+  - 청크 경계가 대화 중간을 자름 → `chunkSrtBlocksAtGaps` 파라미터(갭 임계 기본 2000ms,
+    tolerance 기본 ±20%)
+  - 청크 크기/동시성 → `constants.ts` `SERVER_CHUNK_SIZE` / `SERVER_CONCURRENCY`
+  - **재번호 밀림 주의**: 청크가 ~600블록 넘으면 모델이 자막 번호를 재배열해 이후가 밀림.
+    `SERVER_CHUNK_SIZE + tolerance`를 이 천장 밑으로 유지할 것. 배경은 `constants.ts`
+    주석 + `decisions.md`.
+  - 미착수: 청크 경계 겹침 컨텍스트 → `TODO.md`
+
+### 6. 청크별 병렬 번역 요청
+- **코드**: `useTranslation` (`runOrderedPool` → `requestChunkTranslation`) →
+  `app/api/translate/route.ts` (SSE, job 검증)
+- **하는 일**: 청크를 동시 번역. **실패 청크는 원문 유지**(failedChunks) → 항상 완전한 파일.
+- **품질 레버**: 동시성 `constants.ts` `SERVER_CONCURRENCY`. 실패 정책(재시도 안 함) →
+  `translationService.ts` / `useTranslation` worker.
+
+### 7. 프롬프트 조합 ⭐ (번역 품질의 핵심 집결지)
+- **코드**: `app/api/translate/route.ts` → `app/lib/server/translationService.ts`
+  (`translateSubtitle`) → **`app/lib/prompts/composer.ts` (`composeTranslationPrompt`)**
+  → `app/lib/prompts/translationContent.ts` (`buildTranslationVariables`,
+  `formatMovieInfo`), 로더 `app/lib/prompts/loader.ts`
+- **조립 구조**:
+  - **시스템 프롬프트**:
+    - 페르소나 + 신뢰 경계 → `prompts/common/subtitle_translation_system.txt`
+    - `{{translationPhilosophy}}` → `prompts/common/cinematic_translation_philosophy_ko.txt`
+      (**cinematic 스타일에서만**; meaning은 빈 문자열)
+    - `{{translationRules}}` → `prompts/common/translation_rules_ko.txt`
+    - `{{examplesSection}}` → `prompts/common/translation_examples_ko.txt` (한국어 타깃)
+  - **유저 턴**: `<content_metadata>`(`formatMovieInfo` — 제목/연도/장르/배경·시대/톤앤매너)
+    + `<user_notes>` + 청크 위치 + `<subtitle_data>`(타임스탬프 제거) + 블록 수 지시
+- **품질 레버 (여기가 가장 큰 번역 품질 레버들)**:
+  - 번역 규칙(직역 금지·말투·줄길이·마침표 등) → **`translation_rules_ko.txt`**
+  - 영화적 번역 철학(인물 목소리·감정·압축) → **`cinematic_translation_philosophy_ko.txt`**
+    (cinematic에서만 적용)
+  - few-shot 예시(번역투 제거 감각) → **`translation_examples_ko.txt`**
+  - 페르소나/프롬프트 인젝션 방어 → `subtitle_translation_system.txt`
+  - 메타데이터가 프롬프트에 실리는 형식 → `translationContent.ts` (`formatMovieInfo`)
+  - 도착어별 규칙 로딩 → `translationContent.ts` (`getLanguageConfig`), `loader.ts`
+  - 영어 타깃 규칙 → `translation_rules_en.txt`
+- **주의**: `translation_rules_ko_original.txt`는 참고용 원본 사본(파이프라인 미사용).
+
+### 8. 모델 호출
+- **코드**: `translateSubtitle` → `app/lib/providers/gemini.ts` (`generateModelText`),
+  설정 `app/config/constants.ts`
+- **품질 레버**:
+  - 번역 모델 교체 → `constants.ts` `TRANSLATION_MODEL` (기본 `gemini-3.5-flash`,
+    env `NEXT_PUBLIC_TRANSLATION_MODEL`)
+  - thinking 수준(품질/비용) → `constants.ts` `THINKING_LEVEL` (기본 LOW, env)
+  - **엄격 모드**(출력 검증+재시도+블록단위 재번역) → `translationService.ts`,
+    `TRANSLATION_STRICT_MODE=true`로 켬(기본 off, 비용 폭탄 위험 있어 신중히)
+
+### 9. 타임코드 재조립
+- **코드**: **`app/lib/srt.ts` (`reassembleTranslatedChunk`)**
+- **하는 일**: 모델 출력을 **번호로 대조**해 원본 타임코드와 재결합. 매칭 안 된 블록은
+  원문 유지 → 이후 자막이 안 밀림. 타임스탬프는 모델에 안 보내므로 여기서 복원됨.
+- **품질 레버**: 재번호 밀림 탐지/수리(현재 미구현) → `srt.ts` + `TODO.md`. 이게 밀림
+  버그의 방어선.
+
+### 10. 조립 & 다운로드
+- **코드**: `useTranslation`(청크 결과 합치기), `app/lib/srt.ts` (`buildOutputFilename`),
+  `app/components/simple/DoneStep.tsx`, `TranslationResult`(`failedChunks`/`totalChunks`)
+- **품질 레버**: 출력 파일명 규칙 → `buildOutputFilename` / `constants.ts` `LANG_SUFFIX`.
+  완료 화면 실패 개수 표시 → `DoneStep.tsx`.
+
+---
+
+## 증상 → 고칠 곳 (빠른 인덱스)
+
+| 증상 | 1차로 볼 곳 |
+|---|---|
+| 제목/연도가 파일명에서 잘못 뽑힘 | `content_analysis.txt`, `metadataInference.ts` |
+| 감독/포스터 안 뜸·틀림 | `tmdb.ts` (`lookupTitle`), `enrichMovie.ts` (`buildGroundedPrompt`) |
+| 장르/배경·시대/톤앤매너가 이상함 | `enrichMovie.ts` (`buildKeywordPrompt` / `buildGroundedPrompt`) |
+| 배경/시대가 개봉연도로 나옴 | `enrichMovie.ts` 프롬프트 (그라운딩·"개봉연도≠극중배경" 지침) |
+| 번역이 직역투/어색함 | `translation_rules_ko.txt`, `translation_examples_ko.txt` |
+| 존댓말/반말·인물 말투가 안 맞음 | `translation_rules_ko.txt`, (cinematic) `cinematic_translation_philosophy_ko.txt`, `InfoStep`에서 사람이 톤 입력 |
+| 감정/뉘앙스가 밋밋함 | `cinematic_translation_philosophy_ko.txt` (+ 스타일을 cinematic로) |
+| 줄이 너무 김/마침표 등 표기 규칙 | `translation_rules_ko.txt` |
+| 자막이 밀림(번호 재배열) | 청크 크기 ↓ `constants.ts` `SERVER_CHUNK_SIZE`, 재조립 `srt.ts` |
+| 청크가 대화 중간을 자름 | `srt.ts` (`chunkSrtBlocksAtGaps` 파라미터) |
+| 번역이 느림/비쌈 | `constants.ts` `SERVER_CHUNK_SIZE`/`CONCURRENCY`/`THINKING_LEVEL`, 모델 |
+| 특정 청크만 원문 그대로 | 그 청크 호출 실패(원문 폴백) — `gemini.ts` 로그, `translationService.ts` |
+| 화면 문구가 이상함 | `app/i18n/simpleCopy.ts` (하드코딩 금지) |
+
+---
+
+## 깨면 안 되는 불변식
+
+1. **블록 수 계약**: 청크 입력 블록 수 = 출력 블록 수. 프롬프트가 이걸 강제하고
+   (`composer.ts` 블록 수 지시), 재조립이 번호로 대조한다. 겹침 컨텍스트 같은 걸 넣을 때
+   이 계약을 깨면 밀림이 생긴다.
+2. **타임코드는 코드가 소유**: 모델엔 번호+대사만 보내고(`composer.ts` `stripTimestamps`),
+   타임코드는 `reassembleTranslatedChunk`가 원본에서 복원한다. 모델 출력의 타임스탬프는
+   신뢰하지 않는다.
+3. **재번호 드리프트 천장 ~600블록**: `SERVER_CHUNK_SIZE + tolerance`를 그 밑으로.
+4. **UI 버킷 ↔ AI 버킷 분리**: 제목/연도/감독/포스터(화면용)와 장르/배경/톤(프롬프트용)을
+   섞지 말 것. `notes`는 사용자 자유 입력 전용.
+
+---
+
+## 아직 안 붙은 것 (참고)
+
+- `computeCps` (`srt.ts`) — 자막별 초당 문자수. 고급 번역의 길이 예산용 프리미티브,
+  현재 어떤 기능에도 미연결.
+- 청크 경계 겹침 컨텍스트, 고유명사·호칭 글로사리, 인물별 말투 시트 → 전부 `TODO.md`.
