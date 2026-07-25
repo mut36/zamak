@@ -95,11 +95,25 @@
 - **품질 레버**:
   - 청크 경계가 대화 중간을 자름 → `chunkSrtBlocksAtGaps` 파라미터(갭 임계 기본 2000ms,
     tolerance 기본 ±20%)
-  - 청크 크기/동시성 → `constants.ts` `SERVER_CHUNK_SIZE` / `SERVER_CONCURRENCY`
-  - **재번호 밀림 주의**: 청크가 ~600블록 넘으면 모델이 자막 번호를 재배열해 이후가 밀림.
-    `SERVER_CHUNK_SIZE + tolerance`를 이 천장 밑으로 유지할 것. 배경은 `constants.ts`
-    주석 + `decisions.md`.
   - 미착수: 청크 경계 겹침 컨텍스트 → `TODO.md`
+
+#### 청크 크기(`SERVER_CHUNK_SIZE`) 조절할 때
+
+⚠️ **`B ≥ 300`이면 재번호 드리프트 오류가 난다** (자막 번호가 밀려 엉뚱한 타임코드에
+번역문이 붙음 — 실패 지표에도 안 잡힘). **300 미만으로만** 둘 것. 현재 기본값은 200.
+배경·유도는 `decisions.md` §2-3 / `tuning/chunk-size-model.md` §8.
+
+| 순서 | 파일 | 무엇을 |
+|---|---|---|
+| 1 (필수) | `app/config/constants.ts` | `SERVER_CHUNK_SIZE` 기본값(+ 주석). 런타임은 여기만 보면 됨. env `NEXT_PUBLIC_CHUNK_SIZE`로도 덮을 수 있음(핫리로드) |
+| 2 (문서 동기화) | `README.md` | 티어 표·env 기본값·출력 상한 여유율 |
+| 3 | `docs/tuning/chunk-size-model.md` | 결론 박스·§5-6 비교표·§8 임시 조치 |
+| 4 | `docs/decisions.md` | §2-3 현재값 헤딩·§2-3-2 운영 결정 |
+| 5 | `HANDOFF.md` | "현재 설정값" 표 |
+| 6 | `docs/translation-pipeline.md` | 이 절(현재값·상한 서술이 바뀌면) |
+
+동작에 필요한 건 **1번뿐**. 2–6은 문서가 어긋나지 않게 같이 맞춘다. 동시성(`SERVER_CONCURRENCY`)은
+별 레버 — B만 바꿀 때 K는 보통 그대로 둬도 됨.
 
 ### 6. 청크별 병렬 번역 요청
 - **코드**: `useTranslation` (`runOrderedPool` → `requestChunkTranslation`) →
@@ -170,7 +184,7 @@
 | 존댓말/반말·인물 말투가 안 맞음 | `translation_rules_ko.txt`, (cinematic) `cinematic_translation_philosophy_ko.txt`, `InfoStep`에서 사람이 톤 입력 |
 | 감정/뉘앙스가 밋밋함 | `cinematic_translation_philosophy_ko.txt` (+ 스타일을 cinematic로) |
 | 줄이 너무 김/마침표 등 표기 규칙 | `translation_rules_ko.txt` |
-| 자막이 밀림(번호 재배열) | 청크 크기 ↓ `constants.ts` `SERVER_CHUNK_SIZE`, 재조립 `srt.ts` |
+| 자막이 밀림(번호 재배열) | 청크 크기 ↓ `constants.ts` `SERVER_CHUNK_SIZE` (**≥300 금지**), 재조립 `srt.ts`. 조절 절차는 위 §5 |
 | 청크가 대화 중간을 자름 | `srt.ts` (`chunkSrtBlocksAtGaps` 파라미터) |
 | 번역이 느림/비쌈 | `constants.ts` `SERVER_CHUNK_SIZE`/`CONCURRENCY`/`THINKING_LEVEL`, 모델 |
 | 특정 청크만 원문 그대로 | 그 청크 호출 실패(원문 폴백) — `gemini.ts` 로그, `translationService.ts` |
@@ -186,7 +200,8 @@
 2. **타임코드는 코드가 소유**: 모델엔 번호+대사만 보내고(`composer.ts` `stripTimestamps`),
    타임코드는 `reassembleTranslatedChunk`가 원본에서 복원한다. 모델 출력의 타임스탬프는
    신뢰하지 않는다.
-3. **재번호 드리프트 천장 ~600블록**: `SERVER_CHUNK_SIZE + tolerance`를 그 밑으로.
+3. **재번호 드리프트: `SERVER_CHUNK_SIZE`는 300 미만**. `B ≥ 300`이면 오류 발생.
+   `SERVER_CHUNK_SIZE + tolerance`가 그 밑을 넘지 않게 유지. 조절 시 고칠 파일은 §5.
 4. **UI 버킷 ↔ AI 버킷 분리**: 제목/연도/감독/포스터(화면용)와 장르/배경/톤(프롬프트용)을
    섞지 말 것. `notes`는 사용자 자유 입력 전용.
 

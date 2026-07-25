@@ -49,7 +49,7 @@ export const FREE_CONCURRENCY = readPositiveIntEnv(
 /**
  * Server key knobs — what every request uses today.
  *
- * B=500 IS AN EMPIRICAL SAFETY LIMIT, not a derived optimum — arithmetic
+ * B=200 IS AN EMPIRICAL SAFETY LIMIT, not a derived optimum — arithmetic
  * cannot pick B at all (docs/tuning/chunk-size-model.md §5: cost varies only
  * 6.5% across the whole usable range, wall clock is not a constraint, and
  * expected blast radius from a whole-chunk API failure is B-invariant).
@@ -61,29 +61,28 @@ export const FREE_CONCURRENCY = readPositiveIntEnv(
  * unused, and increasing, a renumbered block passes all three checks and the
  * translation lands on the wrong timecode for the rest of the chunk — silent,
  * not caught by the matched/unmatched counters. Observed to start past ~600
- * lines in one chunk; B=500 has not reproduced it. This is not proven to be
- * the mechanism, only that keeping chunks under it empirically avoids the
- * symptom, so treat 500 as a ceiling pending either a recurrence or the
- * detection/repair logic sketched in docs/decisions.md §2-3.
+ * lines in one chunk; B=500 avoided it in early testing. B=200 sits further
+ * under that ceiling with a smaller blast radius pending either a recurrence
+ * or the detection/repair logic sketched in docs/decisions.md §2-3.
  *
  * The output cap (B ≤ 3,276) and 300s route timeout (B ≤ 4,097) are the only
  * hard walls; constants.test.ts asserts those two and nothing else, so any
- * B up to 500 here is a deliberate choice, not a constraint violation.
+ * B up to those walls here is a deliberate choice, not a constraint violation.
  *
  * K=16 was sized for B=2000 (⌈2000/2000⌉=1 chunk, K unused) and is now
- * comfortably oversized for B=500 (⌈2000/500⌉=4 chunks, still one wave) — no
+ * comfortably oversized for B=200 (⌈2000/200⌉=10 chunks, still one wave) — no
  * change needed, kept so raising B later doesn't require a second edit.
  *
  * History, so nobody re-derives a phantom: K=14 arrived in the initial commit
  * with no derivation, B=125 was then fitted to it via ⌈1500/14⌉, and the 1,500
  * cap it referenced is gone. The one-wave rule that briefly re-justified K was
- * dropped 2026-07-22, then B was pushed to 2000 (no chunking) the same day and
- * reverted to 500 after the renumbering bug above. Override via env to
- * experiment (the harness reads these).
+ * dropped 2026-07-22, then B was pushed to 2000 (no chunking) the same day,
+ * reverted to 500 after the renumbering bug above, then tuned through 400/300
+ * to 200. Override via env to experiment (the harness reads these).
  */
 export const SERVER_CHUNK_SIZE = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CHUNK_SIZE,
-  500,
+  200,
 );
 export const SERVER_CONCURRENCY = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CONCURRENCY,
