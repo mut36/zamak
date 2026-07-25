@@ -332,23 +332,71 @@ function readSourceBlock(raw: string): SourceBlock {
   };
 }
 
+/**
+ * Format a chunk for the model: timestamps dropped (the model never sees or
+ * returns them — reassembleTranslatedChunk restores them from the source) and
+ * each well-formed block's sequence number wrapped as a `[123]` marker instead
+ * of a bare number.
+ *
+ * The bracket is load-bearing, not cosmetic. A bare number is genuinely
+ * ambiguous once timestamps are gone — dialogue that is itself a number (a
+ * subtitle whose whole line is "8." or "1999") is indistinguishable from a
+ * sequence marker by shape alone. That is not a hypothetical: a real source
+ * file had a scene where a character counts aloud, giving ~20 consecutive
+ * blocks with bodies like "8." "9." "10.", and every one of those numbers fell
+ * inside its chunk's expected sequence range — silently swallowed as a false
+ * marker and its dialogue lost (see decisions.md §2-1). A bracket is not valid
+ * subtitle text on its own, so `[8]` can only ever be the marker and a
+ * dialogue line "8." can never be mistaken for one, regardless of what number
+ * it contains.
+ *
+ * Malformed blocks (no parseable sequence+timing) pass through with only a
+ * timestamp-shaped line stripped, since there's no reliable index to marker.
+ */
+export function formatBlocksForModel(content: string): string {
+  return parseSrtBlocks(content)
+    .map((raw) => {
+      const block = readSourceBlock(raw);
+      if (block.index === null) {
+        return raw
+          .split('\n')
+          .filter((line) => !TIMING_LINE.test(line.trim()))
+          .join('\n');
+      }
+      const body = raw.split('\n').slice(2).join('\n');
+      return `[${block.index}]\n${body}`;
+    })
+    .join('\n\n');
+}
+
 function stripCodeFence(text: string): string {
   const trimmed = text.trim();
   if (!trimmed.startsWith('```')) return trimmed;
   return trimmed.replace(/^```[^\n]*\n?/, '').replace(/\n?```$/, '');
 }
 
+const MARKER_LINE = /^\[(\d+)\]$/;
+
 /**
  * Index the model's output by sequence number.
  *
- * The model is asked for `number\ntranslated text` blocks, but it doesn't
- * always oblige: it may drop the blank lines between blocks, wrap everything
- * in a code fence, emit a preamble, or echo timestamps it was told to omit.
- * So rather than splitting on blank lines, we scan for lines that can only be
- * a sequence number — one we asked for, haven't filled yet, and that moves
- * forward. Dialogue that happens to be bare digits fails at least one of
- * those tests, and a line that looks like an index but fails them is dropped
- * rather than folded into the subtitle text.
+ * The model is asked for `[number]\ntranslated text` blocks (see
+ * formatBlocksForModel), but it doesn't always oblige: it may drop the blank
+ * lines between blocks, wrap everything in a code fence, emit a preamble, or
+ * echo timestamps it was told to omit. So rather than splitting on blank
+ * lines, we scan for `[number]` marker lines. Unlike a bare digit, a bracketed
+ * marker can never collide with dialogue — dialogue that happens to be a
+ * number (e.g. "8.") has no brackets, so it always falls straight into the
+ * body buffer, whatever value it holds.
+ *
+ * A marker starts a new block only when its number is one we asked for and
+ * isn't already finalized and isn't the block already open (a repeated marker
+ * for the in-progress block is swallowed as noise and its followers fold into
+ * that same block, matching the old repeated-number behaviour). Because the
+ * bracket removes the ambiguity a bare digit had, this no longer needs a
+ * monotonically-increasing check — a block can legitimately start any marker
+ * in `expected`, in any order, which also fixes reversed-order output folding
+ * into the wrong block (decisions.md §2-1).
  */
 function indexTranslatedBodies(
   modelOutput: string,
@@ -357,7 +405,6 @@ function indexTranslatedBodies(
   const bodies = new Map<number, string>();
   let current: number | null = null;
   let buffer: string[] = [];
-  let highest = 0;
 
   const flush = () => {
     if (current === null) return;
@@ -368,19 +415,21 @@ function indexTranslatedBodies(
 
   for (const line of stripCodeFence(modelOutput).split('\n')) {
     const trimmed = line.trim();
+    const marker = trimmed.match(MARKER_LINE);
 
-    if (/^\d+$/.test(trimmed)) {
-      const candidate = Number(trimmed);
-      if (expected.has(candidate)) {
-        if (candidate > highest && !bodies.has(candidate)) {
-          flush();
-          current = candidate;
-          highest = candidate;
-        }
-        // Either way this line is a sequence number, not dialogue — never
-        // let it reach the subtitle body.
-        continue;
+    if (marker) {
+      const candidate = Number(marker[1]);
+      if (
+        expected.has(candidate) &&
+        candidate !== current &&
+        !bodies.has(candidate)
+      ) {
+        flush();
+        current = candidate;
       }
+      // A bracketed line is a marker, never dialogue — never let it reach the
+      // subtitle body, whether or not it started a new block.
+      continue;
     }
 
     if (current === null) continue; // preamble before the first block

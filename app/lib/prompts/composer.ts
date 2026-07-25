@@ -7,20 +7,12 @@ import {
 } from './loader';
 import { renderPromptTemplate } from './renderer';
 import { buildTranslationVariables } from './translationContent';
+import { formatBlocksForModel, parseSrtBlocks } from '../srt';
 import type {
   ComposedPrompt,
   PromptProvider,
   TranslationPromptContext,
 } from './types';
-
-const TIMESTAMP_LINE = /^\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}/;
-
-function stripTimestamps(content: string): string {
-  return content
-    .split('\n')
-    .filter(line => !TIMESTAMP_LINE.test(line.trim()))
-    .join('\n');
-}
 
 export async function composeTranslationPrompt(
   provider: PromptProvider,
@@ -52,8 +44,14 @@ export async function composeTranslationPrompt(
     .filter(Boolean)
     .join('\n\n');
 
-  const stripped = stripTimestamps(context.subtitleContent);
-  const blockCount = stripped.split('\n').filter(line => /^\d+$/.test(line.trim())).length;
+  // [N]-bracketed markers, not bare numbers — see formatBlocksForModel's doc
+  // for why the bracket matters (dialogue that is itself a number is
+  // otherwise indistinguishable from a sequence marker once timestamps are
+  // gone). Block count comes from the real parsed block structure, not from
+  // counting bare-digit lines in the formatted text — a source block whose
+  // body is purely numeric would otherwise inflate the count.
+  const formatted = formatBlocksForModel(context.subtitleContent);
+  const blockCount = parseSrtBlocks(context.subtitleContent).length;
   const blockCountInstruction = `이 청크의 자막 블록 수: ${blockCount}개. 출력도 반드시 ${blockCount}개여야 해.`;
 
   // The three tags system's trust boundary names — content_metadata,
@@ -64,7 +62,7 @@ export async function composeTranslationPrompt(
     `<content_metadata>\n${translationVariables.movieInfo}\n</content_metadata>`,
     translationVariables.notesSection,
     translationVariables.chunkContext,
-    `<subtitle_data>\n${stripped}\n</subtitle_data>`,
+    `<subtitle_data>\n${formatted}\n</subtitle_data>`,
     blockCountInstruction,
   ]
     .filter(Boolean)

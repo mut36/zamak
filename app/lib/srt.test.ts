@@ -5,6 +5,7 @@ import {
   chunkSrtBlocks,
   chunkSrtBlocksAtGaps,
   computeCps,
+  formatBlocksForModel,
   parseBlockTiming,
   parseSrtBlocks,
   reassembleTranslatedChunk,
@@ -34,6 +35,26 @@ describe('SRT utilities', () => {
   });
 });
 
+describe('formatBlocksForModel', () => {
+  it('wraps well-formed blocks in a [N] marker and drops timestamps', () => {
+    const source = [
+      '801\n00:01:23,456 --> 00:01:25,789\nWhere have you been?',
+      '802\n00:01:26,100 --> 00:01:28,000\nJust looking around.',
+    ].join('\n\n');
+    expect(formatBlocksForModel(source)).toBe(
+      '[801]\nWhere have you been?\n\n[802]\nJust looking around.',
+    );
+  });
+
+  it('passes a malformed block through with only a timestamp-shaped line stripped', () => {
+    const source =
+      '1\nnot a timecode\nSome text\n\n2\n00:00:01,000 --> 00:00:02,000\nHello';
+    expect(formatBlocksForModel(source)).toBe(
+      '1\nnot a timecode\nSome text\n\n[2]\nHello',
+    );
+  });
+});
+
 describe('reassembleTranslatedChunk', () => {
   const source = [
     '801\n00:01:23,456 --> 00:01:25,789\nWhere have you been?',
@@ -42,7 +63,7 @@ describe('reassembleTranslatedChunk', () => {
   ].join('\n\n');
 
   it('restores source timecodes onto the translated text', () => {
-    const output = '801\n어디 갔었어\n\n802\n그냥 좀 둘러봤어\n\n803\n이 시간에?';
+    const output = '[801]\n어디 갔었어\n\n[802]\n그냥 좀 둘러봤어\n\n[803]\n이 시간에?';
     const result = reassembleTranslatedChunk(source, output);
 
     expect(result).toMatchObject({ matched: 3, unmatched: 0, total: 3 });
@@ -57,7 +78,7 @@ describe('reassembleTranslatedChunk', () => {
 
   it('keeps later blocks aligned when the model merges two subtitles', () => {
     // 802 is folded into 801 and never emitted on its own.
-    const output = '801\n어디 갔었길래 좀 둘러봤다는 거야\n\n803\n이 시간에?';
+    const output = '[801]\n어디 갔었길래 좀 둘러봤다는 거야\n\n[803]\n이 시간에?';
     const result = reassembleTranslatedChunk(source, output);
 
     expect(result).toMatchObject({ matched: 2, unmatched: 1 });
@@ -71,13 +92,13 @@ describe('reassembleTranslatedChunk', () => {
   });
 
   it('recovers when the model drops the blank lines between blocks', () => {
-    const output = '801\n어디 갔었어\n802\n그냥 좀 둘러봤어\n803\n이 시간에?';
+    const output = '[801]\n어디 갔었어\n[802]\n그냥 좀 둘러봤어\n[803]\n이 시간에?';
     expect(reassembleTranslatedChunk(source, output).matched).toBe(3);
   });
 
   it('ignores a code fence and a preamble', () => {
     const output =
-      '```srt\n번역 결과입니다\n801\n어디 갔었어\n\n802\n그냥 좀 둘러봤어\n\n803\n이 시간에?\n```';
+      '```srt\n번역 결과입니다\n[801]\n어디 갔었어\n\n[802]\n그냥 좀 둘러봤어\n\n[803]\n이 시간에?\n```';
     const result = reassembleTranslatedChunk(source, output);
 
     expect(result.matched).toBe(3);
@@ -87,7 +108,7 @@ describe('reassembleTranslatedChunk', () => {
 
   it('drops timestamps the model echoed back and uses the source ones', () => {
     const output =
-      '801\n00:00:00,000 --> 00:00:00,001\n어디 갔었어\n\n802\n그냥 좀 둘러봤어\n\n803\n이 시간에?';
+      '[801]\n00:00:00,000 --> 00:00:00,001\n어디 갔었어\n\n[802]\n그냥 좀 둘러봤어\n\n[803]\n이 시간에?';
     const result = reassembleTranslatedChunk(source, output);
 
     expect(result.matched).toBe(3);
@@ -98,7 +119,7 @@ describe('reassembleTranslatedChunk', () => {
   });
 
   it('preserves multi-line subtitle bodies', () => {
-    const output = '801\n어디 갔었어\n말도 없이\n\n802\n그냥\n\n803\n이 시간에?';
+    const output = '[801]\n어디 갔었어\n말도 없이\n\n[802]\n그냥\n\n[803]\n이 시간에?';
     expect(reassembleTranslatedChunk(source, output).content).toContain(
       '801\n00:01:23,456 --> 00:01:25,789\n어디 갔었어\n말도 없이',
     );
@@ -109,15 +130,60 @@ describe('reassembleTranslatedChunk', () => {
       '11\n00:00:01,000 --> 00:00:02,000\n1999',
       '12\n00:00:03,000 --> 00:00:04,000\nThat year.',
     ].join('\n\n');
-    const output = '11\n1999\n\n12\n그 해에';
+    const output = '[11]\n1999\n\n[12]\n그 해에';
     const result = reassembleTranslatedChunk(numeric, output);
 
     expect(result.matched).toBe(2);
     expect(result.content).toContain('11\n00:00:01,000 --> 00:00:02,000\n1999');
   });
 
+  it('regression: a numeric-counting scene does not poison later blocks in the same chunk', () => {
+    // The real bug: dialogue "8", "9", "10" sit inside the chunk's own
+    // sequence range (1..12), so a bare-digit marker scheme would swallow
+    // them as headers and lose every block from "8" onward. The bracket
+    // marker must keep all of them as ordinary dialogue.
+    const counting = [
+      '1\n00:00:01,000 --> 00:00:02,000\nStart counting',
+      '2\n00:00:03,000 --> 00:00:04,000\n8.',
+      '3\n00:00:05,000 --> 00:00:06,000\n9.',
+      '4\n00:00:07,000 --> 00:00:08,000\n10.',
+      '5\n00:00:09,000 --> 00:00:10,000\nDone.',
+    ].join('\n\n');
+    const output = [
+      '[1]\n숫자를 세기 시작해',
+      '[2]\n8',
+      '[3]\n9',
+      '[4]\n10',
+      '[5]\n끝',
+    ].join('\n');
+    const result = reassembleTranslatedChunk(counting, output);
+
+    expect(result).toMatchObject({ matched: 5, unmatched: 0, total: 5 });
+    expect(result.content).toContain('2\n00:00:03,000 --> 00:00:04,000\n8');
+    expect(result.content).toContain('3\n00:00:05,000 --> 00:00:06,000\n9');
+    expect(result.content).toContain('4\n00:00:07,000 --> 00:00:08,000\n10');
+    expect(result.content).toContain('5\n00:00:09,000 --> 00:00:10,000\n끝');
+  });
+
+  it('starts a block for any expected marker regardless of order (no monotonic requirement)', () => {
+    // Reversed order used to fold 801's text into whatever block was already
+    // open, because the old scheme required markers to increase. With
+    // brackets there's no ambiguity to guard against, so out-of-order markers
+    // are just... markers.
+    const output = '[803]\n이 시간에?\n\n[801]\n어디 갔었어\n\n[802]\n그냥 좀 둘러봤어';
+    const result = reassembleTranslatedChunk(source, output);
+
+    expect(result).toMatchObject({ matched: 3, unmatched: 0 });
+    expect(result.content).toContain(
+      '801\n00:01:23,456 --> 00:01:25,789\n어디 갔었어',
+    );
+    expect(result.content).toContain(
+      '803\n00:01:29,000 --> 00:01:31,500\n이 시간에?',
+    );
+  });
+
   it('ignores a repeated sequence number instead of folding it into the text', () => {
-    const output = '801\n어디 갔었어\n801\n다시\n\n802\n그냥\n\n803\n이 시간에?';
+    const output = '[801]\n어디 갔었어\n[801]\n다시\n\n[802]\n그냥\n\n[803]\n이 시간에?';
     const result = reassembleTranslatedChunk(source, output);
 
     expect(result.content).toContain(
@@ -127,7 +193,7 @@ describe('reassembleTranslatedChunk', () => {
   });
 
   it('falls back to the original when a translated body is empty', () => {
-    const output = '801\n\n\n802\n그냥 좀 둘러봤어\n\n803\n이 시간에?';
+    const output = '[801]\n\n\n[802]\n그냥 좀 둘러봤어\n\n[803]\n이 시간에?';
     const result = reassembleTranslatedChunk(source, output);
 
     expect(result.unmatched).toBe(1);

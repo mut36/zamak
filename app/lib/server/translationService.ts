@@ -142,7 +142,9 @@ function getTranslatedBody(translatedBlock: string): string {
 
   const firstLine = translatedLines[0]?.trim() ?? '';
   const secondLine = translatedLines[1]?.trim() ?? '';
-  if (/^\d+$/.test(firstLine)) {
+  // Bare "801" (legacy) or bracketed "[801]" (current wire format, see
+  // formatBlocksForModel in srt.ts) — either way it's a leaked marker, not body.
+  if (/^\[?\d+\]?$/.test(firstLine)) {
     return translatedLines.slice(1).join('\n').trim();
   }
   if (SRT_TIMING_PATTERN.test(firstLine)) {

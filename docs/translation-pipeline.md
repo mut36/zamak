@@ -135,7 +135,9 @@
     - `{{translationRules}}` → `prompts/common/translation_rules_ko.txt`
     - `{{examplesSection}}` → `prompts/common/translation_examples_ko.txt` (한국어 타깃)
   - **유저 턴**: `<content_metadata>`(`formatMovieInfo` — 제목/연도/장르/배경·시대/톤앤매너)
-    + `<user_notes>` + 청크 위치 + `<subtitle_data>`(타임스탬프 제거) + 블록 수 지시
+    + `<user_notes>` + 청크 위치 + `<subtitle_data>`(타임스탬프 제거, 번호는 `[N]`
+    표식으로 감쌈 — `formatBlocksForModel`, `srt.ts`) + 블록 수 지시(구조 기반 카운트,
+    `parseSrtBlocks(...).length`)
 - **품질 레버 (여기가 가장 큰 번역 품질 레버들)**:
   - 번역 규칙(직역 금지·말투·줄길이·마침표 등) → **`translation_rules_ko.txt`**
   - 영화적 번역 철학(인물 목소리·감정·압축) → **`cinematic_translation_philosophy_ko.txt`**
@@ -158,10 +160,14 @@
     `TRANSLATION_STRICT_MODE=true`로 켬(기본 off, 비용 폭탄 위험 있어 신중히)
 
 ### 9. 타임코드 재조립
-- **코드**: **`app/lib/srt.ts` (`reassembleTranslatedChunk`)**
-- **하는 일**: 모델 출력을 **번호로 대조**해 원본 타임코드와 재결합. 매칭 안 된 블록은
-  원문 유지 → 이후 자막이 안 밀림. 타임스탬프는 모델에 안 보내므로 여기서 복원됨.
-- **품질 레버**: 재번호 밀림 탐지/수리(현재 미구현) → `srt.ts` + `TODO.md`. 이게 밀림
+- **코드**: **`app/lib/srt.ts` (`reassembleTranslatedChunk`, `indexTranslatedBodies`,
+  `formatBlocksForModel`)**
+- **하는 일**: 모델 출력을 **`[N]` 표식으로 대조**해 원본 타임코드와 재결합. 매칭 안 된
+  블록은 원문 유지 → 이후 자막이 안 밀림. 타임스탬프는 모델에 안 보내므로 여기서 복원됨.
+  대괄호 표식(2026-07-25, `decisions.md` §2-1)이라 대사가 순수 숫자여도("8", "1999")
+  표식과 절대 안 겹침 — 순서 상관없이 아무 마커나 인정.
+- **품질 레버**: 재번호 밀림 탐지/수리(현재 미구현 — 모델이 스스로 잘못된 `[N]`을
+  내보내는 별개의 실패 모드, 표식 방식과 무관) → `srt.ts` + `TODO.md`. 이게 밀림
   버그의 방어선.
 
 ### 9.5. 리딩스피드 타임코드 조정 (CPS)
@@ -205,6 +211,7 @@
 | 감정/뉘앙스가 밋밋함 | `cinematic_translation_philosophy_ko.txt` (+ 스타일을 cinematic로) |
 | 줄이 너무 김/마침표 등 표기 규칙 | `translation_rules_ko.txt` |
 | 자막이 밀림(번호 재배열) | 청크 크기 ↓ `constants.ts` `SERVER_CHUNK_SIZE` (**≥300 금지**), 재조립 `srt.ts`. 조절 절차는 위 §5 |
+| 특정 구간에서 자막이 대거 미번역(원문 그대로) | 대사 자체가 숫자인 장면(카운트다운 등) → `srt.ts` `[N]` 표식(§7·§9, `decisions.md` §2-1)이 이미 방지함. 그래도 재발하면 그 청크의 `matched`/`unmatched` 로그 확인 |
 | 청크가 대화 중간을 자름 | `srt.ts` (`chunkSrtBlocksAtGaps` 파라미터) |
 | 한국어 자막이 너무 빨리 지나감(읽기 힘듦) | `srt.ts` (`adjustSubtitleTiming`), `constants.ts` `CPS_TARGET`/`MIN_SUBTITLE_GAP_MS` — §9.5 |
 | 번역이 느림/비쌈 | `constants.ts` `SERVER_CHUNK_SIZE`/`CONCURRENCY`/`THINKING_LEVEL`, 모델 |
