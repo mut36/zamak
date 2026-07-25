@@ -9,7 +9,7 @@ import {
 } from '../lib/client/translationJob';
 import {
   buildOutputFilename,
-  chunkSrtBlocks,
+  chunkSrtBlocksAtGaps,
   parseSrtBlocks,
 } from '../lib/srt';
 import { runOrderedPool } from '../lib/client/concurrency';
@@ -236,7 +236,10 @@ export function useTranslation(
       // Chunk size and concurrency both come from the tier, which is the one
       // place the billing/session gate will hook into.
       const { chunkSize, concurrency } = getTierLimits(resolveTier());
-      const chunks = chunkSrtBlocks(blocks, chunkSize);
+      // Cut at scene breaks (large inter-subtitle gaps) near the target size
+      // rather than at a fixed block count — same cost, but boundaries land
+      // between scenes instead of mid-conversation.
+      const chunks = chunkSrtBlocksAtGaps(blocks, chunkSize);
       const totalChunks = chunks.length;
       // Derived from measured generation rate, not a flat per-wave guess —
       // with one request per file the ring has nothing else to go on.

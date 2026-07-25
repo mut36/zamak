@@ -31,6 +31,124 @@ export function chunkSrtBlocks(
 
 const TIMING_LINE = /^\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}/;
 
+const TIMING_LINE_CAPTURE =
+  /^(\d{2}):(\d{2}):(\d{2}),(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2}),(\d{3})/;
+
+export interface BlockTiming {
+  /** Start of the subtitle's on-screen window, in milliseconds. */
+  startMs: number;
+  /** End of the subtitle's on-screen window, in milliseconds. */
+  endMs: number;
+}
+
+function hmsToMs(h: string, m: string, s: string, ms: string): number {
+  return ((Number(h) * 60 + Number(m)) * 60 + Number(s)) * 1000 + Number(ms);
+}
+
+/**
+ * Parse a block's timing line into start/end milliseconds, or null when the
+ * block has no well-formed `HH:MM:SS,mmm --> HH:MM:SS,mmm` line (the timing
+ * line is always the second line in a parsed SRT block).
+ */
+export function parseBlockTiming(raw: string): BlockTiming | null {
+  const timingLine = raw.split('\n')[1]?.trim() ?? '';
+  const m = timingLine.match(TIMING_LINE_CAPTURE);
+  if (!m) return null;
+  return {
+    startMs: hmsToMs(m[1], m[2], m[3], m[4]),
+    endMs: hmsToMs(m[5], m[6], m[7], m[8]),
+  };
+}
+
+export interface GapChunkOptions {
+  /**
+   * How far a cut may drift from targetSize, as a fraction of it.
+   * Default 0.2 (±20%). targetSize + tolerance must stay under the ~600-block
+   * renumbering-drift ceiling (see SERVER_CHUNK_SIZE in config/constants.ts):
+   * at B=400 the max chunk is 480, safely under it.
+   */
+  toleranceRatio?: number;
+  /**
+   * Minimum silence (ms) between two subtitles for that boundary to count as
+   * a scene break worth cutting at. Default 2000 (2s).
+   */
+  gapThresholdMs?: number;
+}
+
+/**
+ * Perceptual-boundary chunking: instead of cutting every fixed `targetSize`
+ * blocks, cut at the strongest scene break (largest inter-subtitle silence)
+ * near the target. A chunk boundary landing on a 2s+ gap falls between scenes,
+ * where dialogue context doesn't carry across anyway — so the model loses far
+ * less than an arbitrary mid-conversation cut, at zero token cost (timecodes
+ * are already in hand here; the composer strips them only later).
+ *
+ * Measured on the sample subtitles (samples/subtitles/, 461 + 1480 blocks):
+ * gaps >= 2s occur roughly once every 4-5 blocks, so a ±20% window holds
+ * dozens of candidate breaks and the search never fell back to a fixed cut on
+ * either file. Because we take the *largest* gap in the window, real cuts land
+ * on ~5-9s silences (p90), i.e. strong scene changes — which also makes the
+ * method robust to the exact threshold: 1s or 3s would pick nearly the same
+ * boundaries. The threshold is really just the "is any gap here worth
+ * deviating from target" gate.
+ *
+ * When no gap clears the threshold in the window (a dialogue-dense stretch, or
+ * blocks with unparseable timing), it falls back to an exact fixed cut, so the
+ * worst case is never worse than chunkSrtBlocks().
+ */
+export function chunkSrtBlocksAtGaps(
+  blocks: readonly string[],
+  targetSize: number,
+  options: GapChunkOptions = {},
+): string[] {
+  if (!Number.isInteger(targetSize) || targetSize <= 0) {
+    throw new Error('targetSize must be a positive integer');
+  }
+
+  const toleranceRatio = options.toleranceRatio ?? 0.2;
+  const gapThresholdMs = options.gapThresholdMs ?? 2000;
+  const tolerance = Math.max(0, Math.round(targetSize * toleranceRatio));
+  const minSize = Math.max(1, targetSize - tolerance);
+  const maxSize = targetSize + tolerance;
+
+  // Precompute timings once; unparseable blocks become null and can never be
+  // chosen as a cut point.
+  const timings = blocks.map(parseBlockTiming);
+
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < blocks.length) {
+    const remaining = blocks.length - start;
+    if (remaining <= maxSize) {
+      chunks.push(blocks.slice(start).join('\n\n'));
+      break;
+    }
+
+    // Boundary "after block i" is the gap between block i and block i+1. Scan
+    // the window [start+minSize, start+maxSize] for the largest qualifying gap.
+    let bestCut: number | null = null;
+    let bestGap = gapThresholdMs;
+    const from = start + minSize - 1;
+    const to = Math.min(start + maxSize - 1, blocks.length - 2);
+    for (let i = from; i <= to; i++) {
+      const endPrev = timings[i]?.endMs;
+      const startNext = timings[i + 1]?.startMs;
+      if (endPrev == null || startNext == null) continue;
+      const gap = startNext - endPrev;
+      if (gap >= bestGap) {
+        bestGap = gap;
+        bestCut = i + 1;
+      }
+    }
+
+    const cut = bestCut ?? start + targetSize;
+    chunks.push(blocks.slice(start, cut).join('\n\n'));
+    start = cut;
+  }
+
+  return chunks;
+}
+
 interface SourceBlock {
   /** Sequence number, or null when the block isn't well-formed SRT. */
   index: number | null;

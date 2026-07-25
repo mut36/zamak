@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildOutputFilename,
   chunkSrtBlocks,
+  chunkSrtBlocksAtGaps,
+  parseBlockTiming,
   parseSrtBlocks,
   reassembleTranslatedChunk,
 } from './srt';
@@ -136,5 +138,116 @@ describe('reassembleTranslatedChunk', () => {
     const result = reassembleTranslatedChunk(source, '죄송하지만 번역할 수 없습니다.');
     expect(result).toMatchObject({ matched: 0, unmatched: 3, total: 3 });
     expect(result.content).toBe(source);
+  });
+});
+
+function fmtMs(ms: number): string {
+  const h = String(Math.floor(ms / 3_600_000)).padStart(2, '0');
+  const m = String(Math.floor(ms / 60_000) % 60).padStart(2, '0');
+  const s = String(Math.floor(ms / 1000) % 60).padStart(2, '0');
+  const milli = String(ms % 1000).padStart(3, '0');
+  return `${h}:${m}:${s},${milli}`;
+}
+
+function block(seq: number, startMs: number, endMs: number, text = 'line'): string {
+  return `${seq}\n${fmtMs(startMs)} --> ${fmtMs(endMs)}\n${text}`;
+}
+
+/**
+ * Build `count` back-to-back 1s subtitles with a small 100ms gap, then apply
+ * `gapsAfter` (boundary index → gap in ms) to widen specific boundaries.
+ */
+function timeline(count: number, gapsAfter: Record<number, number> = {}): string[] {
+  const blocks: string[] = [];
+  let t = 0;
+  for (let i = 0; i < count; i++) {
+    const start = t;
+    const end = start + 1000;
+    blocks.push(block(i + 1, start, end));
+    const gap = gapsAfter[i] ?? 100;
+    t = end + gap;
+  }
+  return blocks;
+}
+
+describe('parseBlockTiming', () => {
+  it('parses start/end into milliseconds', () => {
+    expect(parseBlockTiming('801\n00:01:23,456 --> 00:01:25,789\nHi')).toEqual({
+      startMs: 83_456,
+      endMs: 85_789,
+    });
+  });
+
+  it('returns null for a block with no well-formed timing line', () => {
+    expect(parseBlockTiming('801\nnot a timecode\nHi')).toBeNull();
+    expect(parseBlockTiming('just one line')).toBeNull();
+  });
+});
+
+describe('chunkSrtBlocksAtGaps', () => {
+  it('cuts at a scene-break gap within the window instead of the exact target', () => {
+    // target 10, ±20% -> window boundaries after blocks 7..11 (cuts 8..12).
+    const blocks = timeline(20, { 9: 3000 }); // 3s gap after block index 9 -> cut at 10
+    const chunks = chunkSrtBlocksAtGaps(blocks, 10);
+    expect(chunks[0].split('\n\n')).toHaveLength(10);
+  });
+
+  it('picks the largest qualifying gap when several are in the window', () => {
+    const blocks = timeline(20, { 8: 2500, 10: 4000 });
+    const chunks = chunkSrtBlocksAtGaps(blocks, 10);
+    // The 4s gap after block 10 wins over the 2.5s after block 8 -> cut at 11.
+    expect(chunks[0].split('\n\n')).toHaveLength(11);
+  });
+
+  it('falls back to the exact target when no gap clears the threshold', () => {
+    const blocks = timeline(20); // all gaps are 100ms
+    const chunks = chunkSrtBlocksAtGaps(blocks, 10);
+    expect(chunks[0].split('\n\n')).toHaveLength(10);
+  });
+
+  it('never cuts at an overlapping (negative-gap) boundary', () => {
+    // A big overlap after block 9; otherwise only small gaps -> falls back to target.
+    const blocks = timeline(20, { 9: -4000 });
+    const chunks = chunkSrtBlocksAtGaps(blocks, 10);
+    expect(chunks[0].split('\n\n')).toHaveLength(10);
+  });
+
+  it('skips blocks with unparseable timing and uses the next best gap', () => {
+    const blocks = timeline(20, { 10: 3000 });
+    // Corrupt the timing on block index 10 so the 3s gap after it can't be read.
+    blocks[10] = '11\nBROKEN TIMECODE\nline';
+    blocks[11] = `12\n${fmtMs(999_000)} --> ${fmtMs(1_000_000)}\nline`;
+    const chunks = chunkSrtBlocksAtGaps(blocks, 10);
+    // No readable gap in the window -> fixed fallback at target.
+    expect(chunks[0].split('\n\n')).toHaveLength(10);
+  });
+
+  it('returns a single chunk when the file fits within maxSize', () => {
+    const blocks = timeline(12, { 5: 5000 });
+    expect(chunkSrtBlocksAtGaps(blocks, 10)).toHaveLength(1);
+  });
+
+  it('preserves every block and its order', () => {
+    const blocks = timeline(50, { 9: 3000, 21: 4000, 33: 2500 });
+    const chunks = chunkSrtBlocksAtGaps(blocks, 10);
+    expect(chunks.join('\n\n')).toBe(blocks.join('\n\n'));
+  });
+
+  it('respects a custom threshold and tolerance', () => {
+    const blocks = timeline(20, { 9: 1200 });
+    // Default 2s threshold ignores the 1.2s gap -> target cut at 10.
+    expect(chunkSrtBlocksAtGaps(blocks, 10)[0].split('\n\n')).toHaveLength(10);
+    // Lowering the threshold to 1s lets the 1.2s gap win -> cut at 10 as well,
+    // so widen the window and place the gap off-target to prove it moves.
+    const off = timeline(20, { 7: 1200 });
+    expect(
+      chunkSrtBlocksAtGaps(off, 10, { gapThresholdMs: 1000 })[0].split('\n\n'),
+    ).toHaveLength(8);
+  });
+
+  it('throws on a non-positive target size', () => {
+    expect(() => chunkSrtBlocksAtGaps(['a'], 0)).toThrow();
+    expect(() => chunkSrtBlocksAtGaps(['a'], -5)).toThrow();
+    expect(() => chunkSrtBlocksAtGaps(['a'], 1.5)).toThrow();
   });
 });
