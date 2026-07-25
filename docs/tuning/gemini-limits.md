@@ -3,8 +3,8 @@
 청크 크기(B)와 동시성(K)을 계산으로 정하기 위한 입력값. **추측 금지 — 공식 문서에서 조회한 값만.**
 빈칸은 비워두고, 문서에 없거나 애매하면 `?`와 함께 메모를 남길 것.
 
-- 대상 모델(번역): `gemini-3.5-flash` — `app/config/constants.ts`의 `TRANSLATION_MODEL`
-- 대상 모델(보조): `gemini-3.1-flash-lite` — `AUX_MODEL` (analyze/enrich/summarize)
+- 대상 모델(번역): `gemini-3.6-flash` — `app/config/constants.ts`의 `TRANSLATION_MODEL`
+- 대상 모델(보조): `gemini-3.5-flash-lite` — `AUX_MODEL` (analyze/enrich/summarize)
 - 조회일: 2026-07-20 (§1~6, 대표 조회) / 2026-07-21 (§7-1 인프라, §6 thinking 실측)
 - 출처 URL:
   - Gemini rate limits / pricing / model card: 대표가 콘솔·공식 문서에서 직접 조회
@@ -13,7 +13,7 @@
 
 ---
 
-## 1. 요청 단위 한도 — `gemini-3.5-flash`
+## 1. 요청 단위 한도 — `gemini-3.6-flash`
 
 B(청크 크기)의 천장을 정하는 값들. **출력 상한이 1차 천장이다.**
 
@@ -23,7 +23,7 @@ B(청크 크기)의 천장을 정하는 값들. **출력 상한이 1차 천장�
 | context window (최대 **입력** 토큰)    | 1,048,576 | tokens |                                           |
 | 출력 토큰에 thinking 토큰이 포함되는가 | 예        |        | 포함이면 실질 출력 여유가 그만큼 줄어든다 |
 
-## 2. 등급별 rate limit — `gemini-3.5-flash`
+## 2. 등급별 rate limit — `gemini-3.6-flash`
 
 K(동시성)의 천장을 정하는 값들.
 
@@ -81,7 +81,7 @@ K(동시성)의 천장을 정하는 값들.
 
 | 항목                                        | 값     | 메모                                                                     |
 | ------------------------------------------- | ------ | ------------------------------------------------------------------------ |
-| `gemini-3.5-flash`의 thinking 기본값        | medium | 켜짐                                                                     |
+| `gemini-3.6-flash`의 thinking 기본값        | medium | 켜짐                                                                     |
 | thinking을 끄거나 예산을 0으로 둘 수 있는가 | 안됨   | `thinkingBudget: 0`은 무시된다. 먹는 건 `thinkingLevel`                  |
 | 최소 thinking 예산 (0 불가라면)             | minimal | `ThinkingLevel.MINIMAL`                                                 |
 | 응답에서 thinking 토큰 수를 확인하는 필드명 | `usageMetadata.thoughtsTokenCount` | `[gemini]` 로그의 `thoughts=`                 |

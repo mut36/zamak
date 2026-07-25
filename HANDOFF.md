@@ -185,7 +185,7 @@ main = 9936527 (feat/landing 미머지)
 | K (동시성) | **16** | B=200에서도 과분(`⌈2000/200⌉=10` ≪ 16). 올리면 다시 쓸 수 있게 유지 |
 | THINKING_LEVEL | **LOW** | 확정 |
 | 크레딧 상한 | 2,000블록 | `MAX_BLOCKS_PER_CREDIT` |
-| 모델 | `gemini-3.5-flash` | 보조 라우트는 `gemini-3.1-flash-lite` |
+| 모델 | `gemini-3.6-flash` | 보조 라우트는 `gemini-3.5-flash-lite` |
 
 **B의 진짜 천장** (K는 사실상 자유):
 - 요청당 출력 토큰 상한 65,536 → `t_out=16` 기준 약 4,000블록

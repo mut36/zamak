@@ -151,7 +151,7 @@
 - **코드**: `translateSubtitle` → `app/lib/providers/gemini.ts` (`generateModelText`),
   설정 `app/config/constants.ts`
 - **품질 레버**:
-  - 번역 모델 교체 → `constants.ts` `TRANSLATION_MODEL` (기본 `gemini-3.5-flash`,
+  - 번역 모델 교체 → `constants.ts` `TRANSLATION_MODEL` (기본 `gemini-3.6-flash`,
     env `NEXT_PUBLIC_TRANSLATION_MODEL`)
   - thinking 수준(품질/비용) → `constants.ts` `THINKING_LEVEL` (기본 LOW, env)
   - **엄격 모드**(출력 검증+재시도+블록단위 재번역) → `translationService.ts`,

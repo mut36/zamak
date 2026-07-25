@@ -49,7 +49,7 @@ function restoreStrict() {
 
 async function translate() {
   return translateSubtitle({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.6-flash',
     movieInfo,
     targetLanguage: 'ko',
     translationMode: 'chunk',

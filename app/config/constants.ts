@@ -149,7 +149,7 @@ export const JOB_VALIDITY_MINUTES = readPositiveIntEnv(
  * enrichment, non-movie summarization). Kept as a single constant so a
  * model bump is a one-line change; overridable via env.
  */
-export const AUX_MODEL = process.env.AUX_MODEL || 'gemini-3.1-flash-lite';
+export const AUX_MODEL = process.env.AUX_MODEL || 'gemini-3.5-flash-lite';
 
 const THINKING_LEVELS = ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH'] as const;
 export type ThinkingLevelName = (typeof THINKING_LEVELS)[number];
@@ -206,11 +206,11 @@ export const SUMMARY_SAMPLE_LINES = (() => {
  * Allowed translation models. Unified on a single Gemini model; kept as an
  * array so validation still works and adding a model later is one line.
  */
-export const ALLOWED_MODELS = ['gemini-3.5-flash'] as const;
+export const ALLOWED_MODELS = ['gemini-3.6-flash'] as const;
 
 export type AllowedModel = (typeof ALLOWED_MODELS)[number];
 
-export const DEFAULT_MODEL: AllowedModel = 'gemini-3.5-flash';
+export const DEFAULT_MODEL: AllowedModel = 'gemini-3.6-flash';
 
 /**
  * The single translation model. Model updates are a one-line change here
