@@ -37,12 +37,6 @@ export function loadTranslationPhilosophy(
     : Promise.resolve('');
 }
 
-export function loadTranslationExamples(
-  language: 'ko',
-): Promise<string> {
-  return loadPromptFile(`common/translation_examples_${language}.txt`);
-}
-
 export function loadAnalysisPrompt(): Promise<string> {
   return loadPromptFile('common/content_analysis.txt');
 }

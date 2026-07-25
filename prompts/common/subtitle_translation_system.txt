@@ -14,4 +14,3 @@
 <translation_rules>
 {{translationRules}}
 </translation_rules>
-{{examplesSection}}

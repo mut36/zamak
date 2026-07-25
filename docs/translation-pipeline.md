@@ -133,7 +133,6 @@
     - `{{translationPhilosophy}}` → `prompts/common/cinematic_translation_philosophy_ko.txt`
       (**cinematic 스타일에서만**; meaning은 빈 문자열)
     - `{{translationRules}}` → `prompts/common/translation_rules_ko.txt`
-    - `{{examplesSection}}` → `prompts/common/translation_examples_ko.txt` (한국어 타깃)
   - **유저 턴**: `<content_metadata>`(`formatMovieInfo` — 제목/연도/장르/배경·시대/톤앤매너)
     + `<user_notes>` + 청크 위치 + `<subtitle_data>`(타임스탬프 제거, **줄마다
     `[N] 대사` 표식** — `formatBlocksForModel`, `srt.ts`) + 블록 수 지시(구조 기반
@@ -142,7 +141,6 @@
   - 번역 규칙(직역 금지·말투·줄길이·마침표 등) → **`translation_rules_ko.txt`**
   - 영화적 번역 철학(인물 목소리·감정·압축) → **`cinematic_translation_philosophy_ko.txt`**
     (cinematic에서만 적용)
-  - few-shot 예시(번역투 제거 감각) → **`translation_examples_ko.txt`**
   - 페르소나/프롬프트 인젝션 방어 → `subtitle_translation_system.txt`
   - 메타데이터가 프롬프트에 실리는 형식 → `translationContent.ts` (`formatMovieInfo`)
   - 도착어별 규칙 로딩 → `translationContent.ts` (`getLanguageConfig`), `loader.ts`
@@ -214,7 +212,7 @@
 | 감독/포스터 안 뜸·틀림 | `tmdb.ts` (`lookupTitle`), `enrichMovie.ts` (`buildGroundedPrompt`) |
 | 장르/배경·시대/톤앤매너가 이상함 | `enrichMovie.ts` (`buildKeywordPrompt` / `buildGroundedPrompt`) |
 | 배경/시대가 개봉연도로 나옴 | `enrichMovie.ts` 프롬프트 (그라운딩·"개봉연도≠극중배경" 지침) |
-| 번역이 직역투/어색함 | `translation_rules_ko.txt`, `translation_examples_ko.txt` |
+| 번역이 직역투/어색함 | `translation_rules_ko.txt` |
 | 존댓말/반말·인물 말투가 안 맞음 | `translation_rules_ko.txt`, (cinematic) `cinematic_translation_philosophy_ko.txt`, `InfoStep`에서 사람이 톤 입력 |
 | 감정/뉘앙스가 밋밋함 | `cinematic_translation_philosophy_ko.txt` (+ 스타일을 cinematic로) |
 | 줄이 너무 김/마침표 등 표기 규칙 | `translation_rules_ko.txt` |
