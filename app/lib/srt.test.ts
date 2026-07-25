@@ -29,8 +29,23 @@ describe('SRT utilities', () => {
 
   it('builds a language-specific output filename', () => {
     expect(buildOutputFilename('movie.srt', 'Korean')).toBe('movie.ko.srt');
+    expect(buildOutputFilename('movie.srt', 'ko')).toBe('movie.ko.srt');
+    expect(buildOutputFilename('movie.srt', 'en')).toBe('movie.en.srt');
     expect(buildOutputFilename('movie.srt', 'Portuguese Brazil')).toBe(
       'movie.portuguese.srt',
+    );
+  });
+
+  it('replaces a known source language code before .srt', () => {
+    expect(buildOutputFilename('movie.it.srt', 'ko')).toBe('movie.ko.srt');
+    expect(buildOutputFilename('Movie.EN.SRT', 'ko')).toBe('Movie.ko.SRT');
+    expect(buildOutputFilename('show.ja.srt', 'en')).toBe('show.en.srt');
+  });
+
+  it('appends when the pre-.srt token is not a known language code', () => {
+    expect(buildOutputFilename('movie.hd.srt', 'ko')).toBe('movie.hd.ko.srt');
+    expect(buildOutputFilename('movie.2024.srt', 'ko')).toBe(
+      'movie.2024.ko.srt',
     );
   });
 });

@@ -322,10 +322,29 @@ export const RETRY = {
   BASE_DELAY_MS: 1_000,
 } as const;
 
-/** Language code → file suffix mapping */
+/** Target-language code → output file suffix (before `.srt`). */
 export const LANG_SUFFIX: Record<string, string> = {
   ko: 'ko',
   en: 'en',
   Korean: 'ko',
   English: 'en',
 };
+
+/**
+ * Source-language codes that may appear immediately before `.srt` in a
+ * filename (e.g. `movie.it.srt`). When present, `buildOutputFilename`
+ * replaces them with the target suffix instead of appending another code.
+ * ISO 639-1 two-letter codes only — keeps `.hd` / `.tv` from being treated
+ * as languages.
+ */
+export const SOURCE_LANG_CODES = [
+  'en', 'ko', 'ja', 'zh', 'es', 'fr', 'de', 'it', 'pt', 'ru',
+  'nl', 'sv', 'no', 'da', 'fi', 'pl', 'cs', 'tr', 'ar', 'hi',
+  'th', 'vi', 'id', 'el', 'he', 'ro', 'hu', 'bg', 'hr', 'sr',
+] as const;
+
+const SOURCE_LANG_CODE_SET = new Set<string>(SOURCE_LANG_CODES);
+
+export function isSourceLangCode(token: string): boolean {
+  return SOURCE_LANG_CODE_SET.has(token.toLowerCase());
+}

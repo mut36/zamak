@@ -196,8 +196,10 @@
 ### 10. 조립 & 다운로드
 - **코드**: `useTranslation`(청크 결과 합치기 + §9.5 조정), `app/lib/srt.ts` (`buildOutputFilename`),
   `app/components/simple/DoneStep.tsx`, `TranslationResult`(`failedChunks`/`totalChunks`)
-- **품질 레버**: 출력 파일명 규칙 → `buildOutputFilename` / `constants.ts` `LANG_SUFFIX`.
-  완료 화면 실패 개수 표시 → `DoneStep.tsx`.
+- **품질 레버**: 출력 파일명 규칙 → `buildOutputFilename` / `constants.ts`
+  `LANG_SUFFIX` + `SOURCE_LANG_CODES`. `.srt` 직전 토큰이 화이트리스트 언어
+  코드면 도착어로 **교체**(`movie.it.srt` → `movie.ko.srt`), 아니면 **추가**
+  (`movie.srt` → `movie.ko.srt`). 완료 화면 실패 개수 표시 → `DoneStep.tsx`.
 
 ---
 

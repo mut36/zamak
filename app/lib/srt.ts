@@ -1,4 +1,4 @@
-import { LANG_SUFFIX } from '../config/constants';
+import { LANG_SUFFIX, isSourceLangCode } from '../config/constants';
 
 export function normalizeSrt(content: string): string {
   return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
@@ -494,10 +494,20 @@ export function buildOutputFilename(
   originalName: string,
   targetLanguage: string,
 ): string {
-  const suffix =
+  const rawSuffix =
     LANG_SUFFIX[targetLanguage] ??
-    targetLanguage.trim().toLowerCase().replace(/\s+/g, '-').slice(0, 10) ??
-    'translated';
+    targetLanguage.trim().toLowerCase().replace(/\s+/g, '-').slice(0, 10);
+  const suffix = rawSuffix || 'translated';
 
-  return originalName.replace(/\.srt$/i, `.${suffix || 'translated'}.srt`);
+  const match = originalName.match(/^(.*)(\.srt)$/i);
+  const stem = match?.[1] ?? originalName;
+  const ext = match?.[2] ?? '.srt';
+
+  // movie.it.srt → movie.ko.srt (replace known source lang)
+  // movie.srt / movie.hd.srt → movie.ko.srt / movie.hd.ko.srt (append)
+  const langMatch = stem.match(/\.([a-z]{2})$/i);
+  if (langMatch && isSourceLangCode(langMatch[1])) {
+    return `${stem.slice(0, -langMatch[0].length)}.${suffix}${ext}`;
+  }
+  return `${stem}.${suffix}${ext}`;
 }
