@@ -12,6 +12,7 @@ import { CreditWall } from './components/simple/CreditWall';
 import { PurchaseStep } from './components/simple/PurchaseStep';
 import { useTranslation } from './hooks/useTranslation';
 import { useEnrich } from './hooks/useEnrich';
+import { useCastSheet } from './hooks/useCastSheet';
 import { useAuth } from './hooks/useAuth';
 import { parseSrtBlocks } from './lib/srt';
 import { isSupabaseConfigured } from './lib/supabase/env';
@@ -22,7 +23,7 @@ import { COPY } from './i18n/simpleCopy';
 
 const EMPTY_MOVIE_INFO: MovieInfo = { title: '', year: '', notes: '' };
 // Keep in sync with package.json version.
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.7.0';
 
 function isSrt(file: File): boolean {
   return file.name.toLowerCase().endsWith('.srt');
@@ -116,6 +117,8 @@ export default function Home() {
     reset: resetEnrich,
   } = useEnrich();
 
+  const castSheet = useCastSheet();
+
   const totalLines = useMemo(
     () => (fileContent ? parseSrtBlocks(fileContent).length : 0),
     [fileContent],
@@ -184,10 +187,24 @@ export default function Home() {
     }
   }, [step, contentType, analysis.completed, fileContent, runEnrich]);
 
+  // Cast-sheet prepass: independent opt-in toggle (see docs/decisions.md).
+  // request() no-ops while already in flight/done for this file (internal
+  // ref guard), so firing this effect on every fileContent/enabled change is
+  // safe — it only actually dispatches once per file, and only when enabled.
+  const castSheetEnabled = castSheet.enabled;
+  const requestCastSheet = castSheet.request;
+  useEffect(() => {
+    if (step !== 1) return;
+    if (!castSheetEnabled) return;
+    if (!fileContent) return;
+    requestCastSheet(fileContentRef.current, movieInfoRef.current);
+  }, [step, castSheetEnabled, fileContent, requestCastSheet]);
+
   const resetAnalysis = () => {
     enrichStartedRef.current = false;
     summarizeStartedRef.current = false;
     resetEnrich();
+    castSheet.reset();
     setSummarizing(false);
   };
 
@@ -206,12 +223,21 @@ export default function Home() {
 
   const handleTranslate = async (model: AllowedModel) => {
     setStep(2);
+    // Give a still-running extraction a bounded grace period rather than
+    // blocking indefinitely or always shipping without it — see
+    // GLOSSARY_WAIT_MS. Never called (resolves immediately) when the toggle
+    // is off, since no extraction was ever kicked off.
+    const resolvedCastSheet = castSheet.enabled
+      ? await castSheet.awaitReady()
+      : undefined;
     // translate() resolves true on success, false on error/abort/refusal.
     const ok = await translate(
       movieInfo,
       model,
       targetLang,
       'meaning',
+      undefined,
+      resolvedCastSheet,
     );
     // The balance moved either way: a success spent the credit, and a refusal
     // means our cached number was stale.
@@ -357,6 +383,14 @@ export default function Home() {
               analysisAnalyzing={analysis.isAnalyzing}
               onReEnrich={runEnrich}
               summarizing={summarizing}
+              castSheetEnabled={castSheet.enabled}
+              onCastSheetToggle={castSheet.setEnabled}
+              castSheetStatus={castSheet.status}
+              castSheet={castSheet.sheet}
+              onCastSheetChange={castSheet.setSheet}
+              onCastSheetRefetch={() =>
+                castSheet.refetch(fileContentRef.current, movieInfoRef.current)
+              }
               onBack={resetAll}
               onTranslate={handleTranslate}
             />

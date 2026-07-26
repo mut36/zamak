@@ -1,0 +1,295 @@
+import 'server-only';
+
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
+import {
+  GLOSSARY_MAX_BLOCKS,
+  GLOSSARY_MAX_RELATIONS,
+  GLOSSARY_MAX_TERMS,
+  GLOSSARY_MODEL,
+  GLOSSARY_THINKING_LEVEL,
+} from '../../config/constants';
+import type { CastSheet, GlossaryTerm, SpeechRelation } from '../../types/glossary';
+import { EMPTY_CAST_SHEET } from '../../types/glossary';
+import type { MovieInfo } from '../../types/translation';
+import { formatBlocksForModel, parseSrtBlocks } from '../srt';
+import { loadCastSheetExtractionPrompt } from '../prompts/loader';
+import { formatMovieInfo } from '../prompts/translationContent';
+import { lookupTitle, type TmdbCastMember } from './tmdb';
+
+const CAST_SHEET_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    terms: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          source: { type: Type.STRING },
+          ko: { type: Type.STRING },
+          kind: {
+            type: Type.STRING,
+            enum: ['person', 'place', 'org', 'term'],
+          },
+          note: { type: Type.STRING },
+        },
+        required: ['source', 'ko', 'kind'],
+        propertyOrdering: ['source', 'ko', 'kind', 'note'],
+      },
+    },
+    relations: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          from: { type: Type.STRING },
+          to: { type: Type.STRING },
+          speech: { type: Type.STRING, enum: ['존댓말', '반말', '혼용'] },
+          basis: { type: Type.STRING },
+          fromBlock: { type: Type.INTEGER },
+          toBlock: { type: Type.INTEGER },
+        },
+        required: ['from', 'to', 'speech', 'fromBlock', 'toBlock'],
+        propertyOrdering: [
+          'from',
+          'to',
+          'speech',
+          'basis',
+          'fromBlock',
+          'toBlock',
+        ],
+      },
+    },
+  },
+  required: ['terms', 'relations'],
+};
+
+/**
+ * Evenly excerpt blocks across the whole file rather than sampling the lead
+ * (unlike /api/summarize): names and relationships are scattered throughout,
+ * so a leading-only sample would miss anyone introduced past the opening.
+ * `[...]` markers between segments match the extraction prompt's instruction
+ * to ignore possible relation changes inside a gap. Original blocks (with
+ * their real sequence numbers) pass straight to formatBlocksForModel, so
+ * fromBlock/toBlock in the model's answer still refer to real block numbers.
+ */
+function excerptBlocks(blocks: readonly string[], maxBlocks: number): string {
+  if (blocks.length <= maxBlocks) return blocks.join('\n\n');
+
+  const segments = 12;
+  const segSize = Math.max(1, Math.floor(maxBlocks / segments));
+  const step = blocks.length / segments;
+
+  const picked: string[] = [];
+  for (let s = 0; s < segments; s++) {
+    const start = Math.floor(s * step);
+    const end = Math.min(blocks.length, start + segSize);
+    if (end <= start) continue;
+    if (picked.length > 0) picked.push('[...]');
+    picked.push(...blocks.slice(start, end));
+  }
+  return picked.join('\n\n');
+}
+
+/**
+ * TMDB rarely localizes `character` into Korean, so this is not a ready-made
+ * spelling — just a hint the extraction prompt uses to identify who's who
+ * ("this character, played by this actor, is probably in the subtitles").
+ * The model still does the actual Korean-spelling work.
+ */
+function buildCastAnchorTag(cast: readonly TmdbCastMember[]): string {
+  if (cast.length === 0) return '';
+  const lines = cast.map((c) => `- ${c.character} (배우: ${c.actor})`);
+  return `<tmdb_cast>\n${lines.join('\n')}\n</tmdb_cast>`;
+}
+
+/**
+ * Best-effort TMDB cast lookup for the anchor tag. A second TMDB call
+ * (enrichMovie.ts already made one for /api/enrich) rather than threading the
+ * result through the client — keeps this prepass self-contained and able to
+ * run standalone. Failures (no TMDB key, no match, network error) degrade to
+ * no anchor, same as every other best-effort path in this feature.
+ */
+async function fetchCastAnchors(
+  title: string,
+  year: string,
+): Promise<TmdbCastMember[]> {
+  if (!title.trim()) return [];
+  try {
+    const result = await lookupTitle(title, year);
+    return result.found ? (result.cast ?? []) : [];
+  } catch (error) {
+    console.error('[glossary] TMDB cast lookup failed', error);
+    return [];
+  }
+}
+
+function buildUserTurn(
+  movieInfo: Pick<MovieInfo, 'title' | 'year' | 'genre' | 'country' | 'era' | 'tone'>,
+  cast: readonly TmdbCastMember[],
+  subtitleContent: string,
+  blockCount: number,
+): string {
+  const blocks = parseSrtBlocks(subtitleContent);
+  const excerpted = excerptBlocks(blocks, GLOSSARY_MAX_BLOCKS);
+  const formatted = formatBlocksForModel(excerpted);
+
+  return [
+    `<content_metadata>\n${formatMovieInfo(movieInfo)}\n</content_metadata>`,
+    buildCastAnchorTag(cast),
+    `<subtitle_data>\n${formatted}\n</subtitle_data>`,
+    `이 자막의 전체 블록 수: ${blockCount}개 (번호 1~${blockCount}).`,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+interface RawCastSheet {
+  terms?: unknown;
+  relations?: unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function countOccurrences(haystack: string, needle: string): number {
+  if (!needle) return 0;
+  let count = 0;
+  let index = 0;
+  for (;;) {
+    const found = haystack.indexOf(needle, index);
+    if (found === -1) break;
+    count++;
+    index = found + needle.length;
+  }
+  return count;
+}
+
+const TERM_KINDS: GlossaryTerm['kind'][] = ['person', 'place', 'org', 'term'];
+const SPEECH_VALUES: SpeechRelation['speech'][] = ['존댓말', '반말', '혼용'];
+
+/**
+ * Post-processing the schema alone can't guarantee: responseSchema forces
+ * well-formed JSON, but not truthful content. The single most important check
+ * here is the hallucination filter (line below marked HALLUCINATION FILTER) —
+ * a made-up name would otherwise pollute the fixed spelling used by every
+ * parallel chunk, which is a worse outcome than no glossary at all.
+ */
+function sanitizeCastSheet(
+  raw: RawCastSheet,
+  sourceContent: string,
+  blockCount: number,
+): CastSheet {
+  const rawTerms = Array.isArray(raw.terms) ? raw.terms : [];
+  const seenSource = new Set<string>();
+
+  const candidateTerms = rawTerms
+    .filter(isRecord)
+    .map((t): GlossaryTerm | null => {
+      const source = typeof t.source === 'string' ? t.source.trim() : '';
+      const ko = typeof t.ko === 'string' ? t.ko.trim() : '';
+      const kind = TERM_KINDS.includes(t.kind as GlossaryTerm['kind'])
+        ? (t.kind as GlossaryTerm['kind'])
+        : 'term';
+      const note = typeof t.note === 'string' ? t.note.trim() : undefined;
+      if (!source || !ko) return null;
+      // HALLUCINATION FILTER: a term the model invented (not present in the
+      // actual subtitles) must never become the fixed spelling every chunk is
+      // told to use.
+      if (!sourceContent.includes(source)) return null;
+      if (seenSource.has(source)) return null;
+      seenSource.add(source);
+      return note ? { source, ko, kind, note } : { source, ko, kind };
+    })
+    .filter((t): t is GlossaryTerm => t !== null);
+
+  const terms = candidateTerms
+    .sort(
+      (a, b) =>
+        countOccurrences(sourceContent, b.source) -
+        countOccurrences(sourceContent, a.source),
+    )
+    .slice(0, GLOSSARY_MAX_TERMS);
+
+  const validKo = new Set(terms.map((t) => t.ko));
+
+  const rawRelations = Array.isArray(raw.relations) ? raw.relations : [];
+  const relations = rawRelations
+    .filter(isRecord)
+    .map((r): SpeechRelation | null => {
+      const from = typeof r.from === 'string' ? r.from.trim() : '';
+      const to = typeof r.to === 'string' ? r.to.trim() : '';
+      const speech = SPEECH_VALUES.includes(r.speech as SpeechRelation['speech'])
+        ? (r.speech as SpeechRelation['speech'])
+        : null;
+      const basis = typeof r.basis === 'string' ? r.basis.trim() : undefined;
+      const fromBlockRaw = typeof r.fromBlock === 'number' ? r.fromBlock : NaN;
+      const toBlockRaw = typeof r.toBlock === 'number' ? r.toBlock : NaN;
+
+      if (!from || !to || !speech) return null;
+      if (!validKo.has(from) || !validKo.has(to)) return null;
+      if (!Number.isFinite(fromBlockRaw) || !Number.isFinite(toBlockRaw)) {
+        return null;
+      }
+
+      const fromBlock = Math.max(1, Math.min(blockCount, Math.round(fromBlockRaw)));
+      const toBlock = Math.max(1, Math.min(blockCount, Math.round(toBlockRaw)));
+      if (fromBlock > toBlock) return null;
+
+      return basis
+        ? { from, to, speech, basis, fromBlock, toBlock }
+        : { from, to, speech, fromBlock, toBlock };
+    })
+    .filter((r): r is SpeechRelation => r !== null)
+    .slice(0, GLOSSARY_MAX_RELATIONS);
+
+  return { terms, relations };
+}
+
+/**
+ * One-shot cast-sheet extraction: a glossary of confirmed name/place/term
+ * spellings plus directional speech-formality relations, so parallel chunks
+ * agree on both instead of drifting per-chunk. Opt-in (InfoStep toggle,
+ * default off) — this never runs unless the user turns it on.
+ *
+ * Any failure (missing key, API error, unparseable JSON) returns an empty
+ * sheet rather than throwing: this prepass must never block translation.
+ */
+export async function extractCastSheet(
+  subtitleContent: string,
+  movieInfo: Pick<MovieInfo, 'title' | 'year' | 'genre' | 'country' | 'era' | 'tone'>,
+): Promise<CastSheet> {
+  const apiKey = process.env.GOOGLE_GENAI_API_KEY;
+  if (!apiKey) return EMPTY_CAST_SHEET;
+
+  const blockCount = parseSrtBlocks(subtitleContent).length;
+  if (blockCount === 0) return EMPTY_CAST_SHEET;
+
+  try {
+    const [systemInstruction, cast] = await Promise.all([
+      loadCastSheetExtractionPrompt(),
+      fetchCastAnchors(movieInfo.title, movieInfo.year),
+    ]);
+    const userTurn = buildUserTurn(movieInfo, cast, subtitleContent, blockCount);
+
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: GLOSSARY_MODEL,
+      contents: userTurn,
+      config: {
+        systemInstruction,
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel[GLOSSARY_THINKING_LEVEL],
+        },
+        responseMimeType: 'application/json',
+        responseSchema: CAST_SHEET_SCHEMA,
+      },
+    });
+
+    const parsed = JSON.parse(response.text ?? '{}') as RawCastSheet;
+    return sanitizeCastSheet(parsed, subtitleContent, blockCount);
+  } catch (error) {
+    console.error('[glossary] cast sheet extraction failed', error);
+    return EMPTY_CAST_SHEET;
+  }
+}

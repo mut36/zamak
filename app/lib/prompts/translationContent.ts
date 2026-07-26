@@ -20,7 +20,9 @@ function getLanguageConfig(targetLanguage: string) {
   };
 }
 
-function formatMovieInfo(movieInfo: MovieInfo): string {
+export function formatMovieInfo(
+  movieInfo: Pick<MovieInfo, 'title' | 'year' | 'genre' | 'country' | 'era' | 'tone'>,
+): string {
   const fields = [
     movieInfo.title && `- 제목: ${movieInfo.title}`,
     movieInfo.year && `- 연도: ${movieInfo.year}`,

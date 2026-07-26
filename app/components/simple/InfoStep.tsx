@@ -2,7 +2,10 @@
 
 import { useState, type ReactNode } from 'react';
 import { SpinnerIcon, SparkleIcon, PencilIcon } from '../icons';
+import { CastSheetCard } from './CastSheetCard';
 import type { EnrichStatus } from '../../hooks/useEnrich';
+import type { CastSheetStatus } from '../../hooks/useCastSheet';
+import type { CastSheet } from '../../types/glossary';
 import type { ContentType, MovieInfo } from '../../types/translation';
 import {
   FLASH_MODEL,
@@ -25,6 +28,14 @@ interface InfoStepProps {
   onReEnrich: () => void;
   // other branch
   summarizing: boolean;
+  // cast sheet — independent toggle from the translation model, shared by
+  // both branches (see docs/decisions.md)
+  castSheetEnabled: boolean;
+  onCastSheetToggle: (value: boolean) => void;
+  castSheetStatus: CastSheetStatus;
+  castSheet: CastSheet;
+  onCastSheetChange: (sheet: CastSheet) => void;
+  onCastSheetRefetch: () => void;
   /** Optional content rendered just above the action buttons. */
   beforeActions?: ReactNode;
   onBack: () => void;
@@ -51,6 +62,12 @@ function MovieInfo({
   director,
   analysisAnalyzing,
   onReEnrich,
+  castSheetEnabled,
+  onCastSheetToggle,
+  castSheetStatus,
+  castSheet,
+  onCastSheetChange,
+  onCastSheetRefetch,
   beforeActions,
   onBack,
   onTranslate,
@@ -223,6 +240,17 @@ function MovieInfo({
         </div>
       )}
 
+      {!busy && (
+        <CastSheetCard
+          enabled={castSheetEnabled}
+          onToggle={onCastSheetToggle}
+          status={castSheetStatus}
+          sheet={castSheet}
+          onChangeSheet={onCastSheetChange}
+          onRefetch={onCastSheetRefetch}
+        />
+      )}
+
       {!busy && beforeActions}
       <Actions onBack={onBack} onTranslate={onTranslate} disabled={busy} />
     </div>
@@ -235,6 +263,12 @@ function OtherInfo({
   movieInfo,
   setMovieInfo,
   summarizing,
+  castSheetEnabled,
+  onCastSheetToggle,
+  castSheetStatus,
+  castSheet,
+  onCastSheetChange,
+  onCastSheetRefetch,
   beforeActions,
   onBack,
   onTranslate,
@@ -264,6 +298,17 @@ function OtherInfo({
             }
           />
         </div>
+      )}
+
+      {!summarizing && (
+        <CastSheetCard
+          enabled={castSheetEnabled}
+          onToggle={onCastSheetToggle}
+          status={castSheetStatus}
+          sheet={castSheet}
+          onChangeSheet={onCastSheetChange}
+          onRefetch={onCastSheetRefetch}
+        />
       )}
 
       {!summarizing && beforeActions}

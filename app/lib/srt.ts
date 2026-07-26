@@ -445,6 +445,26 @@ function readSourceBlock(raw: string): SourceBlock {
  * Malformed blocks (no parseable sequence+timing) pass through with only a
  * timestamp-shaped line stripped, since there's no reliable index to marker.
  */
+export interface BlockIndexRange {
+  min: number;
+  max: number;
+}
+
+/**
+ * The real (source-file) sequence-number span covered by a chunk. Blocks
+ * keep their original numbering through chunking, so this is what lets the
+ * composer tell which cast-sheet speech relations (each tagged with a block
+ * range) actually apply to a given chunk. Null when the chunk has no
+ * well-formed blocks.
+ */
+export function getBlockIndexRange(content: string): BlockIndexRange | null {
+  const indexes = parseSrtBlocks(content)
+    .map((raw) => readSourceBlock(raw).index)
+    .filter((index): index is number => index !== null);
+  if (indexes.length === 0) return null;
+  return { min: Math.min(...indexes), max: Math.max(...indexes) };
+}
+
 export function formatBlocksForModel(content: string): string {
   return parseSrtBlocks(content)
     .map((raw) => {

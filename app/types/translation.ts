@@ -1,4 +1,5 @@
 import type { TranslationErrorCode } from '../lib/translationErrors';
+import type { CastSheet } from './glossary';
 
 export interface MovieInfo {
   title: string;
@@ -61,6 +62,8 @@ export interface TranslationRequestBase {
   model?: string;
   targetLang?: string;
   translationStyle?: TranslationStyle;
+  /** Optional glossary + speech-relation sheet, extracted once per file. */
+  castSheet?: CastSheet;
 }
 
 export interface ChunkTranslationRequest extends TranslationRequestBase {

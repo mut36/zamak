@@ -14,6 +14,7 @@ import type {
   TranslationMode,
   TranslationStyle,
 } from '../../types/translation';
+import type { CastSheet } from '../../types/glossary';
 
 export interface TranslationOutcome {
   /** Full SRT content for this chunk, source timecodes restored. */
@@ -36,6 +37,7 @@ interface TranslateOptions {
     index: number;
     total: number;
   };
+  castSheet?: CastSheet;
 }
 
 const SRT_TIMING_PATTERN =
@@ -244,6 +246,7 @@ export async function translateSubtitle({
   subtitleContent,
   apiKeys = {},
   chunkPosition,
+  castSheet,
 }: TranslateOptions): Promise<TranslationOutcome> {
   const provider = getModelProvider(model);
 
@@ -255,6 +258,7 @@ export async function translateSubtitle({
       translationStyle,
       subtitleContent: content,
       chunkPosition,
+      castSheet,
     });
   }
 

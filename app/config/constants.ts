@@ -240,6 +240,56 @@ export function thinkingLevelForModel(model: string): ThinkingLevelName {
 }
 
 /**
+ * Cast-sheet extraction (glossary + speech-relation prepass, opt-in toggle in
+ * InfoStep). One call per file, so cost/latency here is negligible next to
+ * per-chunk translation calls — flash (not flash-lite) for the long-context +
+ * relational reasoning the task needs, MEDIUM thinking since it isn't paid
+ * per chunk. Overridable via env for tuning without a redeploy.
+ */
+export const GLOSSARY_MODEL =
+  process.env.GLOSSARY_MODEL || FLASH_MODEL;
+export const GLOSSARY_THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
+  'GLOSSARY_THINKING_LEVEL',
+  'MEDIUM',
+);
+
+/**
+ * Subtitle blocks sampled for cast-sheet extraction. Files under this size
+ * are sent whole; larger files are evenly excerpted (names/relations are
+ * scattered through a whole file, unlike summarize's leading-sample approach)
+ * — see extractCastSheet.ts.
+ */
+export const GLOSSARY_MAX_BLOCKS = readPositiveIntEnv(
+  process.env.GLOSSARY_MAX_BLOCKS,
+  3000,
+);
+
+/** Hard caps on the extracted sheet — keeps the per-chunk prompt tax bounded. */
+export const GLOSSARY_MAX_TERMS = readPositiveIntEnv(
+  process.env.GLOSSARY_MAX_TERMS,
+  40,
+);
+export const GLOSSARY_MAX_RELATIONS = readPositiveIntEnv(
+  process.env.GLOSSARY_MAX_RELATIONS,
+  16,
+);
+/** Rendered <glossary>/<speech_relations> text length cap, in characters. */
+export const GLOSSARY_MAX_CHARS = readPositiveIntEnv(
+  process.env.GLOSSARY_MAX_CHARS,
+  1200,
+);
+
+/**
+ * How long the translate button waits for a still-running extraction before
+ * giving up and proceeding with an empty sheet. Never blocks translation —
+ * only delays the first chunk request.
+ */
+export const GLOSSARY_WAIT_MS = readPositiveIntEnv(
+  process.env.GLOSSARY_WAIT_MS,
+  15000,
+);
+
+/**
  * TMDB (The Movie Database) — movie/drama metadata + posters. Server-only key
  * (never exposed to the client; the /api/tmdb route proxies all calls).
  * Get the value from TMDB → Settings → API → "API Key (v3 auth)".

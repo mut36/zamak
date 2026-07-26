@@ -23,6 +23,7 @@ import type {
   TranslationProgress,
   TranslationResult,
 } from '../types/translation';
+import type { CastSheet } from '../types/glossary';
 import {
   CPS_HARD_MAX,
   CPS_TARGET,
@@ -217,6 +218,7 @@ export function useTranslation(
     targetLang: string,
     translationStyle: TranslationStyle,
     onSuccess?: () => void,
+    castSheet?: CastSheet,
   ): Promise<boolean> => {
     if (!file) return false;
 
@@ -293,6 +295,7 @@ export function useTranslation(
                     targetLang,
                     translationStyle,
                     jobId,
+                    castSheet,
                   },
                   signal,
                 ),
