@@ -170,6 +170,21 @@ NEXT_PUBLIC_CHUNK_SIZE=100 npm run harness -- file=samples/subtitles/full-movie.
 
 `app/config/constants.test.ts`는 위 상한 두 개만 강제합니다 — 임의의 값을 꽂아보는 걸 막지 않기 위해서입니다. 자세한 유도 이력(무너진 유도 4개 포함)은 [docs/tuning/chunk-size-model.md](docs/tuning/chunk-size-model.md) §5에 있습니다.
 
+#### Gemini rate limit과 운영 천장 (유료 Tier 2, 2026-07-26)
+
+| 모델 | 용도 | RPM | TPM | RPD |
+|---|---|---|---|---|
+| `gemini-3.6-flash` | 빠른번역 | 2,000 | 3,000,000 | 100,000 |
+| `gemini-3.5-flash-lite` | analyze/enrich/summarize | 10,000 | 10,000,000 | 350,000 |
+| `gemini-3.1-pro-preview` | 고급번역 | 1,000 | 5,000,000 | 50,000 |
+
+이 한도는 **전체 사용자가 나눠 씁니다.** B=100·K=16에서 나오는 실질 천장은 두 가지입니다:
+
+- **동시 번역 인원** — 850줄짜리면 약 20명, 크레딧 상한(2,000줄)에 가까운 파일이 몰리면 **약 11명**. 먼저 조이는 건 RPM이 아니라 **TPM**입니다.
+- **하루 처리 편수** — RPD 기준 flash **5,000편** / pro **2,500편** (편당 20요청 가정). Tier 1에선 RPD가 무제한이었으므로 이건 이번 승급으로 새로 생긴 천장입니다.
+
+429는 재시도하지 않고 그 청크를 원문으로 남기므로, 조여오면 **K(`NEXT_PUBLIC_CONCURRENCY`)를 먼저 줄이세요** — B는 수용 인원을 거의 못 바꿉니다. 계산은 [docs/tuning/gemini-limits.md §2·§7-2](docs/tuning/gemini-limits.md).
+
 값의 유도 과정과 계산기는 [docs/tuning/](docs/tuning/)에, **"왜 이렇게 되어 있는가"는 [docs/decisions.md](docs/decisions.md)**에 있습니다.
 
 ```bash

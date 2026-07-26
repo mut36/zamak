@@ -186,6 +186,11 @@ main = 9936527 (feat/landing 미머지)
 | THINKING_LEVEL | **LOW** | 확정 |
 | 크레딧 상한 | 2,000블록 | `MAX_BLOCKS_PER_CREDIT` |
 | 모델 | `gemini-3.6-flash` | 보조 라우트는 `gemini-3.5-flash-lite` |
+| Gemini 등급 | **유료 Tier 2** (2026-07-26 승급) | flash 2,000 RPM / 3M TPM / 100K RPD. pro 1,000 / 5M / 50K, flash-lite 10,000 / 10M / 350K (`gemini-limits.md` §2-1) |
+
+**운영 천장** (B=100·K=16): 동시 번역 약 11~20명(큰 파일일수록 낮음, **TPM이 먼저 조인다**),
+하루 처리 flash 5,000편 / pro 2,500편(RPD). 조여오면 B가 아니라 **K를 줄인다** —
+`gemini-limits.md` §7-2.
 
 **B의 진짜 천장** (K는 사실상 자유):
 - 요청당 출력 토큰 상한 65,536 → `t_out=16` 기준 약 4,000블록

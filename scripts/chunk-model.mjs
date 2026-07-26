@@ -33,8 +33,15 @@ const P = {
   pin: 1.5,      // $/1M input
   pout: 7.5,     // $/1M output (thinking bills here too)
   rpmFree: 15,
-  rpmPaid: 1000,
+  tpmFree: 1_000_000,
   rpdFree: 1500,
+  // Paid limits are per model and moved to Tier 2 on 2026-07-26. These are
+  // gemini-3.6-flash, the default translation model; pro-preview runs
+  // 1,000 / 5M / 50,000 and flash-lite 10,000 / 10M / 350,000
+  // (docs/tuning/gemini-limits.md §2-1).
+  rpmPaid: 2000,
+  tpmPaid: 3_000_000,
+  rpdPaid: 100_000,
   timeout: 300,  // route maxDuration seconds
 
   // Concurrency ceiling we impose ourselves (SERVER_CONCURRENCY). Neither
@@ -67,20 +74,28 @@ for (const arg of process.argv.slice(2)) {
 const Bs = P.B.split(',').map(Number);
 
 // ---------- model -----------------------------------------------------------
-function evaluate(B, rpm) {
+function evaluate(B, rpm, tpm) {
   const m = Math.ceil(P.N / B);
 
   // Per-chunk duration: TTFT + generation of (body + thoughts).
   const outTokens = B * P.tout + P.th;
   const D = P.ttft + outTokens / P.v;
 
-  // Concurrency ceiling. Three binds: the number of chunks, the rate Gemini
-  // allows (the launch burst plus the steady-state 60K/D), and the cap we
-  // impose ourselves. On the free tier RPM dominates; on the paid tier it
-  // never binds, so kmax is the only thing holding K down.
+  // Concurrency ceiling. Four binds: the number of chunks, the request rate
+  // Gemini allows (launch burst plus steady-state 60K/D), the token rate, and
+  // the cap we impose ourselves. On the free tier RPM dominates; on the paid
+  // tier TPM is the tighter of the two API limits (gemini-limits.md §7-2) but
+  // still lands far above kmax, so kmax is what actually holds K down.
+  const tokPerChunk = P.pfixed + B * P.tin;
   const K = Math.max(
     1,
-    Math.min(m, P.kmax, rpm, Math.floor((D * rpm) / 60) || 1),
+    Math.min(
+      m,
+      P.kmax,
+      rpm,
+      Math.floor((D * rpm) / 60) || 1,
+      Math.floor((D * tpm) / (60 * tokPerChunk)) || 1,
+    ),
   );
 
   const waves = Math.ceil(m / K);
@@ -104,11 +119,11 @@ function fmtTime(s) {
   return s >= 60 ? `${Math.floor(s / 60)}m${String(Math.round(s % 60)).padStart(2, '0')}s` : `${Math.round(s)}s`;
 }
 
-function table(rpm, label, showCost) {
-  console.log(`\n=== ${label} (RPM ${rpm}) — N=${P.N}, tout=${P.tout}, th=${P.th}, v=${P.v} tok/s ===`);
-  const rows = Bs.map((B) => evaluate(B, rpm));
+function table(rpm, tpm, rpd, label, showCost) {
+  console.log(`\n=== ${label} (RPM ${rpm}, TPM ${tpm / 1e6}M, RPD ${rpd}) — N=${P.N}, tout=${P.tout}, th=${P.th}, v=${P.v} tok/s ===`);
+  const rows = Bs.map((B) => evaluate(B, rpm, tpm));
   const header = showCost
-    ? 'B      chunks  D/chunk  K   waves  total    $/file    tok(in/out)'
+    ? 'B      chunks  D/chunk  K   waves  total    $/file    tok(in/out)  files/day'
     : 'B      chunks  D/chunk  K   waves  total    files/day';
   console.log(header);
   for (const r of rows) {
@@ -121,8 +136,8 @@ function table(rpm, label, showCost) {
       fmtTime(r.T).padEnd(8),
     ].join(' ');
     const tail = showCost
-      ? `$${r.cost.toFixed(4)}   ${(r.inputTok / 1000).toFixed(1)}k/${(r.outputTok / 1000).toFixed(1)}k`
-      : `${Math.floor(P.rpdFree / r.m)}`;
+      ? `$${r.cost.toFixed(4)}   ${(r.inputTok / 1000).toFixed(1)}k/${(r.outputTok / 1000).toFixed(1)}k`.padEnd(25) + `${Math.floor(rpd / r.m)}`
+      : `${Math.floor(rpd / r.m)}`;
     const flag = r.flags.length ? `  ⚠ ${r.flags.join(',')}` : '';
     console.log(`${base} ${tail}${flag}`);
   }
@@ -134,13 +149,15 @@ function table(rpm, label, showCost) {
     : `→ fastest: B=${byTime.B} (${fmtTime(byTime.T)})`);
 }
 
-table(P.rpmFree, 'FREE tier (BYOK)', false);
-table(P.rpmPaid, 'PAID tier (server key)', true);
+table(P.rpmFree, P.tpmFree, P.rpdFree, 'FREE tier (BYOK)', false);
+table(P.rpmPaid, P.tpmPaid, P.rpdPaid, 'PAID Tier 2 (server key, flash)', true);
 
 console.log(`\nNotes:
 - th (thinking) is a PER-REQUEST cost at output rates — the reason many small
   chunks are expensive even though the subtitle text itself is B-invariant.
 - Free tier cost is $0; the columns that matter are total time and files/day (RPD ${P.rpdFree}).
+- files/day is RPD / chunks-per-file. Paid RPD became finite at Tier 2
+  (${P.rpdPaid} for flash, 50,000 for pro) — it used to be unlimited.
 - OUTCAP flag uses the densest-window factor dens=${P.dens}, not the average.
 - Failure blast radius is B-INVARIANT in expectation: one failed chunk costs B
   blocks, but halving B doubles the chunk count, so expected loss stays ~p*N.
