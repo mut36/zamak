@@ -1,9 +1,17 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { SpinnerIcon, SparkleIcon, PencilIcon, ArrowRightIcon } from '../icons';
+import { SpinnerIcon, SparkleIcon, PencilIcon } from '../icons';
+import { CastSheetCard } from './CastSheetCard';
 import type { EnrichStatus } from '../../hooks/useEnrich';
+import type { CastSheetStatus } from '../../hooks/useCastSheet';
+import type { CastSheet } from '../../types/glossary';
 import type { ContentType, MovieInfo } from '../../types/translation';
+import {
+  FLASH_MODEL,
+  PRO_MODEL,
+  type AllowedModel,
+} from '../../config/constants';
 import { COPY } from '../../i18n/simpleCopy';
 
 interface InfoStepProps {
@@ -20,10 +28,18 @@ interface InfoStepProps {
   onReEnrich: () => void;
   // other branch
   summarizing: boolean;
+  // cast sheet — independent toggle from the translation model, shared by
+  // both branches (see docs/decisions.md)
+  castSheetEnabled: boolean;
+  onCastSheetToggle: (value: boolean) => void;
+  castSheetStatus: CastSheetStatus;
+  castSheet: CastSheet;
+  onCastSheetChange: (sheet: CastSheet) => void;
+  onCastSheetRefetch: () => void;
   /** Optional content rendered just above the action buttons. */
   beforeActions?: ReactNode;
   onBack: () => void;
-  onTranslate: () => void;
+  onTranslate: (model: AllowedModel) => void;
 }
 
 const c = COPY.info;
@@ -46,6 +62,12 @@ function MovieInfo({
   director,
   analysisAnalyzing,
   onReEnrich,
+  castSheetEnabled,
+  onCastSheetToggle,
+  castSheetStatus,
+  castSheet,
+  onCastSheetChange,
+  onCastSheetRefetch,
   beforeActions,
   onBack,
   onTranslate,
@@ -166,7 +188,45 @@ function MovieInfo({
       )}
 
       {!busy && (
-        <div className='field mt-6'>
+        <div className='mt-6'>
+          <p className='text-[12px] text-ink-3 mb-2'>{c.aiInfoHint}</p>
+          <div className='frow'>
+            <div className='field !mb-0'>
+              <label>{c.genreLabel}</label>
+              <input
+                className='input'
+                value={movieInfo.genre ?? ''}
+                onChange={(e) =>
+                  setMovieInfo((p) => ({ ...p, genre: e.target.value }))
+                }
+              />
+            </div>
+            <div className='field !mb-0'>
+              <label>{c.eraLabel}</label>
+              <input
+                className='input'
+                value={movieInfo.era ?? ''}
+                onChange={(e) =>
+                  setMovieInfo((p) => ({ ...p, era: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+          <div className='field mt-3'>
+            <label>{c.toneLabel}</label>
+            <input
+              className='input'
+              value={movieInfo.tone ?? ''}
+              onChange={(e) =>
+                setMovieInfo((p) => ({ ...p, tone: e.target.value }))
+              }
+            />
+          </div>
+        </div>
+      )}
+
+      {!busy && (
+        <div className='field mt-4'>
           <label>{c.notesLabel}</label>
           <p className='text-[12px] text-ink-3 mb-2'>{c.notesHint}</p>
           <textarea
@@ -178,6 +238,17 @@ function MovieInfo({
             }
           />
         </div>
+      )}
+
+      {!busy && (
+        <CastSheetCard
+          enabled={castSheetEnabled}
+          onToggle={onCastSheetToggle}
+          status={castSheetStatus}
+          sheet={castSheet}
+          onChangeSheet={onCastSheetChange}
+          onRefetch={onCastSheetRefetch}
+        />
       )}
 
       {!busy && beforeActions}
@@ -192,6 +263,12 @@ function OtherInfo({
   movieInfo,
   setMovieInfo,
   summarizing,
+  castSheetEnabled,
+  onCastSheetToggle,
+  castSheetStatus,
+  castSheet,
+  onCastSheetChange,
+  onCastSheetRefetch,
   beforeActions,
   onBack,
   onTranslate,
@@ -223,6 +300,17 @@ function OtherInfo({
         </div>
       )}
 
+      {!summarizing && (
+        <CastSheetCard
+          enabled={castSheetEnabled}
+          onToggle={onCastSheetToggle}
+          status={castSheetStatus}
+          sheet={castSheet}
+          onChangeSheet={onCastSheetChange}
+          onRefetch={onCastSheetRefetch}
+        />
+      )}
+
       {!summarizing && beforeActions}
       <Actions onBack={onBack} onTranslate={onTranslate} disabled={summarizing} />
     </div>
@@ -246,7 +334,7 @@ function Actions({
   disabled,
 }: {
   onBack: () => void;
-  onTranslate: () => void;
+  onTranslate: (model: AllowedModel) => void;
   disabled: boolean;
 }) {
   return (
@@ -258,10 +346,17 @@ function Actions({
         type='button'
         className='btn btn-primary flex-1'
         disabled={disabled}
-        onClick={onTranslate}
+        onClick={() => onTranslate(PRO_MODEL)}
       >
-        {c.translate}
-        <ArrowRightIcon />
+        {c.translatePro}
+      </button>
+      <button
+        type='button'
+        className='btn btn-ghost flex-1'
+        disabled={disabled}
+        onClick={() => onTranslate(FLASH_MODEL)}
+      >
+        {c.translateFlash}
       </button>
     </div>
   );

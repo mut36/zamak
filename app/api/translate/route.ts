@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
           index: body.chunkIndex,
           total: body.totalChunks,
         },
+        castSheet: body.castSheet,
       }),
     );
   } catch (error) {

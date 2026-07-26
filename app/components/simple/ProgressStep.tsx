@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { TranslationProgress } from '../../types/translation';
 import { COPY } from '../../i18n/simpleCopy';
+import { DEFAULT_MODEL, estimateTranslationMs } from '../../config/constants';
 
 interface ProgressStepProps {
   progress: TranslationProgress;
@@ -49,7 +50,8 @@ function ease(raw: number): number {
 export function ProgressStep({ progress, totalLines, onCancel }: ProgressStepProps) {
   const [pct, setPct] = useState(0);
   const startRef = useRef(0);
-  const estimate = progress.totalEstimateMs || 110_000;
+  const estimate =
+    progress.totalEstimateMs || estimateTranslationMs(DEFAULT_MODEL);
   const done = progress.stage === 'finalizing' || progress.stage === 'done';
 
   useEffect(() => {

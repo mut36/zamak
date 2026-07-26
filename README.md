@@ -6,14 +6,14 @@ SRT 자막을 Gemini로 번역하는 웹 애플리케이션입니다. 타임코�
 
 ## Features
 
-- **AI 자막 번역** — Gemini 3.5 Flash 단일 모델. 의미보존형(meaning)과 영화적(cinematic) 두 가지 스타일
+- **AI 자막 번역** — Gemini 3.6 Flash 단일 모델. 의미보존형(meaning)과 영화적(cinematic) 두 가지 스타일
 - **키 입력 없이 바로 번역** — 모든 요청이 서버 키(`GOOGLE_GENAI_API_KEY`)로 동작합니다. 사용자가 API 키를 다루는 화면은 없습니다
 - **Google 로그인 + 크레딧** — 가입 시 번역권 1편 자동 지급. 모델을 호출하는 모든 라우트가 로그인을 요구하고, 크레딧은 파일 단위로 차감됩니다
 - **번역권 충전** — 토스페이먼츠(카드·간편결제) 선불 크레딧. 가격은 서버가 확정하고, 승인·지급은 멱등한 서버 라우트에서 일어납니다
-- **타임코드 무결성** — AI에게는 번호와 대사만 보내고(타임스탬프는 토큰 낭비), 응답을 **번호로 대조해 원본 타임코드와 재결합**합니다. AI가 자막을 합치거나 빠뜨려도 이후 자막이 밀리지 않습니다
+- **타임코드 무결성** — AI에게는 `[번호] 대사` 형태로 줄마다 표식을 붙여 보내고(타임스탬프는 토큰 낭비), 응답을 **표식으로 대조해 원본 타임코드와 재결합**합니다. 모든 줄이 스스로를 식별하므로 대사가 숫자여도 번호와 안 겹치고, AI가 표식을 빠뜨려도 그 텍스트가 옆 자막을 오염시키지 않으며, 자막을 합치거나 빠뜨려도 이후 자막이 밀리지 않습니다
 - **티어별 청크 병렬 번역** — 자막을 청크로 나눠 동시 번역. 크기와 동시성은 티어별로 다릅니다 ([산출 근거](docs/tuning/chunk-size-model.md))
 - **부분 실패 허용** — 실패한 청크는 원문을 유지하고 나머지는 번역해, 항상 재생 가능한 완전한 SRT를 반환합니다. 완료 화면에 실패 개수가 표시됩니다
-- **작품 정보 자동 수집** — 파일명·자막 샘플에서 제목/연도를 추출하고, Google Search로 감독·톤·인물 말투 지침을 생성하며, TMDB에서 포스터를 가져옵니다
+- **작품 정보 자동 수집** — 파일명·자막 샘플에서 제목/연도를 추출한 뒤, TMDB에서 공식 제목·연도·감독·장르·포스터를 우선 조회하고, TMDB에 없는 작품은 Google Search 그라운딩으로 대체 조회합니다. 배경/시대·톤앤매너는 AI가 키워드로 보강합니다
 - **영화 아닌 영상 지원** — 자막 앞부분을 샘플링해 AI가 내용을 요약하는 분기
 - **번역 취소** — 진행 중 중단
 
@@ -25,7 +25,7 @@ SRT 자막을 Gemini로 번역하는 웹 애플리케이션입니다. 타임코�
 | UI | React 19, Tailwind CSS v4 |
 | Language | TypeScript 5 |
 | AI | Google Gemini API (`@google/genai`) |
-| 메타데이터 | TMDB API (포스터) |
+| 메타데이터 | TMDB API (제목·연도·감독·장르·포스터), Google Search grounding (TMDB 미스 폴백) |
 | Hosting | Vercel |
 
 ## Getting Started
@@ -35,7 +35,7 @@ SRT 자막을 Gemini로 번역하는 웹 애플리케이션입니다. 타임코�
 - Node.js 18+
 - Supabase 프로젝트 (로그인 + 크레딧 저장) — 아래 [인증 설정](#인증-설정) 참조
 - Google Cloud OAuth 클라이언트 (Google 로그인용)
-- TMDB API 키 (포스터용, 서버 전용)
+- TMDB API 키 (작품 정보 조회용, 서버 전용)
 - 토스페이먼츠 API 키 (크레딧 결제용) — 없어도 번역은 동작합니다. 실키 발급에는 사업자등록과 통신판매업 신고가 필요하고, 그 전까지는 테스트 키로 전 흐름을 확인할 수 있습니다
 - Gemini API 키 (서버 전용) — **필수.** 모든 요청이 이 키로 돌아갑니다. Google Search grounding(`/api/enrich`)은 무료 등급 프로젝트에서 동작하지 않으므로 **결제가 연결된 프로젝트의 키**여야 합니다
 
@@ -50,7 +50,7 @@ npm install
 `.env.local` 생성:
 
 ```env
-# TMDB — 포스터 조회 (서버 전용, 클라이언트에 노출되지 않음)
+# TMDB — 작품 정보 조회 (서버 전용, 클라이언트에 노출되지 않음)
 TMDB_API_KEY=your_tmdb_v3_api_key
 
 # Gemini — 모든 요청이 이 키로 돌아감 (서버 전용, 클라이언트에 노출되지 않음)
@@ -149,21 +149,23 @@ npx tsc --noEmit && npx eslint app && npx vitest run
 
 | | 청크 크기 | 동시성 | 근거 |
 |---|---|---|---|
-| server (현재 전원) | 500 | 16 | 계산상 최적값이 아니라 **경험적 안전선** — 아래 참조 |
+| server (현재 전원) | 100 | 16 | 계산상 최적값이 아니라 **경험적 안전선** — 아래 참조 |
 | free (현재 미사용) | 150 | 6 | Gemini 무료 등급 RPM 15에서 유도. 로그인 후 무크레딧 티어용으로 보존 |
 
-**청크 크기는 계산으로 정할 수 없습니다.** 유도되는 건 상한 두 개(출력 상한 65,536 → `B ≤ 3,276`, 라우트 타임아웃 300초 → `B ≤ 4,097`)뿐이고 둘 다 500의 6배 이상 떨어져 있습니다. 그 안쪽은 전부 끝점 없는 트레이드입니다 — 비용은 B에 단조 감소하지만 전 구간 6.5% 차이고(thinking 토큰이 0이라), 시간은 단조 증가하지만 영화 한 편이 어느 쪽이든 1분 안에 끝납니다.
+**청크 크기는 계산으로 정할 수 없습니다.** 유도되는 건 상한 두 개(출력 상한 65,536 → `B ≤ 3,276`, 라우트 타임아웃 300초 → `B ≤ 4,097`)뿐이고 둘 다 100의 32배 이상 떨어져 있습니다. 그 안쪽은 전부 끝점 없는 트레이드입니다 — 비용은 B에 단조 감소하지만 전 구간 6.5% 차이고(thinking 토큰이 0이라), 시간은 단조 증가하지만 영화 한 편이 어느 쪽이든 1분 안에 끝납니다.
 
 실제로 B를 가를 두 양은 **둘 다 미측정이고 방향이 반대**입니다: 정렬 실패율은 방향 불명, 인물 말투 일관성은 큰 B를 선호합니다(청크가 서로를 모른 채 병렬 번역되므로).
 
-**2026-07-22 낮엔 `B = 크레딧 상한`(청킹 없음)까지 갔다가, 같은 날 저녁 베타 테스트에서 되돌렸습니다.** 모델이 자막 하나를 둘로 쪼개면 그 뒤 번호가 전부 하나씩 밀리는 사고가 실사용으로 재현됐고, 밀린 번호도 정상 검증(원본에 존재·미사용·증가)을 통과하기 때문에 **번역문이 엉뚱한 타임코드에 조용히 붙습니다** — 실패 지표에도 안 잡힙니다. 청크가 클수록(2000이면 최대 1,361블록) 사고당 오염 범위가 커지므로, 사고 확률을 낮췄다고 관찰된 500으로 낮췄습니다. 이건 완화이지 수정이 아닙니다 — 탐지·복구 로직은 아직 없고, 재발하면 그때 추가합니다. 상세는 [docs/tuning/chunk-size-model.md §8](docs/tuning/chunk-size-model.md), 결정 기록은 [docs/decisions.md §2-3-1](docs/decisions.md).
+**2026-07-22 낮엔 `B = 크레딧 상한`(청킹 없음)까지 갔다가, 같은 날 저녁 베타 테스트에서 되돌렸습니다.** 모델이 자막 하나를 둘로 쪼개면 그 뒤 번호가 전부 하나씩 밀리는 사고가 실사용으로 재현됐고, 밀린 번호도 정상 검증(원본에 존재·미사용·증가)을 통과하기 때문에 **번역문이 엉뚱한 타임코드에 조용히 붙습니다** — 실패 지표에도 안 잡힙니다. 청크가 클수록(2000이면 최대 1,361블록) 사고당 오염 범위가 커지므로, 사고 확률을 낮췄다고 관찰된 500으로 낮췄다가 이후 200, (문서화되지 않은 채) 150을 거쳐 **B=100**까지 더 줄였습니다. 이건 완화이지 수정이 아닙니다 — 탐지·복구 로직은 아직 없고, 재발하면 그때 추가합니다. 상세는 [docs/tuning/chunk-size-model.md §8](docs/tuning/chunk-size-model.md), 결정 기록은 [docs/decisions.md §2-3-1](docs/decisions.md).
 
-⚠️ 출력 상한 여유는 15.3%까지 사용합니다(B=500 기준). **비영어 자막을 받기 전에 블록당 출력 토큰을 재측정**하세요 — 밀도가 6.5배를 넘으면 상한을 넘길 수 있습니다.
+**2026-07-25 하네스 실측**: 별개의 실패 모드 — 마커(`[번호]`)가 같은 청크 안 다른 대사의 토큰에 오염돼 깨지는 현상(모델 생성 단계 문제, 파싱 버그 아님) — 이 THINKING_LEVEL=LOW·B=150에서 1874블록 중 1건 재현됐고, B=100으로 줄이자 재현되지 않았습니다(단일 실행 관찰, 확정된 임계값 아님). THINKING_LEVEL=MEDIUM으로도 동일 사고가 사라졌지만 비용이 3배라 채택하지 않았습니다. 상세는 [docs/decisions.md §2-3-3](docs/decisions.md).
+
+⚠️ 출력 상한 여유는 B=100 기준 더 넉넉합니다(B=200일 때 6.1%). **비영어 자막을 받기 전에 블록당 출력 토큰을 재측정**하세요 — 밀도가 6.5배를 넘으면 상한을 넘길 수 있습니다.
 
 숫자를 바꿔 실험하려면 env로 덮으면 됩니다(하네스도 같은 상수를 읽습니다):
 
 ```bash
-NEXT_PUBLIC_CHUNK_SIZE=200 npm run harness -- file=samples/subtitles/full-movie.srt
+NEXT_PUBLIC_CHUNK_SIZE=100 npm run harness -- file=samples/subtitles/full-movie.srt
 ```
 
 `app/config/constants.test.ts`는 위 상한 두 개만 강제합니다 — 임의의 값을 꽂아보는 걸 막지 않기 위해서입니다. 자세한 유도 이력(무너진 유도 4개 포함)은 [docs/tuning/chunk-size-model.md](docs/tuning/chunk-size-model.md) §5에 있습니다.
@@ -179,11 +181,12 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 
 | 변수 | 기본값 | 용도 |
 |---|---|---|
-| `TMDB_API_KEY` | — | **필수.** 포스터 조회 |
+| `TMDB_API_KEY` | — | **필수.** 작품 정보 조회 (제목·연도·감독·장르·포스터). 미매칭 시 Google Search 그라운딩으로 대체 |
 | `TMDB_LANGUAGE` | `ko-KR` | TMDB 메타데이터 언어 |
-| `THINKING_LEVEL` | `LOW` | `MINIMAL`\|`LOW`\|`MEDIUM`\|`HIGH`. **실측상 MINIMAL과 LOW 모두 thinking 0** — 비용이 같아 품질이 나은 LOW가 기본값. 변경 시 dev 서버 재시작 필요 |
+| `THINKING_LEVEL` | `LOW` | 빠른번역(flash) thinking. `MINIMAL`\|`LOW`\|`MEDIUM`\|`HIGH`. **실측상 MINIMAL과 LOW 모두 thinking 0** — 비용이 같아 품질이 나은 LOW가 기본값. 변경 시 dev 서버 재시작 필요 |
+| `PRO_THINKING_LEVEL` | `MEDIUM` | 고급번역(Pro) thinking. 같은 네 값. 변경 시 dev 서버 재시작 필요 |
 | `NEXT_PUBLIC_FREE_CHUNK_SIZE` / `_FREE_CONCURRENCY` | 150 / 6 | 무료 티어 청킹 |
-| `NEXT_PUBLIC_CHUNK_SIZE` / `NEXT_PUBLIC_CONCURRENCY` | 500 / 16 | server 티어 청킹 (현재 전원). 500은 계산상 최적값이 아니라 재번호 드리프트를 피하려는 경험적 안전선(위 참조) |
+| `NEXT_PUBLIC_CHUNK_SIZE` / `NEXT_PUBLIC_CONCURRENCY` | 100 / 16 | server 티어 청킹 (현재 전원). 100은 계산상 최적값이 아니라 재번호 드리프트·마커 오염을 피하려는 경험적 안전선(위 참조) |
 | `TRANSLATION_STRICT_MODE` | `false` | 아래 참조 |
 | `GOOGLE_GENAI_API_KEY` | — | **필수.** analyze/enrich/summarize/translate 4개 라우트 전부가 이 키로 동작. grounding 때문에 결제 연결 프로젝트여야 함 |
 | `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` | — | **필수.** 없으면 모델 라우트가 전부 500으로 닫힘 |
@@ -191,6 +194,24 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 | `JOB_VALIDITY_MINUTES` | 60 | 결제된 job이 유효한 시간 |
 | `TOSS_SECRET_KEY` | — | 결제 승인용 시크릿 키 (서버 전용). 없으면 결제 라우트만 닫히고 번역은 그대로 동작 |
 | `NEXT_PUBLIC_TOSS_CLIENT_KEY` | — | 결제창을 여는 클라이언트 키. 브라우저에 노출되며 그래도 안전 — 이 키로는 승인을 못 함 |
+| `GLOSSARY_MODEL` | `gemini-3.6-flash` | 글로사리·존대관계 추출(opt-in, InfoStep 토글) 모델. 파일당 1회 호출이라 번역 모델과 별도로 조정 가능 |
+| `GLOSSARY_THINKING_LEVEL` | `MEDIUM` | 위와 같은 네 값. 파일당 1회라 번역 flash의 LOW보다 여유를 둠 |
+| `GLOSSARY_MAX_BLOCKS` | 3000 | 이 블록 수를 넘는 파일은 앞/중간/뒤를 고르게 발췌해 추출(이름·관계가 파일 전체에 흩어져 있어 summarize처럼 앞부분만 보지 않음) |
+| `GLOSSARY_MAX_TERMS` / `GLOSSARY_MAX_RELATIONS` | 40 / 16 | 시트 항목 상한 — 청크당 프롬프트 세금을 제한 |
+| `GLOSSARY_MAX_CHARS` | 1200 | `<glossary>`+`<speech_relations>` 렌더 결과 총 길이 상한(문자) |
+| `GLOSSARY_WAIT_MS` | 15000 | 번역 시작 시 아직 추출 중이면 최대 이만큼만 기다리고 빈 시트로 진행 |
+
+### 글로사리·존대관계 (opt-in)
+
+InfoStep의 "등장인물·용어 일관성" 토글(기본 OFF, 브라우저에 기억됨)을 켜면 파일 전체를
+한 번 스캔해 인물·지명·용어의 한국어 표기와 인물 간 존댓말/반말을 미리 정합니다. 청크가
+병렬로 번역되며 이름 표기·말투가 청크마다 흔들리던 문제를 줄입니다. 존대 관계는 자막
+번호 구간을 갖고 있어(예: 1~412번은 존댓말, 413번부터 반말) 관계가 장면 안에서 바뀌어도
+그 아크를 그대로 실어 나릅니다 — 번역 단계에서는 청크의 실제 블록 범위와 겹치는 관계만
+프롬프트에 실립니다. 토글이 꺼져 있으면(기본값) 이 기능은 API를 전혀 호출하지 않고
+프롬프트도 이 기능이 없던 시절과 완전히 동일합니다. 자세한 배선은
+[docs/translation-pipeline.md](docs/translation-pipeline.md) §2-C·§7, 토글을 켜고
+끄는 결정 배경은 [docs/decisions.md](docs/decisions.md) §2-8을 참고하세요.
 
 ### 번역 실행 경로
 
@@ -219,12 +240,11 @@ app/
 ├── api/
 │   ├── analyze/route.ts        # 파일명/자막 샘플 → 제목·연도 (로그인 필요)
 │   ├── credits/route.ts        # 잔액 조회
-│   ├── enrich/route.ts         # Google Search → 감독·톤·인물 지침 (로그인 필요)
+│   ├── enrich/route.ts         # TMDB 우선 조회, 미스 시 Google Search 폴백 (로그인 필요)
 │   ├── payments/prepare/       # 팩 → 주문 생성 (가격을 서버가 확정)
 │   ├── payments/confirm/       # Toss successUrl — 승인 + 크레딧 지급 (멱등)
 │   ├── payments/fail/          # Toss failUrl — 주문 종료
 │   ├── summarize/route.ts      # 영화 아닌 영상의 내용 요약 (로그인 필요)
-│   ├── tmdb/route.ts           # 포스터 조회 (TMDB 키, 로그인 불필요)
 │   ├── translation/begin/      # 크레딧 1개 차감 + job 생성
 │   └── translate/route.ts      # 청크 번역, SSE (job 검증)
 ├── components/simple/          # 위저드 스텝 (업로드/정보/진행/완료) + 충전
@@ -234,13 +254,13 @@ app/
 │   └── languages.ts            # 도착어 (enabled 플래그로 확장)
 ├── hooks/
 │   ├── useTranslation.ts       # 파일 처리, 청킹, 병렬 번역, 취소
-│   └── useEnrich.ts            # 작품 정보 + 포스터 병렬 조회
+│   └── useEnrich.ts            # 작품 정보 통합 조회 (TMDB → 그라운딩 폴백)
 ├── i18n/simpleCopy.ts          # UI 문구 (하드코딩 금지)
 ├── lib/
 │   ├── client/                 # SSE, API 요청, 병렬 실행 풀
 │   ├── prompts/                # 프롬프트 로더·조합
 │   ├── providers/              # Gemini provider
-│   ├── server/                 # 요청 검증, SSE, 번역 서비스, TMDB, 토스 결제
+│   ├── server/                 # 요청 검증, SSE, 번역 서비스, enrichMovie(TMDB·그라운딩), TMDB, 토스 결제
 │   └── srt.ts                  # 파싱, 청킹, 타임코드 재조립
 └── types/translation.ts
 docs/decisions.md               # 기획·설계 결정과 그 이유 (뒤집힌 결정 포함)
@@ -260,17 +280,18 @@ scripts/chunk-model.mjs         # 청크 크기 계산기
    → useTranslation.processFile
         └── /api/analyze          제목·연도 추출
    → InfoStep (useEnrich)
-        ├── /api/enrich           감독·톤·인물 지침 (Google Search)
-        └── /api/tmdb             포스터                      ← 병렬
+        └── /api/enrich           enrichMovie(): TMDB 조회 → 매치 시 제목·연도·
+                                   감독·장르·포스터 + AI 키워드(배경/시대·톤앤매너)
+                                   1회, 미스 시 Google Search 그라운딩으로 대체
    → useTranslation.translate
         ├── /api/translation/begin  크레딧 1개 차감 → jobId (파일당 1회)
         ├── resolveTier()         청크 크기·동시성 (현재 항상 server)
         ├── chunkSrtBlocks        자막을 청크로 분할
         └── runOrderedPool        청크별 /api/translate 병렬 호출
              └── translateSubtitle
-                  ├── composeTranslationPrompt   타임스탬프 제거, 번호+대사만 전송
+                  ├── composeTranslationPrompt   타임스탬프 제거, 줄마다 [번호] 대사 전송
                   ├── Gemini 호출 (청크당 1회)
-                  └── reassembleTranslatedChunk  번호 대조 → 원본 타임코드 복원
+                  └── reassembleTranslatedChunk  [번호] 표식 대조 → 원본 타임코드 복원
    → DoneStep                     명시적 다운로드
 
 [크레딧 소진 / 헤더의 잔액 클릭]

@@ -25,7 +25,7 @@ export const COPY = {
   // timecode integrity and work-context-aware tone.
   landing: {
     hero: {
-      title: 'SRT 자막, 2분이면 번역돼요',
+      title: 'SRT 자막, 30초면 번역돼요',
       subtitle:
         '타임코드는 100% 그대로. 작품의 톤과 인물의 말투까지 반영해요.',
       cta: 'Google로 무료 시작하기',
@@ -73,7 +73,7 @@ export const COPY = {
       steps: [
         { title: '업로드', body: '.srt 파일을 끌어다 놓아요.' },
         { title: '확인', body: 'AI가 찾은 작품 정보를 확인하고 시작을 눌러요.' },
-        { title: '다운로드', body: '평균 2분 뒤, 번역된 .srt를 받아요.' },
+        { title: '다운로드', body: '평균 30초 뒤, 번역된 .srt를 받아요.' },
       ],
     },
     closing: {
@@ -127,7 +127,7 @@ export const COPY = {
 
   upload: {
     title: '자막을 올려주세요',
-    subtitle: '한 번의 업로드로 끝. 평균 2분이면 자연스러운 번역 자막을 받아요.',
+    subtitle: '한 번의 업로드로 끝. 평균 30초면 자연스러운 번역 자막을 받아요.',
     dropTitle: '파일을 여기에 끌어다 놓으세요',
     dropOr: '또는',
     browse: '파일 선택',
@@ -139,7 +139,7 @@ export const COPY = {
     typeMovie: '영화 · 드라마',
     typeOther: '기타 영상',
     typeOtherHint: '유튜브 · 인터뷰 · 강연 등',
-    reassure: ['평균 2분 소요', '타임코드 100% 보존', '설치 없이 바로'],
+    reassure: ['평균 30초 소요', '타임코드 100% 보존', '설치 없이 바로'],
     invalidFile: 'SRT 파일만 올릴 수 있어요.',
   },
 
@@ -164,8 +164,14 @@ export const COPY = {
     // nothing. The raw server message follows so the cause is visible instead
     // of hiding behind "자동으로 못 찾았어요".
     enrichFailed: '작품 정보 검색에 실패했어요.',
+    // AI-derived keyword fields fed into the translation prompt. Editable so
+    // a wrong AI guess can be corrected before translating.
+    aiInfoHint: 'AI가 자동으로 채운 정보예요. 번역 톤을 잡는 데 쓰이니, 틀리면 고쳐주세요.',
+    genreLabel: '장르',
+    eraLabel: '배경/시대',
+    toneLabel: '톤앤매너',
     notesLabel: '참고할 내용',
-    notesHint: '번역에 반영할 톤·인물 말투 지침이에요. 자유롭게 다듬어도 좋아요.',
+    notesHint: '번역에 참고할 내용을 자유롭게 적어주세요.',
     // other branch
     otherTitle: '어떤 영상인가요?',
     otherSubtitle: '앞부분을 읽고 내용을 요약했어요. 번역 맥락으로 쓰여요.',
@@ -175,8 +181,30 @@ export const COPY = {
     otherNotesHint: '말투(존댓말/반말), 전문 용어 표기 등 참고할 내용을 적어주세요.',
     // shared
     back: '이전',
-    translate: '번역 시작',
+    translatePro: '고급번역',
+    translateFlash: '빠른번역',
     startOver: '처음부터',
+
+    // Cast-sheet toggle card — opt-in glossary + speech-relation prepass.
+    // Independent of the translation model toggle above (see decisions.md).
+    castSheet: {
+      title: '등장인물·용어 일관성',
+      badge: '고급',
+      hint: '이름·지명 표기와 존댓말을 파일 전체에서 통일해요. 준비에 20~40초 걸려요.',
+      extracting: '분석하고 있어요…',
+      count: (n: number) => `${n}개`,
+      tabTerms: '표기',
+      tabRelations: '말투',
+      termSourceLabel: '원문',
+      termKoLabel: '한국어 표기',
+      addTerm: '+ 새 항목',
+      removeRow: '삭제',
+      emptyTerms: '표기 항목이 없어요. 직접 추가할 수 있어요.',
+      emptyRelations: '아직 파악된 말투 관계가 없어요.',
+      speechOptions: ['존댓말', '반말', '혼용'] as const,
+      relationRange: (from: number, to: number) => `${from}~${to}번 구간`,
+      refetch: '다시 추출',
+    },
   },
 
   progress: {

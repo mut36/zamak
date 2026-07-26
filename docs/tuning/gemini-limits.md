@@ -3,9 +3,10 @@
 청크 크기(B)와 동시성(K)을 계산으로 정하기 위한 입력값. **추측 금지 — 공식 문서에서 조회한 값만.**
 빈칸은 비워두고, 문서에 없거나 애매하면 `?`와 함께 메모를 남길 것.
 
-- 대상 모델(번역): `gemini-3.5-flash` — `app/config/constants.ts`의 `TRANSLATION_MODEL`
-- 대상 모델(보조): `gemini-3.1-flash-lite` — `AUX_MODEL` (analyze/enrich/summarize)
-- 조회일: 2026-07-20 (§1~6, 대표 조회) / 2026-07-21 (§7-1 인프라, §6 thinking 실측)
+- 대상 모델(빠른번역): `gemini-3.6-flash` — `app/config/constants.ts`의 `FLASH_MODEL`
+- 대상 모델(고급번역): `gemini-3.1-pro-preview` — `PRO_MODEL` (2026-07-25 추가)
+- 대상 모델(보조): `gemini-3.5-flash-lite` — `AUX_MODEL` (analyze/enrich/summarize)
+- 조회일: 2026-07-20 (§1~6, 대표 조회) / 2026-07-21 (§7-1 인프라, §6 thinking 실측) / 2026-07-25 (§1·§4 세 모델 갱신, 대표 조회)
 - 출처 URL:
   - Gemini rate limits / pricing / model card: 대표가 콘솔·공식 문서에서 직접 조회
   - Vercel Functions 한도(§7-1): <https://vercel.com/docs/functions/limitations>
@@ -13,19 +14,22 @@
 
 ---
 
-## 1. 요청 단위 한도 — `gemini-3.5-flash`
+## 1. 요청 단위 한도 — 3개 모델 공통 (2026-07-25 확인)
 
 B(청크 크기)의 천장을 정하는 값들. **출력 상한이 1차 천장이다.**
+`gemini-3.6-flash` / `gemini-3.1-pro-preview` / `gemini-3.5-flash-lite` **세 모델 모두 동일** —
+모델별로 나눠 조회했으나 값이 같아서 공통표로 합친다.
 
 | 항목                                   | 값        | 단위   | 메모                                      |
 | -------------------------------------- | --------- | ------ | ----------------------------------------- |
-| 요청당 최대 **출력** 토큰              | 65,536    | tokens |                                           |
-| context window (최대 **입력** 토큰)    | 1,048,576 | tokens |                                           |
-| 출력 토큰에 thinking 토큰이 포함되는가 | 예        |        | 포함이면 실질 출력 여유가 그만큼 줄어든다 |
+| 요청당 최대 **출력** 토큰              | 65,536    | tokens | 3개 모델 공통                             |
+| context window (최대 **입력** 토큰)    | 1,048,576 | tokens | 3개 모델 공통                             |
+| 출력 토큰에 thinking 토큰이 포함되는가 | 예        |        | flash 실측(§6)만 확인됨. pro·flash-lite는 미확인 — 포함이면 실질 출력 여유가 그만큼 줄어든다 |
 
-## 2. 등급별 rate limit — `gemini-3.5-flash`
+## 2. 등급별 rate limit — `gemini-3.6-flash`
 
-K(동시성)의 천장을 정하는 값들.
+K(동시성)의 천장을 정하는 값들. **flash 기준이며, pro-preview·flash-lite는 미확인** —
+번역 트래픽 대부분이 flash라 지금까지는 조회 우선순위에서 밀렸다.
 
 > **현재 우리가 쓰는 건 유료 열뿐이다.** BYOK가 삭제돼 전원이 서버 키로 돈다
 > (`decisions.md` §1-1). 무료 열은 참고용으로 남긴다 — 값 자체는 여전히 맞고,
@@ -53,14 +57,22 @@ K(동시성)의 천장을 정하는 값들.
 
 ## 4. 단가 (유료 서버 모드용 — 무료 티어는 0)
 
+⚠️ **2026-07-25 갱신 — flash 출력 단가가 바뀌었다.** 이전 조회값은 $9.00/1M이었고
+`chunk-size-model.md` §3·§5-6의 비용표는 그 옛 단가로 계산돼 있다 (그 문서 상단 각주 참고).
+`scripts/chunk-model.mjs`의 `pin`/`pout`은 이번 갱신에 맞춰 같이 고쳤다.
+
+| 모델 | 입력 $/1M | 출력 $/1M | 메모 |
+| --- | --- | --- | --- |
+| `gemini-3.6-flash` (FLASH_MODEL) | $1.50 | $7.50 | 이전 조회값 $9.00에서 인하 |
+| `gemini-3.5-flash-lite` (AUX_MODEL) | $0.30 | $2.50 | 신규 조회 (이전엔 단가 미기록) |
+| `gemini-3.1-pro-preview` (PRO_MODEL) | $2.00 (프롬프트 ≤200K 토큰) / $4.00 (>200K) | $12.00 (≤200K) / $18.00 (>200K) | 신규 조회. 장문 컨텍스트 할증 있음 — 아래 참고 |
+
 | 항목                              | 값                             | 단위    | 메모                        |
 | --------------------------------- | ------------------------------ | ------- | --------------------------- |
-| 입력 토큰                         | $1.50                          | $/1M    |                             |
-| 출력 토큰                         | $9.00                          | $/1M    |                             |
-| 캐시 적중 입력 토큰               | $0.15                          | $/1M    |                             |
-| 캐시 저장 비용 (explicit caching) | $1.00                          | $/1M/hr | explicit 쓸 경우만          |
-| thinking 토큰                     | 출력 토큰 단가와 동일하게 과금 | $/1M    | 출력 단가와 같은지 확인     |
-| 장문 컨텍스트 할증 구간이 있는가  | 없음                           |         | 예: N토큰 초과 시 단가 상승 |
+| 캐시 적중 입력 토큰               | $0.15                          | $/1M    | flash 기준(2026-07-20 조회), 다른 두 모델은 미확인 |
+| 캐시 저장 비용 (explicit caching) | $1.00                          | $/1M/hr | explicit 쓸 경우만, flash 기준 |
+| thinking 토큰                     | 출력 토큰 단가와 동일하게 과금 | $/1M    | flash 기준. pro·flash-lite는 미확인 |
+| 장문 컨텍스트 할증 구간이 있는가  | 모델마다 다름                  |         | flash·flash-lite는 없음. **pro-preview는 프롬프트 200K 토큰 기준으로 입출력 단가가 모두 뛴다** (위 표) |
 
 ## 5. 컨텍스트 캐싱
 
@@ -81,7 +93,7 @@ K(동시성)의 천장을 정하는 값들.
 
 | 항목                                        | 값     | 메모                                                                     |
 | ------------------------------------------- | ------ | ------------------------------------------------------------------------ |
-| `gemini-3.5-flash`의 thinking 기본값        | medium | 켜짐                                                                     |
+| `gemini-3.6-flash`의 thinking 기본값        | medium | 켜짐                                                                     |
 | thinking을 끄거나 예산을 0으로 둘 수 있는가 | 안됨   | `thinkingBudget: 0`은 무시된다. 먹는 건 `thinkingLevel`                  |
 | 최소 thinking 예산 (0 불가라면)             | minimal | `ThinkingLevel.MINIMAL`                                                 |
 | 응답에서 thinking 토큰 수를 확인하는 필드명 | `usageMetadata.thoughtsTokenCount` | `[gemini]` 로그의 `thoughts=`                 |
@@ -144,15 +156,21 @@ Gemini도(§2) Vercel도(§7-1) 동시성을 막지 않으므로, K는 **제약�
 동시 번역 가능 인원 ≈ 1,000 ÷ 위 값
 ```
 
-현재값(B=125, K=14, N=851: 7요청/11초 = 38 RPM)이면 **동시 번역 26명**까지 여유가 있다.
-K를 키우거나 B를 줄이면 이 숫자가 줄어든다 — 그게 K의 진짜 트레이드오프다.
+현재값(B=100, K=16, N=851: 9요청/9초 = 60 RPM, `scripts/chunk-model.mjs`로 재계산
+— 이전에 여기 있던 B=125/K=14 예시는 그 값들이 폐기(`decisions.md` §2-3)된 뒤로
+갱신 안 된 채 남아있었다)이면 **동시 번역 16명**까지 여유가 있다. K를 키우거나
+B를 줄이면 이 숫자가 줄어든다 — 그게 K의 진짜 트레이드오프다.
 
 ---
 
-## 상태 (2026-07-21)
+## 상태 (2026-07-25)
 
-이 표는 **다 채워졌다.** 남은 미측정은 THINKING_LEVEL MEDIUM/HIGH 품질·비용뿐이고, 그건
-B/K 결정에 영향을 주지 않는다(§6 참조 — thinking은 실사용에서 0).
+§1(요청 한도)·§4(단가)는 2026-07-25에 pro-preview·flash-lite를 추가해 갱신했다. §2(rate
+limit)·§5(캐싱)·§6(thinking)은 여전히 flash 기준만 채워져 있다 — pro-preview·flash-lite는
+번역 트래픽이 붙으면 그때 조회.
+
+남은 미측정: THINKING_LEVEL MEDIUM/HIGH 품질·비용(flash), pro-preview·flash-lite의 rate
+limit·캐싱·thinking 거동. B/K 결정 자체엔 영향 없음(§6 참조 — flash의 thinking은 실사용에서 0).
 
 B/K의 최종 결정과 근거는 **`chunk-size-model.md`**에 있다. 이 문서는 그 계산의 입력값이다.
 

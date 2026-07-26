@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { GoogleGenAI, FinishReason, ThinkingLevel } from '@google/genai';
-import { THINKING_LEVEL } from '../../config/constants';
+import { thinkingLevelForModel } from '../../config/constants';
 import type { ModelProvider } from './types';
 
 const defaultClient = process.env.GOOGLE_GENAI_API_KEY
@@ -24,13 +24,15 @@ export const geminiProvider: ModelProvider = {
     if (!client) throw new Error('Google AI API key not configured');
     // thinkingBudget: 0 used to sit here, but this model does not allow
     // disabling thinking — the budget was ignored and we paid for the default
-    // level. thinkingLevel is the knob it actually honours.
+    // level. thinkingLevel is the knob it actually honours. Pro uses
+    // PRO_THINKING_LEVEL (default MEDIUM); flash uses THINKING_LEVEL (default LOW).
+    const thinking = thinkingLevelForModel(model);
     const response = await client.models.generateContent({
       model,
       contents: prompt,
       config: {
         ...(systemInstruction ? { systemInstruction } : {}),
-        thinkingConfig: { thinkingLevel: ThinkingLevel[THINKING_LEVEL] },
+        thinkingConfig: { thinkingLevel: ThinkingLevel[thinking] },
       },
     });
 
@@ -39,7 +41,7 @@ export const geminiProvider: ModelProvider = {
     const usage = response.usageMetadata;
     const cached = usage?.cachedContentTokenCount ?? 0;
     console.log(
-      `[gemini] model=${model} thinking=${THINKING_LEVEL} prompt=${usage?.promptTokenCount} cached=${cached} thoughts=${usage?.thoughtsTokenCount ?? 0} output=${usage?.candidatesTokenCount}`,
+      `[gemini] model=${model} thinking=${thinking} prompt=${usage?.promptTokenCount} cached=${cached} thoughts=${usage?.thoughtsTokenCount ?? 0} output=${usage?.candidatesTokenCount}`,
     );
 
     const candidate = response.candidates?.[0];

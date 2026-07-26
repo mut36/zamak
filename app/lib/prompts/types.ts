@@ -6,6 +6,8 @@ import type {
   TranslationStyle,
 } from '../../types/translation';
 
+import type { CastSheet } from '../../types/glossary';
+
 export type { MovieInfo, TranslationMode };
 
 export interface TranslationPromptContext {
@@ -18,6 +20,8 @@ export interface TranslationPromptContext {
     index: number;
     total: number;
   };
+  /** Optional glossary + speech-relation sheet, extracted once per file. */
+  castSheet?: CastSheet;
 }
 
 /**

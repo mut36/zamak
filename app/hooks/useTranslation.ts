@@ -8,8 +8,9 @@ import {
   JobRefusedError,
 } from '../lib/client/translationJob';
 import {
+  adjustSubtitleTiming,
   buildOutputFilename,
-  chunkSrtBlocks,
+  chunkSrtBlocksAtGaps,
   parseSrtBlocks,
 } from '../lib/srt';
 import { runOrderedPool } from '../lib/client/concurrency';
@@ -19,9 +20,14 @@ import type {
   TranslationProgress,
   TranslationResult,
 } from '../types/translation';
+import type { CastSheet } from '../types/glossary';
 import {
+  CPS_HARD_MAX,
+  CPS_TARGET,
   estimateTranslationMs,
   getTierLimits,
+  MIN_SUBTITLE_DURATION_MS,
+  MIN_SUBTITLE_GAP_MS,
   resolveTier,
 } from '../config/constants';
 
@@ -209,6 +215,7 @@ export function useTranslation(
     targetLang: string,
     translationStyle: TranslationStyle,
     onSuccess?: () => void,
+    castSheet?: CastSheet,
   ): Promise<boolean> => {
     if (!file) return false;
 
@@ -236,15 +243,13 @@ export function useTranslation(
       // Chunk size and concurrency both come from the tier, which is the one
       // place the billing/session gate will hook into.
       const { chunkSize, concurrency } = getTierLimits(resolveTier());
-      const chunks = chunkSrtBlocks(blocks, chunkSize);
+      // Cut at scene breaks (large inter-subtitle gaps) near the target size
+      // rather than at a fixed block count — same cost, but boundaries land
+      // between scenes instead of mid-conversation.
+      const chunks = chunkSrtBlocksAtGaps(blocks, chunkSize);
       const totalChunks = chunks.length;
-      // Derived from measured generation rate, not a flat per-wave guess —
-      // with one request per file the ring has nothing else to go on.
-      const totalEstimateMs = estimateTranslationMs(
-        blocks.length,
-        chunkSize,
-        concurrency,
-      );
+      // One figure per model — the same one the landing copy promises.
+      const totalEstimateMs = estimateTranslationMs(model);
 
       setTranslationProgress({
         stage: 'translating',
@@ -275,6 +280,7 @@ export function useTranslation(
                 targetLang,
                 translationStyle,
                 jobId,
+                castSheet,
               },
               controller.signal,
             );
@@ -313,7 +319,20 @@ export function useTranslation(
         throw new Error(msg.noResponse);
       }
 
-      const translated = (results as string[]).join('\n\n');
+      // Code owns the timecodes end-to-end: after reassembly, widen any block
+      // that reads too fast (cps > target) or is simply too short (< min
+      // duration) into the free gaps its neighbours leave, without ever
+      // overlapping them. Applied on the whole in-order file so it also
+      // covers chunk-boundary neighbours.
+      const translated = adjustSubtitleTiming(
+        (results as string[]).join('\n\n'),
+        {
+          cpsHardMax: CPS_HARD_MAX,
+          cpsTarget: CPS_TARGET,
+          minGapMs: MIN_SUBTITLE_GAP_MS,
+          minDurationMs: MIN_SUBTITLE_DURATION_MS,
+        },
+      );
       const outputFilename = buildOutputFilename(file.name, targetLang);
 
       setTranslationProgress({

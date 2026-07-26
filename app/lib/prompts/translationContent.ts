@@ -20,13 +20,16 @@ function getLanguageConfig(targetLanguage: string) {
   };
 }
 
-function formatMovieInfo(movieInfo: MovieInfo): string {
+export function formatMovieInfo(
+  movieInfo: Pick<MovieInfo, 'title' | 'year' | 'genre' | 'country' | 'era' | 'tone'>,
+): string {
   const fields = [
     movieInfo.title && `- 제목: ${movieInfo.title}`,
     movieInfo.year && `- 연도: ${movieInfo.year}`,
     movieInfo.genre && `- 장르: ${movieInfo.genre}`,
     movieInfo.country && `- 국가: ${movieInfo.country}`,
-    movieInfo.era && `- 시대/배경: ${movieInfo.era}`,
+    movieInfo.era && `- 배경/시대: ${movieInfo.era}`,
+    movieInfo.tone && `- 톤앤매너: ${movieInfo.tone}`,
   ].filter(Boolean);
 
   return fields.length > 0 ? fields.join('\n') : '- 제공되지 않음';
@@ -50,7 +53,6 @@ export async function buildTranslationVariables(
         : '',
     movieInfo: formatMovieInfo(movieInfo),
     translationRules,
-    examplesSection: '',
     notesSection: movieInfo.notes
       ? `<user_notes>\n${movieInfo.notes}\n</user_notes>`
       : '',

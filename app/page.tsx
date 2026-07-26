@@ -12,18 +12,18 @@ import { CreditWall } from './components/simple/CreditWall';
 import { PurchaseStep } from './components/simple/PurchaseStep';
 import { useTranslation } from './hooks/useTranslation';
 import { useEnrich } from './hooks/useEnrich';
+import { useCastSheet } from './hooks/useCastSheet';
 import { useAuth } from './hooks/useAuth';
-import { fetchMoviePoster } from './lib/client/tmdb';
 import { parseSrtBlocks } from './lib/srt';
 import { isSupabaseConfigured } from './lib/supabase/env';
 import { DEFAULT_TARGET_LANG } from './config/languages';
-import { TRANSLATION_MODEL } from './config/constants';
+import type { AllowedModel } from './config/constants';
 import type { ContentType, MovieInfo } from './types/translation';
 import { COPY } from './i18n/simpleCopy';
 
 const EMPTY_MOVIE_INFO: MovieInfo = { title: '', year: '', notes: '' };
 // Keep in sync with package.json version.
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.7.0';
 
 function isSrt(file: File): boolean {
   return file.name.toLowerCase().endsWith('.srt');
@@ -117,6 +117,8 @@ export default function Home() {
     reset: resetEnrich,
   } = useEnrich();
 
+  const castSheet = useCastSheet();
+
   const totalLines = useMemo(
     () => (fileContent ? parseSrtBlocks(fileContent).length : 0),
     [fileContent],
@@ -134,21 +136,22 @@ export default function Home() {
   const enrichStartedRef = useRef(false);
   const summarizeStartedRef = useRef(false);
 
-  // Movie branch: AI enrich (director + tone/character notes) and the TMDB
-  // poster fetch run in parallel, then land in a single state update. Metadata
-  // comes from the AI; TMDB contributes the poster image only.
+  // Movie branch: one unified lookup (TMDB first, grounded search fallback —
+  // see enrichMovie() server-side). title/year/director/poster are UI-facing
+  // and overwrite the filename-guessed values with the authoritative ones;
+  // genre/era/tone are AI-facing keyword fields, never rendered. `notes`
+  // stays untouched here — it is the user's own free-text field.
   const runEnrich = useCallback(async () => {
     const { title, year } = movieInfoRef.current;
-    const [data, posterUrl] = await Promise.all([
-      enrich(title, year),
-      fetchMoviePoster(title, year),
-    ]);
+    const data = await enrich(title, year);
     setMovieInfo((prev) => ({
       ...prev,
-      posterUrl: posterUrl ?? undefined,
-      ...(data?.isMovie && data.notes
-        ? { notes: data.notes, year: prev.year || data.year || '' }
-        : { notes: '' }),
+      posterUrl: data?.posterUrl ?? undefined,
+      title: data?.found && data.title ? data.title : prev.title,
+      year: data?.found && data.year ? data.year : prev.year,
+      genre: data?.found ? data.genre : '',
+      era: data?.found ? data.era : '',
+      tone: data?.found ? data.tone : '',
     }));
   }, [enrich]);
 
@@ -184,10 +187,24 @@ export default function Home() {
     }
   }, [step, contentType, analysis.completed, fileContent, runEnrich]);
 
+  // Cast-sheet prepass: independent opt-in toggle (see docs/decisions.md).
+  // request() no-ops while already in flight/done for this file (internal
+  // ref guard), so firing this effect on every fileContent/enabled change is
+  // safe — it only actually dispatches once per file, and only when enabled.
+  const castSheetEnabled = castSheet.enabled;
+  const requestCastSheet = castSheet.request;
+  useEffect(() => {
+    if (step !== 1) return;
+    if (!castSheetEnabled) return;
+    if (!fileContent) return;
+    requestCastSheet(fileContentRef.current, movieInfoRef.current);
+  }, [step, castSheetEnabled, fileContent, requestCastSheet]);
+
   const resetAnalysis = () => {
     enrichStartedRef.current = false;
     summarizeStartedRef.current = false;
     resetEnrich();
+    castSheet.reset();
     setSummarizing(false);
   };
 
@@ -204,14 +221,23 @@ export default function Home() {
     setStep(1);
   };
 
-  const handleTranslate = async () => {
+  const handleTranslate = async (model: AllowedModel) => {
     setStep(2);
+    // Give a still-running extraction a bounded grace period rather than
+    // blocking indefinitely or always shipping without it — see
+    // GLOSSARY_WAIT_MS. Never called (resolves immediately) when the toggle
+    // is off, since no extraction was ever kicked off.
+    const resolvedCastSheet = castSheet.enabled
+      ? await castSheet.awaitReady()
+      : undefined;
     // translate() resolves true on success, false on error/abort/refusal.
     const ok = await translate(
       movieInfo,
-      TRANSLATION_MODEL,
+      model,
       targetLang,
       'meaning',
+      undefined,
+      resolvedCastSheet,
     );
     // The balance moved either way: a success spent the credit, and a refusal
     // means our cached number was stale.
@@ -357,6 +383,14 @@ export default function Home() {
               analysisAnalyzing={analysis.isAnalyzing}
               onReEnrich={runEnrich}
               summarizing={summarizing}
+              castSheetEnabled={castSheet.enabled}
+              onCastSheetToggle={castSheet.setEnabled}
+              castSheetStatus={castSheet.status}
+              castSheet={castSheet.sheet}
+              onCastSheetChange={castSheet.setSheet}
+              onCastSheetRefetch={() =>
+                castSheet.refetch(fileContentRef.current, movieInfoRef.current)
+              }
               onBack={resetAll}
               onTranslate={handleTranslate}
             />
