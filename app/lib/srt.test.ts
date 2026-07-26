@@ -506,4 +506,31 @@ describe('adjustSubtitleTiming', () => {
     // its start back over the unknown span of the wall (start stays at 5s).
     expect(blocks[1]).toContain('00:00:05,000 --> 00:00:06,400');
   });
+
+  it('widens a block shorter than minDurationMs even with a comfortable cps', () => {
+    // 2 chars over 0.2s = 10 cps — under the hard max, so cps alone would
+    // never trigger a widen. minDurationMs must still kick in.
+    const srt =
+      '1\n00:00:01,000 --> 00:00:01,200\n가나\n\n' +
+      '2\n00:00:10,000 --> 00:00:12,000\n다음';
+    const out = adjustSubtitleTiming(srt, { minDurationMs: 800 });
+    const [a] = parseSrtBlocks(out).map(parseBlockTiming);
+    expect(a!.endMs - a!.startMs).toBeGreaterThanOrEqual(800);
+  });
+
+  it('widens an empty block too short in duration', () => {
+    // No visible text at all — cps is meaningless (charCount 0), but the
+    // block is still on screen too briefly and must be widened.
+    const srt =
+      '1\n00:00:01,000 --> 00:00:01,100\n\n\n' +
+      '2\n00:00:10,000 --> 00:00:12,000\n다음';
+    const out = adjustSubtitleTiming(srt, { minDurationMs: 800 });
+    const [a] = parseSrtBlocks(out).map(parseBlockTiming);
+    expect(a!.endMs - a!.startMs).toBeGreaterThanOrEqual(800);
+  });
+
+  it('does not shrink a block already at or above minDurationMs', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n안녕';
+    expect(adjustSubtitleTiming(srt, { minDurationMs: 800 })).toBe(srt);
+  });
 });

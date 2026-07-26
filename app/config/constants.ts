@@ -308,7 +308,13 @@ export function estimateTranslationMs(model: string): number {
  *    lower edge for any future reporting.
  *
  * MIN_SUBTITLE_GAP_MS keeps a ~2-frame (24fps) silence between adjacent
- * subtitles so a widened line never visually touches the next. All env-tunable.
+ * subtitles so a widened line never visually touches the next.
+ *
+ * MIN_SUBTITLE_DURATION_MS (800ms) is a separate, independent floor: even a
+ * block that reads comfortably slow (or has no text at all) gets widened up
+ * to this minimum on-screen duration, using the same neighbour-borrowing pass.
+ *
+ * All env-tunable.
  */
 export const CPS_HARD_MAX = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CPS_HARD_MAX,
@@ -325,6 +331,10 @@ export const CPS_RECOMMENDED_MIN = readPositiveIntEnv(
 export const MIN_SUBTITLE_GAP_MS = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_MIN_SUBTITLE_GAP_MS,
   84,
+);
+export const MIN_SUBTITLE_DURATION_MS = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_MIN_SUBTITLE_DURATION_MS,
+  800,
 );
 
 /** Timing estimates (milliseconds) */

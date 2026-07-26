@@ -133,12 +133,19 @@ export interface TimingAdjustOptions {
   cpsTarget?: number;
   /** Minimum silence (ms) kept between two adjacent subtitles after adjusting. */
   minGapMs?: number;
+  /**
+   * Minimum on-screen duration (ms) a block must have, independent of its
+   * reading speed — even an empty or very short line is widened up to this
+   * floor. Default 800.
+   */
+  minDurationMs?: number;
 }
 
 /**
- * Widen the on-screen window of subtitles that read too fast (cps > hard max),
- * pulling them down toward the target cps, borrowing only from the silent gaps
- * their neighbours leave free.
+ * Widen the on-screen window of subtitles that read too fast (cps > hard max)
+ * or that are simply too short (duration < minDurationMs) regardless of
+ * reading speed, pulling them toward the target cps / minimum duration,
+ * borrowing only from the silent gaps their neighbours leave free.
  *
  * Runs once over the whole, in-order file so it also protects chunk-boundary
  * neighbours. A single forward pass keeps overlaps impossible: each block's new
@@ -165,6 +172,7 @@ export function adjustSubtitleTiming(
   const cpsHardMax = options.cpsHardMax ?? 12;
   const cpsTarget = options.cpsTarget ?? 10;
   const minGapMs = Math.max(0, options.minGapMs ?? 84);
+  const minDurationMs = Math.max(0, options.minDurationMs ?? 800);
 
   const blocks = parseSrtBlocks(srt);
   const timings = blocks.map(parseBlockTiming);
@@ -187,8 +195,12 @@ export function adjustSubtitleTiming(
     const charCount = visibleCharCount(raw);
     const cps = durationMs > 0 ? charCount / (durationMs / 1000) : Infinity;
 
-    if (cps > cpsHardMax && charCount > 0) {
-      const requiredMs = (charCount / cpsTarget) * 1000;
+    const cpsTriggered = cps > cpsHardMax && charCount > 0;
+    const shortDurationTriggered = durationMs < minDurationMs;
+
+    if (cpsTriggered || shortDurationTriggered) {
+      const requiredMsForCps = cpsTriggered ? (charCount / cpsTarget) * 1000 : 0;
+      const requiredMs = Math.max(requiredMsForCps, minDurationMs);
       let deficit = Math.max(0, requiredMs - durationMs);
 
       // Extend the end first, up to just before the next block's ORIGINAL start.

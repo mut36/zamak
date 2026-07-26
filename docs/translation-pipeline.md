@@ -179,21 +179,23 @@
   내보내는 별개의 실패 모드, 표식 방식과 무관) → `srt.ts` + `TODO.md`. 이게 밀림
   버그의 방어선.
 
-### 9.5. 리딩스피드 타임코드 조정 (CPS)
+### 9.5. 리딩스피드·최소 길이 타임코드 조정 (CPS / minDuration)
 - **코드**: **`app/lib/srt.ts` (`adjustSubtitleTiming`)**, `constants.ts`
-  (`CPS_HARD_MAX`/`CPS_TARGET`/`CPS_RECOMMENDED_MIN`/`MIN_SUBTITLE_GAP_MS`),
-  `useTranslation`에서 청크 합친 직후 1회 호출.
-- **하는 일**: 번역된 한국어 블록 중 **`cps > CPS_HARD_MAX`(기본 12, Netflix 한국어 상한)**
-  인 것만 골라, **이웃이 비운 침묵(gap)** 안에서 표시창을 넓혀 읽기 속도를 **목표
-  `CPS_TARGET`(기본 10, 권장 밴드 8~10의 위쪽 끝)**까지 낮춘다. end를 먼저 뒤로 밀고
-  모자라면 start를 앞으로 당김. 첫 블록은 앞의 빈 프리롤(0초까지)로 start를 당길 수 있다.
-  **창은 늘리기만 하고 줄이지 않으며, 절대 겹치지 않는다** — 앞 블록은 조정된 end, 뒤 블록은
-  원본 start를 경계로 쓰는 비대칭 + `MIN_SUBTITLE_GAP_MS`. 전체 파일에 한 번 돌아 청크 경계
-  이웃까지 커버. 타임코드를 코드가 소유한다는 원칙의 연장.
-- **임계값 3단**: 12 초과 = 손봄(위반), 10 = 착지 목표, 8 = 그 아래로는 안 내림(목표가 10이라
-  자동 보장). 10~12 사이는 상한 밑이라 손대지 않는다.
+  (`CPS_HARD_MAX`/`CPS_TARGET`/`CPS_RECOMMENDED_MIN`/`MIN_SUBTITLE_GAP_MS`/
+  `MIN_SUBTITLE_DURATION_MS`), `useTranslation`에서 청크 합친 직후 1회 호출.
+- **하는 일**: 두 가지 독립된 조건 중 하나라도 걸리면 같은 방식으로 넓힌다 —
+  ① **`cps > CPS_HARD_MAX`**(기본 12, Netflix 한국어 상한, 대사가 있는 블록만) 또는
+  ② **구간 길이 < `MIN_SUBTITLE_DURATION_MS`**(기본 800ms, 대사 유무 무관 — 빈 블록도 대상).
+  두 조건의 요구량 중 **큰 쪽**을 목표로, **이웃이 비운 침묵(gap)** 안에서 표시창을 넓힌다.
+  end를 먼저 뒤로 밀고 모자라면 start를 앞으로 당김. 첫 블록은 앞의 빈 프리롤(0초까지)로
+  start를 당길 수 있다. **창은 늘리기만 하고 줄이지 않으며, 절대 겹치지 않는다** — 앞
+  블록은 조정된 end, 뒤 블록은 원본 start를 경계로 쓰는 비대칭 + `MIN_SUBTITLE_GAP_MS`.
+  전체 파일에 한 번 돌아 청크 경계 이웃까지 커버. 타임코드를 코드가 소유한다는 원칙의 연장.
+- **임계값 3단(CPS)**: 12 초과 = 손봄(위반), 10 = 착지 목표, 8 = 그 아래로는 안 내림(목표가
+  10이라 자동 보장). 10~12 사이는 상한 밑이라 손대지 않는다.
 - **품질 레버**: `CPS_HARD_MAX`(낮추면 더 많은 블록을 손봄), `CPS_TARGET`(낮추면 더 여유롭게
-  늘리지만 gap을 더 씀), `MIN_SUBTITLE_GAP_MS`(인접 최소 간격). 모두 `constants.ts` + env.
+  늘리지만 gap을 더 씀), `MIN_SUBTITLE_GAP_MS`(인접 최소 간격), `MIN_SUBTITLE_DURATION_MS`
+  (올리면 더 많은 짧은 블록이 늘어남). 모두 `constants.ts` + env.
   gap이 부족하면 목표까지 못 내려가고 가능한 만큼만 조정.
 - **알려진 한계**: 연속 밀집 구간에서 앞 블록이 공유 gap을 end로 먼저 선점하면(greedy) 뒤
   블록이 backward-room을 못 써 덜 조정된다(decisions §2-5). 실측(1480블록)상 여유가 있는데
@@ -226,6 +228,7 @@
 | 특정 구간에서 자막이 대거 미번역(원문 그대로) | 대사 자체가 숫자인 장면(카운트다운 등) → `srt.ts` `[N]` 표식(§7·§9, `decisions.md` §2-1)이 이미 방지함. 그래도 재발하면 그 청크의 `matched`/`unmatched` 로그 확인 |
 | 청크가 대화 중간을 자름 | `srt.ts` (`chunkSrtBlocksAtGaps` 파라미터) |
 | 한국어 자막이 너무 빨리 지나감(읽기 힘듦) | `srt.ts` (`adjustSubtitleTiming`), `constants.ts` `CPS_TARGET`/`MIN_SUBTITLE_GAP_MS` — §9.5 |
+| 자막이 너무 짧게 스쳐 지나감(대사와 무관하게) | `srt.ts` (`adjustSubtitleTiming`), `constants.ts` `MIN_SUBTITLE_DURATION_MS` — §9.5 |
 | 번역이 느림/비쌈 | `constants.ts` `SERVER_CHUNK_SIZE`/`CONCURRENCY`/`thinkingLevelForModel`, 모델(고급/빠른) |
 | 특정 청크만 원문 그대로 | 그 청크 호출 실패(원문 폴백) — `gemini.ts` 로그, `translationService.ts` |
 | 진행 링이 너무 빨리 차서 99%에서 오래 기다림(또는 그 반대) | `constants.ts` `TRANSLATION_ESTIMATE_MS`(모델별), 이징 곡선은 `ProgressStep.tsx` — §6 |
