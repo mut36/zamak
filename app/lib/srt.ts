@@ -232,6 +232,75 @@ export function adjustSubtitleTiming(
   return rewritten.join('\n\n');
 }
 
+export interface TextRuleReport {
+  /** ASCII "..."-style runs (2+ dots) normalized to a single "…". */
+  ellipsisNormalized: number;
+  /** Blocks whose 3rd+ line got folded into line 2 (translation_rules_ko.txt
+   * rule 9 — 2-line cap). */
+  linesMerged: number;
+  /** Lines that had a trailing "."/"," removed (rule 7). */
+  trailingPunctuationStripped: number;
+}
+
+const ELLIPSIS_RUN = /\.{2,}/g;
+const TRAILING_PUNCTUATION = /[.,]\s*$/;
+
+/**
+ * Mechanically enforces the two translation rules that have exactly one
+ * correct output regardless of context — translation_rules_ko.txt rule 7
+ * (no trailing "."/",") and rule 9 (2-line cap per block) — plus ellipsis
+ * normalization. The model is asked to follow these already, but "a rule is
+ * asked for" and "a rule always holds" are different guarantees; unlike
+ * line-wrap (rule 8, needs a meaning-based break point) or honorific
+ * consistency (rule 5/6, needs judgment), these have no ambiguity, so code
+ * can just make them true instead of hoping the model does.
+ *
+ * Ellipsis runs to "…" first, so the punctuation strip below never mistakes
+ * a trailing-off ellipsis for a sentence-ending period — after normalization
+ * there is no longer a bare "." to match at the end of one.
+ *
+ * Malformed blocks (no parseable timing) pass through untouched, same as
+ * adjustSubtitleTiming — there's no reliable body to rewrite.
+ */
+export function enforceTextRules(
+  srt: string,
+): { content: string; report: TextRuleReport } {
+  const report: TextRuleReport = {
+    ellipsisNormalized: 0,
+    linesMerged: 0,
+    trailingPunctuationStripped: 0,
+  };
+
+  const rewritten = parseSrtBlocks(srt).map((raw) => {
+    if (!parseBlockTiming(raw)) return raw;
+
+    const lines = raw.split('\n');
+    let bodyLines = lines.slice(2);
+
+    bodyLines = bodyLines.map((line) =>
+      line.replace(ELLIPSIS_RUN, () => {
+        report.ellipsisNormalized++;
+        return '…';
+      }),
+    );
+
+    if (bodyLines.length > 2) {
+      report.linesMerged += bodyLines.length - 2;
+      bodyLines = [bodyLines[0], bodyLines.slice(1).join(' ')];
+    }
+
+    bodyLines = bodyLines.map((line) => {
+      if (!TRAILING_PUNCTUATION.test(line)) return line;
+      report.trailingPunctuationStripped++;
+      return line.replace(TRAILING_PUNCTUATION, '');
+    });
+
+    return [lines[0], lines[1], ...bodyLines].join('\n');
+  });
+
+  return { content: rewritten.join('\n\n'), report };
+}
+
 export interface GapChunkOptions {
   /**
    * How far a cut may drift from targetSize, as a fraction of it.

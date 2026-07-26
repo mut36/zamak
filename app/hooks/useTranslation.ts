@@ -12,6 +12,7 @@ import {
   adjustSubtitleTiming,
   buildOutputFilename,
   chunkSrtBlocksAtGaps,
+  enforceTextRules,
   parseSrtBlocks,
 } from '../lib/srt';
 import { runOrderedPool } from '../lib/client/concurrency';
@@ -329,13 +330,27 @@ export function useTranslation(
         throw new Error(msg.noResponse);
       }
 
+      // Mechanical text rules (translation_rules_ko.txt §7/§9 — trailing
+      // punctuation, 2-line cap) have exactly one correct output, so code
+      // enforces them rather than hoping the model always complies. Runs
+      // before timing so any char-count change lands before CPS measures it.
+      const { content: ruleEnforced, report: textRuleReport } =
+        enforceTextRules((results as string[]).join('\n\n'));
+      if (
+        textRuleReport.ellipsisNormalized > 0 ||
+        textRuleReport.linesMerged > 0 ||
+        textRuleReport.trailingPunctuationStripped > 0
+      ) {
+        console.log('[translate] text rule enforcement', textRuleReport);
+      }
+
       // Code owns the timecodes end-to-end: after reassembly, widen any block
       // that reads too fast (cps > target) or is simply too short (< min
       // duration) into the free gaps its neighbours leave, without ever
       // overlapping them. Applied on the whole in-order file so it also
       // covers chunk-boundary neighbours.
       const translated = adjustSubtitleTiming(
-        (results as string[]).join('\n\n'),
+        ruleEnforced,
         {
           cpsHardMax: CPS_HARD_MAX,
           cpsTarget: CPS_TARGET,

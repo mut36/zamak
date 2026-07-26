@@ -228,9 +228,37 @@
   따로 표시(`DoneStep.tsx`, `simpleCopy.ts` `done.stopReason`).
 - **미룬 것(다음 커밋)**: 크레딧 환불 정책, "실패한 부분만 재번역" 버튼. `TODO.md` 참조.
 
+### 9.7. 기계적 번역 규칙 강제 (말줄임표·마침표·2줄 상한)
+- **코드**: **`app/lib/srt.ts` (`enforceTextRules`)**, `useTranslation.ts`에서 청크 합친
+  직후 · §9.5 타이밍 조정 **이전**에 1회 호출(글자 수가 바뀌면 CPS가 그 결과 위에서
+  계산돼야 하므로 순서가 중요).
+- **왜 이 세 개만 코드가 처리하나**: `translation_rules_ko.txt`의 12개 규칙 중 정답이
+  **하나뿐**인 것만 골랐다 — 나머지(줄바꿈 지점, 인물 말투, 정보 추가 금지)는 의미
+  판단이 필요해서 코드가 잘못 "고치면" 오히려 품질을 해칠 수 있다(`decisions.md` §2-8).
+  - **말줄임표 정규화**: ASCII 마침표 2개 이상 연속(`..`/`...`/`....`)을 전부 `…` 한
+    글자로 치환. 이 단계가 먼저 돌아야 다음 단계가 말줄임표를 문장 종결 마침표로
+    오인하지 않는다(치환 후엔 끝에 남는 게 `.`이 아니라 `…`이라 애초에 안 걸림).
+  - **규칙 9 (2줄 상한)**: 같은 마커에 줄이 3개 이상이면 2번째 줄부터 공백으로 합쳐
+    강제로 2줄로 만든다. 텍스트 유실 없음(공백으로 이어붙일 뿐 아무것도 버리지 않음).
+  - **규칙 7 (문장 끝 마침표·줄 끝 쉼표 생략)**: 각 줄 끝의 `.`/`,` 하나를 제거.
+- **8번(25자 초과 시 의미 단위로 두 줄 나누기)은 여전히 AI 담당**이다 — 어디서 끊어야
+  자연스러운지는 의미 판단이라 코드가 임의 지점(예: 중간 공백)에서 자르면 어색한
+  줄바꿈을 강제로 만들 위험이 더 크다. 규칙 9는 "AI가 8번을 못 지켰을 때의 안전망"이지
+  8번 자체를 대신하는 게 아니다.
+- **11번(스타일 태그 위치·의미 유지)은 스코프에서 제외**: 출력만 보고 고칠 수 있는
+  7·9번과 달리, 11번은 원본 블록과 번역 블록을 태그 단위로 비교해야 판단이 서서 성격이
+  다르다 — 검토는 했으나(`decisions.md` §2-8) 이번엔 넣지 않았다.
+- **6번(고어체 금지)·5번(인물 말투 일관성)**: 판단이 필요해 자동 고침 대상 아님.
+  5번은 [character_voice_registry](TODO.md)(파일 단위 존댓말/반말 표 주입, 미착수)가
+  담당할 영역.
+- **리포트만, 아직 미표시**: `enforceTextRules`는 무엇을 몇 번 고쳤는지
+  `TextRuleReport`로 반환하고 `useTranslation.ts`가 콘솔에 로그만 남긴다 — 화면에
+  보여주거나 하네스(`prompt-ab.mts`)에 집계하는 건 아직 안 함(향후 §9.6처럼 확장 가능).
+
 ### 10. 조립 & 다운로드
-- **코드**: `useTranslation`(청크 결과 합치기 + §9.5 조정 + §9.6 재시도/폴백 집계),
-  `app/lib/srt.ts` (`buildOutputFilename`), `app/components/simple/DoneStep.tsx`,
+- **코드**: `useTranslation`(청크 결과 합치기 + §9.7 텍스트 규칙 강제 + §9.5 조정 +
+  §9.6 재시도/폴백 집계), `app/lib/srt.ts` (`buildOutputFilename`),
+  `app/components/simple/DoneStep.tsx`,
   `TranslationResult`(`failedChunks`/`fallbackBlocks`/`totalChunks`/`stopReason`)
 - **품질 레버**: 출력 파일명 규칙 → `buildOutputFilename` / `constants.ts`
   `LANG_SUFFIX` + `SOURCE_LANG_CODES`. `.srt` 직전 토큰이 화이트리스트 언어
@@ -250,7 +278,8 @@
 | 번역이 직역투/어색함 | `translation_rules_ko.txt` |
 | 존댓말/반말·인물 말투가 안 맞음 | `translation_rules_ko.txt`, (cinematic) `cinematic_translation_philosophy_ko.txt`, `InfoStep`에서 사람이 톤 입력 |
 | 감정/뉘앙스가 밋밋함 | `cinematic_translation_philosophy_ko.txt` (+ 스타일을 cinematic로) |
-| 줄이 너무 김/마침표 등 표기 규칙 | `translation_rules_ko.txt` |
+| 줄이 25자 넘는데 안 나뉨(의미 단위 줄바꿈) | `translation_rules_ko.txt` 규칙 8 — 프롬프트로만 유도, 코드 강제 없음(의미 판단이라 §9.7 스코프 밖) |
+| 마침표·쉼표가 줄 끝에 남아 있음 / 3줄 이상 나옴 / `...`가 `…`로 안 바뀜 | `srt.ts` (`enforceTextRules`) — 이 셋은 코드가 강제하므로 재발하면 버그. `decisions.md` §2-8 — §9.7 |
 | 두 줄 자막이 한 줄에 `/`로 붙어 나옴 | `translation_rules_ko.txt` 규칙 8·10 예시(같은 번호 줄을 실제 줄바꿈으로 표기, 슬래시 구분 금지). 재조립은 같은 번호를 `\n`으로 합침 → `srt.ts` `indexTranslatedBodies` |
 | 자막이 밀림(번호 재배열) | 청크 크기 ↓ `constants.ts` `SERVER_CHUNK_SIZE` (**≥300 금지**), 재조립 `srt.ts`. 조절 절차는 위 §5 |
 | 특정 구간에서 자막이 대거 미번역(원문 그대로) | 대사 자체가 숫자인 장면(카운트다운 등) → `srt.ts` `[N]` 표식(§7·§9, `decisions.md` §2-1)이 이미 방지함. 그래도 재발하면 그 청크의 `matched`/`unmatched` 로그 확인 |

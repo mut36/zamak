@@ -5,6 +5,7 @@ import {
   chunkSrtBlocks,
   chunkSrtBlocksAtGaps,
   computeCps,
+  enforceTextRules,
   formatBlocksForModel,
   parseBlockTiming,
   parseSrtBlocks,
@@ -532,5 +533,87 @@ describe('adjustSubtitleTiming', () => {
   it('does not shrink a block already at or above minDurationMs', () => {
     const srt = '1\n00:00:00,000 --> 00:00:01,000\n안녕';
     expect(adjustSubtitleTiming(srt, { minDurationMs: 800 })).toBe(srt);
+  });
+});
+
+describe('enforceTextRules', () => {
+  it('normalizes ASCII ellipsis runs of 2 or more dots to a single "…"', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n음... 글쎄';
+    const { content, report } = enforceTextRules(srt);
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\n음… 글쎄');
+    expect(report.ellipsisNormalized).toBe(1);
+  });
+
+  it('normalizes a longer run (4+ dots) the same way', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n글쎄....';
+    const { content } = enforceTextRules(srt);
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\n글쎄…');
+  });
+
+  it('strips a trailing sentence-final period', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n안녕하세요.';
+    const { content, report } = enforceTextRules(srt);
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\n안녕하세요');
+    expect(report.trailingPunctuationStripped).toBe(1);
+  });
+
+  it('strips a trailing comma at line end', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n그리고,';
+    const { content } = enforceTextRules(srt);
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\n그리고');
+  });
+
+  it('does not mistake a normalized ellipsis for a trailing period', () => {
+    // After normalization the line ends in "…", not ".", so the punctuation
+    // strip must leave it alone.
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n글쎄...';
+    const { content, report } = enforceTextRules(srt);
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\n글쎄…');
+    expect(report.trailingPunctuationStripped).toBe(0);
+  });
+
+  it('leaves a compliant single line untouched', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n괜찮아';
+    expect(enforceTextRules(srt).content).toBe(srt);
+  });
+
+  it('leaves an already-compliant 2-line block untouched', () => {
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n지금 생각하면 심장이 쿵 내려앉지만\n그만한 가치가 있었어요';
+    expect(enforceTextRules(srt).content).toBe(srt);
+  });
+
+  it('merges a 3rd+ line into line 2, keeping the 2-line cap', () => {
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n첫째 줄\n둘째 줄\n셋째 줄';
+    const { content, report } = enforceTextRules(srt);
+    expect(content).toBe(
+      '1\n00:00:00,000 --> 00:00:01,000\n첫째 줄\n둘째 줄 셋째 줄',
+    );
+    expect(report.linesMerged).toBe(1);
+  });
+
+  it('merges 4+ lines all into line 2, dropping no text', () => {
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\nA\nB\nC\nD';
+    const { content, report } = enforceTextRules(srt);
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\nA\nB C D');
+    expect(report.linesMerged).toBe(2);
+  });
+
+  it('preserves block count, sequence numbers, and timecodes', () => {
+    const srt =
+      '1\n00:00:01,000 --> 00:00:02,000\n안녕.\n\n' +
+      '2\n00:00:20,000 --> 00:00:22,000\n느긋한 자막';
+    const { content } = enforceTextRules(srt);
+    const blocks = parseSrtBlocks(content);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]).toBe('1\n00:00:01,000 --> 00:00:02,000\n안녕');
+    expect(blocks[1]).toBe('2\n00:00:20,000 --> 00:00:22,000\n느긋한 자막');
+  });
+
+  it('passes a malformed (unparseable-timing) block through untouched', () => {
+    const srt = '1\nnot a timecode\n서문...';
+    expect(enforceTextRules(srt).content).toBe(srt);
   });
 });
