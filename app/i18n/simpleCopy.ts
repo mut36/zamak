@@ -184,6 +184,27 @@ export const COPY = {
     translatePro: '고급번역',
     translateFlash: '빠른번역',
     startOver: '처음부터',
+
+    // Cast-sheet toggle card — opt-in glossary + speech-relation prepass.
+    // Independent of the translation model toggle above (see decisions.md).
+    castSheet: {
+      title: '등장인물·용어 일관성',
+      badge: '고급',
+      hint: '이름·지명 표기와 존댓말을 파일 전체에서 통일해요. 준비에 20~40초 걸려요.',
+      extracting: '분석하고 있어요…',
+      count: (n: number) => `${n}개`,
+      tabTerms: '표기',
+      tabRelations: '말투',
+      termSourceLabel: '원문',
+      termKoLabel: '한국어 표기',
+      addTerm: '+ 새 항목',
+      removeRow: '삭제',
+      emptyTerms: '표기 항목이 없어요. 직접 추가할 수 있어요.',
+      emptyRelations: '아직 파악된 말투 관계가 없어요.',
+      speechOptions: ['존댓말', '반말', '혼용'] as const,
+      relationRange: (from: number, to: number) => `${from}~${to}번 구간`,
+      refetch: '다시 추출',
+    },
   },
 
   progress: {
