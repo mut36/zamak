@@ -194,6 +194,24 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 | `JOB_VALIDITY_MINUTES` | 60 | 결제된 job이 유효한 시간 |
 | `TOSS_SECRET_KEY` | — | 결제 승인용 시크릿 키 (서버 전용). 없으면 결제 라우트만 닫히고 번역은 그대로 동작 |
 | `NEXT_PUBLIC_TOSS_CLIENT_KEY` | — | 결제창을 여는 클라이언트 키. 브라우저에 노출되며 그래도 안전 — 이 키로는 승인을 못 함 |
+| `GLOSSARY_MODEL` | `gemini-3.6-flash` | 글로사리·존대관계 추출(opt-in, InfoStep 토글) 모델. 파일당 1회 호출이라 번역 모델과 별도로 조정 가능 |
+| `GLOSSARY_THINKING_LEVEL` | `MEDIUM` | 위와 같은 네 값. 파일당 1회라 번역 flash의 LOW보다 여유를 둠 |
+| `GLOSSARY_MAX_BLOCKS` | 3000 | 이 블록 수를 넘는 파일은 앞/중간/뒤를 고르게 발췌해 추출(이름·관계가 파일 전체에 흩어져 있어 summarize처럼 앞부분만 보지 않음) |
+| `GLOSSARY_MAX_TERMS` / `GLOSSARY_MAX_RELATIONS` | 40 / 16 | 시트 항목 상한 — 청크당 프롬프트 세금을 제한 |
+| `GLOSSARY_MAX_CHARS` | 1200 | `<glossary>`+`<speech_relations>` 렌더 결과 총 길이 상한(문자) |
+| `GLOSSARY_WAIT_MS` | 15000 | 번역 시작 시 아직 추출 중이면 최대 이만큼만 기다리고 빈 시트로 진행 |
+
+### 글로사리·존대관계 (opt-in)
+
+InfoStep의 "등장인물·용어 일관성" 토글(기본 OFF, 브라우저에 기억됨)을 켜면 파일 전체를
+한 번 스캔해 인물·지명·용어의 한국어 표기와 인물 간 존댓말/반말을 미리 정합니다. 청크가
+병렬로 번역되며 이름 표기·말투가 청크마다 흔들리던 문제를 줄입니다. 존대 관계는 자막
+번호 구간을 갖고 있어(예: 1~412번은 존댓말, 413번부터 반말) 관계가 장면 안에서 바뀌어도
+그 아크를 그대로 실어 나릅니다 — 번역 단계에서는 청크의 실제 블록 범위와 겹치는 관계만
+프롬프트에 실립니다. 토글이 꺼져 있으면(기본값) 이 기능은 API를 전혀 호출하지 않고
+프롬프트도 이 기능이 없던 시절과 완전히 동일합니다. 자세한 배선은
+[docs/translation-pipeline.md](docs/translation-pipeline.md) §2-C·§7, 토글을 켜고
+끄는 결정 배경은 [docs/decisions.md](docs/decisions.md) §2-8을 참고하세요.
 
 ### 번역 실행 경로
 

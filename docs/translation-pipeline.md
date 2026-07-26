@@ -6,7 +6,7 @@
 [`TODO.md`](TODO.md), 청크 수치 유도는 [`tuning/`](tuning/) 참조.
 
 > 파일 경로 + 함수/심볼 이름으로만 가리킨다(줄 번호는 금방 어긋나서 안 적음).
-> 기준 시점: 2026-07-25. 구조가 바뀌면 이 문서도 같이 고칠 것.
+> 기준 시점: 2026-07-26. 구조가 바뀌면 이 문서도 같이 고칠 것.
 
 메인 경로는 **영화·드라마 분기**다. "기타 영상" 분기는 3단계에서 갈린다.
 
@@ -20,7 +20,8 @@
   → /api/analyze         제목·연도 확정 (AUX 모델)
   → [영화] /api/enrich    TMDB + 그라운딩 → 제목/연도/감독/포스터 + 장르/배경/톤
     [기타] /api/summarize 자막 앞부분 요약 → notes
-  → InfoStep             사람이 검토·수정
+  → (opt-in, 토글 ON시) /api/glossary  전체 자막 1회 스캔 → 글로사리+존대관계
+  → InfoStep             사람이 검토·수정 (+ 글로사리 카드, 켰다면)
   → /api/translation/begin  크레딧 1 차감 → jobId
   → 청킹 (장면 갭 기준)
   → 청크별 병렬 /api/translate
@@ -70,11 +71,40 @@
 - **품질 레버**: 요약 프롬프트는 `summarize/route.ts` 안에 인라인. 샘플 줄 수는
   `constants.ts` `SUMMARY_SAMPLE_LINES`.
 
+### 2-C. 글로사리·존대관계 추출 (opt-in, 모델·콘텐츠 유형 무관)
+- **코드**: `app/api/glossary/route.ts` → `app/lib/server/extractCastSheet.ts`
+  (`extractCastSheet` → `fetchCastAnchors`(TMDB cast, best-effort) + Gemini
+  `responseSchema` 호출 → `sanitizeCastSheet`), 렌더 `app/lib/prompts/glossaryContent.ts`
+  (`renderGlossaryTags`), 프롬프트 `prompts/common/cast_sheet_extraction.txt`, 토글
+  훅 `app/hooks/useCastSheet.ts`, 카드 `app/components/simple/CastSheetCard.tsx`.
+- **하는 일**: InfoStep의 "등장인물·용어 일관성" 토글(기본 **OFF**, `localStorage`에
+  기억)을 켜면 전체 자막을 한 번 스캔해 ①인물·지명·용어의 확정 한국어 표기(글로사리)와
+  ②인물 간 존댓말/반말(방향성 있음, 자막 블록 범위가 붙음)을 뽑는다. 파일당 1회이고
+  청크별 병렬 번역 호출과 별개 — 결과가 모든 청크 프롬프트에 주입된다(§7). **OFF가
+  기본값이라 이 라우트는 사용자가 켜기 전엔 절대 호출되지 않는다.**
+- **왜 opt-in인가**: 추출에 20~40초 걸린다. 토글을 켜면 InfoStep 진입과 동시에
+  백그라운드로 돌아 지연이 대부분 숨지만(사람이 작품 정보를 검토하는 동안 끝남), 처음
+  켜는 순간만은 그 지연이 노출된다. 번역 모델(고급/빠른) 선택과는 **무관한 독립
+  토글**이다 — 결정 배경은 `decisions.md` §2-8.
+- **품질 레버**:
+  - 표기·관계가 틀리거나 아예 안 잡힘 → `prompts/common/cast_sheet_extraction.txt`
+  - 지어낸 이름이 섞임(환각) → `extractCastSheet.ts`의 `sanitizeCastSheet`
+    (실제 자막 문자열에 없는 `source`는 버림 — 이게 이 기능의 핵심 방어선)
+  - 인물명 표기가 TMDB와 다름 → `tmdb.ts`의 `cast`(상위 12명, 배역명+배우명, 한국어
+    표기는 아님 — 식별 힌트일 뿐 모델이 직접 음차)
+  - 청크당 프롬프트 비용이 커짐 → `constants.ts` `GLOSSARY_MAX_TERMS`/`_RELATIONS`/`_CHARS`
+  - 후반 청크가 초반 관계를 물려받음(또는 그 반대) → 있으면 안 되는 일 — `composer.ts`가
+    `getBlockIndexRange`로 청크의 실제 블록 범위를 구해 겹치는 관계만 넣는다
+    (`glossaryContent.ts` `renderGlossaryTags`)
+  - 사람이 잘못된 항목을 고치고 싶음 → InfoStep 카드에서 직접 편집(표기/삭제/추가,
+    말투 드롭다운) 가능, `CastSheetCard.tsx`
+
 ### 3. 사용자 검토·수정 (InfoStep)
 - **코드**: `app/components/simple/InfoStep.tsx`, 문구 `app/i18n/simpleCopy.ts`
-  (`COPY.info`)
+  (`COPY.info`), 글로사리 카드는 `CastSheetCard.tsx`(§2-C)
 - **하는 일**: 제목·연도·장르·배경/시대·톤앤매너·notes를 **사람이 편집 가능**. 자동
-  수집이 틀려도 여기서 최종 교정된 값이 번역에 들어간다.
+  수집이 틀려도 여기서 최종 교정된 값이 번역에 들어간다. 글로사리 토글을 켰다면 표기·
+  존대관계도 같은 화면에서 편집 가능(§2-C).
 - **품질 레버**: 어떤 필드를 보여줄지/편집 가능하게 할지 → `InfoStep.tsx`. 필드 라벨/힌트
   문구 → `simpleCopy.ts`. **자동화가 애매하면 이 사람-교정 단계를 강화하는 게 가장 안전.**
 
@@ -131,15 +161,20 @@
 - **코드**: `app/api/translate/route.ts` → `app/lib/server/translationService.ts`
   (`translateSubtitle`) → **`app/lib/prompts/composer.ts` (`composeTranslationPrompt`)**
   → `app/lib/prompts/translationContent.ts` (`buildTranslationVariables`,
-  `formatMovieInfo`), 로더 `app/lib/prompts/loader.ts`
+  `formatMovieInfo`) + `app/lib/prompts/glossaryContent.ts` (`renderGlossaryTags`),
+  로더 `app/lib/prompts/loader.ts`
 - **조립 구조**:
   - **시스템 프롬프트**:
     - 페르소나 + 신뢰 경계 → `prompts/common/subtitle_translation_system.txt`
+      (`<glossary>`, `<speech_relations>`도 이 경계에 포함 — §2-C가 켜져 있을 때만
+      실제로 등장)
     - `{{translationPhilosophy}}` → `prompts/common/cinematic_translation_philosophy_ko.txt`
       (**cinematic 스타일에서만**; meaning은 빈 문자열)
     - `{{translationRules}}` → `prompts/common/translation_rules_ko.txt`
   - **유저 턴**: `<content_metadata>`(`formatMovieInfo` — 제목/연도/장르/배경·시대/톤앤매너)
-    + `<user_notes>` + 청크 위치 + `<subtitle_data>`(타임스탬프 제거, **줄마다
+    + `<user_notes>` + 청크 위치 + `<glossary>`(파일 전체 표기, §2-C 켰을 때만) +
+    `<speech_relations>`(이 청크의 블록 범위와 겹치는 관계만, `getBlockIndexRange` +
+    `renderGlossaryTags` — §2-C) + `<subtitle_data>`(타임스탬프 제거, **줄마다
     `[N] 대사` 표식** — `formatBlocksForModel`, `srt.ts`) + 블록 수 지시(구조 기반
     카운트, `parseSrtBlocks(...).length`)
 - **품질 레버 (여기가 가장 큰 번역 품질 레버들)**:
@@ -150,7 +185,12 @@
   - 메타데이터가 프롬프트에 실리는 형식 → `translationContent.ts` (`formatMovieInfo`)
   - 도착어별 규칙 로딩 → `translationContent.ts` (`getLanguageConfig`), `loader.ts`
   - 영어 타깃 규칙 → `translation_rules_en.txt`
+  - 이름 표기·존대가 청크마다 흔들림 → §2-C(추출) 참조. 표기는 `translation_rules_ko.txt`
+    규칙 5·12에서 고정 규칙으로 못박혀 있음
 - **주의**: `translation_rules_ko_original.txt`는 참고용 원본 사본(파이프라인 미사용).
+  `castSheet`가 없으면(토글 OFF, 기본값) `<glossary>`/`<speech_relations>`는
+  `.filter(Boolean)`으로 완전히 드롭돼 프롬프트가 이 기능 도입 이전과 바이트 단위로
+  같다 — `composer.test.ts` 회귀 테스트로 고정됨.
 
 ### 8. 모델 호출
 - **코드**: `translateSubtitle` → `app/lib/providers/gemini.ts` (`generateModelText`),
@@ -220,7 +260,8 @@
 | 장르/배경·시대/톤앤매너가 이상함 | `enrichMovie.ts` (`buildKeywordPrompt` / `buildGroundedPrompt`) |
 | 배경/시대가 개봉연도로 나옴 | `enrichMovie.ts` 프롬프트 (그라운딩·"개봉연도≠극중배경" 지침) |
 | 번역이 직역투/어색함 | `translation_rules_ko.txt` |
-| 존댓말/반말·인물 말투가 안 맞음 | `translation_rules_ko.txt`, (cinematic) `cinematic_translation_philosophy_ko.txt`, `InfoStep`에서 사람이 톤 입력 |
+| 존댓말/반말·인물 말투가 안 맞음 | 먼저 InfoStep의 "등장인물·용어 일관성" 토글을 켜봤는지 확인(§2-C, 기본 OFF) — 켰다면 `cast_sheet_extraction.txt` 또는 카드에서 직접 관계 수정. 안 켰거나 그래도 안 맞으면 `translation_rules_ko.txt`, (cinematic) `cinematic_translation_philosophy_ko.txt`, `InfoStep`에서 사람이 톤 입력 |
+| 같은 이름이 청크마다 다르게 번역됨(표기 흔들림) | InfoStep 토글을 켜지 않았으면 그게 원인(§2-C, 기본 OFF). 켰는데도 흔들리면 `extractCastSheet.ts` `sanitizeCastSheet`(환각 필터로 그 이름이 버려졌을 수 있음) 또는 카드에서 직접 추가 |
 | 감정/뉘앙스가 밋밋함 | `cinematic_translation_philosophy_ko.txt` (+ 스타일을 cinematic로) |
 | 줄이 너무 김/마침표 등 표기 규칙 | `translation_rules_ko.txt` |
 | 두 줄 자막이 한 줄에 `/`로 붙어 나옴 | `translation_rules_ko.txt` 규칙 8·10 예시(같은 번호 줄을 실제 줄바꿈으로 표기, 슬래시 구분 금지). 재조립은 같은 번호를 `\n`으로 합침 → `srt.ts` `indexTranslatedBodies` |
@@ -246,8 +287,9 @@
    신뢰하지 않는다.
 3. **재번호 드리프트: `SERVER_CHUNK_SIZE`는 300 미만**. `B ≥ 300`이면 오류 발생.
    `SERVER_CHUNK_SIZE + tolerance`가 그 밑을 넘지 않게 유지. 조절 시 고칠 파일은 §5.
-4. **UI 버킷 ↔ AI 버킷 분리**: 제목/연도/감독/포스터(화면용)와 장르/배경/톤(프롬프트용)을
-   섞지 말 것. `notes`는 사용자 자유 입력 전용.
+4. **UI 버킷 ↔ AI 버킷 ↔ 글로사리 버킷 분리**: 제목/연도/감독/포스터(화면용)와
+   장르/배경/톤(프롬프트용)을 섞지 말 것. `notes`는 사용자 자유 입력 전용. 글로사리·
+   존대관계(`CastSheet`)는 제3의 버킷 — `MovieInfo`에 합치지 말 것(§2-C).
 
 ---
 
@@ -256,4 +298,5 @@
 - `computeCps` (`srt.ts`) — 자막별 초당 문자수. 고급 번역의 길이 예산용 프리미티브.
   읽기속도 자동 조정(§9.5 `adjustSubtitleTiming`)은 같은 계산을 쓰지만, `computeCps`
   자체는 아직 다른 기능에 직접 연결돼 있지 않다.
-- 청크 경계 겹침 컨텍스트, 고유명사·호칭 글로사리, 인물별 말투 시트 → 전부 `TODO.md`.
+- 청크 경계 겹침 컨텍스트 → `TODO.md`. 고유명사·호칭 글로사리와 인물별 말투 시트는
+  §2-C로 완료(2026-07-26) — 더 이상 미착수 항목이 아님.

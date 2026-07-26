@@ -12,6 +12,7 @@
 `docs/translation-pipeline.md`는 업로드→다운로드 전 과정과 "증상→고칠 파일"을 적은
 품질관리 지도다. 아래를 건드리면 그 지도가 낡으니 함께 고친다:
 프롬프트(`prompts/`), enrich(`app/lib/server/enrichMovie.ts`, `tmdb.ts`),
+글로사리 추출(`app/lib/server/extractCastSheet.ts`, `app/api/glossary`),
 청킹·재조립(`app/lib/srt.ts`), 프롬프트 조합(`app/lib/prompts/`),
 번역 서비스/라우트(`app/lib/server/translationService.ts`, `app/api/translate`),
 관련 상수(`app/config/constants.ts`).
@@ -34,8 +35,12 @@
 1. **청크 입력 블록 수 = 출력 블록 수** (재조립이 번호로 대조).
 2. **타임코드는 코드가 복원** — 모델엔 번호+대사만 보내고, 모델이 뱉은 타임스탬프는 불신.
 3. **청크 크기 상한**: 재번호 드리프트 천장(~600블록) 밑으로 유지.
-4. **UI 버킷↔AI 버킷 분리**: 제목/연도/감독/포스터(화면용)와 장르/배경/톤(프롬프트용)을
-   섞지 말 것. `movieInfo.notes`는 사용자 자유 입력 전용.
+4. **UI 버킷↔AI 버킷↔글로사리 버킷 분리**: 제목/연도/감독/포스터(화면용)와
+   장르/배경/톤(프롬프트용)을 섞지 말 것. `movieInfo.notes`는 사용자 자유 입력 전용.
+   글로사리·존대관계(`CastSheet`, `app/types/glossary.ts`)는 이 둘과 또 다른 제3의
+   버킷 — `MovieInfo`에 합치지 말고 별도 타입·별도 프롬프트 태그(`<glossary>`,
+   `<speech_relations>`)로 유지한다. opt-in 토글(기본 OFF)이 꺼지면 이 버킷은
+   프롬프트에 아예 나타나지 않아야 한다.
 
 ## 컨벤션
 
