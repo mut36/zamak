@@ -1,3 +1,5 @@
+import type { CastSheet } from './glossary';
+
 export interface MovieInfo {
   title: string;
   year: string;
@@ -50,6 +52,8 @@ export interface TranslationRequestBase {
   model?: string;
   targetLang?: string;
   translationStyle?: TranslationStyle;
+  /** Optional glossary + speech-relation sheet, extracted once per file. */
+  castSheet?: CastSheet;
 }
 
 export interface ChunkTranslationRequest extends TranslationRequestBase {

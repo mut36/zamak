@@ -13,6 +13,7 @@ import type {
   TranslationMode,
   TranslationStyle,
 } from '../../types/translation';
+import type { CastSheet } from '../../types/glossary';
 
 interface TranslateOptions {
   model: string;
@@ -26,6 +27,7 @@ interface TranslateOptions {
     index: number;
     total: number;
   };
+  castSheet?: CastSheet;
 }
 
 const SRT_TIMING_PATTERN =
@@ -227,6 +229,7 @@ export async function translateSubtitle({
   subtitleContent,
   apiKeys = {},
   chunkPosition,
+  castSheet,
 }: TranslateOptions): Promise<string> {
   const provider = getModelProvider(model);
 
@@ -238,6 +241,7 @@ export async function translateSubtitle({
       translationStyle,
       subtitleContent: content,
       chunkPosition,
+      castSheet,
     });
   }
 
