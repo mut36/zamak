@@ -25,7 +25,7 @@ export const COPY = {
   // timecode integrity and work-context-aware tone.
   landing: {
     hero: {
-      title: 'SRT 자막, 2분이면 번역돼요',
+      title: 'SRT 자막, 30초면 번역돼요',
       subtitle:
         '타임코드는 100% 그대로. 작품의 톤과 인물의 말투까지 반영해요.',
       cta: 'Google로 무료 시작하기',
@@ -73,7 +73,7 @@ export const COPY = {
       steps: [
         { title: '업로드', body: '.srt 파일을 끌어다 놓아요.' },
         { title: '확인', body: 'AI가 찾은 작품 정보를 확인하고 시작을 눌러요.' },
-        { title: '다운로드', body: '평균 2분 뒤, 번역된 .srt를 받아요.' },
+        { title: '다운로드', body: '평균 30초 뒤, 번역된 .srt를 받아요.' },
       ],
     },
     closing: {
@@ -127,7 +127,7 @@ export const COPY = {
 
   upload: {
     title: '자막을 올려주세요',
-    subtitle: '한 번의 업로드로 끝. 평균 2분이면 자연스러운 번역 자막을 받아요.',
+    subtitle: '한 번의 업로드로 끝. 평균 30초면 자연스러운 번역 자막을 받아요.',
     dropTitle: '파일을 여기에 끌어다 놓으세요',
     dropOr: '또는',
     browse: '파일 선택',
@@ -139,7 +139,7 @@ export const COPY = {
     typeMovie: '영화 · 드라마',
     typeOther: '기타 영상',
     typeOtherHint: '유튜브 · 인터뷰 · 강연 등',
-    reassure: ['평균 2분 소요', '타임코드 100% 보존', '설치 없이 바로'],
+    reassure: ['평균 30초 소요', '타임코드 100% 보존', '설치 없이 바로'],
     invalidFile: 'SRT 파일만 올릴 수 있어요.',
   },
 

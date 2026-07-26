@@ -262,41 +262,31 @@ export const SUMMARY_SAMPLE_LINES = (() => {
 })();
 
 /**
- * Measured generation parameters, from docs/tuning/chunk-size-model.md §1.
- * These drive the progress estimate; they are the same numbers the chunk-size
- * model uses, so re-measure both together.
- */
-export const GENERATION = {
-  /** Output tokens per subtitle block (measured on English sources). */
-  OUTPUT_TOKENS_PER_BLOCK: 16,
-  /** Output tokens generated per second. */
-  OUTPUT_TOKENS_PER_SEC: 220,
-  /** Time to first token. */
-  TTFT_MS: 2_000,
-} as const;
-
-/**
- * How long a translation should take, in milliseconds.
+ * What the progress ring fills against, in milliseconds — one figure per
+ * model, not a per-file derivation.
  *
- * This replaced a flat 60s-per-wave guess that was independent of both file
- * size and chunk size — at one request per file it ran 48% fast on a short
- * file and 146% slow on a full-length one, which is what made the ring stall
- * at 99%. A chunk's duration is dominated by generating its output tokens, so
- * estimate that directly and multiply by the number of concurrency waves.
+ * The previous version computed this from block count, chunk size and wave
+ * count off the measured generation rate (chunk-size-model.md §1). It tracked
+ * wall clock well, but it quoted a different duration for every file while the
+ * landing page promises one number ("30초"), so the ring and the pitch could
+ * disagree on the same screen. These are the promise; the ring still eases
+ * toward 99% and only a landed result reaches 100%, so a file that runs long
+ * degrades into a crawl rather than a lie.
+ *
+ * Flash at 30s covers a full-length film today (~1,900 blocks measured at 23s,
+ * experiment-log.md 2026-07-25). Pro is unmeasured — 3분 is a deliberately
+ * loose placeholder, so re-measure before quoting it anywhere tighter.
  */
-export function estimateTranslationMs(
-  totalBlocks: number,
-  chunkSize: number,
-  concurrency: number,
-): number {
-  const chunks = Math.max(1, Math.ceil(totalBlocks / chunkSize));
-  const waves = Math.max(1, Math.ceil(chunks / concurrency));
-  // Blocks in a full chunk, or the whole file when it fits in one.
-  const blocksPerChunk = Math.min(totalBlocks, chunkSize);
-  const generationMs =
-    (blocksPerChunk * GENERATION.OUTPUT_TOKENS_PER_BLOCK * 1000) /
-    GENERATION.OUTPUT_TOKENS_PER_SEC;
-  return waves * (GENERATION.TTFT_MS + generationMs);
+export const TRANSLATION_ESTIMATE_MS: Record<AllowedModel, number> = {
+  [FLASH_MODEL]: 30_000,
+  [PRO_MODEL]: 180_000,
+};
+
+/** Progress-ring duration for a translation model; unknown models get flash. */
+export function estimateTranslationMs(model: string): number {
+  return model === PRO_MODEL
+    ? TRANSLATION_ESTIMATE_MS[PRO_MODEL]
+    : TRANSLATION_ESTIMATE_MS[FLASH_MODEL];
 }
 
 /**
@@ -339,8 +329,6 @@ export const MIN_SUBTITLE_GAP_MS = readPositiveIntEnv(
 
 /** Timing estimates (milliseconds) */
 export const TIMING = {
-  /** Estimated translation time per batch — pro model */
-  PRO_BATCH_MS: 110_000,
   /** SSE heartbeat interval to prevent gateway timeout */
   HEARTBEAT_MS: 5_000,
   /** Delay before resetting UI after successful translation */

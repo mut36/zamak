@@ -245,13 +245,8 @@ export function useTranslation(
       // between scenes instead of mid-conversation.
       const chunks = chunkSrtBlocksAtGaps(blocks, chunkSize);
       const totalChunks = chunks.length;
-      // Derived from measured generation rate, not a flat per-wave guess —
-      // with one request per file the ring has nothing else to go on.
-      const totalEstimateMs = estimateTranslationMs(
-        blocks.length,
-        chunkSize,
-        concurrency,
-      );
+      // One figure per model — the same one the landing copy promises.
+      const totalEstimateMs = estimateTranslationMs(model);
 
       setTranslationProgress({
         stage: 'translating',

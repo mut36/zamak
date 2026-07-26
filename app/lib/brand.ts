@@ -16,6 +16,6 @@ export const SITE = {
   name: 'ZAMAK',
   title: 'ZAMAK — 자막 번역기',
   description:
-    '자막 파일을 올리면 약 2분 만에 AI 번역 자막을 받아보세요.',
+    '자막 파일을 올리면 약 30초 만에 AI 번역 자막을 받아보세요.',
   locale: 'ko_KR',
 } as const;
