@@ -302,6 +302,16 @@ export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 export const TMDB_LANGUAGE = process.env.TMDB_LANGUAGE || 'ko-KR';
 
 /**
+ * How many TMDB search candidates to surface for user disambiguation when a
+ * title/year matches more than one work (remakes, common titles). A single
+ * match always skips the picker regardless of this cap.
+ */
+export const MAX_ENRICH_CANDIDATES = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_MAX_ENRICH_CANDIDATES,
+  5,
+);
+
+/**
  * Number of leading subtitle lines sampled to summarize non-movie content.
  * Developer-tweakable via env for quick tuning.
  */

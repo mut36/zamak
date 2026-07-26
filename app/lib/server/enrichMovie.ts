@@ -1,8 +1,10 @@
 import 'server-only';
 
 import { GoogleGenAI } from '@google/genai';
-import { AUX_MODEL } from '../../config/constants';
-import { lookupTitle } from './tmdb';
+import { AUX_MODEL, MAX_ENRICH_CANDIDATES } from '../../config/constants';
+import { lookupById, searchCandidates, type TmdbCandidate, type TmdbLookupResult } from './tmdb';
+
+export type { TmdbCandidate } from './tmdb';
 
 /**
  * Unified enrichment result. Two buckets, kept separate all the way to the
@@ -121,23 +123,17 @@ async function extractKeywords(
 }
 
 /**
- * TMDB-first enrichment. Returns null when TMDB has no match — or when the
- * lookup itself fails (misconfigured key, network error) — so the caller
- * falls back to a grounded search either way. When TMDB matches, the UI
- * bucket (title/year/director/poster) and genre come straight from TMDB;
- * era/tone (and, when needed, a transliterated title) come from one grounded
- * aux-model call.
+ * Shared assembly: given a resolved TMDB record, run the grounded era/tone
+ * (and, when needed, transliterated-title) extraction and build the unified
+ * enrichment shape. `posterFallback` covers the rare case where the detail
+ * endpoint's poster_path is null but the search hit that led here had one.
  */
-export async function enrichFromTmdb(
+async function buildEnrichmentFromTmdb(
+  tmdb: TmdbLookupResult,
   title: string,
   year: string,
-): Promise<MovieEnrichment | null> {
-  const tmdb = await lookupTitle(title, year).catch((error: unknown) => {
-    console.error('[enrich] TMDB lookup failed', error);
-    return { found: false as const };
-  });
-  if (!tmdb.found) return null;
-
+  posterFallback?: string | null,
+): Promise<MovieEnrichment> {
   const resolvedYear = tmdb.year || year;
   const genres = tmdb.genres ?? [];
   const tmdbTitle = tmdb.title || title;
@@ -155,11 +151,32 @@ export async function enrichFromTmdb(
     title: needsTitle && keywords.title ? keywords.title : tmdbTitle,
     year: resolvedYear,
     director: tmdb.director ?? null,
-    posterUrl: tmdb.posterUrl ?? null,
+    posterUrl: tmdb.posterUrl ?? posterFallback ?? null,
     genre: genres.join(', '),
     era: keywords.era,
     tone: keywords.tone,
   };
+}
+
+/**
+ * Enrichment for a TMDB candidate the user explicitly picked from an
+ * ambiguous search (see searchMovie()). Skips search entirely — the caller
+ * already knows which work this is.
+ */
+export async function enrichMovieById(
+  candidate: TmdbCandidate,
+  title: string,
+  year: string,
+): Promise<MovieEnrichment | null> {
+  const tmdb = await lookupById(candidate.mediaType, candidate.tmdbId).catch(
+    (error: unknown) => {
+      console.error('[enrich] TMDB lookup by id failed', error);
+      return { found: false as const };
+    },
+  );
+  if (!tmdb.found) return null;
+
+  return buildEnrichmentFromTmdb(tmdb, title, year, candidate.posterUrl);
 }
 
 function buildGroundedPrompt(title: string, year: string): string {
@@ -244,20 +261,46 @@ export async function enrichWithGrounding(
   }
 }
 
+/** Discriminated result of searchMovie() — see below. */
+export type EnrichSearchResult =
+  | { status: 'found'; enrichment: MovieEnrichment }
+  | { status: 'ambiguous'; candidates: TmdbCandidate[] }
+  | { status: 'not_found' };
+
 /**
- * Entry point: TMDB first for the structured UI facts (title/year/director/
- * genre/poster) when it has a match — cheap, authoritative, no grounding
- * needed for those. Era/tone always go through grounded search regardless of
- * whether TMDB found the title, since those need actual plot/setting
- * knowledge that only a search (or TMDB's absence entirely) can supply.
- * Returns null when neither TMDB nor grounding can identify the work — the
- * caller drops into manual input.
+ * Entry point, used for the initial auto-search and for "다시 검색": TMDB
+ * first for the structured UI facts (title/year/director/genre/poster),
+ * falling back to grounded search when TMDB has no match. Unlike blindly
+ * auto-picking TMDB's top hit, this pauses on an ambiguous title/year —
+ * several TMDB matches with no reason to prefer one — and hands the
+ * candidates back for the user to pick from, instead of guessing (and
+ * possibly guessing wrong) on every re-search. era/tone extraction (a Gemini
+ * call) is skipped until a single work is settled on, either automatically
+ * (one match) or by the user (see enrichMovieById()).
  */
-export async function enrichMovie(
+export async function searchMovie(
   title: string,
   year: string,
-): Promise<MovieEnrichment | null> {
-  const fromTmdb = await enrichFromTmdb(title, year);
-  if (fromTmdb) return fromTmdb;
-  return enrichWithGrounding(title, year);
+): Promise<EnrichSearchResult> {
+  const candidates = await searchCandidates(title, year).catch(
+    (error: unknown) => {
+      console.error('[enrich] TMDB search failed', error);
+      return [] as TmdbCandidate[];
+    },
+  );
+
+  if (candidates.length > 1) {
+    return {
+      status: 'ambiguous',
+      candidates: candidates.slice(0, MAX_ENRICH_CANDIDATES),
+    };
+  }
+
+  if (candidates.length === 1) {
+    const enrichment = await enrichMovieById(candidates[0], title, year);
+    if (enrichment) return { status: 'found', enrichment };
+  }
+
+  const grounded = await enrichWithGrounding(title, year);
+  return grounded ? { status: 'found', enrichment: grounded } : { status: 'not_found' };
 }

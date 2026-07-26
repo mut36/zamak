@@ -44,6 +44,21 @@ interface TmdbSearchItem {
   release_date?: string; // movie
   first_air_date?: string; // tv
   poster_path?: string | null;
+  overview?: string;
+}
+
+/**
+ * Lightweight search hit — no detail/credits fetch behind it. Used to let the
+ * user disambiguate among several matches before we spend a detail call (and
+ * a grounded era/tone call) on the wrong one.
+ */
+export interface TmdbCandidate {
+  mediaType: TmdbMediaType;
+  tmdbId: number;
+  title: string;
+  year: string;
+  overview: string;
+  posterUrl: string | null;
 }
 
 interface TmdbCredits {
@@ -94,25 +109,18 @@ function yearOf(item: { release_date?: string; first_air_date?: string }): strin
   return /^\d{4}/.test(raw) ? raw.slice(0, 4) : '';
 }
 
+type RawCandidate = { item: TmdbSearchItem; mediaType: TmdbMediaType };
+
 /**
- * Search movies + TV in parallel (a "movie·drama" file can be either), then
- * fetch full details (with credits) for the most popular match. Year, when
- * provided, narrows each search. Returns `{ found: false }` when nothing
- * matches — the caller drops into manual input.
+ * Search movies + TV in parallel (a "movie·drama" file can be either). Year,
+ * when provided, narrows each search but is a filter, not a gate: a title
+ * whose year drifts from TMDB's (festival vs wide release, mislabeled files)
+ * must still resolve, so a year-narrowed miss retries without the year.
+ * Returns candidates sorted best-first (exact year match, then popularity),
+ * uncapped — callers decide how many to use.
  */
-export async function lookupTitle(
-  title: string,
-  year?: string,
-): Promise<TmdbLookupResult> {
-  assertConfigured();
-
-  const q = title.trim();
-  if (!q) return { found: false };
-  const y = year?.trim();
-
-  type Candidate = { item: TmdbSearchItem; mediaType: TmdbMediaType };
-
-  const searchCandidates = async (useYear: boolean): Promise<Candidate[]> => {
+async function searchRaw(q: string, y: string | undefined): Promise<RawCandidate[]> {
+  const search = async (useYear: boolean): Promise<RawCandidate[]> => {
     const [movieRes, tvRes] = await Promise.all([
       tmdbGet<{ results?: TmdbSearchItem[] }>('/search/movie', {
         query: q,
@@ -133,13 +141,8 @@ export async function lookupTitle(
     ];
   };
 
-  // Year is a filter, not a gate: a title whose year drifts from TMDB's
-  // (festival vs wide release, mislabeled files) must still resolve. Search
-  // with the year first, then retry without it if nothing comes back.
-  let candidates = await searchCandidates(true);
-  if (candidates.length === 0 && y) candidates = await searchCandidates(false);
-
-  if (candidates.length === 0) return { found: false };
+  let candidates = await search(true);
+  if (candidates.length === 0 && y) candidates = await search(false);
 
   // Prefer an exact year match (disambiguates remakes when the year is right),
   // then fall back to popularity.
@@ -151,28 +154,59 @@ export async function lookupTitle(
     }
     return (b.item.popularity ?? 0) - (a.item.popularity ?? 0);
   });
-  const best = candidates[0];
+  return candidates;
+}
 
-  const details = await tmdbGet<TmdbDetails>(
-    `/${best.mediaType}/${best.item.id}`,
-    { language: TMDB_LANGUAGE, append_to_response: 'credits' },
-  );
+/**
+ * Lightweight search: no detail/credits fetch. Returns every match, best-first
+ * — uncapped, since it's the caller's job to decide what "one match" vs
+ * "several matches" means (and how many to show).
+ */
+export async function searchCandidates(
+  title: string,
+  year?: string,
+): Promise<TmdbCandidate[]> {
+  assertConfigured();
+
+  const q = title.trim();
+  if (!q) return [];
+
+  const raw = await searchRaw(q, year?.trim());
+  return raw.map(({ item, mediaType }) => ({
+    mediaType,
+    tmdbId: item.id,
+    title: (item.title || item.name || '').trim(),
+    year: yearOf(item),
+    overview: (item.overview ?? '').trim(),
+    posterUrl: item.poster_path ? `${TMDB_IMAGE_BASE}${item.poster_path}` : null,
+  }));
+}
+
+/** Full details (with credits) for a specific, already-identified work. */
+export async function lookupById(
+  mediaType: TmdbMediaType,
+  tmdbId: number,
+): Promise<TmdbLookupResult> {
+  assertConfigured();
+
+  const details = await tmdbGet<TmdbDetails>(`/${mediaType}/${tmdbId}`, {
+    language: TMDB_LANGUAGE,
+    append_to_response: 'credits',
+  });
 
   // Overview is often missing in ko-KR for lesser-known works — fall back to en.
   let overview = (details.overview ?? '').trim();
   if (!overview && TMDB_LANGUAGE !== 'en-US') {
-    const en = await tmdbGet<TmdbDetails>(`/${best.mediaType}/${best.item.id}`, {
+    const en = await tmdbGet<TmdbDetails>(`/${mediaType}/${tmdbId}`, {
       language: 'en-US',
     }).catch(() => null);
     overview = (en?.overview ?? '').trim();
   }
 
   const director =
-    best.mediaType === 'movie'
+    mediaType === 'movie'
       ? details.credits?.crew?.find((c) => c.job === 'Director')?.name ?? null
       : details.created_by?.[0]?.name ?? null;
-
-  const posterPath = details.poster_path ?? best.item.poster_path ?? null;
 
   // Top-billed cast, most prominent first — the anchor for cast-sheet
   // extraction's name-spelling glossary (extractCastSheet.ts). TMDB rarely
@@ -191,7 +225,7 @@ export async function lookupTitle(
 
   return {
     found: true,
-    mediaType: best.mediaType,
+    mediaType,
     tmdbId: details.id,
     title: (details.title || details.name || '').trim(),
     year: yearOf(details),
@@ -200,7 +234,7 @@ export async function lookupTitle(
       .map((g) => g.name?.trim())
       .filter((n): n is string => !!n),
     overview,
-    posterUrl: posterPath ? `${TMDB_IMAGE_BASE}${posterPath}` : null,
+    posterUrl: details.poster_path ? `${TMDB_IMAGE_BASE}${details.poster_path}` : null,
     cast,
   };
 }

@@ -11,7 +11,7 @@ import { LandingPage } from './components/simple/LandingPage';
 import { CreditWall } from './components/simple/CreditWall';
 import { PurchaseStep } from './components/simple/PurchaseStep';
 import { useTranslation } from './hooks/useTranslation';
-import { useEnrich } from './hooks/useEnrich';
+import { useEnrich, type EnrichCandidate } from './hooks/useEnrich';
 import { useCastSheet } from './hooks/useCastSheet';
 import { useAuth } from './hooks/useAuth';
 import { parseSrtBlocks } from './lib/srt';
@@ -23,7 +23,7 @@ import { COPY } from './i18n/simpleCopy';
 
 const EMPTY_MOVIE_INFO: MovieInfo = { title: '', year: '', notes: '' };
 // Keep in sync with package.json version.
-const APP_VERSION = '0.7.0';
+const APP_VERSION = '0.7.3';
 
 function isSrt(file: File): boolean {
   return file.name.toLowerCase().endsWith('.srt');
@@ -113,7 +113,9 @@ export default function Home() {
     status: enrichStatus,
     director,
     error: enrichError,
+    candidates: enrichCandidates,
     enrich,
+    selectCandidate,
     reset: resetEnrich,
   } = useEnrich();
 
@@ -154,6 +156,26 @@ export default function Home() {
       tone: data?.found ? data.tone : '',
     }));
   }, [enrich]);
+
+  // User picked one of several TMDB matches from the ambiguous-search
+  // candidate list (InfoStep) — resolve that specific work the same way
+  // runEnrich merges an auto-resolved one.
+  const runSelectCandidate = useCallback(
+    async (candidate: EnrichCandidate) => {
+      const { title, year } = movieInfoRef.current;
+      const data = await selectCandidate(candidate, title, year);
+      setMovieInfo((prev) => ({
+        ...prev,
+        posterUrl: data?.posterUrl ?? undefined,
+        title: data?.found && data.title ? data.title : prev.title,
+        year: data?.found && data.year ? data.year : prev.year,
+        genre: data?.found ? data.genre : '',
+        era: data?.found ? data.era : '',
+        tone: data?.found ? data.tone : '',
+      }));
+    },
+    [selectCandidate],
+  );
 
   // Auto-analyze once per file: movie → web-search enrich + TMDB poster,
   // other → summarize. Guarded by refs so returning never re-triggers.
@@ -380,6 +402,8 @@ export default function Home() {
               enrichStatus={enrichStatus}
               enrichError={enrichError}
               director={director}
+              candidates={enrichCandidates}
+              onSelectCandidate={runSelectCandidate}
               analysisAnalyzing={analysis.isAnalyzing}
               onReEnrich={runEnrich}
               summarizing={summarizing}

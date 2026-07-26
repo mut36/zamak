@@ -5,7 +5,8 @@ vi.mock('server-only', () => ({}));
 const mocks = vi.hoisted(() => {
   const generateContent = vi.fn();
   return {
-    lookupTitle: vi.fn(),
+    searchCandidates: vi.fn(),
+    lookupById: vi.fn(),
     generateContent,
     GoogleGenAI: vi.fn().mockImplementation(function GoogleGenAI(this: {
       models: { generateContent: typeof generateContent };
@@ -16,14 +17,21 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock('./tmdb', () => ({
-  lookupTitle: mocks.lookupTitle,
+  searchCandidates: mocks.searchCandidates,
+  lookupById: mocks.lookupById,
 }));
 
 vi.mock('@google/genai', () => ({
   GoogleGenAI: mocks.GoogleGenAI,
 }));
 
-import { enrichFromTmdb, enrichMovie, enrichWithGrounding } from './enrichMovie';
+import { MAX_ENRICH_CANDIDATES } from '../../config/constants';
+import {
+  enrichMovieById,
+  enrichWithGrounding,
+  searchMovie,
+  type TmdbCandidate,
+} from './enrichMovie';
 
 const originalApiKey = process.env.GOOGLE_GENAI_API_KEY;
 
@@ -31,10 +39,22 @@ function textResponse(text: string) {
   return { text };
 }
 
-describe('enrichFromTmdb', () => {
+function makeCandidate(overrides: Partial<TmdbCandidate> = {}): TmdbCandidate {
+  return {
+    mediaType: 'movie',
+    tmdbId: 1,
+    title: '괴물',
+    year: '2006',
+    overview: '',
+    posterUrl: null,
+    ...overrides,
+  };
+}
+
+describe('enrichMovieById', () => {
   beforeEach(() => {
     process.env.GOOGLE_GENAI_API_KEY = 'test-key';
-    mocks.lookupTitle.mockReset();
+    mocks.lookupById.mockReset();
     mocks.generateContent.mockReset();
   });
 
@@ -43,17 +63,8 @@ describe('enrichFromTmdb', () => {
     else process.env.GOOGLE_GENAI_API_KEY = originalApiKey;
   });
 
-  it('returns null when TMDB has no match, without calling the aux model', async () => {
-    mocks.lookupTitle.mockResolvedValue({ found: false });
-
-    const result = await enrichFromTmdb('Some Obscure Title', '2020');
-
-    expect(result).toBeNull();
-    expect(mocks.generateContent).not.toHaveBeenCalled();
-  });
-
   it('keeps the TMDB Korean title as-is and ignores any title line from the aux model', async () => {
-    mocks.lookupTitle.mockResolvedValue({
+    mocks.lookupById.mockResolvedValue({
       found: true,
       title: '괴물',
       year: '2006',
@@ -67,7 +78,7 @@ describe('enrichFromTmdb', () => {
       ),
     );
 
-    const result = await enrichFromTmdb('괴물', '2006');
+    const result = await enrichMovieById(makeCandidate(), '괴물', '2006');
 
     expect(result).toEqual({
       found: true,
@@ -79,6 +90,7 @@ describe('enrichFromTmdb', () => {
       era: '2000년대 한강, 도시',
       tone: '긴박, 블랙코미디',
     });
+    expect(mocks.lookupById).toHaveBeenCalledWith('movie', 1);
     // Requesting a transliteration line would only be needed for a
     // non-Hangul TMDB title.
     expect(mocks.generateContent.mock.calls[0][0].contents).not.toContain(
@@ -90,7 +102,7 @@ describe('enrichFromTmdb', () => {
     // Regression: a 2022-released film set in 1978 was getting era="2022"
     // back — the non-grounded call had no way to know the real setting and
     // defaulted to echoing the release year it was given.
-    mocks.lookupTitle.mockResolvedValue({
+    mocks.lookupById.mockResolvedValue({
       found: true,
       title: '어떤 시대극',
       year: '2022',
@@ -102,7 +114,11 @@ describe('enrichFromTmdb', () => {
       textResponse('배경/시대: 1978년, 지방 소도시\n톤앤매너: 담담'),
     );
 
-    const result = await enrichFromTmdb('어떤 시대극', '2022');
+    const result = await enrichMovieById(
+      makeCandidate({ title: '어떤 시대극', year: '2022' }),
+      '어떤 시대극',
+      '2022',
+    );
 
     expect(result?.era).toBe('1978년, 지방 소도시');
     expect(mocks.generateContent.mock.calls[0][0].config.tools).toEqual([
@@ -114,7 +130,7 @@ describe('enrichFromTmdb', () => {
   });
 
   it('uses the aux model transliteration when TMDB has no Korean title', async () => {
-    mocks.lookupTitle.mockResolvedValue({
+    mocks.lookupById.mockResolvedValue({
       found: true,
       title: 'Amélie',
       year: '2001',
@@ -128,7 +144,11 @@ describe('enrichFromTmdb', () => {
       ),
     );
 
-    const result = await enrichFromTmdb('Amelie', '2001');
+    const result = await enrichMovieById(
+      makeCandidate({ title: 'Amelie', year: '2001' }),
+      'Amelie',
+      '2001',
+    );
 
     expect(result?.title).toBe('아멜리에');
     expect(mocks.generateContent.mock.calls[0][0].contents).toContain(
@@ -137,7 +157,7 @@ describe('enrichFromTmdb', () => {
   });
 
   it('still returns TMDB fields when the aux call fails, with empty era/tone', async () => {
-    mocks.lookupTitle.mockResolvedValue({
+    mocks.lookupById.mockResolvedValue({
       found: true,
       title: '괴물',
       year: '2006',
@@ -147,7 +167,7 @@ describe('enrichFromTmdb', () => {
     });
     mocks.generateContent.mockRejectedValue(new Error('quota exceeded'));
 
-    const result = await enrichFromTmdb('괴물', '2006');
+    const result = await enrichMovieById(makeCandidate(), '괴물', '2006');
 
     expect(result).toEqual({
       found: true,
@@ -163,7 +183,7 @@ describe('enrichFromTmdb', () => {
 
   it('skips the aux call and returns empty era/tone when no API key is configured', async () => {
     delete process.env.GOOGLE_GENAI_API_KEY;
-    mocks.lookupTitle.mockResolvedValue({
+    mocks.lookupById.mockResolvedValue({
       found: true,
       title: '괴물',
       year: '2006',
@@ -172,7 +192,7 @@ describe('enrichFromTmdb', () => {
       posterUrl: null,
     });
 
-    const result = await enrichFromTmdb('괴물', '2006');
+    const result = await enrichMovieById(makeCandidate(), '괴물', '2006');
 
     expect(mocks.generateContent).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -188,7 +208,7 @@ describe('enrichFromTmdb', () => {
   });
 
   it('falls back to the input year when TMDB has no parseable date', async () => {
-    mocks.lookupTitle.mockResolvedValue({
+    mocks.lookupById.mockResolvedValue({
       found: true,
       title: '괴물',
       year: '',
@@ -198,15 +218,37 @@ describe('enrichFromTmdb', () => {
     });
     mocks.generateContent.mockResolvedValue(textResponse(''));
 
-    const result = await enrichFromTmdb('괴물', '2006');
+    const result = await enrichMovieById(makeCandidate(), '괴물', '2006');
 
     expect(result?.year).toBe('2006');
   });
 
-  it('treats a TMDB lookup failure the same as a miss (returns null)', async () => {
-    mocks.lookupTitle.mockRejectedValue(new Error('TMDB request failed: 500'));
+  it('falls back to the candidate poster when the TMDB detail has none', async () => {
+    mocks.lookupById.mockResolvedValue({
+      found: true,
+      title: '괴물',
+      year: '2006',
+      director: '봉준호',
+      genres: [],
+      posterUrl: null,
+    });
+    mocks.generateContent.mockResolvedValue(textResponse(''));
 
-    const result = await enrichFromTmdb('괴물', '2006');
+    const result = await enrichMovieById(
+      makeCandidate({ posterUrl: 'https://image.tmdb.org/t/p/w500/search-hit.jpg' }),
+      '괴물',
+      '2006',
+    );
+
+    expect(result?.posterUrl).toBe(
+      'https://image.tmdb.org/t/p/w500/search-hit.jpg',
+    );
+  });
+
+  it('treats a TMDB lookup failure the same as a miss (returns null)', async () => {
+    mocks.lookupById.mockRejectedValue(new Error('TMDB request failed: 500'));
+
+    const result = await enrichMovieById(makeCandidate(), '괴물', '2006');
 
     expect(result).toBeNull();
     expect(mocks.generateContent).not.toHaveBeenCalled();
@@ -292,10 +334,11 @@ describe('enrichWithGrounding', () => {
   });
 });
 
-describe('enrichMovie', () => {
+describe('searchMovie', () => {
   beforeEach(() => {
     process.env.GOOGLE_GENAI_API_KEY = 'test-key';
-    mocks.lookupTitle.mockReset();
+    mocks.searchCandidates.mockReset();
+    mocks.lookupById.mockReset();
     mocks.generateContent.mockReset();
   });
 
@@ -304,8 +347,11 @@ describe('enrichMovie', () => {
     else process.env.GOOGLE_GENAI_API_KEY = originalApiKey;
   });
 
-  it('returns the TMDB result and never calls the full grounded-identification prompt when TMDB has a match', async () => {
-    mocks.lookupTitle.mockResolvedValue({
+  it('auto-resolves and enriches when TMDB has exactly one match', async () => {
+    mocks.searchCandidates.mockResolvedValue([
+      makeCandidate({ posterUrl: 'https://image.tmdb.org/t/p/w500/abc.jpg' }),
+    ]);
+    mocks.lookupById.mockResolvedValue({
       found: true,
       title: '괴물',
       year: '2006',
@@ -317,49 +363,106 @@ describe('enrichMovie', () => {
       textResponse('배경/시대: 2000년대 한강\n톤앤매너: 긴박'),
     );
 
-    const result = await enrichMovie('괴물', '2006');
+    const result = await searchMovie('괴물', '2006');
 
-    expect(result?.posterUrl).toBe('https://image.tmdb.org/t/p/w500/abc.jpg');
+    expect(result.status).toBe('found');
+    if (result.status === 'found') {
+      expect(result.enrichment.posterUrl).toBe(
+        'https://image.tmdb.org/t/p/w500/abc.jpg',
+      );
+    }
     // Exactly one call — the grounded keyword-extraction call (era/tone
     // only), never the full grounded-identification prompt (which would ask
     // "영화여부:" — that one is reserved for a TMDB miss).
     expect(mocks.generateContent).toHaveBeenCalledTimes(1);
-    expect(mocks.generateContent.mock.calls[0][0].config.tools).toEqual([
-      { googleSearch: {} },
-    ]);
     expect(mocks.generateContent.mock.calls[0][0].contents).not.toContain(
       '영화여부:',
     );
   });
 
+  it('returns ambiguous status with candidates, without touching the aux model, when TMDB has multiple matches', async () => {
+    const candidates = [
+      makeCandidate({ tmdbId: 1, title: '괴물' }),
+      makeCandidate({ tmdbId: 2, title: '괴물 (2006)', mediaType: 'tv' }),
+    ];
+    mocks.searchCandidates.mockResolvedValue(candidates);
+
+    const result = await searchMovie('괴물', '2006');
+
+    expect(result).toEqual({ status: 'ambiguous', candidates });
+    expect(mocks.lookupById).not.toHaveBeenCalled();
+    expect(mocks.generateContent).not.toHaveBeenCalled();
+  });
+
+  it('caps the ambiguous candidate list at MAX_ENRICH_CANDIDATES', async () => {
+    const many = Array.from({ length: MAX_ENRICH_CANDIDATES + 3 }, (_, i) =>
+      makeCandidate({ tmdbId: i + 1, title: `후보${i + 1}` }),
+    );
+    mocks.searchCandidates.mockResolvedValue(many);
+
+    const result = await searchMovie('흔한 제목', '');
+
+    expect(result.status).toBe('ambiguous');
+    if (result.status === 'ambiguous') {
+      expect(result.candidates).toEqual(many.slice(0, MAX_ENRICH_CANDIDATES));
+    }
+  });
+
   it('falls back to grounded search when TMDB has no match', async () => {
-    mocks.lookupTitle.mockResolvedValue({ found: false });
+    mocks.searchCandidates.mockResolvedValue([]);
     mocks.generateContent.mockResolvedValue(
       textResponse(
         '영화여부: 영화\n제목: 마이너 영화\n연도: 2010\n감독: 이감독\n장르: 코미디\n배경/시대: 현대 서울\n톤앤매너: 유쾌',
       ),
     );
 
-    const result = await enrichMovie('마이너 영화', '2010');
+    const result = await searchMovie('마이너 영화', '2010');
 
     expect(result).toEqual({
-      found: true,
-      title: '마이너 영화',
-      year: '2010',
-      director: '이감독',
-      posterUrl: null,
-      genre: '코미디',
-      era: '현대 서울',
-      tone: '유쾌',
+      status: 'found',
+      enrichment: {
+        found: true,
+        title: '마이너 영화',
+        year: '2010',
+        director: '이감독',
+        posterUrl: null,
+        genre: '코미디',
+        era: '현대 서울',
+        tone: '유쾌',
+      },
     });
   });
 
-  it('returns null when neither TMDB nor grounded search can identify the work', async () => {
-    mocks.lookupTitle.mockResolvedValue({ found: false });
+  it('falls back to grounded search when the single TMDB candidate fails to resolve', async () => {
+    mocks.searchCandidates.mockResolvedValue([makeCandidate()]);
+    mocks.lookupById.mockRejectedValue(new Error('TMDB request failed: 500'));
+    mocks.generateContent.mockResolvedValue(
+      textResponse(
+        '영화여부: 영화\n제목: 괴물\n연도: 2006\n감독: 봉준호\n장르: SF\n배경/시대: 2000년대 한강\n톤앤매너: 긴박',
+      ),
+    );
+
+    const result = await searchMovie('괴물', '2006');
+
+    expect(result.status).toBe('found');
+    if (result.status === 'found') expect(result.enrichment.title).toBe('괴물');
+  });
+
+  it('returns not_found status when neither TMDB nor grounded search can identify the work', async () => {
+    mocks.searchCandidates.mockResolvedValue([]);
     mocks.generateContent.mockResolvedValue(textResponse('영화여부: 없음'));
 
-    const result = await enrichMovie('완전히 알 수 없는 파일', '');
+    const result = await searchMovie('완전히 알 수 없는 파일', '');
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ status: 'not_found' });
+  });
+
+  it('treats a TMDB search failure the same as a miss', async () => {
+    mocks.searchCandidates.mockRejectedValue(new Error('TMDB request failed: 500'));
+    mocks.generateContent.mockResolvedValue(textResponse('영화여부: 없음'));
+
+    const result = await searchMovie('괴물', '2006');
+
+    expect(result).toEqual({ status: 'not_found' });
   });
 });
