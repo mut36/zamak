@@ -153,6 +153,11 @@ export const COPY = {
     notFoundBadge: '자동으로 못 찾았어요',
     posterAlt: (title: string) => `${title} 포스터`,
     posterEmpty: '포스터 없음',
+    // Shown when TMDB has several equally-plausible matches (common title,
+    // remake) and there's no reason to auto-pick one.
+    ambiguousHint: '검색 결과가 여러 개예요. 찾으시는 작품을 골라주세요.',
+    mediaTypeMovie: '영화',
+    mediaTypeTv: '드라마',
     labelTitle: '제목',
     labelYear: '개봉 연도',
     labelDirector: '감독',

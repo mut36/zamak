@@ -14,7 +14,7 @@ import type { MovieInfo } from '../../types/translation';
 import { formatBlocksForModel, parseSrtBlocks } from '../srt';
 import { loadCastSheetExtractionPrompt } from '../prompts/loader';
 import { formatMovieInfo } from '../prompts/translationContent';
-import { lookupTitle, type TmdbCastMember } from './tmdb';
+import { lookupById, searchCandidates, type TmdbCastMember } from './tmdb';
 
 const CAST_SHEET_SCHEMA = {
   type: Type.OBJECT,
@@ -115,7 +115,10 @@ async function fetchCastAnchors(
 ): Promise<TmdbCastMember[]> {
   if (!title.trim()) return [];
   try {
-    const result = await lookupTitle(title, year);
+    const candidates = await searchCandidates(title, year);
+    if (candidates.length === 0) return [];
+    const best = candidates[0];
+    const result = await lookupById(best.mediaType, best.tmdbId);
     return result.found ? (result.cast ?? []) : [];
   } catch (error) {
     console.error('[glossary] TMDB cast lookup failed', error);

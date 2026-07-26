@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import { SpinnerIcon, SparkleIcon, PencilIcon } from '../icons';
 import { CastSheetCard } from './CastSheetCard';
-import type { EnrichStatus } from '../../hooks/useEnrich';
+import type { EnrichCandidate, EnrichStatus } from '../../hooks/useEnrich';
 import type { CastSheetStatus } from '../../hooks/useCastSheet';
 import type { CastSheet } from '../../types/glossary';
 import type { ContentType, MovieInfo } from '../../types/translation';
@@ -24,6 +24,9 @@ interface InfoStepProps {
   /** Non-empty when the search failed rather than found nothing. */
   enrichError: string;
   director: string;
+  /** Present when enrichStatus === 'ambiguous' — the TMDB matches to pick from. */
+  candidates: EnrichCandidate[];
+  onSelectCandidate: (candidate: EnrichCandidate) => void;
   analysisAnalyzing: boolean;
   onReEnrich: () => void;
   // other branch
@@ -60,6 +63,8 @@ function MovieInfo({
   enrichStatus,
   enrichError,
   director,
+  candidates,
+  onSelectCandidate,
   analysisAnalyzing,
   onReEnrich,
   castSheetEnabled,
@@ -77,6 +82,7 @@ function MovieInfo({
   const busy =
     analysisAnalyzing || enrichStatus === 'searching' || enrichStatus === 'idle';
   const inputMode = editing || enrichStatus === 'notFound';
+  const awaitingSelection = !editing && enrichStatus === 'ambiguous';
 
   const handleReEnrich = () => {
     setEditing(false);
@@ -92,6 +98,8 @@ function MovieInfo({
 
       {busy ? (
         <Loading text={analysisAnalyzing ? c.analyzing : c.searching} />
+      ) : awaitingSelection ? (
+        <CandidatePicker candidates={candidates} onSelect={onSelectCandidate} />
       ) : inputMode ? (
         <div className='card p-[18px] mb-4'>
           {enrichStatus === 'notFound' && !editing && (
@@ -187,7 +195,7 @@ function MovieInfo({
         </div>
       )}
 
-      {!busy && (
+      {!busy && !awaitingSelection && (
         <div className='mt-6'>
           <p className='text-[12px] text-ink-3 mb-2'>{c.aiInfoHint}</p>
           <div className='frow'>
@@ -225,7 +233,7 @@ function MovieInfo({
         </div>
       )}
 
-      {!busy && (
+      {!busy && !awaitingSelection && (
         <div className='field mt-4'>
           <label>{c.notesLabel}</label>
           <p className='text-[12px] text-ink-3 mb-2'>{c.notesHint}</p>
@@ -240,7 +248,7 @@ function MovieInfo({
         </div>
       )}
 
-      {!busy && (
+      {!busy && !awaitingSelection && (
         <CastSheetCard
           enabled={castSheetEnabled}
           onToggle={onCastSheetToggle}
@@ -251,8 +259,12 @@ function MovieInfo({
         />
       )}
 
-      {!busy && beforeActions}
-      <Actions onBack={onBack} onTranslate={onTranslate} disabled={busy} />
+      {!busy && !awaitingSelection && beforeActions}
+      <Actions
+        onBack={onBack}
+        onTranslate={onTranslate}
+        disabled={busy || awaitingSelection}
+      />
     </div>
   );
 }
@@ -313,6 +325,63 @@ function OtherInfo({
 
       {!summarizing && beforeActions}
       <Actions onBack={onBack} onTranslate={onTranslate} disabled={summarizing} />
+    </div>
+  );
+}
+
+/* -------------------------------------------------------- candidate picker ---- */
+
+function CandidatePicker({
+  candidates,
+  onSelect,
+}: {
+  candidates: EnrichCandidate[];
+  onSelect: (candidate: EnrichCandidate) => void;
+}) {
+  return (
+    <div className='card p-[18px] mb-4'>
+      <p className='text-[13px] text-ink-3 mb-3'>{c.ambiguousHint}</p>
+      <div className='flex flex-col gap-1'>
+        {candidates.map((candidate) => (
+          <button
+            key={`${candidate.mediaType}-${candidate.tmdbId}`}
+            type='button'
+            className='flex gap-3 text-left items-start p-2 rounded-lg transition-colors hover:bg-[var(--surface-2)]'
+            onClick={() => onSelect(candidate)}
+          >
+            <div className='poster !w-[46px] !h-[64px]'>
+              {candidate.posterUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={candidate.posterUrl}
+                  alt={c.posterAlt(candidate.title)}
+                  className='w-full h-full object-cover'
+                />
+              ) : (
+                <span>{c.posterEmpty}</span>
+              )}
+            </div>
+            <div className='min-w-0'>
+              <div className='dtitle truncate !text-[14px]'>{candidate.title}</div>
+              <div className='dmeta !text-[12px]'>
+                {[
+                  candidate.year,
+                  candidate.mediaType === 'movie'
+                    ? c.mediaTypeMovie
+                    : c.mediaTypeTv,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
+              {candidate.overview && (
+                <p className='text-[12px] text-ink-3 mt-1 line-clamp-2'>
+                  {candidate.overview}
+                </p>
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

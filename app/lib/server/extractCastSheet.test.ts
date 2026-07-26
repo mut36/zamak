@@ -4,10 +4,12 @@ vi.mock('server-only', () => ({}));
 
 const mocks = vi.hoisted(() => {
   const generateContent = vi.fn();
-  const lookupTitle = vi.fn();
+  const searchCandidates = vi.fn();
+  const lookupById = vi.fn();
   return {
     generateContent,
-    lookupTitle,
+    searchCandidates,
+    lookupById,
     GoogleGenAI: vi.fn().mockImplementation(function GoogleGenAI(this: {
       models: { generateContent: typeof generateContent };
     }) {
@@ -30,7 +32,8 @@ vi.mock('./tmdb', async () => {
   const actual = await vi.importActual<typeof import('./tmdb')>('./tmdb');
   return {
     ...actual,
-    lookupTitle: mocks.lookupTitle,
+    searchCandidates: mocks.searchCandidates,
+    lookupById: mocks.lookupById,
   };
 });
 
@@ -53,8 +56,9 @@ describe('extractCastSheet', () => {
   beforeEach(() => {
     process.env.GOOGLE_GENAI_API_KEY = 'test-key';
     mocks.generateContent.mockReset();
-    mocks.lookupTitle.mockReset();
-    mocks.lookupTitle.mockResolvedValue({ found: false });
+    mocks.searchCandidates.mockReset();
+    mocks.lookupById.mockReset();
+    mocks.searchCandidates.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -180,7 +184,10 @@ describe('extractCastSheet', () => {
   });
 
   it('includes a <tmdb_cast> anchor tag (character + actor, not a Korean spelling) when TMDB has a match', async () => {
-    mocks.lookupTitle.mockResolvedValue({
+    mocks.searchCandidates.mockResolvedValue([
+      { mediaType: 'movie', tmdbId: 1, title: 'Test Movie', year: '2020', overview: '', posterUrl: null },
+    ]);
+    mocks.lookupById.mockResolvedValue({
       found: true,
       cast: [{ character: 'Jonathan', actor: 'John Smith' }],
     });
@@ -190,7 +197,8 @@ describe('extractCastSheet', () => {
 
     await extractCastSheet(SUBTITLE, movieInfo);
 
-    expect(mocks.lookupTitle).toHaveBeenCalledWith('Test Movie', '2020');
+    expect(mocks.searchCandidates).toHaveBeenCalledWith('Test Movie', '2020');
+    expect(mocks.lookupById).toHaveBeenCalledWith('movie', 1);
     const call = mocks.generateContent.mock.calls[0][0];
     expect(call.contents).toContain(
       '<tmdb_cast>\n- Jonathan (배우: John Smith)\n</tmdb_cast>',
@@ -198,13 +206,14 @@ describe('extractCastSheet', () => {
   });
 
   it('omits the <tmdb_cast> tag when TMDB has no match', async () => {
-    mocks.lookupTitle.mockResolvedValue({ found: false });
+    mocks.searchCandidates.mockResolvedValue([]);
     mocks.generateContent.mockResolvedValue(
       jsonResponse({ terms: [], relations: [] }),
     );
 
     await extractCastSheet(SUBTITLE, movieInfo);
 
+    expect(mocks.lookupById).not.toHaveBeenCalled();
     const call = mocks.generateContent.mock.calls[0][0];
     expect(call.contents).not.toContain('<tmdb_cast>');
   });

@@ -51,14 +51,27 @@
 
 ### 2-A. 작품 정보 수집 — 영화·드라마 (enrich)
 - **코드**: `app/api/enrich/route.ts` → **`app/lib/server/enrichMovie.ts`**
-  (`enrichMovie` → `enrichFromTmdb` → `lookupTitle` + `extractKeywords`;
-  TMDB 미스 시 `enrichWithGrounding`), TMDB 조회 `app/lib/server/tmdb.ts`.
+  — 검색 모드(`{title, year}`) → `searchMovie` → TMDB 후보 검색
+  `tmdb.ts`(`searchCandidates`); 선택 모드(`{candidate}`, 사용자가 후보를 고른 뒤) →
+  `enrichMovieById` → 상세조회 `tmdb.ts`(`lookupById`) + `extractKeywords`.
+  둘 다 TMDB 미스 시 `enrichWithGrounding`으로 폴백.
 - **하는 일 / 두 버킷**:
   - **UI 버킷** (화면 표시): 제목·연도·감독·포스터 — TMDB 매치 시 TMDB에서, 미스 시 그라운딩.
   - **AI 버킷** (번역 프롬프트로만 감): 장르(TMDB) + 배경/시대·톤앤매너(그라운딩 검색).
+- **후보가 여러 개일 때 (사용자 선택)**: `searchMovie`는 TMDB 검색 결과가 정확히 1개면
+  바로 상세조회까지 진행하지만, **2개 이상이면(제목이 흔하거나 리메이크가 있을 때)
+  era/tone 추출 없이 후보 목록만 반환**한다(`{status:'ambiguous', candidates}`, 최대
+  `MAX_ENRICH_CANDIDATES`개 — `constants.ts`). 인기도만으로 자동 선택하면 재검색해도
+  계속 다른 작품이 나오는 문제가 있어, 그 대신 `InfoStep.tsx`가 포스터·제목·연도·
+  영화/드라마 구분으로 후보 카드를 보여주고 사용자가 클릭해서 고르면(`onSelectCandidate`)
+  그때 `/api/enrich`를 선택 모드로 다시 호출해 `enrichMovieById`가 마무리한다.
 - **품질 레버**:
-  - 제목/연도/감독/포스터 틀림 → TMDB 매칭 로직 `tmdb.ts` (`lookupTitle`), 또는 미스 시
-    그라운딩 프롬프트 `enrichMovie.ts` (`buildGroundedPrompt`)
+  - 제목/연도/감독/포스터 틀림 → TMDB 검색·정렬 로직 `tmdb.ts` (`searchCandidates`의
+    연도매칭→인기도 정렬), 상세조회 `tmdb.ts` (`lookupById`), 또는 미스 시 그라운딩
+    프롬프트 `enrichMovie.ts` (`buildGroundedPrompt`)
+  - 후보가 계속 엉뚱한 작품으로 자동 선택됨(재검색 정확도) → `tmdb.ts`
+    (`searchCandidates`의 정렬 기준), 후보 노출 상한 `constants.ts`
+    `MAX_ENRICH_CANDIDATES`, 후보 카드 UI `InfoStep.tsx` (`CandidatePicker`)
   - 장르/배경·시대/톤앤매너 품질 → **`enrichMovie.ts`의 `buildKeywordPrompt`
     (TMDB 매치용) / `buildGroundedPrompt` (미스용)**
   - 한국어 제목 없을 때 음차 → `enrichMovie.ts` (`needsTransliteration` + 프롬프트)
@@ -312,7 +325,8 @@
 | 증상 | 1차로 볼 곳 |
 |---|---|
 | 제목/연도가 파일명에서 잘못 뽑힘 | `content_analysis.txt`, `metadataInference.ts` |
-| 감독/포스터 안 뜸·틀림 | `tmdb.ts` (`lookupTitle`), `enrichMovie.ts` (`buildGroundedPrompt`) |
+| 감독/포스터 안 뜸·틀림 | `tmdb.ts` (`searchCandidates`/`lookupById`), `enrichMovie.ts` (`buildGroundedPrompt`) |
+| 재검색해도 계속 다른(엉뚱한) 작품이 나옴 | `tmdb.ts` (`searchCandidates` 정렬), `enrichMovie.ts` (`searchMovie`의 후보 임계값), `InfoStep.tsx` (`CandidatePicker`) — §2-A "후보가 여러 개일 때" |
 | 장르/배경·시대/톤앤매너가 이상함 | `enrichMovie.ts` (`buildKeywordPrompt` / `buildGroundedPrompt`) |
 | 배경/시대가 개봉연도로 나옴 | `enrichMovie.ts` 프롬프트 (그라운딩·"개봉연도≠극중배경" 지침) |
 | 번역이 직역투/어색함 | `translation_rules_ko.txt` |
