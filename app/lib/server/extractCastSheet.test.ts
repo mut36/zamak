@@ -4,8 +4,10 @@ vi.mock('server-only', () => ({}));
 
 const mocks = vi.hoisted(() => {
   const generateContent = vi.fn();
+  const lookupTitle = vi.fn();
   return {
     generateContent,
+    lookupTitle,
     GoogleGenAI: vi.fn().mockImplementation(function GoogleGenAI(this: {
       models: { generateContent: typeof generateContent };
     }) {
@@ -21,6 +23,14 @@ vi.mock('@google/genai', async () => {
   return {
     ...actual,
     GoogleGenAI: mocks.GoogleGenAI,
+  };
+});
+
+vi.mock('./tmdb', async () => {
+  const actual = await vi.importActual<typeof import('./tmdb')>('./tmdb');
+  return {
+    ...actual,
+    lookupTitle: mocks.lookupTitle,
   };
 });
 
@@ -43,6 +53,8 @@ describe('extractCastSheet', () => {
   beforeEach(() => {
     process.env.GOOGLE_GENAI_API_KEY = 'test-key';
     mocks.generateContent.mockReset();
+    mocks.lookupTitle.mockReset();
+    mocks.lookupTitle.mockResolvedValue({ found: false });
   });
 
   afterEach(() => {
@@ -165,6 +177,36 @@ describe('extractCastSheet', () => {
     mocks.generateContent.mockResolvedValue({ text: 'not json at all' });
     const result = await extractCastSheet(SUBTITLE, movieInfo);
     expect(result).toEqual({ terms: [], relations: [] });
+  });
+
+  it('includes a <tmdb_cast> anchor tag (character + actor, not a Korean spelling) when TMDB has a match', async () => {
+    mocks.lookupTitle.mockResolvedValue({
+      found: true,
+      cast: [{ character: 'Jonathan', actor: 'John Smith' }],
+    });
+    mocks.generateContent.mockResolvedValue(
+      jsonResponse({ terms: [], relations: [] }),
+    );
+
+    await extractCastSheet(SUBTITLE, movieInfo);
+
+    expect(mocks.lookupTitle).toHaveBeenCalledWith('Test Movie', '2020');
+    const call = mocks.generateContent.mock.calls[0][0];
+    expect(call.contents).toContain(
+      '<tmdb_cast>\n- Jonathan (배우: John Smith)\n</tmdb_cast>',
+    );
+  });
+
+  it('omits the <tmdb_cast> tag when TMDB has no match', async () => {
+    mocks.lookupTitle.mockResolvedValue({ found: false });
+    mocks.generateContent.mockResolvedValue(
+      jsonResponse({ terms: [], relations: [] }),
+    );
+
+    await extractCastSheet(SUBTITLE, movieInfo);
+
+    const call = mocks.generateContent.mock.calls[0][0];
+    expect(call.contents).not.toContain('<tmdb_cast>');
   });
 
   it('returns an empty sheet when the model call throws', async () => {

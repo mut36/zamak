@@ -14,12 +14,7 @@ import type { MovieInfo } from '../../types/translation';
 import { formatBlocksForModel, parseSrtBlocks } from '../srt';
 import { loadCastSheetExtractionPrompt } from '../prompts/loader';
 import { formatMovieInfo } from '../prompts/translationContent';
-
-/** A cast anchor from TMDB credits — the model must use this spelling as-is. */
-export interface CastAnchor {
-  source: string;
-  ko: string;
-}
+import { lookupTitle, type TmdbCastMember } from './tmdb';
 
 const CAST_SHEET_SCHEMA = {
   type: Type.OBJECT,
@@ -95,15 +90,42 @@ function excerptBlocks(blocks: readonly string[], maxBlocks: number): string {
   return picked.join('\n\n');
 }
 
-function buildCastAnchorTag(cast: readonly CastAnchor[]): string {
+/**
+ * TMDB rarely localizes `character` into Korean, so this is not a ready-made
+ * spelling — just a hint the extraction prompt uses to identify who's who
+ * ("this character, played by this actor, is probably in the subtitles").
+ * The model still does the actual Korean-spelling work.
+ */
+function buildCastAnchorTag(cast: readonly TmdbCastMember[]): string {
   if (cast.length === 0) return '';
-  const lines = cast.map((c) => `- ${c.source} → ${c.ko}`);
+  const lines = cast.map((c) => `- ${c.character} (배우: ${c.actor})`);
   return `<tmdb_cast>\n${lines.join('\n')}\n</tmdb_cast>`;
+}
+
+/**
+ * Best-effort TMDB cast lookup for the anchor tag. A second TMDB call
+ * (enrichMovie.ts already made one for /api/enrich) rather than threading the
+ * result through the client — keeps this prepass self-contained and able to
+ * run standalone. Failures (no TMDB key, no match, network error) degrade to
+ * no anchor, same as every other best-effort path in this feature.
+ */
+async function fetchCastAnchors(
+  title: string,
+  year: string,
+): Promise<TmdbCastMember[]> {
+  if (!title.trim()) return [];
+  try {
+    const result = await lookupTitle(title, year);
+    return result.found ? (result.cast ?? []) : [];
+  } catch (error) {
+    console.error('[glossary] TMDB cast lookup failed', error);
+    return [];
+  }
 }
 
 function buildUserTurn(
   movieInfo: Pick<MovieInfo, 'title' | 'year' | 'genre' | 'country' | 'era' | 'tone'>,
-  cast: readonly CastAnchor[],
+  cast: readonly TmdbCastMember[],
   subtitleContent: string,
   blockCount: number,
 ): string {
@@ -236,7 +258,6 @@ function sanitizeCastSheet(
 export async function extractCastSheet(
   subtitleContent: string,
   movieInfo: Pick<MovieInfo, 'title' | 'year' | 'genre' | 'country' | 'era' | 'tone'>,
-  cast: readonly CastAnchor[] = [],
 ): Promise<CastSheet> {
   const apiKey = process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) return EMPTY_CAST_SHEET;
@@ -245,7 +266,10 @@ export async function extractCastSheet(
   if (blockCount === 0) return EMPTY_CAST_SHEET;
 
   try {
-    const systemInstruction = await loadCastSheetExtractionPrompt();
+    const [systemInstruction, cast] = await Promise.all([
+      loadCastSheetExtractionPrompt(),
+      fetchCastAnchors(movieInfo.title, movieInfo.year),
+    ]);
     const userTurn = buildUserTurn(movieInfo, cast, subtitleContent, blockCount);
 
     const ai = new GoogleGenAI({ apiKey });

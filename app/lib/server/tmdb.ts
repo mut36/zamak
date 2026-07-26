@@ -32,6 +32,8 @@ export interface TmdbLookupResult {
   overview?: string;
   /** Ready-to-use poster URL, or null. */
   posterUrl?: string | null;
+  /** Top-billed cast (character + actor), most prominent first. */
+  cast?: TmdbCastMember[];
 }
 
 interface TmdbSearchItem {
@@ -46,6 +48,13 @@ interface TmdbSearchItem {
 
 interface TmdbCredits {
   crew?: Array<{ job?: string; name?: string }>;
+  cast?: Array<{ character?: string; name?: string; order?: number }>;
+}
+
+/** A cast member as billed — character name (often untranslated) + actor. */
+export interface TmdbCastMember {
+  character: string;
+  actor: string;
 }
 
 interface TmdbDetails {
@@ -165,6 +174,21 @@ export async function lookupTitle(
 
   const posterPath = details.poster_path ?? best.item.poster_path ?? null;
 
+  // Top-billed cast, most prominent first — the anchor for cast-sheet
+  // extraction's name-spelling glossary (extractCastSheet.ts). TMDB rarely
+  // localizes `character` into Korean, so this is mostly a "here's the
+  // actor" hint rather than a ready Korean name; the model still has to do
+  // the actual romanization work for most entries.
+  const cast = (details.credits?.cast ?? [])
+    .slice()
+    .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+    .slice(0, 12)
+    .map((c) => ({
+      character: (c.character ?? '').trim(),
+      actor: (c.name ?? '').trim(),
+    }))
+    .filter((c) => c.character && c.actor);
+
   return {
     found: true,
     mediaType: best.mediaType,
@@ -177,5 +201,6 @@ export async function lookupTitle(
       .filter((n): n is string => !!n),
     overview,
     posterUrl: posterPath ? `${TMDB_IMAGE_BASE}${posterPath}` : null,
+    cast,
   };
 }
