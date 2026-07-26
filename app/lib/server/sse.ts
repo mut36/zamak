@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { TIMING } from '../../config/constants';
+import { classifyError } from '../translationErrors';
+import type { TranslationOutcome } from './translationService';
 import type { TranslationEvent } from '../../types/translation';
 
 function encodeEvent(
@@ -11,7 +13,7 @@ function encodeEvent(
 }
 
 export function createTranslationStream(
-  task: () => Promise<string>,
+  task: () => Promise<TranslationOutcome>,
 ): Response {
   const stream = new ReadableStream({
     async start(controller) {
@@ -21,14 +23,19 @@ export function createTranslationStream(
       }, TIMING.HEARTBEAT_MS);
 
       try {
-        const translatedContent = await task();
+        const { content, unmatchedBlocks } = await task();
         controller.enqueue(
-          encodeEvent(encoder, { translatedContent }),
+          encodeEvent(encoder, {
+            translatedContent: content,
+            unmatchedBlocks,
+          }),
         );
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Translation failed';
-        controller.enqueue(encodeEvent(encoder, { error: message }));
+        controller.enqueue(
+          encodeEvent(encoder, { error: message, code: classifyError(error) }),
+        );
       } finally {
         clearInterval(heartbeat);
         controller.close();

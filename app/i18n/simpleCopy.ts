@@ -209,8 +209,21 @@ export const COPY = {
     summaryTimecode: '타임코드 보존',
     previewTitle: '번역 미리보기',
     startOver: '새 파일 번역하기',
-    partialWarning: (failed: number) =>
-      `일부 구간(${failed.toLocaleString()}개)은 번역에 실패해 원문 그대로 남아 있어요. 해당 부분만 다시 번역하거나 직접 손봐주세요.`,
+    // failedChunks: whole chunks that errored out entirely. fallbackBlocks:
+    // individual lines within an otherwise-successful chunk that the model
+    // skipped or misaligned. Both, either, or neither may be non-zero.
+    partialWarning: (failedChunks: number, fallbackBlocks: number) => {
+      const parts: string[] = [];
+      if (failedChunks > 0) parts.push(`구간 ${failedChunks.toLocaleString()}개`);
+      if (fallbackBlocks > 0) parts.push(`자막 ${fallbackBlocks.toLocaleString()}줄`);
+      return `${parts.join(', ')}은 번역에 실패해 원문 그대로 남아 있어요. 해당 부분만 다시 번역하거나 직접 손봐주세요.`;
+    },
+    stopReason: {
+      quota:
+        'API 사용 한도를 초과해 번역을 도중에 멈췄어요. 여기까지는 저장됐고, 나머지는 원문 그대로예요.',
+      auth:
+        '인증에 문제가 생겨 번역을 도중에 멈췄어요. 여기까지는 저장됐고, 나머지는 원문 그대로예요. 다시 로그인한 뒤 새로 시도해주세요.',
+    },
   },
 
   footer: {

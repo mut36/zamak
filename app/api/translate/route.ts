@@ -12,6 +12,7 @@ import { translateSubtitle } from '../../lib/server/translationService';
 import { requireUser } from '../../lib/server/auth';
 import { isJobUsable } from '../../lib/server/translationJob';
 import { createClient } from '../../lib/supabase/server';
+import { classifyError } from '../../lib/translationErrors';
 
 export const maxDuration = 300;
 
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     if (!(await isJobUsable(supabase, body.jobId, auth.user.id))) {
       return NextResponse.json(
-        { error: 'invalid_or_expired_job' },
+        { error: 'invalid_or_expired_job', code: 'auth' },
         { status: 403 },
       );
     }
@@ -58,6 +59,9 @@ export async function POST(request: NextRequest) {
         : 500;
     const message =
       error instanceof Error ? error.message : 'Translation request failed';
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json(
+      { error: message, code: classifyError(error) },
+      { status },
+    );
   }
 }

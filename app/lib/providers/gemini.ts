@@ -2,6 +2,7 @@ import 'server-only';
 
 import { GoogleGenAI, FinishReason, ThinkingLevel } from '@google/genai';
 import { thinkingLevelForModel } from '../../config/constants';
+import { TranslationError } from '../translationErrors';
 import type { ModelProvider } from './types';
 
 const defaultClient = process.env.GOOGLE_GENAI_API_KEY
@@ -48,10 +49,16 @@ export const geminiProvider: ModelProvider = {
     const finishReason = candidate?.finishReason;
 
     if (finishReason === FinishReason.SAFETY) {
-      throw new Error(`Gemini safety filter blocked the response (model=${model}). Try rephrasing the content or switching to the Pro model.`);
+      throw new TranslationError(
+        `Gemini safety filter blocked the response (model=${model}). Try rephrasing the content or switching to the Pro model.`,
+        'safety',
+      );
     }
     if (finishReason === FinishReason.MAX_TOKENS) {
-      throw new Error(`Gemini output was truncated: MAX_TOKENS reached (model=${model}). The chunk may be too large.`);
+      throw new TranslationError(
+        `Gemini output was truncated: MAX_TOKENS reached (model=${model}). The chunk may be too large.`,
+        'oversize',
+      );
     }
 
     return response.text ?? '';

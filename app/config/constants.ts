@@ -345,6 +345,16 @@ export const TIMING = {
   SUCCESS_RESET_MS: 5_000,
 } as const;
 
+/**
+ * Per-chunk request timeout on the client (ms). Matches `/api/translate`'s
+ * `maxDuration = 300` — without this, a connection that stalls (rather than
+ * erroring outright) hangs forever, since fetch has no default timeout.
+ */
+export const CHUNK_TIMEOUT_MS = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_CHUNK_TIMEOUT_MS,
+  300_000,
+);
+
 /** API retry configuration */
 export const RETRY = {
   MAX_ATTEMPTS: 3,

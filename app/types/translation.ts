@@ -1,3 +1,5 @@
+import type { TranslationErrorCode } from '../lib/translationErrors';
+
 export interface MovieInfo {
   title: string;
   year: string;
@@ -31,6 +33,15 @@ export interface TranslationResult {
   failedChunks?: number;
   /** Total chunks the file was split into. */
   totalChunks?: number;
+  /** Subtitle blocks that individually kept their original text inside an
+   * otherwise-successful chunk (model skipped/misaligned them) — distinct
+   * from failedChunks, which are whole chunks that errored out. */
+  fallbackBlocks?: number;
+  /** Set when a fatal error (quota/auth) stopped the job before every chunk
+   * was attempted; every chunk after the stopping point kept its original
+   * text. Undefined when the job ran to completion (with or without
+   * per-chunk/per-block fallbacks). */
+  stopReason?: 'quota' | 'auth';
 }
 
 export type TranslationMode = 'chunk';
@@ -60,5 +71,9 @@ export interface ChunkTranslationRequest extends TranslationRequestBase {
 
 export interface TranslationEvent {
   translatedContent?: string;
+  /** Blocks within this chunk that fell back to original text (see
+   * TranslationOutcome.unmatchedBlocks server-side). */
+  unmatchedBlocks?: number;
   error?: string;
+  code?: TranslationErrorCode;
 }

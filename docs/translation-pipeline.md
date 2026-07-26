@@ -201,9 +201,37 @@
   블록이 backward-room을 못 써 덜 조정된다(decisions §2-5). 실측(1480블록)상 여유가 있는데
   미조정으로 남는 블록은 2개 수준.
 
+### 9.6. 에러 분류·재시도·폴백
+- **코드**: **`app/lib/translationErrors.ts`**(분류 표, 서버·클라 공용) — 서버
+  (`translationService.ts`, `providers/gemini.ts`)가 에러를 `TranslationError{code}`로
+  타입 붙여 던지고, SSE(`server/sse.ts`)·JSON 에러 응답(`api/translate/route.ts`)
+  둘 다 `code`를 실어 보낸다. 클라(`lib/client/translationApi.ts`)는 코드가 없는
+  네트워크 레벨 에러(타임아웃·fetch 실패)만 `classifyError`로 재분류. 실제 재시도/
+  전역중단 판단은 **`app/lib/client/chunkRetry.ts`**, 호출은 `useTranslation.ts`.
+- **분류표**: `transient`(5xx·네트워크·타임아웃) / `quota`(429) / `auth`(401·403·
+  `invalid_or_expired_job`) / `safety`(Gemini SAFETY) / `oversize`(MAX_TOKENS) /
+  `align`(청크 전체가 정렬 실패, `matched===0`) / `unknown`.
+- **대응**: `transient`·`align` → 1회 재시도. `oversize`(블록 2개 이상일 때만) → 반으로
+  쪼개 1회. `quota`·`auth` → **전역 중단**: `chunkRetry`의 `RetryState.fatalCode`를
+  세우고, 그 시점 이후 시작되는 모든 청크가 네트워크 호출 없이 바로 원문 폴백된다(이미
+  전송 중이던 청크는 각자 결과대로 끝남). 전역 중단은 `throw`가 아니라 폴백이므로
+  **파일은 항상 끝까지 조립되어 다운로드 가능** — 불변식 위반이 아니다. `safety`·
+  `unknown`은 재시도해도 같은 결과일 가능성이 높아 바로 폴백.
+- **예산**: 파일 전체에 `computeRetryBudget(totalChunks) = max(3, ceil(totalChunks*0.2))`
+  개의 "추가 호출"(재시도+분할 합산) 상한. 소진되면 이후 실패는 재시도 없이 폴백. 이게
+  `decisions.md` §2-2의 20분/5,000원 사고를 **구조적으로** 못 일어나게 만드는 장치 —
+  최악의 비용 증가가 +20%로 고정된다.
+- **보고**: 청크 전체 실패(`failedChunks`)와 청크 안에서 일부 블록만 못 맞춘 경우
+  (`fallbackBlocks`, 서버 `TranslationOutcome.unmatchedBlocks` 합산)를 분리해서 화면에
+  보여준다 — 전자만 보이던 예전엔 후자가 조용히 원문으로 나가도 "실패 0"으로 표시됐다.
+  전역 중단이 있었으면 `TranslationResult.stopReason`(`'quota'|'auth'`)으로 그 사유를
+  따로 표시(`DoneStep.tsx`, `simpleCopy.ts` `done.stopReason`).
+- **미룬 것(다음 커밋)**: 크레딧 환불 정책, "실패한 부분만 재번역" 버튼. `TODO.md` 참조.
+
 ### 10. 조립 & 다운로드
-- **코드**: `useTranslation`(청크 결과 합치기 + §9.5 조정), `app/lib/srt.ts` (`buildOutputFilename`),
-  `app/components/simple/DoneStep.tsx`, `TranslationResult`(`failedChunks`/`totalChunks`)
+- **코드**: `useTranslation`(청크 결과 합치기 + §9.5 조정 + §9.6 재시도/폴백 집계),
+  `app/lib/srt.ts` (`buildOutputFilename`), `app/components/simple/DoneStep.tsx`,
+  `TranslationResult`(`failedChunks`/`fallbackBlocks`/`totalChunks`/`stopReason`)
 - **품질 레버**: 출력 파일명 규칙 → `buildOutputFilename` / `constants.ts`
   `LANG_SUFFIX` + `SOURCE_LANG_CODES`. `.srt` 직전 토큰이 화이트리스트 언어
   코드면 도착어로 **교체**(`movie.it.srt` → `movie.ko.srt`), 아니면 **추가**
@@ -230,7 +258,10 @@
 | 한국어 자막이 너무 빨리 지나감(읽기 힘듦) | `srt.ts` (`adjustSubtitleTiming`), `constants.ts` `CPS_TARGET`/`MIN_SUBTITLE_GAP_MS` — §9.5 |
 | 자막이 너무 짧게 스쳐 지나감(대사와 무관하게) | `srt.ts` (`adjustSubtitleTiming`), `constants.ts` `MIN_SUBTITLE_DURATION_MS` — §9.5 |
 | 번역이 느림/비쌈 | `constants.ts` `SERVER_CHUNK_SIZE`/`CONCURRENCY`/`thinkingLevelForModel`, 모델(고급/빠른) |
-| 특정 청크만 원문 그대로 | 그 청크 호출 실패(원문 폴백) — `gemini.ts` 로그, `translationService.ts` |
+| 특정 청크만 원문 그대로 | 그 청크 호출 실패(원문 폴백) — `gemini.ts` 로그, `translationService.ts`, 재시도 판단은 `chunkRetry.ts` — §9.6 |
+| 청크는 성공했는데 일부 줄만 원문 그대로 (화면엔 "성공"으로만 뜸) | `translationService.ts` `unmatchedBlocks` → `TranslationResult.fallbackBlocks` 집계 확인 — §9.6 |
+| API 한도 초과 이후 남은 파일이 통째로 원문 | 의도된 전역 중단(quota/auth) — `chunkRetry.ts` `RetryState.fatalCode`, 화면엔 `stopReason` 배너 — §9.6 |
+| 에러 종류에 따라 재시도/중단 동작을 바꾸고 싶음 | `translationErrors.ts` 분류(`classifyError`)·성격 함수(`isFatalCode`/`isRetryableCode`) — §9.6 |
 | 진행 링이 너무 빨리 차서 99%에서 오래 기다림(또는 그 반대) | `constants.ts` `TRANSLATION_ESTIMATE_MS`(모델별), 이징 곡선은 `ProgressStep.tsx` — §6 |
 | 화면 문구가 이상함 | `app/i18n/simpleCopy.ts` (하드코딩 금지) |
 

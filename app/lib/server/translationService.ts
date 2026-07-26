@@ -3,6 +3,7 @@ import 'server-only';
 import { RETRY } from '../../config/constants';
 import { parseSrtBlocks, reassembleTranslatedChunk } from '../srt';
 import { composeTranslationPrompt } from '../prompts/composer';
+import { classifyError, TranslationError } from '../translationErrors';
 import {
   generateModelText,
   getModelProvider,
@@ -13,6 +14,15 @@ import type {
   TranslationMode,
   TranslationStyle,
 } from '../../types/translation';
+
+export interface TranslationOutcome {
+  /** Full SRT content for this chunk, source timecodes restored. */
+  content: string;
+  /** Blocks within this chunk that kept their original text because the
+   * model's output didn't line up with them (non-strict mode only — strict
+   * mode fully validates or throws, so it's always 0 there). */
+  unmatchedBlocks: number;
+}
 
 interface TranslateOptions {
   model: string;
@@ -31,11 +41,6 @@ interface TranslateOptions {
 const SRT_TIMING_PATTERN =
   /^\d{2}:\d{2}:\d{2},\d{3}\s+-->\s+\d{2}:\d{2}:\d{2},\d{3}/;
 
-function isQuotaError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes('429') || message.toLowerCase().includes('quota');
-}
-
 /**
  * Strict mode (opt-in, default OFF). When enabled, the model output is
  * validated block-by-block and retried up to RETRY.MAX_ATTEMPTS, and a
@@ -53,12 +58,24 @@ function isStrictModeEnabled(): boolean {
   return setting === 'true' || setting === '1';
 }
 
-function toUserMessage(error: unknown): string {
-  if (isQuotaError(error)) {
+function toUserMessage(error: unknown, code: ReturnType<typeof classifyError>): string {
+  if (code === 'quota') {
     return 'API 사용 한도를 초과했습니다. 잠시 후 다시 시도해주세요.';
+  }
+  if (code === 'auth') {
+    return '인증에 실패했습니다. 다시 로그인한 뒤 시도해주세요.';
   }
   const message = error instanceof Error ? error.message : String(error);
   return `번역 중 오류가 발생했습니다: ${message}`;
+}
+
+/** Wraps any error thrown along the translate-a-chunk path into a
+ * TranslationError carrying the code the client needs to decide whether to
+ * retry, split, or give up — an already-typed TranslationError passes through
+ * with its message re-localized, everything else is classified fresh. */
+function toTranslationError(error: unknown): TranslationError {
+  const code = classifyError(error);
+  return new TranslationError(toUserMessage(error, code), code);
 }
 
 class TranslationOutputValidationError extends Error {
@@ -227,7 +244,7 @@ export async function translateSubtitle({
   subtitleContent,
   apiKeys = {},
   chunkPosition,
-}: TranslateOptions): Promise<string> {
+}: TranslateOptions): Promise<TranslationOutcome> {
   const provider = getModelProvider(model);
 
   function composePrompt(content: string) {
@@ -245,7 +262,7 @@ export async function translateSubtitle({
   // capped at a single API call — no validation retries, no per-block splits.
   // On failure it throws so the caller can keep the original (untranslated)
   // chunk and still deliver a complete file.
-  async function translateOnce(content: string): Promise<string> {
+  async function translateOnce(content: string): Promise<TranslationOutcome> {
     const { system, user } = await composePrompt(content);
     let modelOutput: string;
     try {
@@ -255,7 +272,7 @@ export async function translateSubtitle({
       );
     } catch (error) {
       console.error(`[translation] ${provider.name} call failed`, error);
-      throw new Error(toUserMessage(error));
+      throw toTranslationError(error);
     }
 
     // The model is sent subtitles without timestamps, so its output has none
@@ -274,8 +291,9 @@ export async function translateSubtitle({
       console.error(
         `[translation] chunk ${position}: model output matched none of ${total} blocks`,
       );
-      throw new Error(
+      throw new TranslationError(
         '번역 결과를 자막 형식으로 복원하지 못했습니다. 잠시 후 다시 시도해주세요.',
+        'align',
       );
     }
     if (unmatched > 0) {
@@ -284,7 +302,7 @@ export async function translateSubtitle({
       );
     }
 
-    return rebuilt;
+    return { content: rebuilt, unmatchedBlocks: unmatched };
   }
 
   // Strict path (opt-in via TRANSLATION_STRICT_MODE): validate the output,
@@ -319,7 +337,7 @@ export async function translateSubtitle({
 
         if (
           error instanceof TranslationOutputValidationError ||
-          isQuotaError(error) ||
+          classifyError(error) === 'quota' ||
           attempt === RETRY.MAX_ATTEMPTS
         ) {
           break;
@@ -342,10 +360,14 @@ export async function translateSubtitle({
       return translatedBlocks.join('\n\n');
     }
 
-    throw new Error(toUserMessage(lastError));
+    throw toTranslationError(lastError);
   }
 
-  return isStrictModeEnabled()
-    ? translateContentStrict(subtitleContent)
-    : translateOnce(subtitleContent);
+  if (isStrictModeEnabled()) {
+    const content = await translateContentStrict(subtitleContent);
+    // Strict mode validates every block matches or throws, so there is never
+    // a partial fallback to report.
+    return { content, unmatchedBlocks: 0 };
+  }
+  return translateOnce(subtitleContent);
 }

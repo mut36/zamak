@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { parseFilename, type FilenameMetadata } from '../utils/metadataInference';
 import { requestChunkTranslation } from '../lib/client/translationApi';
+import { translateChunkWithRetry, type RetryState } from '../lib/client/chunkRetry';
 import {
   beginTranslationJob,
   JobRefusedError,
@@ -14,6 +15,7 @@ import {
   parseSrtBlocks,
 } from '../lib/srt';
 import { runOrderedPool } from '../lib/client/concurrency';
+import { computeRetryBudget } from '../lib/translationErrors';
 import type {
   MovieInfo,
   TranslationStyle,
@@ -259,36 +261,47 @@ export function useTranslation(
       });
 
       // A failed chunk keeps its original (untranslated) text so the output
-      // file stays complete. We never retry here — one call per chunk — and
-      // only cancellation aborts the whole job.
+      // file stays complete. Retries are capped by a single per-file budget
+      // (docs/decisions.md §2-2) shared across every chunk — a fatal error
+      // (quota/auth) trips retryState.fatalCode, and every chunk that hasn't
+      // started yet falls straight back to its original text without
+      // spending a call. Only user cancellation aborts the whole job.
       let failedChunks = 0;
+      let fallbackBlocks = 0;
+      const retryState: RetryState = {
+        budget: computeRetryBudget(totalChunks),
+        fatalCode: null,
+      };
       const results = await runOrderedPool<string, string>({
         items: chunks,
         concurrency,
         signal: controller.signal,
         worker: async (chunk, index) => {
           try {
-            return await requestChunkTranslation(
-              {
-                chunk,
-                chunkIndex: index + 1,
-                totalChunks,
-                movieInfo,
-                model,
-                targetLang,
-                translationStyle,
-                jobId,
-              },
+            const outcome = await translateChunkWithRetry(
+              chunk,
               controller.signal,
+              (content, signal) =>
+                requestChunkTranslation(
+                  {
+                    chunk: content,
+                    chunkIndex: index + 1,
+                    totalChunks,
+                    movieInfo,
+                    model,
+                    targetLang,
+                    translationStyle,
+                    jobId,
+                  },
+                  signal,
+                ),
+              retryState,
             );
+            fallbackBlocks += outcome.unmatchedBlocks;
+            return outcome.content;
           } catch (err) {
             // Let cancellation propagate so the pool can abort.
-            if (
-              controller.signal.aborted ||
-              (err instanceof Error && err.name === 'AbortError')
-            ) {
-              throw err;
-            }
+            if (controller.signal.aborted) throw err;
             failedChunks++;
             console.error(
               `[translate] chunk ${index + 1}/${totalChunks} failed, keeping original`,
@@ -350,6 +363,8 @@ export function useTranslation(
         durationMs: Date.now() - startedAt,
         failedChunks,
         totalChunks,
+        fallbackBlocks,
+        stopReason: retryState.fatalCode ?? undefined,
       });
 
       setTranslationProgress({

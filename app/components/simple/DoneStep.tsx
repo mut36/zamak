@@ -47,8 +47,9 @@ export function DoneStep({ result, originalContent, onStartOver }: DoneStepProps
         </div>
       </div>
 
-      {/* Partial-failure notice — some chunks kept their original text */}
-      {result.failedChunks ? (
+      {/* Partial-failure notice — some chunks/blocks kept their original
+          text, or a fatal error (quota/auth) stopped the job early. */}
+      {result.stopReason || result.failedChunks || result.fallbackBlocks ? (
         <div
           className='card p-4 mt-6 text-[13px] leading-relaxed'
           style={{
@@ -56,7 +57,9 @@ export function DoneStep({ result, originalContent, onStartOver }: DoneStepProps
             background: 'oklch(0.97 0.03 85)',
           }}
         >
-          {c.partialWarning(result.failedChunks)}
+          {result.stopReason
+            ? c.stopReason[result.stopReason]
+            : c.partialWarning(result.failedChunks ?? 0, result.fallbackBlocks ?? 0)}
         </div>
       ) : null}
 

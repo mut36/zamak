@@ -58,6 +58,10 @@ async function translate() {
   });
 }
 
+async function translateContent(): Promise<string> {
+  return (await translate()).content;
+}
+
 describe('translateSubtitle strict mode (opt-in validation)', () => {
   beforeEach(() => {
     // Strict mode is off by default; these tests cover the opt-in path.
@@ -80,7 +84,7 @@ describe('translateSubtitle strict mode (opt-in validation)', () => {
     ].join('\n');
     mocks.generateModelText.mockResolvedValue(translatedContent);
 
-    await expect(translate()).resolves.toBe(translatedContent);
+    await expect(translateContent()).resolves.toBe(translatedContent);
   });
 
   it('rejects an empty AI response', async () => {
@@ -118,7 +122,7 @@ describe('translateSubtitle strict mode (opt-in validation)', () => {
         '세계',
       ].join('\n'));
 
-    await expect(translate()).resolves.toBe([
+    await expect(translateContent()).resolves.toBe([
       '1',
       '00:00:01,000 --> 00:00:02,000',
       '안녕',
@@ -140,7 +144,7 @@ describe('translateSubtitle strict mode (opt-in validation)', () => {
       '세계',
     ].join('\n'));
 
-    await expect(translate()).resolves.toBe([
+    await expect(translateContent()).resolves.toBe([
       '1',
       '00:00:01,000 --> 00:00:02,000',
       '안녕',
@@ -164,7 +168,7 @@ describe('translateSubtitle strict mode (opt-in validation)', () => {
       '세계',
     ].join('\n'));
 
-    await expect(translate()).resolves.toBe([
+    await expect(translateContent()).resolves.toBe([
       '1',
       '00:00:01,000 --> 00:00:02,000',
       '안녕',
@@ -187,7 +191,7 @@ describe('translateSubtitle strict mode (opt-in validation)', () => {
       '세계',
     ].join('\n'));
 
-    await expect(translate()).resolves.toBe([
+    await expect(translateContent()).resolves.toBe([
       '1',
       '00:00:01,000 --> 00:00:02,000',
       '안녕',
@@ -205,7 +209,7 @@ describe('translateSubtitle strict mode (opt-in validation)', () => {
       '세계',
     ].join('\n'));
 
-    await expect(translate()).resolves.toBe([
+    await expect(translateContent()).resolves.toBe([
       '1',
       '00:00:01,000 --> 00:00:02,000',
       '안녕',
@@ -246,7 +250,7 @@ describe('translateSubtitle default mode (single call, no cost bomb)', () => {
       ['[1] 안녕', '', '[2] 세계'].join('\n'),
     );
 
-    await expect(translate()).resolves.toBe(
+    await expect(translateContent()).resolves.toBe(
       [
         '1',
         '00:00:01,000 --> 00:00:02,000',
@@ -265,7 +269,7 @@ describe('translateSubtitle default mode (single call, no cost bomb)', () => {
     // still gets block 2's timecode — no shifting.
     mocks.generateModelText.mockResolvedValue('[1] 안녕');
 
-    await expect(translate()).resolves.toBe(
+    await expect(translateContent()).resolves.toBe(
       [
         '1',
         '00:00:01,000 --> 00:00:02,000',
@@ -279,10 +283,28 @@ describe('translateSubtitle default mode (single call, no cost bomb)', () => {
     expect(mocks.generateModelText).toHaveBeenCalledTimes(1);
   });
 
+  it('reports the skipped block as unmatched for the caller to surface', async () => {
+    mocks.generateModelText.mockResolvedValue('[1] 안녕');
+
+    await expect(translate()).resolves.toMatchObject({ unmatchedBlocks: 1 });
+  });
+
   it('does not retry — a failed call throws after exactly one attempt', async () => {
     mocks.generateModelText.mockRejectedValue(new Error('boom'));
 
     await expect(translate()).rejects.toThrow();
     expect(mocks.generateModelText).toHaveBeenCalledTimes(1);
+  });
+
+  it('tags a quota error so the caller can classify it without message-sniffing', async () => {
+    mocks.generateModelText.mockRejectedValue(new Error('429 Too Many Requests'));
+
+    await expect(translate()).rejects.toMatchObject({ code: 'quota' });
+  });
+
+  it('tags an alignment failure distinctly from a raw call failure', async () => {
+    mocks.generateModelText.mockResolvedValue('형식을 무시하고 뱉은 산문');
+
+    await expect(translate()).rejects.toMatchObject({ code: 'align' });
   });
 });
