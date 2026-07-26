@@ -41,6 +41,10 @@ export function loadAnalysisPrompt(): Promise<string> {
   return loadPromptFile('common/content_analysis.txt');
 }
 
+export function loadCastSheetExtractionPrompt(): Promise<string> {
+  return loadPromptFile('common/cast_sheet_extraction.txt');
+}
+
 export function loadModelAdapterPrompt(
   provider: PromptProvider,
 ): Promise<string> {
