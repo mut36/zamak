@@ -122,16 +122,36 @@ export function useCastSheet() {
   /**
    * Wait up to timeoutMs for an in-flight extraction, then proceed with
    * whatever's available — this must never block translation indefinitely.
+   *
+   * Always resolves with `sheetRef.current` (the latest state), never with
+   * `pendingRef.current`'s own resolved value directly: once extraction
+   * finishes, that promise is frozen at the just-fetched data forever, so
+   * racing it after the user has since hand-edited the sheet in
+   * CastSheetCard would silently ship the pre-edit version instead of their
+   * correction. Only race against the *pending* promise while genuinely
+   * extracting (status 'extracting'); once settled, there's nothing to wait
+   * for and the latest sheet is returned immediately.
    */
   const awaitReady = useCallback(
     (timeoutMs: number = GLOSSARY_WAIT_MS): Promise<CastSheet> => {
-      if (!pendingRef.current) return Promise.resolve(sheetRef.current);
-      const timeout = new Promise<CastSheet>((resolve) => {
-        setTimeout(() => resolve(sheetRef.current), timeoutMs);
+      if (status !== 'extracting' || !pendingRef.current) {
+        return Promise.resolve(sheetRef.current);
+      }
+      return new Promise<CastSheet>((resolve) => {
+        const timer = setTimeout(() => resolve(sheetRef.current), timeoutMs);
+        // Resolve with the promise's own value, not sheetRef — the effect
+        // that syncs sheetRef from React state hasn't necessarily flushed
+        // yet at the instant this settles. Moot for edits either way: the
+        // edit UI only renders once status leaves 'extracting' (see
+        // CastSheetCard's `hasResult`), so nothing can have edited the sheet
+        // while this branch is waiting.
+        pendingRef.current!.then((data) => {
+          clearTimeout(timer);
+          resolve(data);
+        });
       });
-      return Promise.race([pendingRef.current, timeout]);
     },
-    [],
+    [status],
   );
 
   const reset = useCallback(() => {
