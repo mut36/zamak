@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { BrandMark } from './components/BrandMark';
 import { StepTracker } from './components/simple/StepTracker';
 import { UploadStep } from './components/simple/UploadStep';
@@ -443,12 +444,19 @@ export default function Home() {
       <footer className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pb-10 text-center text-ink-3'>
         <p className='mono text-[12px]'>v{APP_VERSION} · Beta</p>
         <p className='text-[12px] mt-1'>© 2026 ZAMAK. All rights reserved.</p>
-        <a
-          href={`mailto:${COPY.footer.feedbackEmail}`}
-          className='text-[12px] mt-1 inline-block underline'
-        >
-          {COPY.footer.feedback}
-        </a>
+        <div className='flex items-center justify-center gap-2.5 mt-1 text-[12px]'>
+          <a href={`mailto:${COPY.footer.feedbackEmail}`} className='underline'>
+            {COPY.footer.feedback}
+          </a>
+          <span className='dot-sep' />
+          <Link href={COPY.legal.termsHref} className='underline'>
+            {COPY.legal.terms}
+          </Link>
+          <span className='dot-sep' />
+          <Link href={COPY.legal.privacyHref} className='underline'>
+            {COPY.legal.privacy}
+          </Link>
+        </div>
       </footer>
     </div>
   );

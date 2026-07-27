@@ -144,6 +144,10 @@ export const COPY = {
     typeOtherHint: '유튜브 · 인터뷰 · 강연 등',
     reassure: ['평균 30초 소요', '타임코드 100% 보존', '설치 없이 바로'],
     invalidFile: 'SRT 파일만 올릴 수 있어요.',
+    // 업로드가 저작권 리스크가 실제로 발생하는 시점이라, 동의 모달 대신 여기에
+    // 상시 노출한다. 모달은 "30초면 번역돼요"라는 제품 약속과 정면으로 충돌한다.
+    rightsNotice: '권리가 있는 자막만 올려주세요.',
+    storageNotice: '파일은 서버에 저장하지 않아요.',
   },
 
   info: {
@@ -258,6 +262,22 @@ export const COPY = {
   footer: {
     feedback: '피드백 보내기',
     feedbackEmail: 'hello@mut36.com',
+  },
+
+  // 약관·처리방침 링크와 그 주변 마이크로카피. 본문 장문은 app/legal/*에
+  // 인라인으로 둔다 — 조문은 재사용되지 않고, 한 곳에서 통으로 읽혀야 한다.
+  legal: {
+    terms: '이용약관',
+    privacy: '개인정보처리방침',
+    termsHref: '/legal',
+    privacyHref: '/legal/privacy',
+    backHome: '돌아가기',
+    detail: '자세히',
+    // signup-wrap. 별도 체크박스보다 마찰이 적으면서, 가입이라는 능동적
+    // 행위에 결합되어 있어 단순 푸터 링크(browsewrap)보다 효력이 안정적이다.
+    consentPrefix: '계속하면 ',
+    consentAnd: ' 및 ',
+    consentSuffix: '에 동의하는 것으로 봅니다.',
   },
 
   notFound: {

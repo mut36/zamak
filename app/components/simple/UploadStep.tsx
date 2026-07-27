@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, type DragEvent } from 'react';
+import Link from 'next/link';
 import { UploadIcon, FilmIcon, VideoIcon, ArrowRightIcon } from '../icons';
 import { LanguageSelect } from './LanguageSelect';
 import type { ContentType } from '../../types/translation';
@@ -136,6 +137,15 @@ export function UploadStep({
           </span>
         ))}
       </div>
+
+      {/* Rights notice. Upload is where the copyright risk actually arises, so
+          the notice lives here permanently rather than behind a consent modal. */}
+      <p className='mt-3 text-center text-[12px] text-ink-3'>
+        {c.rightsNotice} {c.storageNotice}{' '}
+        <Link href={COPY.legal.termsHref} className='underline'>
+          {COPY.legal.detail}
+        </Link>
+      </p>
     </div>
   );
 }

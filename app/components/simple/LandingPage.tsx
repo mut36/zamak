@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { COPY } from '../../i18n/simpleCopy';
 import { BrandMark } from '../BrandMark';
 
@@ -62,6 +63,19 @@ function GoogleCta({
         {busy ? COPY.auth.signingIn : c.hero.cta}
       </button>
       <p className='text-[12.5px] text-ink-3 text-center'>{c.hero.ctaHint}</p>
+      {/* signup-wrap: binding the notice to the sign-in action holds up better
+          than a footer link alone, without a modal's friction. */}
+      <p className='text-[11.5px] text-ink-3 text-center max-w-[320px]'>
+        {COPY.legal.consentPrefix}
+        <Link href={COPY.legal.termsHref} className='underline'>
+          {COPY.legal.terms}
+        </Link>
+        {COPY.legal.consentAnd}
+        <Link href={COPY.legal.privacyHref} className='underline'>
+          {COPY.legal.privacy}
+        </Link>
+        {COPY.legal.consentSuffix}
+      </p>
     </div>
   );
 }
@@ -203,12 +217,22 @@ export function LandingPage({ onSignIn, error, configured }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Footer — legal / pricing links land here the day payments ship. */}
-      <footer className='mt-14 pt-6 border-t border-border flex items-center justify-center gap-2.5 text-[12.5px] text-ink-3'>
-        <BrandMark size={16} wordmarkSize={0} />
-        <span className='font-bold text-ink-2'>{COPY.brand}</span>
-        <span className='dot-sep' />
-        <span>{c.footerNote}</span>
+      <footer className='mt-14 pt-6 border-t border-border text-[12.5px] text-ink-3'>
+        <div className='flex items-center justify-center gap-2.5 flex-wrap'>
+          <BrandMark size={16} wordmarkSize={0} />
+          <span className='font-bold text-ink-2'>{COPY.brand}</span>
+          <span className='dot-sep' />
+          <span>{c.footerNote}</span>
+        </div>
+        <div className='flex items-center justify-center gap-2.5 mt-2'>
+          <Link href={COPY.legal.termsHref} className='underline'>
+            {COPY.legal.terms}
+          </Link>
+          <span className='dot-sep' />
+          <Link href={COPY.legal.privacyHref} className='underline'>
+            {COPY.legal.privacy}
+          </Link>
+        </div>
       </footer>
     </div>
   );
