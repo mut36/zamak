@@ -15,15 +15,16 @@ export const metadata = {
  * readable before purchase, and card acquirers check for this page during the
  * Toss Payments merchant review.
  *
- * SELLER_INFO is unfilled on purpose — these are facts about the business, not
- * decisions the code can make. Payments must not go live until it is filled in:
- * 통신판매업 미신고 자체가 벌칙 대상이고, Toss 심사도 여기서 막힌다.
+ * 사업장 주소는 아직 TODO — 대표가 직접 채울 것. 통신판매업 신고번호는 결제가
+ * 붙지 않은 지금은 "결제 미가동" 표기로 대신한다: 그 신고 자체가 통신판매업 신고
+ * 면제 대상(직전년도 거래 50회 미만 등)인지 대표가 사업자 유형(간이과세자 여부)을
+ * 확인해 판단할 사안이라, 결제를 열 때 신고번호 또는 면제 근거로 교체해야 한다.
  */
 const SELLER_INFO: { label: string; value: string }[] = [
-  { label: '상호', value: 'TODO — 사업자등록증상 상호' },
-  { label: '대표자', value: 'TODO' },
-  { label: '사업자등록번호', value: 'TODO' },
-  { label: '통신판매업 신고번호', value: 'TODO' },
+  { label: '상호', value: '뭍36 (MUT36)' },
+  { label: '대표자', value: '이지안' },
+  { label: '사업자등록번호', value: '224-23-65160' },
+  { label: '통신판매업 신고번호', value: '결제 미가동 — 결제 오픈 시 신고 또는 면제 근거로 표기' },
   { label: '사업장 주소', value: 'TODO' },
   { label: '고객문의', value: COPY.footer.feedbackEmail },
   { label: '호스팅 제공', value: 'Vercel Inc.' },

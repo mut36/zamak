@@ -14,13 +14,10 @@ export const metadata = {
  * means an email address is collected from the first sign-in. 제28조의8 then
  * requires the overseas-transfer disclosure, because every processor below is
  * US-based.
- *
- * OFFICER is unfilled for the same reason SELLER_INFO in ../page.tsx is — the
- * law wants a named human, which is a business fact, not a code decision.
  */
 const OFFICER: { label: string; value: string }[] = [
-  { label: '개인정보 보호책임자', value: 'TODO — 성명' },
-  { label: '직책', value: 'TODO' },
+  { label: '개인정보 보호책임자', value: '이지안' },
+  { label: '직책', value: '대표' },
   { label: '문의', value: COPY.footer.feedbackEmail },
 ];
 
