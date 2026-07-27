@@ -2,6 +2,19 @@
 
 나중에 다시 볼 일 있는 후속 작업들. 완료하면 지우지 말고 취소선 처리(이유 남기기).
 
+## 베타
+
+### 정식 오픈 시: 가입 크레딧 3편 → 1편으로 복귀 (2026-07-27)
+
+베타 30명에게 결제 없이 체험시키려고 한시적으로 3편을 준 것(`docs/decisions.md` §1-10).
+결제(토스)가 정식으로 열리는 시점에 아래를 되돌릴 것:
+
+- [ ] `supabase/migrations/0003_beta_signup_credit.sql` 하단의 "베타 종료 후
+      되돌리기" 블록 실행 (`grant_signup_credit()`을 1편 지급으로 되돌림)
+- [ ] `app/i18n/simpleCopy.ts` 3곳을 1편으로: `landing.hero.ctaHint`,
+      `landing.closing.title`/`body`, `credits.emptyBody`
+- [ ] 베타 기간에 지급된 3편 중 미사용분을 회수할지 결정 (지금은 회수 안 함)
+
 ## enrich
 
 ### 이용자 증가 시: era/tone 추출을 그라운딩 → 모델 자체 지식으로 전환 검토 (2026-07-24)
