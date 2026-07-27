@@ -146,6 +146,14 @@ export function resolveTier(): Tier {
  * per-block token counts (chunk-size-model.md §1) since pro hasn't been
  * measured separately — treat it as directional, not exact. Credit pricing has
  * to clear the worst case (pro, at the cap), not the flash average.
+ *
+ * ⚠️ STALE as of 2026-07-26: the pro figures above assume thoughts=0, copied
+ * from flash. Real pro logs show LOW thinking is NOT free (docs/decisions.md
+ * §2-4-1) — a 967-block file cost 971원 against this model's ~320원 estimate,
+ * with thinking tokens alone accounting for ~58% of the bill. Pro's true
+ * worst-case cost is higher than the $0.49/670원 above; re-derive from real
+ * pro thoughts data before trusting this for credit pricing (see
+ * decisions.md §4 item 10).
  */
 export const MAX_BLOCKS_PER_CREDIT = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_MAX_BLOCKS_PER_CREDIT,
@@ -230,6 +238,23 @@ export const THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
 /**
  * Thinking effort for the Pro (고급번역) path.
  * Env `PRO_THINKING_LEVEL` — default MEDIUM; same restart caveat as flash.
+ *
+ * Unlike flash, LOW is NOT free here — confirmed 2026-07-26
+ * (docs/decisions.md §2-4-1, docs/tuning/gemini-limits.md §6-2). Two things
+ * broke the flash-derived assumption:
+ *
+ * 1. The API rejects `ThinkingLevel.MINIMAL` for gemini-3.1-pro-preview
+ *    outright — LOW is the actual floor for this model, not an equal
+ *    alternative to MINIMAL like it is for flash.
+ * 2. Even LOW reports non-zero `thoughts` most of the time: a 967-block file
+ *    (10 chunks) logged thoughts of 0, 1930, 3346, 4107, 4381, 4747, 5245, 0,
+ *    0, 4089 — averaging ~2,785/chunk and accounting for ~58% of that file's
+ *    translation cost. This is why a theoretical ~320원 estimate came in at
+ *    an actual 971원.
+ *
+ * The MAX_BLOCKS_PER_CREDIT cost estimate below predates this measurement and
+ * reuses flash's `th=0` assumption for pro — treat that number as stale until
+ * re-derived from real pro thoughts data.
  */
 export const PRO_THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
   'PRO_THINKING_LEVEL',

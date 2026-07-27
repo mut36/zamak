@@ -123,10 +123,10 @@ K(동시성)의 천장을 정하는 값들.
 | ------------------------------------------- | ------ | ------------------------------------------------------------------------ |
 | `gemini-3.6-flash`의 thinking 기본값        | medium | 켜짐                                                                     |
 | thinking을 끄거나 예산을 0으로 둘 수 있는가 | 안됨   | `thinkingBudget: 0`은 무시된다. 먹는 건 `thinkingLevel`                  |
-| 최소 thinking 예산 (0 불가라면)             | minimal | `ThinkingLevel.MINIMAL`                                                 |
+| 최소 thinking 예산 (0 불가라면)             | minimal | `ThinkingLevel.MINIMAL` — **flash 기준. pro-preview는 MINIMAL 자체를 거부한다, 아래 §6-2 참고** |
 | 응답에서 thinking 토큰 수를 확인하는 필드명 | `usageMetadata.thoughtsTokenCount` | `[gemini]` 로그의 `thoughts=`                 |
 
-**실측 (2026-07-21) — MINIMAL과 LOW 모두 `thoughts=0`.**
+### 6-1. flash 실측 (2026-07-21) — MINIMAL과 LOW 모두 `thoughts=0`
 
 | THINKING_LEVEL | 실측 thoughts/요청 | 표본 |
 |---|---|---|
@@ -141,6 +141,44 @@ K(동시성)의 천장을 정하는 값들.
 
 이 실측이 청크 모델의 결론을 바꿨다 — `th=0`이면 "요청마다 붙는 thinking을 줄이려면 B를
 키워야 한다"는 논거가 통째로 사라진다. 상세는 `chunk-size-model.md`.
+
+**이 결론은 flash 전용이다 — pro-preview에는 가져다 쓸 수 없다.** §6-2 참고.
+
+### 6-2. pro-preview 실측 (2026-07-26) — MINIMAL 미지원, LOW도 `thoughts=0`이 아니다
+
+**MINIMAL을 설정할 수 없다.** `ThinkingLevel` SDK enum엔 `MINIMAL`이 존재하지만
+API가 `gemini-3.1-pro-preview`에는 이 값을 거부한다(직접 시도로 확인, 2026-07-26).
+**LOW가 pro에서 실제로 설정 가능한 최저값**이다 — flash처럼 MINIMAL·LOW가 동급이 아니다.
+
+**그 LOW조차 flash처럼 항상 `thoughts=0`이 아니다.** 967블록 파일(B=100, 청크 10개,
+THINKING_LEVEL=LOW) 실제 로그:
+
+| 청크 | prompt | thoughts | output |
+|---|---|---|---|
+| 1 | 2,777 | 0 | 1,448 |
+| 2 | 2,502 | 1,930 | 1,038 |
+| 3 | 3,142 | 3,346 | 1,690 |
+| 4 | 3,022 | 4,107 | 1,594 |
+| 5 | 2,617 | 4,381 | 1,268 |
+| 6 | 2,659 | 4,747 | 1,351 |
+| 7 | 3,260 | 5,245 | 1,914 |
+| 8 | 3,109 | 0 | 1,805 |
+| 9 | 3,106 | 0 | 1,810 |
+| 10 | 2,726 | 4,089 | 1,342 |
+
+10개 청크 중 7개가 `thoughts>0`(평균 ~2,785/청크), 3개는 0 — flash처럼 안정적으로
+0이 아니라 **청크마다 들쭉날쭉하다.** prompt 크기와의 뚜렷한 상관은 안 보인다. thoughts
+합계(27,845) × 출력 단가만으로 이 파일 번역 비용의 약 58%를 차지했다. 소요시간도
+정비례한다(`thoughts=0`이면 13~18초, `thoughts=5245`면 51초) — 로그 상 이상치가 아니라
+실제로 사고 중이라는 뜻.
+
+**영향**: `constants.ts`의 `MAX_BLOCKS_PER_CREDIT` 코멘트가 인용하는 pro 원가(2,000블록
+$0.49)는 flash의 `th=0` 가정을 그대로 가져다 쓴 추정치라 이 실측과 안 맞는다 — 실제 pro
+원가는 그보다 높을 가능성이 크다. 상세 결정 근거·크레딧 가격 재검토는 `decisions.md`
+§2-4-1.
+
+**미결**: MEDIUM(현재 pro 코드 기본값)이 LOW보다 품질·비용 면에서 나은지, LOW의
+들쭉날쭉함이 프롬프트 길이 등 다른 변수 때문인지는 미측정.
 
 ## 7. 기타 제약 (문서 조회 불필요, 우리 쪽 값)
 
@@ -207,12 +245,15 @@ RPM 기준 309, TPM 기준 183이라, 지금의 16은 어느 쪽으로도 한참
 ## 상태 (2026-07-26)
 
 §1(요청 한도)·§4(단가)는 2026-07-25에, **§2(rate limit)는 2026-07-26 Tier 2 승급과 함께**
-세 모델 모두 채웠다. §5(캐싱)·§6(thinking)만 아직 flash 기준뿐이다 — pro-preview·flash-lite는
-번역 트래픽이 붙으면 그때 조회.
+세 모델 모두 채웠다. §5(캐싱)는 아직 flash 기준뿐 — pro-preview·flash-lite는 번역 트래픽이
+붙으면 그때 조회. **§6(thinking)은 2026-07-26에 pro-preview 실측(§6-2)이 추가됐다** — flash와
+달리 pro는 MINIMAL을 설정할 수 없고 LOW도 `thoughts=0`이 아니다. `MAX_BLOCKS_PER_CREDIT`의
+pro 원가 추정이 이 실측 이전 값이라 갱신이 필요하다(`decisions.md` §2-4-1).
 
-남은 미측정: THINKING_LEVEL MEDIUM/HIGH 품질·비용(flash), pro-preview·flash-lite의 캐싱·
-thinking 거동, 그리고 **pro의 청크 소요시간 D**(진행 링의 3분 추정이 여기 걸려 있다 —
-`decisions.md` §2-7). B/K 결정 자체엔 영향 없음(§6 참조 — flash의 thinking은 실사용에서 0).
+남은 미측정: THINKING_LEVEL MEDIUM/HIGH 품질·비용(flash 및 pro), flash-lite의 캐싱·thinking
+거동, pro의 thoughts 변동 원인, 그리고 **pro의 청크 소요시간 D**(진행 링의 3분 추정이 여기
+걸려 있다 — `decisions.md` §2-7). B/K 결정 자체엔 영향 없음(flash의 thinking은 실사용에서
+0 — pro의 thinking 변동은 비용 문제이지 B/K 재산정 사유는 아님).
 
 B/K의 최종 결정과 근거는 **`chunk-size-model.md`**에 있다. 이 문서는 그 계산의 입력값이다.
 
