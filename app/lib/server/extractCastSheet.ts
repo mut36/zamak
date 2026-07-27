@@ -9,10 +9,15 @@ import {
   GLOSSARY_THINKING_LEVEL,
 } from '../../config/constants';
 import type { CastSheet, GlossaryTerm, SpeechRelation } from '../../types/glossary';
-import { EMPTY_CAST_SHEET } from '../../types/glossary';
+import { EMPTY_CAST_SHEET, SPEECH_FORMALITIES } from '../../types/glossary';
 import type { MovieInfo } from '../../types/translation';
+import { resolveTargetLang, type TargetLang } from '../../config/languages';
 import { formatBlocksForModel, parseSrtBlocks } from '../srt';
-import { loadCastSheetExtractionPrompt } from '../prompts/loader';
+import {
+  loadCastSheetExtractionPrompt,
+  loadCastSheetFormalityTask,
+} from '../prompts/loader';
+import { renderPromptTemplate } from '../prompts/renderer';
 import { formatMovieInfo } from '../prompts/translationContent';
 import { lookupById, searchCandidates, type TmdbCastMember } from './tmdb';
 
@@ -25,15 +30,15 @@ const CAST_SHEET_SCHEMA = {
         type: Type.OBJECT,
         properties: {
           source: { type: Type.STRING },
-          ko: { type: Type.STRING },
+          target: { type: Type.STRING },
           kind: {
             type: Type.STRING,
             enum: ['person', 'place', 'org', 'term'],
           },
           note: { type: Type.STRING },
         },
-        required: ['source', 'ko', 'kind'],
-        propertyOrdering: ['source', 'ko', 'kind', 'note'],
+        required: ['source', 'target', 'kind'],
+        propertyOrdering: ['source', 'target', 'kind', 'note'],
       },
     },
     relations: {
@@ -43,7 +48,7 @@ const CAST_SHEET_SCHEMA = {
         properties: {
           from: { type: Type.STRING },
           to: { type: Type.STRING },
-          speech: { type: Type.STRING, enum: ['존댓말', '반말', '혼용'] },
+          speech: { type: Type.STRING, enum: SPEECH_FORMALITIES },
           basis: { type: Type.STRING },
           fromBlock: { type: Type.INTEGER },
           toBlock: { type: Type.INTEGER },
@@ -91,10 +96,38 @@ function excerptBlocks(blocks: readonly string[], maxBlocks: number): string {
 }
 
 /**
- * TMDB rarely localizes `character` into Korean, so this is not a ready-made
- * spelling — just a hint the extraction prompt uses to identify who's who
- * ("this character, played by this actor, is probably in the subtitles").
- * The model still does the actual Korean-spelling work.
+ * Builds the extraction system prompt for one target language: the relations
+ * half is injected only when the language has a formality axis, so English or
+ * Chinese runs ask for spellings alone instead of inventing an axis their
+ * grammar doesn't have.
+ */
+async function buildSystemInstruction(lang: TargetLang): Promise<string> {
+  const [template, formalityTemplate] = await Promise.all([
+    loadCastSheetExtractionPrompt(),
+    lang.formality ? loadCastSheetFormalityTask() : Promise.resolve(''),
+  ]);
+
+  const axis = lang.formality;
+  const formalityTask = axis
+    ? `\n${renderPromptTemplate(formalityTemplate, {
+        targetLanguage: lang.promptLabel,
+        formalLabel: axis.formal,
+        informalLabel: axis.informal,
+        mixedLabel: axis.mixed,
+      })}\n`
+    : `\n[할 일 2 — 말투 관계표(relations)]\n- ${lang.promptLabel}에는 상대에 따라 달라지는 문법적 말투 축이 없다. relations는 빈 배열로 둬.\n`;
+
+  return renderPromptTemplate(template, {
+    targetLanguage: lang.promptLabel,
+    formalityTask,
+  });
+}
+
+/**
+ * TMDB rarely localizes `character`, so this is not a ready-made spelling —
+ * just a hint the extraction prompt uses to identify who's who ("this
+ * character, played by this actor, is probably in the subtitles"). The model
+ * still does the actual target-language spelling work.
  */
 function buildCastAnchorTag(cast: readonly TmdbCastMember[]): string {
   if (cast.length === 0) return '';
@@ -169,7 +202,6 @@ function countOccurrences(haystack: string, needle: string): number {
 }
 
 const TERM_KINDS: GlossaryTerm['kind'][] = ['person', 'place', 'org', 'term'];
-const SPEECH_VALUES: SpeechRelation['speech'][] = ['존댓말', '반말', '혼용'];
 
 /**
  * Post-processing the schema alone can't guarantee: responseSchema forces
@@ -182,6 +214,7 @@ function sanitizeCastSheet(
   raw: RawCastSheet,
   sourceContent: string,
   blockCount: number,
+  hasFormalityAxis: boolean,
 ): CastSheet {
   const rawTerms = Array.isArray(raw.terms) ? raw.terms : [];
   const seenSource = new Set<string>();
@@ -190,19 +223,19 @@ function sanitizeCastSheet(
     .filter(isRecord)
     .map((t): GlossaryTerm | null => {
       const source = typeof t.source === 'string' ? t.source.trim() : '';
-      const ko = typeof t.ko === 'string' ? t.ko.trim() : '';
+      const target = typeof t.target === 'string' ? t.target.trim() : '';
       const kind = TERM_KINDS.includes(t.kind as GlossaryTerm['kind'])
         ? (t.kind as GlossaryTerm['kind'])
         : 'term';
       const note = typeof t.note === 'string' ? t.note.trim() : undefined;
-      if (!source || !ko) return null;
+      if (!source || !target) return null;
       // HALLUCINATION FILTER: a term the model invented (not present in the
       // actual subtitles) must never become the fixed spelling every chunk is
       // told to use.
       if (!sourceContent.includes(source)) return null;
       if (seenSource.has(source)) return null;
       seenSource.add(source);
-      return note ? { source, ko, kind, note } : { source, ko, kind };
+      return note ? { source, target, kind, note } : { source, target, kind };
     })
     .filter((t): t is GlossaryTerm => t !== null);
 
@@ -214,15 +247,20 @@ function sanitizeCastSheet(
     )
     .slice(0, GLOSSARY_MAX_TERMS);
 
-  const validKo = new Set(terms.map((t) => t.ko));
+  const validTargets = new Set(terms.map((t) => t.target));
 
-  const rawRelations = Array.isArray(raw.relations) ? raw.relations : [];
+  // A language with no formality axis has nothing to say here — drop whatever
+  // the model produced rather than shipping an axis its grammar lacks.
+  const rawRelations =
+    hasFormalityAxis && Array.isArray(raw.relations) ? raw.relations : [];
   const relations = rawRelations
     .filter(isRecord)
     .map((r): SpeechRelation | null => {
       const from = typeof r.from === 'string' ? r.from.trim() : '';
       const to = typeof r.to === 'string' ? r.to.trim() : '';
-      const speech = SPEECH_VALUES.includes(r.speech as SpeechRelation['speech'])
+      const speech = SPEECH_FORMALITIES.includes(
+        r.speech as SpeechRelation['speech'],
+      )
         ? (r.speech as SpeechRelation['speech'])
         : null;
       const basis = typeof r.basis === 'string' ? r.basis.trim() : undefined;
@@ -230,7 +268,7 @@ function sanitizeCastSheet(
       const toBlockRaw = typeof r.toBlock === 'number' ? r.toBlock : NaN;
 
       if (!from || !to || !speech) return null;
-      if (!validKo.has(from) || !validKo.has(to)) return null;
+      if (!validTargets.has(from) || !validTargets.has(to)) return null;
       if (!Number.isFinite(fromBlockRaw) || !Number.isFinite(toBlockRaw)) {
         return null;
       }
@@ -261,6 +299,7 @@ function sanitizeCastSheet(
 export async function extractCastSheet(
   subtitleContent: string,
   movieInfo: Pick<MovieInfo, 'title' | 'year' | 'genre' | 'country' | 'era' | 'tone'>,
+  targetLang: string,
 ): Promise<CastSheet> {
   const apiKey = process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) return EMPTY_CAST_SHEET;
@@ -268,9 +307,11 @@ export async function extractCastSheet(
   const blockCount = parseSrtBlocks(subtitleContent).length;
   if (blockCount === 0) return EMPTY_CAST_SHEET;
 
+  const lang = resolveTargetLang(targetLang);
+
   try {
     const [systemInstruction, cast] = await Promise.all([
-      loadCastSheetExtractionPrompt(),
+      buildSystemInstruction(lang),
       fetchCastAnchors(movieInfo.title, movieInfo.year),
     ]);
     const userTurn = buildUserTurn(movieInfo, cast, subtitleContent, blockCount);
@@ -290,7 +331,12 @@ export async function extractCastSheet(
     });
 
     const parsed = JSON.parse(response.text ?? '{}') as RawCastSheet;
-    return sanitizeCastSheet(parsed, subtitleContent, blockCount);
+    return sanitizeCastSheet(
+      parsed,
+      subtitleContent,
+      blockCount,
+      lang.formality !== null,
+    );
   } catch (error) {
     console.error('[glossary] cast sheet extraction failed', error);
     return EMPTY_CAST_SHEET;

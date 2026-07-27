@@ -39,6 +39,8 @@ interface InfoStepProps {
   castSheet: CastSheet;
   onCastSheetChange: (sheet: CastSheet) => void;
   onCastSheetRefetch: () => void;
+  /** Target language code — the cast sheet's 표기/말투 columns follow it. */
+  targetLang: string;
   /** Optional content rendered just above the action buttons. */
   beforeActions?: ReactNode;
   onBack: () => void;
@@ -73,6 +75,7 @@ function MovieInfo({
   castSheet,
   onCastSheetChange,
   onCastSheetRefetch,
+  targetLang,
   beforeActions,
   onBack,
   onTranslate,
@@ -256,6 +259,7 @@ function MovieInfo({
           sheet={castSheet}
           onChangeSheet={onCastSheetChange}
           onRefetch={onCastSheetRefetch}
+          targetLang={targetLang}
         />
       )}
 
@@ -281,6 +285,7 @@ function OtherInfo({
   castSheet,
   onCastSheetChange,
   onCastSheetRefetch,
+  targetLang,
   beforeActions,
   onBack,
   onTranslate,
@@ -320,6 +325,7 @@ function OtherInfo({
           sheet={castSheet}
           onChangeSheet={onCastSheetChange}
           onRefetch={onCastSheetRefetch}
+          targetLang={targetLang}
         />
       )}
 

@@ -6,6 +6,7 @@ import {
   composeAnalysisPrompt,
   composeTranslationPrompt,
 } from './index';
+import { TARGET_LANGS } from '../../config/languages';
 
 const movieInfo = {
   title: 'Test Movie',
@@ -135,14 +136,14 @@ describe('prompt composition', () => {
   it('injects the glossary (file-wide) and only in-range speech relations for this chunk', async () => {
     const castSheet = {
       terms: [
-        { source: 'Jonathan', ko: '조너선', kind: 'person' as const, note: '주인공의 형' },
-        { source: 'Blackwood Manor', ko: '블랙우드 저택', kind: 'place' as const },
+        { source: 'Jonathan', target: '조너선', kind: 'person' as const, note: '주인공의 형' },
+        { source: 'Blackwood Manor', target: '블랙우드 저택', kind: 'place' as const },
       ],
       relations: [
         {
           from: '조너선',
           to: '엘리자베스',
-          speech: '존댓말' as const,
+          speech: 'formal' as const,
           basis: '초면',
           fromBlock: 1,
           toBlock: 2,
@@ -150,7 +151,7 @@ describe('prompt composition', () => {
         {
           from: '조너선',
           to: '엘리자베스',
-          speech: '반말' as const,
+          speech: 'informal' as const,
           fromBlock: 900,
           toBlock: 1000,
         },
@@ -178,6 +179,85 @@ describe('prompt composition', () => {
     expect(user).toContain('존댓말 (초면)');
     expect(user).not.toContain('900');
     expect(user.match(/조너선 → 엘리자베스/g)).toHaveLength(1);
+  });
+
+  it('builds every enabled target language with its own rules and line cap', async () => {
+    for (const lang of TARGET_LANGS.filter((l) => l.enabled)) {
+      const { system } = await composeTranslationPrompt('gemini', {
+        movieInfo,
+        targetLanguage: lang.code,
+        translationMode: 'chunk',
+        translationStyle: 'meaning',
+        subtitleContent: '1\n00:00:01,000 --> 00:00:02,000\nHi.',
+        chunkPosition: { index: 1, total: 1 },
+      });
+
+      expect(system).not.toContain('{{');
+      expect(system).toContain(`목표 언어: ${lang.promptLabel}`);
+      expect(system).toContain(`[도착어(${lang.promptLabel}) 지침]`);
+      expect(system).toContain(`공백 포함 ${lang.lineMaxChars}자`);
+      // The shared format invariants must survive in every language.
+      expect(system).toContain('출력하는 모든 줄은 `[번호] 번역문` 형식이어야 해');
+      expect(system).toContain('한 블록은 최대 두 줄까지만 허용돼');
+    }
+  });
+
+  it('rejects a target language that is not enabled instead of guessing one', async () => {
+    await expect(
+      composeTranslationPrompt('gemini', {
+        movieInfo,
+        targetLanguage: 'sv',
+        translationMode: 'chunk',
+        translationStyle: 'meaning',
+        subtitleContent: '1\n00:00:01,000 --> 00:00:02,000\nHi.',
+        chunkPosition: { index: 1, total: 1 },
+      }),
+    ).rejects.toThrow('Unsupported target language: sv');
+  });
+
+  it('renders formality in the target language’s own terms, and drops the tag entirely for a language without that axis', async () => {
+    const castSheet = {
+      terms: [
+        { source: 'Jonathan', target: 'ジョナサン', kind: 'person' as const },
+        { source: 'Elizabeth', target: 'エリザベス', kind: 'person' as const },
+      ],
+      relations: [
+        {
+          from: 'ジョナサン',
+          to: 'エリザベス',
+          speech: 'formal' as const,
+          fromBlock: 1,
+          toBlock: 2,
+        },
+      ],
+    };
+    const base = {
+      movieInfo,
+      translationMode: 'chunk' as const,
+      translationStyle: 'meaning' as const,
+      subtitleContent: [
+        '1\n00:00:01,000 --> 00:00:02,000\nHi.',
+        '2\n00:00:03,000 --> 00:00:04,000\nBye.',
+      ].join('\n\n'),
+      chunkPosition: { index: 1, total: 1 },
+      castSheet,
+    };
+
+    const ja = await composeTranslationPrompt('gemini', {
+      ...base,
+      targetLanguage: 'ja',
+    });
+    expect(ja.user).toContain('<speech_relations>');
+    expect(ja.user).toContain('ジョナサン → エリザベス: 敬語(です・ます体)');
+
+    // English has no grammaticalized formality axis: spellings stay, the
+    // relations tag never appears.
+    const en = await composeTranslationPrompt('gemini', {
+      ...base,
+      targetLanguage: 'en',
+    });
+    expect(en.user).toContain('<glossary>');
+    expect(en.user).not.toContain('<speech_relations>');
   });
 
   it('builds a JSON-only analysis prompt with untrusted data boundaries', async () => {

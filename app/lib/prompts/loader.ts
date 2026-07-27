@@ -3,6 +3,7 @@ import 'server-only';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { PromptProvider } from './types';
+import type { TargetLangCode } from '../../config/languages';
 
 const promptCache = new Map<string, Promise<string>>();
 
@@ -23,8 +24,18 @@ export function loadSystemPromptTemplate(): Promise<string> {
   return loadPromptFile('common/subtitle_translation_system.txt');
 }
 
+/**
+ * Language-neutral output-format rules (marker integrity, block count, line
+ * cap). Shared by every target language so invariants 1-2 can't drift as
+ * languages are added — the per-language file below carries style only.
+ * Contains a {{lineMaxChars}} placeholder the caller renders.
+ */
+export function loadTranslationFormatRules(): Promise<string> {
+  return loadPromptFile('common/translation_rules_format.txt');
+}
+
 export function loadTranslationRules(
-  language: 'ko' | 'en',
+  language: TargetLangCode,
 ): Promise<string> {
   return loadPromptFile(`common/translation_rules_${language}.txt`);
 }
@@ -43,6 +54,14 @@ export function loadAnalysisPrompt(): Promise<string> {
 
 export function loadCastSheetExtractionPrompt(): Promise<string> {
   return loadPromptFile('common/cast_sheet_extraction.txt');
+}
+
+/**
+ * The relations half of the cast sheet, injected only for target languages
+ * that actually have a formality axis (TargetLang.formality).
+ */
+export function loadCastSheetFormalityTask(): Promise<string> {
+  return loadPromptFile('common/cast_sheet_formality_task.txt');
 }
 
 export function loadModelAdapterPrompt(

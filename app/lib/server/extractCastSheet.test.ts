@@ -68,13 +68,13 @@ describe('extractCastSheet', () => {
 
   it('returns an empty sheet without calling the model when no API key is configured', async () => {
     delete process.env.GOOGLE_GENAI_API_KEY;
-    const result = await extractCastSheet(SUBTITLE, movieInfo);
+    const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
     expect(result).toEqual({ terms: [], relations: [] });
     expect(mocks.generateContent).not.toHaveBeenCalled();
   });
 
   it('returns an empty sheet for empty subtitle content, without calling the model', async () => {
-    const result = await extractCastSheet('', movieInfo);
+    const result = await extractCastSheet('', movieInfo, 'ko');
     expect(result).toEqual({ terms: [], relations: [] });
     expect(mocks.generateContent).not.toHaveBeenCalled();
   });
@@ -83,14 +83,14 @@ describe('extractCastSheet', () => {
     mocks.generateContent.mockResolvedValue(
       jsonResponse({
         terms: [
-          { source: 'Jonathan', ko: '조너선', kind: 'person', note: '주인공' },
-          { source: 'Elizabeth', ko: '엘리자베스', kind: 'person' },
+          { source: 'Jonathan', target: '조너선', kind: 'person', note: '주인공' },
+          { source: 'Elizabeth', target: '엘리자베스', kind: 'person' },
         ],
         relations: [
           {
             from: '조너선',
             to: '엘리자베스',
-            speech: '존댓말',
+            speech: 'formal',
             basis: '초면',
             fromBlock: 1,
             toBlock: 2,
@@ -99,17 +99,17 @@ describe('extractCastSheet', () => {
       }),
     );
 
-    const result = await extractCastSheet(SUBTITLE, movieInfo);
+    const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
 
     expect(result.terms).toEqual([
-      { source: 'Jonathan', ko: '조너선', kind: 'person', note: '주인공' },
-      { source: 'Elizabeth', ko: '엘리자베스', kind: 'person' },
+      { source: 'Jonathan', target: '조너선', kind: 'person', note: '주인공' },
+      { source: 'Elizabeth', target: '엘리자베스', kind: 'person' },
     ]);
     expect(result.relations).toEqual([
       {
         from: '조너선',
         to: '엘리자베스',
-        speech: '존댓말',
+        speech: 'formal',
         basis: '초면',
         fromBlock: 1,
         toBlock: 2,
@@ -121,28 +121,28 @@ describe('extractCastSheet', () => {
     mocks.generateContent.mockResolvedValue(
       jsonResponse({
         terms: [
-          { source: 'Jonathan', ko: '조너선', kind: 'person' },
-          { source: 'Made-Up Name', ko: '지어낸이름', kind: 'person' },
+          { source: 'Jonathan', target: '조너선', kind: 'person' },
+          { source: 'Made-Up Name', target: '지어낸이름', kind: 'person' },
         ],
         relations: [],
       }),
     );
 
-    const result = await extractCastSheet(SUBTITLE, movieInfo);
+    const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
 
     expect(result.terms).toHaveLength(1);
     expect(result.terms[0].source).toBe('Jonathan');
   });
 
-  it('drops a relation referencing a ko name that is not in the surviving terms', async () => {
+  it('drops a relation referencing a target name that is not in the surviving terms', async () => {
     mocks.generateContent.mockResolvedValue(
       jsonResponse({
-        terms: [{ source: 'Jonathan', ko: '조너선', kind: 'person' }],
+        terms: [{ source: 'Jonathan', target: '조너선', kind: 'person' }],
         relations: [
           {
             from: '조너선',
             to: '유령인물',
-            speech: '반말',
+            speech: 'informal',
             fromBlock: 1,
             toBlock: 2,
           },
@@ -150,7 +150,7 @@ describe('extractCastSheet', () => {
       }),
     );
 
-    const result = await extractCastSheet(SUBTITLE, movieInfo);
+    const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
     expect(result.relations).toEqual([]);
   });
 
@@ -158,14 +158,14 @@ describe('extractCastSheet', () => {
     mocks.generateContent.mockResolvedValue(
       jsonResponse({
         terms: [
-          { source: 'Jonathan', ko: '조너선', kind: 'person' },
-          { source: 'Elizabeth', ko: '엘리자베스', kind: 'person' },
+          { source: 'Jonathan', target: '조너선', kind: 'person' },
+          { source: 'Elizabeth', target: '엘리자베스', kind: 'person' },
         ],
         relations: [
           {
             from: '조너선',
             to: '엘리자베스',
-            speech: '존댓말',
+            speech: 'formal',
             fromBlock: -5,
             toBlock: 999,
           },
@@ -173,17 +173,17 @@ describe('extractCastSheet', () => {
       }),
     );
 
-    const result = await extractCastSheet(SUBTITLE, movieInfo);
+    const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
     expect(result.relations[0]).toMatchObject({ fromBlock: 1, toBlock: 2 });
   });
 
   it('returns an empty sheet when the model response is not parseable JSON', async () => {
     mocks.generateContent.mockResolvedValue({ text: 'not json at all' });
-    const result = await extractCastSheet(SUBTITLE, movieInfo);
+    const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
     expect(result).toEqual({ terms: [], relations: [] });
   });
 
-  it('includes a <tmdb_cast> anchor tag (character + actor, not a Korean spelling) when TMDB has a match', async () => {
+  it('includes a <tmdb_cast> anchor tag (character + actor, not a target-language spelling) when TMDB has a match', async () => {
     mocks.searchCandidates.mockResolvedValue([
       { mediaType: 'movie', tmdbId: 1, title: 'Test Movie', year: '2020', overview: '', posterUrl: null },
     ]);
@@ -195,7 +195,7 @@ describe('extractCastSheet', () => {
       jsonResponse({ terms: [], relations: [] }),
     );
 
-    await extractCastSheet(SUBTITLE, movieInfo);
+    await extractCastSheet(SUBTITLE, movieInfo, 'ko');
 
     expect(mocks.searchCandidates).toHaveBeenCalledWith('Test Movie', '2020');
     expect(mocks.lookupById).toHaveBeenCalledWith('movie', 1);
@@ -211,16 +211,55 @@ describe('extractCastSheet', () => {
       jsonResponse({ terms: [], relations: [] }),
     );
 
-    await extractCastSheet(SUBTITLE, movieInfo);
+    await extractCastSheet(SUBTITLE, movieInfo, 'ko');
 
     expect(mocks.lookupById).not.toHaveBeenCalled();
     const call = mocks.generateContent.mock.calls[0][0];
     expect(call.contents).not.toContain('<tmdb_cast>');
   });
 
+  it('asks for the target language’s own formality axis, and for none at all when the language has no axis', async () => {
+    mocks.generateContent.mockResolvedValue(
+      jsonResponse({ terms: [], relations: [] }),
+    );
+
+    await extractCastSheet(SUBTITLE, movieInfo, 'ja');
+    const ja = mocks.generateContent.mock.calls[0][0].config.systemInstruction;
+    expect(ja).not.toContain('{{');
+    expect(ja).toContain('일본어 표기(target)');
+    expect(ja).toContain('敬語(です・ます体)');
+
+    await extractCastSheet(SUBTITLE, movieInfo, 'en');
+    const en = mocks.generateContent.mock.calls[1][0].config.systemInstruction;
+    expect(en).not.toContain('{{');
+    expect(en).toContain('문법적 말투 축이 없다');
+    expect(en).not.toContain('敬語');
+  });
+
+  it('drops relations the model returned anyway for an axis-less language', async () => {
+    mocks.generateContent.mockResolvedValue(
+      jsonResponse({
+        terms: [{ source: 'Jonathan', target: 'Jonathan', kind: 'person' }],
+        relations: [
+          {
+            from: 'Jonathan',
+            to: 'Jonathan',
+            speech: 'formal',
+            fromBlock: 1,
+            toBlock: 2,
+          },
+        ],
+      }),
+    );
+
+    const result = await extractCastSheet(SUBTITLE, movieInfo, 'en');
+    expect(result.terms).toHaveLength(1);
+    expect(result.relations).toEqual([]);
+  });
+
   it('returns an empty sheet when the model call throws', async () => {
     mocks.generateContent.mockRejectedValue(new Error('quota exceeded'));
-    const result = await extractCastSheet(SUBTITLE, movieInfo);
+    const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
     expect(result).toEqual({ terms: [], relations: [] });
   });
 });

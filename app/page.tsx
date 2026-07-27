@@ -24,7 +24,7 @@ import { COPY } from './i18n/simpleCopy';
 
 const EMPTY_MOVIE_INFO: MovieInfo = { title: '', year: '', notes: '' };
 // Keep in sync with package.json version.
-const APP_VERSION = '0.7.3';
+const APP_VERSION = '0.8.0';
 
 function isSrt(file: File): boolean {
   return file.name.toLowerCase().endsWith('.srt');
@@ -220,8 +220,8 @@ export default function Home() {
     if (step !== 1) return;
     if (!castSheetEnabled) return;
     if (!fileContent) return;
-    requestCastSheet(fileContentRef.current, movieInfoRef.current);
-  }, [step, castSheetEnabled, fileContent, requestCastSheet]);
+    requestCastSheet(fileContentRef.current, movieInfoRef.current, targetLang);
+  }, [step, castSheetEnabled, fileContent, requestCastSheet, targetLang]);
 
   const resetAnalysis = () => {
     enrichStartedRef.current = false;
@@ -408,13 +408,18 @@ export default function Home() {
               analysisAnalyzing={analysis.isAnalyzing}
               onReEnrich={runEnrich}
               summarizing={summarizing}
+              targetLang={targetLang}
               castSheetEnabled={castSheet.enabled}
               onCastSheetToggle={castSheet.setEnabled}
               castSheetStatus={castSheet.status}
               castSheet={castSheet.sheet}
               onCastSheetChange={castSheet.setSheet}
               onCastSheetRefetch={() =>
-                castSheet.refetch(fileContentRef.current, movieInfoRef.current)
+                castSheet.refetch(
+                  fileContentRef.current,
+                  movieInfoRef.current,
+                  targetLang,
+                )
               }
               onBack={resetAll}
               onTranslate={handleTranslate}

@@ -9,6 +9,7 @@ import { renderPromptTemplate } from './renderer';
 import { buildTranslationVariables } from './translationContent';
 import { renderGlossaryTags } from './glossaryContent';
 import { formatBlocksForModel, getBlockIndexRange, parseSrtBlocks } from '../srt';
+import { getTargetLang } from '../../config/languages';
 import type {
   ComposedPrompt,
   PromptProvider,
@@ -63,6 +64,7 @@ export async function composeTranslationPrompt(
   const { glossary, speechRelations } = renderGlossaryTags(
     context.castSheet,
     chunkRange,
+    getTargetLang(context.targetLanguage)?.formality ?? null,
   );
 
   // The tags system's trust boundary names — content_metadata, user_notes,

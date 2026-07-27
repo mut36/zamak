@@ -25,14 +25,14 @@ import type {
 } from '../types/translation';
 import type { CastSheet } from '../types/glossary';
 import {
-  CPS_HARD_MAX,
-  CPS_TARGET,
   estimateTranslationMs,
+  getReadingSpeed,
   getTierLimits,
   MIN_SUBTITLE_DURATION_MS,
   MIN_SUBTITLE_GAP_MS,
   resolveTier,
 } from '../config/constants';
+import { resolveTargetLang } from '../config/languages';
 
 interface TranslationState {
   isTranslating: boolean;
@@ -333,12 +333,15 @@ export function useTranslation(
         throw new Error(msg.noResponse);
       }
 
-      // Mechanical text rules (translation_rules_ko.txt §7/§9 — trailing
-      // punctuation, 2-line cap) have exactly one correct output, so code
-      // enforces them rather than hoping the model always complies. Runs
-      // before timing so any char-count change lands before CPS measures it.
-      const { content: ruleEnforced, report: textRuleReport } =
-        enforceTextRules((results as string[]).join('\n\n'));
+      // Mechanical text rules (2-line cap, and sentence-final punctuation for
+      // the languages whose convention drops it) have exactly one correct
+      // output, so code enforces them rather than hoping the model always
+      // complies. Runs before timing so any char-count change lands before
+      // CPS measures it.
+      const { content: ruleEnforced, report: textRuleReport } = enforceTextRules(
+        (results as string[]).join('\n\n'),
+        { trailingPunctuation: resolveTargetLang(targetLang).trailingPunctuation },
+      );
       if (
         textRuleReport.ellipsisNormalized > 0 ||
         textRuleReport.linesMerged > 0 ||
@@ -352,11 +355,12 @@ export function useTranslation(
       // duration) into the free gaps its neighbours leave, without ever
       // overlapping them. Applied on the whole in-order file so it also
       // covers chunk-boundary neighbours.
+      // Reading speed is per target language (Latin script reads far more
+      // characters per second than Hangul or Han) — see getReadingSpeed.
       const translated = adjustSubtitleTiming(
         ruleEnforced,
         {
-          cpsHardMax: CPS_HARD_MAX,
-          cpsTarget: CPS_TARGET,
+          ...getReadingSpeed(targetLang),
           minGapMs: MIN_SUBTITLE_GAP_MS,
           minDurationMs: MIN_SUBTITLE_DURATION_MS,
         },

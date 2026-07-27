@@ -2,6 +2,8 @@
 // Centralized configuration constants
 // ============================================
 
+import { resolveTargetLang, TARGET_LANGS } from './languages';
+
 /**
  * SRT chunking & concurrency — the two knobs for parallel translation, split
  * per tier. Set a very large chunk size to force a single request (no
@@ -397,6 +399,26 @@ export const MIN_SUBTITLE_DURATION_MS = readPositiveIntEnv(
   800,
 );
 
+/**
+ * The band above is Korean; reading speed is script-dependent (a Latin line
+ * carries far less meaning per character than a Hangul or Han one), so the
+ * per-language numbers live in TargetLang.reading and this resolves them.
+ * An explicitly set env var still wins — it stays the global escape hatch,
+ * applying to every language at once.
+ */
+export function getReadingSpeed(targetLang: string): {
+  cpsHardMax: number;
+  cpsTarget: number;
+} {
+  const { reading } = resolveTargetLang(targetLang);
+  return {
+    cpsHardMax: process.env.NEXT_PUBLIC_CPS_HARD_MAX
+      ? CPS_HARD_MAX
+      : reading.hardMax,
+    cpsTarget: process.env.NEXT_PUBLIC_CPS_TARGET ? CPS_TARGET : reading.target,
+  };
+}
+
 /** Timing estimates (milliseconds) */
 export const TIMING = {
   /** SSE heartbeat interval to prevent gateway timeout */
@@ -423,8 +445,8 @@ export const RETRY = {
 
 /** Target-language code → output file suffix (before `.srt`). */
 export const LANG_SUFFIX: Record<string, string> = {
-  ko: 'ko',
-  en: 'en',
+  ...Object.fromEntries(TARGET_LANGS.map((lang) => [lang.code, lang.code])),
+  // Legacy long-form values that older clients may still send.
   Korean: 'ko',
   English: 'en',
 };

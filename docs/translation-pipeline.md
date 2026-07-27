@@ -6,7 +6,7 @@
 [`TODO.md`](TODO.md), 청크 수치 유도는 [`tuning/`](tuning/) 참조.
 
 > 파일 경로 + 함수/심볼 이름으로만 가리킨다(줄 번호는 금방 어긋나서 안 적음).
-> 기준 시점: 2026-07-26. 구조가 바뀌면 이 문서도 같이 고칠 것.
+> 기준 시점: 2026-07-27. 구조가 바뀌면 이 문서도 같이 고칠 것.
 
 메인 경로는 **영화·드라마 분기**다. "기타 영상" 분기는 3단계에서 갈린다.
 
@@ -20,7 +20,7 @@
   → /api/analyze         제목·연도 확정 (AUX 모델)
   → [영화] /api/enrich    TMDB + 그라운딩 → 제목/연도/감독/포스터 + 장르/배경/톤
     [기타] /api/summarize 자막 앞부분 요약 → notes
-  → (opt-in, 토글 ON시) /api/glossary  전체 자막 1회 스캔 → 글로사리+존대관계
+  → (opt-in, 토글 ON시) /api/glossary  전체 자막 1회 스캔 → 글로사리+말투관계
   → InfoStep             사람이 검토·수정 (+ 글로사리 카드, 켰다면)
   → /api/translation/begin  크레딧 1 차감 → jobId
   → 청킹 (장면 갭 기준)
@@ -91,8 +91,13 @@
   (`renderGlossaryTags`), 프롬프트 `prompts/common/cast_sheet_extraction.txt`, 토글
   훅 `app/hooks/useCastSheet.ts`, 카드 `app/components/simple/CastSheetCard.tsx`.
 - **하는 일**: InfoStep의 "등장인물·용어 일관성" 토글(기본 **OFF**, `localStorage`에
-  기억)을 켜면 전체 자막을 한 번 스캔해 ①인물·지명·용어의 확정 한국어 표기(글로사리)와
-  ②인물 간 존댓말/반말(방향성 있음, 자막 블록 범위가 붙음)을 뽑는다. 파일당 1회이고
+  기억)을 켜면 전체 자막을 한 번 스캔해 ①인물·지명·용어의 확정 **도착어 표기**(글로사리,
+  `GlossaryTerm.target`)와 ②인물 간 말투(방향성 있음, 자막 블록 범위가 붙음)를 뽑는다.
+  말투 값은 언어 중립(`formal`/`informal`/`mixed`)으로 저장하고, 프롬프트·UI에는
+  도착어의 어휘(존댓말·반말 / 敬語·タメ口 / usted·tú …)로 번역해 보여준다 —
+  라벨 출처는 `app/config/languages.ts`의 `TargetLang.formality`.
+  **말투 축이 없는 언어(영어·중국어)는 `formality: null`이라 relations를 아예 뽑지
+  않고 `<speech_relations>` 태그도 나가지 않는다**(§7). 파일당 1회이고
   청크별 병렬 번역 호출과 별개 — 결과가 모든 청크 프롬프트에 주입된다(§7). **OFF가
   기본값이라 이 라우트는 사용자가 켜기 전엔 절대 호출되지 않는다.**
 - **왜 opt-in인가**: 추출에 20~40초 걸린다. 토글을 켜면 InfoStep 진입과 동시에
@@ -101,6 +106,8 @@
   토글**이다 — 결정 배경은 `decisions.md` §2-9.
 - **품질 레버**:
   - 표기·관계가 틀리거나 아예 안 잡힘 → `prompts/common/cast_sheet_extraction.txt`
+    (말투 파트는 별도 파일 `prompts/common/cast_sheet_formality_task.txt` — 말투 축이
+    있는 언어에서만 주입됨, `extractCastSheet.ts`의 `buildSystemInstruction`)
   - 지어낸 이름이 섞임(환각) → `extractCastSheet.ts`의 `sanitizeCastSheet`
     (실제 자막 문자열에 없는 `source`는 버림 — 이게 이 기능의 핵심 방어선)
   - 인물명 표기가 TMDB와 다름 → `tmdb.ts`의 `cast`(상위 12명, 배역명+배우명, 한국어
@@ -129,7 +136,13 @@
   - **번역 스타일** `meaning`(의미보존) / `cinematic`(영화적) — 현재 `handleTranslate`에서
     **`'meaning'` 하드코딩**. cinematic 철학 파일은 존재하나 UI에 안 붙어 있음. 스타일을
     노출/전환하려면 여기 + `InfoStep`.
-  - 도착어 → `app/config/languages.ts` (`TARGET_LANGS` enabled 플래그)
+  - 도착어 → **`app/config/languages.ts` (`TARGET_LANGS`)** — 한 행이 곧 한 언어다:
+    picker 표시(label/mono/enabled), 프롬프트(promptLabel/lineMaxChars/formality),
+    후처리(trailingPunctuation/reading). 현재 활성: 한국어·영어·일본어·스페인어·
+    프랑스어·중국어(간체)·독일어. **언어 추가 = 이 표에 한 행 + `prompts/common/
+    translation_rules_<code>.txt` 한 개**(둘 중 하나만 있으면 `languages.test.ts`가
+    실패한다). 서버는 `requestValidation.parseTargetLanguage`에서 enabled 코드만
+    통과시키므로, 표에 없는 코드는 프롬프트 조합에 도달하지 못한다.
 
 ### 5. 청킹 (장면 경계 기준)
 - **코드**: `useTranslation.translate` → **`app/lib/srt.ts` (`chunkSrtBlocksAtGaps`)**,
@@ -183,7 +196,10 @@
       실제로 등장)
     - `{{translationPhilosophy}}` → `prompts/common/cinematic_translation_philosophy_ko.txt`
       (**cinematic 스타일에서만**; meaning은 빈 문자열)
-    - `{{translationRules}}` → `prompts/common/translation_rules_ko.txt`
+    - `{{translationRules}}` → **공통 형식 규칙 `prompts/common/translation_rules_format.txt`
+      (도착어 무관, `{{lineMaxChars}}`만 언어별로 치환) + 도착어 규칙
+      `prompts/common/translation_rules_<code>.txt`**를 이어붙인 것
+      (`translationContent.ts`의 `buildTranslationRules`)
   - **유저 턴**: `<content_metadata>`(`formatMovieInfo` — 제목/연도/장르/배경·시대/톤앤매너)
     + `<user_notes>` + 청크 위치 + `<glossary>`(파일 전체 표기, §2-C 켰을 때만) +
     `<speech_relations>`(이 청크의 블록 범위와 겹치는 관계만, `getBlockIndexRange` +
@@ -191,15 +207,20 @@
     `[N] 대사` 표식** — `formatBlocksForModel`, `srt.ts`) + 블록 수 지시(구조 기반
     카운트, `parseSrtBlocks(...).length`)
 - **품질 레버 (여기가 가장 큰 번역 품질 레버들)**:
-  - 번역 규칙(직역 금지·말투·줄길이·마침표 등) → **`translation_rules_ko.txt`**
+  - 번호·블록 수·2줄 상한 같은 **형식 불변식**(모든 언어 공통) →
+    **`translation_rules_format.txt`** — 여기를 고치면 7개 언어가 동시에 바뀐다
+  - 특정 도착어의 문체·말투·문장부호 → **`translation_rules_<code>.txt`**
+    (예: 직역투/마침표는 `translation_rules_ko.txt`)
   - 영화적 번역 철학(인물 목소리·감정·압축) → **`cinematic_translation_philosophy_ko.txt`**
     (cinematic에서만 적용)
   - 페르소나/프롬프트 인젝션 방어 → `subtitle_translation_system.txt`
   - 메타데이터가 프롬프트에 실리는 형식 → `translationContent.ts` (`formatMovieInfo`)
-  - 도착어별 규칙 로딩 → `translationContent.ts` (`getLanguageConfig`), `loader.ts`
-  - 영어 타깃 규칙 → `translation_rules_en.txt`
-  - 이름 표기·존대가 청크마다 흔들림 → §2-C(추출) 참조. 표기는 `translation_rules_ko.txt`
-    규칙 5·12에서 고정 규칙으로 못박혀 있음
+  - 도착어별 규칙 로딩·조립 → `translationContent.ts` (`requireTargetLang`,
+    `buildTranslationRules`), `loader.ts` (`loadTranslationFormatRules` /
+    `loadTranslationRules`)
+  - 줄 길이 상한 → `languages.ts`의 `lineMaxChars`(ko 25 / ja 20 / zh 18 / 라틴계 42)
+  - 이름 표기·말투가 청크마다 흔들림 → §2-C(추출) 참조. 표기 고정은
+    `translation_rules_format.txt` 규칙 5·10에 못박혀 있음(모든 언어 공통)
 - **주의**: `translation_rules_ko_original.txt`는 참고용 원본 사본(파이프라인 미사용).
   `castSheet`가 없으면(토글 OFF, 기본값) `<glossary>`/`<speech_relations>`는
   `.filter(Boolean)`으로 완전히 드롭돼 프롬프트가 이 기능 도입 이전과 바이트 단위로
@@ -215,7 +236,9 @@
     `NEXT_PUBLIC_TRANSLATION_MODEL`, 기본 flash)
   - thinking 수준 → `thinkingLevelForModel(model)`: flash는
     `THINKING_LEVEL`(기본 LOW), Pro는 `PRO_THINKING_LEVEL`(기본 MEDIUM).
-    둘 다 env, 변경 시 dev 서버 재시작. 로그에 `thinking=`로 찍힘
+    둘 다 env, 변경 시 dev 서버 재시작. 로그에 `thinking=`로 찍힘. ⚠️ flash와 달리
+    pro는 MINIMAL을 설정할 수 없고(API가 거부) LOW도 `thoughts=0`이 아니다 — 실측·비용
+    영향은 `docs/decisions.md` §2-4-1, `docs/tuning/gemini-limits.md` §6-2 참고
   - **엄격 모드**(출력 검증+재시도+블록단위 재번역) → `translationService.ts`,
     `TRANSLATION_STRICT_MODE=true`로 켬(기본 off, 비용 폭탄 위험 있어 신중히)
 
@@ -232,12 +255,13 @@
   내보내는 별개의 실패 모드, 표식 방식과 무관) → `srt.ts` + `TODO.md`. 이게 밀림
   버그의 방어선.
 
-### 9.5. 리딩스피드·최소 길이 타임코드 조정 (CPS / minDuration)
+### 9.5. 리딩스피드·최소 길이 타임코드 조정 (CPS / minDuration, 도착어별)
 - **코드**: **`app/lib/srt.ts` (`adjustSubtitleTiming`)**, `constants.ts`
   (`CPS_HARD_MAX`/`CPS_TARGET`/`CPS_RECOMMENDED_MIN`/`MIN_SUBTITLE_GAP_MS`/
   `MIN_SUBTITLE_DURATION_MS`), `useTranslation`에서 청크 합친 직후 1회 호출.
 - **하는 일**: 두 가지 독립된 조건 중 하나라도 걸리면 같은 방식으로 넓힌다 —
-  ① **`cps > CPS_HARD_MAX`**(기본 12, Netflix 한국어 상한, 대사가 있는 블록만) 또는
+  ① **`cps > 도착어의 hardMax`**(한국어 12 = Netflix 한국어 상한, ja/zh 9, 라틴계 20 —
+  `languages.ts`의 `TargetLang.reading`, 해석은 `constants.ts`의 `getReadingSpeed`) 또는
   ② **구간 길이 < `MIN_SUBTITLE_DURATION_MS`**(기본 800ms, 대사 유무 무관 — 빈 블록도 대상).
   두 조건의 요구량 중 **큰 쪽**을 목표로, **이웃이 비운 침묵(gap)** 안에서 표시창을 넓힌다.
   end를 먼저 뒤로 밀고 모자라면 start를 앞으로 당김. 첫 블록은 앞의 빈 프리롤(0초까지)로
@@ -246,7 +270,10 @@
   전체 파일에 한 번 돌아 청크 경계 이웃까지 커버. 타임코드를 코드가 소유한다는 원칙의 연장.
 - **임계값 3단(CPS)**: 12 초과 = 손봄(위반), 10 = 착지 목표, 8 = 그 아래로는 안 내림(목표가
   10이라 자동 보장). 10~12 사이는 상한 밑이라 손대지 않는다.
-- **품질 레버**: `CPS_HARD_MAX`(낮추면 더 많은 블록을 손봄), `CPS_TARGET`(낮추면 더 여유롭게
+- **품질 레버**: 언어별 기본값은 `languages.ts`의 `reading`(한국어만 실측, 나머지는
+  공개 스타일 가이드 기반 추정 — `tuning/reading-speed.md`). env
+  `NEXT_PUBLIC_CPS_HARD_MAX`/`_TARGET`을 설정하면 **모든 언어에 일괄 적용되는
+  전역 오버라이드**로 동작한다. `CPS_HARD_MAX`(낮추면 더 많은 블록을 손봄), `CPS_TARGET`(낮추면 더 여유롭게
   늘리지만 gap을 더 씀), `MIN_SUBTITLE_GAP_MS`(인접 최소 간격), `MIN_SUBTITLE_DURATION_MS`
   (올리면 더 많은 짧은 블록이 늘어남). 모두 `constants.ts` + env.
   gap이 부족하면 목표까지 못 내려가고 가능한 만큼만 조정.
@@ -281,7 +308,7 @@
   따로 표시(`DoneStep.tsx`, `simpleCopy.ts` `done.stopReason`).
 - **미룬 것(다음 커밋)**: 크레딧 환불 정책, "실패한 부분만 재번역" 버튼. `TODO.md` 참조.
 
-### 9.7. 기계적 번역 규칙 강제 (말줄임표·마침표·2줄 상한)
+### 9.7. 기계적 번역 규칙 강제 (말줄임표·마침표·2줄 상한, 도착어별)
 - **코드**: **`app/lib/srt.ts` (`enforceTextRules`)**, `useTranslation.ts`에서 청크 합친
   직후 · §9.5 타이밍 조정 **이전**에 1회 호출(글자 수가 바뀌면 CPS가 그 결과 위에서
   계산돼야 하므로 순서가 중요).
@@ -293,7 +320,10 @@
     오인하지 않는다(치환 후엔 끝에 남는 게 `.`이 아니라 `…`이라 애초에 안 걸림).
   - **규칙 9 (2줄 상한)**: 같은 마커에 줄이 3개 이상이면 2번째 줄부터 공백으로 합쳐
     강제로 2줄로 만든다. 텍스트 유실 없음(공백으로 이어붙일 뿐 아무것도 버리지 않음).
-  - **규칙 7 (문장 끝 마침표·줄 끝 쉼표 생략)**: 각 줄 끝의 `.`/`,` 하나를 제거.
+  - **문장 끝 마침표·줄 끝 쉼표 생략**: 각 줄 끝의 문장부호 하나를 제거. **어떤 문자를
+    지울지는 도착어가 정한다** — `languages.ts`의 `trailingPunctuation`(ko `.,` /
+    ja `.,。、` / zh `.,。，` / 영어·스페인어·프랑스어·독일어는 빈 문자열이라 **아예
+    건드리지 않는다** — 라틴계 자막 관행은 문장부호를 유지한다).
 - **8번(25자 초과 시 의미 단위로 두 줄 나누기)은 여전히 AI 담당**이다 — 어디서 끊어야
   자연스러운지는 의미 판단이라 코드가 임의 지점(예: 중간 공백)에서 자르면 어색한
   줄바꿈을 강제로 만들 위험이 더 크다. 규칙 9는 "AI가 8번을 못 지켰을 때의 안전망"이지
@@ -314,7 +344,8 @@
   `app/components/simple/DoneStep.tsx`,
   `TranslationResult`(`failedChunks`/`fallbackBlocks`/`totalChunks`/`stopReason`)
 - **품질 레버**: 출력 파일명 규칙 → `buildOutputFilename` / `constants.ts`
-  `LANG_SUFFIX` + `SOURCE_LANG_CODES`. `.srt` 직전 토큰이 화이트리스트 언어
+  `LANG_SUFFIX`(이제 `TARGET_LANGS`에서 파생 — 언어를 추가해도 따로 손댈 필요 없음)
+  + `SOURCE_LANG_CODES`. `.srt` 직전 토큰이 화이트리스트 언어
   코드면 도착어로 **교체**(`movie.it.srt` → `movie.ko.srt`), 아니면 **추가**
   (`movie.srt` → `movie.ko.srt`). 완료 화면 실패 개수 표시 → `DoneStep.tsx`.
 
@@ -329,8 +360,12 @@
 | 재검색해도 계속 다른(엉뚱한) 작품이 나옴 | `tmdb.ts` (`searchCandidates` 정렬), `enrichMovie.ts` (`searchMovie`의 후보 임계값), `InfoStep.tsx` (`CandidatePicker`) — §2-A "후보가 여러 개일 때" |
 | 장르/배경·시대/톤앤매너가 이상함 | `enrichMovie.ts` (`buildKeywordPrompt` / `buildGroundedPrompt`) |
 | 배경/시대가 개봉연도로 나옴 | `enrichMovie.ts` 프롬프트 (그라운딩·"개봉연도≠극중배경" 지침) |
-| 번역이 직역투/어색함 | `translation_rules_ko.txt` |
-| 존댓말/반말·인물 말투가 안 맞음 | 먼저 InfoStep의 "등장인물·용어 일관성" 토글을 켜봤는지 확인(§2-C, 기본 OFF) — 켰다면 `cast_sheet_extraction.txt` 또는 카드에서 직접 관계 수정. 안 켰거나 그래도 안 맞으면 `translation_rules_ko.txt`, (cinematic) `cinematic_translation_philosophy_ko.txt`, `InfoStep`에서 사람이 톤 입력 |
+| 번역이 직역투/어색함 | 해당 도착어의 `translation_rules_<code>.txt` |
+| 도착어를 추가하고 싶음 | `app/config/languages.ts`에 한 행 + `prompts/common/translation_rules_<code>.txt` — §4. 실제 모델 출력 확인은 `LIVE_LANG_SMOKE=1 npx vitest run app/lib/prompts/liveLang.smoke.test.ts` |
+| 영어/중국어인데 존댓말 관계표가 안 보임 | 정상 — 그 언어엔 문법적 말투 축이 없어 relations를 안 만든다(§2-C, `languages.ts`의 `formality: null`) |
+| 영어 자막인데 문장 끝 마침표가 사라짐 | `languages.ts`의 `trailingPunctuation`이 비어 있어야 정상 — 값이 있으면 §9.7이 지운다 |
+| 일본어/중국어 자막이 너무 빨리 지나감 | `languages.ts`의 `reading`(언어별 CPS) — §9.5 |
+| 존댓말/반말·인물 말투가 안 맞음(말투 축이 있는 언어) | 먼저 InfoStep의 "등장인물·용어 일관성" 토글을 켜봤는지 확인(§2-C, 기본 OFF) — 켰다면 `cast_sheet_extraction.txt` 또는 카드에서 직접 관계 수정. 안 켰거나 그래도 안 맞으면 `translation_rules_ko.txt`, (cinematic) `cinematic_translation_philosophy_ko.txt`, `InfoStep`에서 사람이 톤 입력 |
 | 같은 이름이 청크마다 다르게 번역됨(표기 흔들림) | InfoStep 토글을 켜지 않았으면 그게 원인(§2-C, 기본 OFF). 켰는데도 흔들리면 `extractCastSheet.ts` `sanitizeCastSheet`(환각 필터로 그 이름이 버려졌을 수 있음) 또는 카드에서 직접 추가 |
 | 감정/뉘앙스가 밋밋함 | `cinematic_translation_philosophy_ko.txt` (+ 스타일을 cinematic로) |
 | 줄이 25자 넘는데 안 나뉨(의미 단위 줄바꿈) | `translation_rules_ko.txt` 규칙 8 — 프롬프트로만 유도, 코드 강제 없음(의미 판단이라 §9.7 스코프 밖) |
@@ -364,6 +399,9 @@
 4. **UI 버킷 ↔ AI 버킷 ↔ 글로사리 버킷 분리**: 제목/연도/감독/포스터(화면용)와
    장르/배경/톤(프롬프트용)을 섞지 말 것. `notes`는 사용자 자유 입력 전용. 글로사리·
    존대관계(`CastSheet`)는 제3의 버킷 — `MovieInfo`에 합치지 말 것(§2-C).
+5. **도착어 표는 하나뿐**: 언어별 값(프롬프트 라벨·줄 길이·말투 축·문장부호·읽기속도)은
+   전부 `app/config/languages.ts`에 있다. 다른 파일에 `if (lang === 'ko')`류 분기를
+   다시 만들지 말 것 — 그 분기가 곧 "언어를 늘렸는데 한 곳만 안 고쳐진" 버그다.
 
 ---
 

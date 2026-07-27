@@ -235,25 +235,42 @@ export function adjustSubtitleTiming(
 export interface TextRuleReport {
   /** ASCII "..."-style runs (2+ dots) normalized to a single "…". */
   ellipsisNormalized: number;
-  /** Blocks whose 3rd+ line got folded into line 2 (translation_rules_ko.txt
-   * rule 9 — 2-line cap). */
+  /** Blocks whose 3rd+ line got folded into line 2 (2-line cap). */
   linesMerged: number;
-  /** Lines that had a trailing "."/"," removed (rule 7). */
+  /** Lines that had sentence-final punctuation removed. */
   trailingPunctuationStripped: number;
 }
 
 const ELLIPSIS_RUN = /\.{2,}/g;
-const TRAILING_PUNCTUATION = /[.,]\s*$/;
+
+/** Escapes the configured characters for use inside a character class. */
+function trailingPunctuationPattern(chars: string): RegExp {
+  const escaped = chars.replace(/[\\\]^-]/g, '\\$&');
+  return new RegExp(`[${escaped}]\\s*$`);
+}
+
+export interface TextRuleOptions {
+  /**
+   * Sentence-final characters to strip (TargetLang.trailingPunctuation).
+   * Empty — Latin-script targets, which keep their punctuation per standard
+   * subtitling practice — skips the strip entirely.
+   */
+  trailingPunctuation?: string;
+}
 
 /**
- * Mechanically enforces the two translation rules that have exactly one
- * correct output regardless of context — translation_rules_ko.txt rule 7
- * (no trailing "."/",") and rule 9 (2-line cap per block) — plus ellipsis
- * normalization. The model is asked to follow these already, but "a rule is
- * asked for" and "a rule always holds" are different guarantees; unlike
- * line-wrap (rule 8, needs a meaning-based break point) or honorific
- * consistency (rule 5/6, needs judgment), these have no ambiguity, so code
+ * Mechanically enforces the translation rules that have exactly one correct
+ * output regardless of context — the 2-line cap (shared format rule 7) and,
+ * for languages whose subtitle convention drops it, sentence-final
+ * punctuation — plus ellipsis normalization. The model is asked to follow
+ * these already, but "a rule is asked for" and "a rule always holds" are
+ * different guarantees; unlike line-wrap (needs a meaning-based break point)
+ * or formality consistency (needs judgment), these have no ambiguity, so code
  * can just make them true instead of hoping the model does.
+ *
+ * The punctuation set is per-language: Korean drops "." and ",", Japanese and
+ * Chinese also drop "。"/"、"/"，", while English/Spanish/French/German keep
+ * theirs (empty set → no strip).
  *
  * Ellipsis runs to "…" first, so the punctuation strip below never mistakes
  * a trailing-off ellipsis for a sentence-ending period — after normalization
@@ -264,7 +281,12 @@ const TRAILING_PUNCTUATION = /[.,]\s*$/;
  */
 export function enforceTextRules(
   srt: string,
+  options: TextRuleOptions = {},
 ): { content: string; report: TextRuleReport } {
+  const trailingPunctuation = options.trailingPunctuation ?? '.,';
+  const trailingPattern = trailingPunctuation
+    ? trailingPunctuationPattern(trailingPunctuation)
+    : null;
   const report: TextRuleReport = {
     ellipsisNormalized: 0,
     linesMerged: 0,
@@ -289,11 +311,13 @@ export function enforceTextRules(
       bodyLines = [bodyLines[0], bodyLines.slice(1).join(' ')];
     }
 
-    bodyLines = bodyLines.map((line) => {
-      if (!TRAILING_PUNCTUATION.test(line)) return line;
-      report.trailingPunctuationStripped++;
-      return line.replace(TRAILING_PUNCTUATION, '');
-    });
+    if (trailingPattern) {
+      bodyLines = bodyLines.map((line) => {
+        if (!trailingPattern.test(line)) return line;
+        report.trailingPunctuationStripped++;
+        return line.replace(trailingPattern, '');
+      });
+    }
 
     return [lines[0], lines[1], ...bodyLines].join('\n');
   });

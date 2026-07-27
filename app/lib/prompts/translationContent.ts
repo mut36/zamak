@@ -1,23 +1,37 @@
 import type { MovieInfo } from './types';
-import { loadTranslationRules } from './loader';
+import { loadTranslationFormatRules, loadTranslationRules } from './loader';
+import { renderPromptTemplate } from './renderer';
+import { getEnabledTargetLang, type TargetLang } from '../../config/languages';
 
-function getLanguageConfig(targetLanguage: string) {
-  if (targetLanguage === 'ko' || targetLanguage === 'Korean') {
-    return {
-      language: 'ko' as const,
-      translationDirection: '한국어',
-    };
+/**
+ * Every server path that reaches here has already validated the code
+ * (requestValidation.parseTargetLanguage), so an unknown one is a programming
+ * error, not user input — throwing beats silently translating into whatever
+ * language the fallback happened to pick.
+ */
+function requireTargetLang(targetLanguage: string): TargetLang {
+  const lang = getEnabledTargetLang(targetLanguage);
+  if (!lang) {
+    throw new Error(`Unsupported target language: ${targetLanguage}`);
   }
-  if (targetLanguage === 'en' || targetLanguage === 'English') {
-    return {
-      language: 'en' as const,
-      translationDirection: '영어',
-    };
-  }
-  return {
-    language: 'en' as const,
-    translationDirection: targetLanguage,
-  };
+  return lang;
+}
+
+/**
+ * Shared format invariants first, then the target language's style delta
+ * under its own heading — see prompts/common/translation_rules_format.txt.
+ */
+async function buildTranslationRules(lang: TargetLang): Promise<string> {
+  const [formatTemplate, languageRules] = await Promise.all([
+    loadTranslationFormatRules(),
+    loadTranslationRules(lang.code),
+  ]);
+
+  const formatRules = renderPromptTemplate(formatTemplate, {
+    lineMaxChars: String(lang.lineMaxChars),
+  });
+
+  return `${formatRules}\n\n[도착어(${lang.promptLabel}) 지침]\n${languageRules}`;
 }
 
 export function formatMovieInfo(
@@ -41,11 +55,11 @@ export async function buildTranslationVariables(
   translationMode: 'chunk',
   chunkPosition?: { index: number; total: number },
 ): Promise<Record<string, string>> {
-  const config = getLanguageConfig(targetLanguage);
-  const translationRules = await loadTranslationRules(config.language);
+  const lang = requireTargetLang(targetLanguage);
+  const translationRules = await buildTranslationRules(lang);
 
   return {
-    translationDirection: config.translationDirection,
+    translationDirection: lang.promptLabel,
     translationMode: '청크',
     chunkContext:
       translationMode === 'chunk' && chunkPosition

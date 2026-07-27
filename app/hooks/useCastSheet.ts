@@ -69,7 +69,11 @@ export function useCastSheet() {
   );
 
   const request = useCallback(
-    (content: string, movieInfo: CastSheetMovieInfo): Promise<CastSheet> => {
+    (
+      content: string,
+      movieInfo: CastSheetMovieInfo,
+      targetLang: string,
+    ): Promise<CastSheet> => {
       if (!content) return Promise.resolve(EMPTY_CAST_SHEET);
       if (dispatchedRef.current && pendingRef.current) return pendingRef.current;
 
@@ -84,7 +88,7 @@ export function useCastSheet() {
           const res = await fetch('/api/glossary', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content, movieInfo }),
+            body: JSON.stringify({ content, movieInfo, targetLang }),
             signal: controller.signal,
           });
           const data: CastSheet = res.ok ? await res.json() : EMPTY_CAST_SHEET;
@@ -109,12 +113,12 @@ export function useCastSheet() {
 
   /** Force a fresh extraction even if one already completed ("다시 추출"). */
   const refetch = useCallback(
-    (content: string, movieInfo: CastSheetMovieInfo) => {
+    (content: string, movieInfo: CastSheetMovieInfo, targetLang: string) => {
       abortRef.current?.abort();
       dispatchedRef.current = false;
       pendingRef.current = null;
       setStatus('idle');
-      return request(content, movieInfo);
+      return request(content, movieInfo, targetLang);
     },
     [request],
   );

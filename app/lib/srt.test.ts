@@ -616,4 +616,32 @@ describe('enforceTextRules', () => {
     const srt = '1\nnot a timecode\n서문...';
     expect(enforceTextRules(srt).content).toBe(srt);
   });
+
+  it('keeps sentence punctuation for a language whose convention keeps it', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\nI know what you did.';
+    const { content, report } = enforceTextRules(srt, {
+      trailingPunctuation: '',
+    });
+    expect(content).toBe(srt);
+    expect(report.trailingPunctuationStripped).toBe(0);
+  });
+
+  it('still caps lines and normalizes ellipses when punctuation is kept', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\nWell...\nA\nB';
+    const { content, report } = enforceTextRules(srt, {
+      trailingPunctuation: '',
+    });
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\nWell…\nA B');
+    expect(report.ellipsisNormalized).toBe(1);
+    expect(report.linesMerged).toBe(1);
+  });
+
+  it('strips the CJK full-width stops for a language that configures them', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\nそこにいるのか。';
+    const { content, report } = enforceTextRules(srt, {
+      trailingPunctuation: '.,。、',
+    });
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\nそこにいるのか');
+    expect(report.trailingPunctuationStripped).toBe(1);
+  });
 });

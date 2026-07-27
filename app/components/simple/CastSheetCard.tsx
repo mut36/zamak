@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import type { CastSheet, GlossaryTerm, SpeechRelation } from '../../types/glossary';
+import { SPEECH_FORMALITIES } from '../../types/glossary';
+import { resolveTargetLang } from '../../config/languages';
 import type { CastSheetStatus } from '../../hooks/useCastSheet';
 import { ChevronDownIcon, RefreshIcon, SpinnerIcon } from '../icons';
 import { COPY } from '../../i18n/simpleCopy';
@@ -15,6 +17,9 @@ interface CastSheetCardProps {
   sheet: CastSheet;
   onChangeSheet: (sheet: CastSheet) => void;
   onRefetch: () => void;
+  /** Target language code — decides the 표기 column's label and whether the
+   * 말투 tab exists at all (English/Chinese have no formality axis). */
+  targetLang: string;
 }
 
 /**
@@ -31,9 +36,16 @@ export function CastSheetCard({
   sheet,
   onChangeSheet,
   onRefetch,
+  targetLang,
 }: CastSheetCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [tab, setTab] = useState<'terms' | 'relations'>('terms');
+
+  const language = resolveTargetLang(targetLang);
+  const axis = language.formality;
+  // Without a formality axis there are no relations to edit, so the tab is
+  // dropped rather than shown empty.
+  const activeTab = axis ? tab : 'terms';
 
   const itemCount = sheet.terms.length;
   const extracting = enabled && status === 'extracting';
@@ -49,7 +61,7 @@ export function CastSheetCard({
     const terms = sheet.terms.filter((_, i) => i !== index);
     // A term that backs a relation shouldn't leave a dangling reference.
     const relations = sheet.relations.filter(
-      (r) => r.from !== removed.ko && r.to !== removed.ko,
+      (r) => r.from !== removed.target && r.to !== removed.target,
     );
     onChangeSheet({ ...sheet, terms, relations });
   };
@@ -57,7 +69,7 @@ export function CastSheetCard({
   const addTerm = () => {
     onChangeSheet({
       ...sheet,
-      terms: [...sheet.terms, { source: '', ko: '', kind: 'term' }],
+      terms: [...sheet.terms, { source: '', target: '', kind: 'term' }],
     });
   };
 
@@ -134,18 +146,20 @@ export function CastSheetCard({
           <div className='flex gap-1 mb-3'>
             <button
               type='button'
-              className={tab === 'terms' ? 'btn btn-ghost !py-1.5 !px-3 !text-[12px]' : 'btn btn-ghost !py-1.5 !px-3 !text-[12px] opacity-50'}
+              className={activeTab === 'terms' ? 'btn btn-ghost !py-1.5 !px-3 !text-[12px]' : 'btn btn-ghost !py-1.5 !px-3 !text-[12px] opacity-50'}
               onClick={() => setTab('terms')}
             >
               {c.tabTerms}
             </button>
-            <button
-              type='button'
-              className={tab === 'relations' ? 'btn btn-ghost !py-1.5 !px-3 !text-[12px]' : 'btn btn-ghost !py-1.5 !px-3 !text-[12px] opacity-50'}
-              onClick={() => setTab('relations')}
-            >
-              {c.tabRelations}
-            </button>
+            {axis && (
+              <button
+                type='button'
+                className={activeTab === 'relations' ? 'btn btn-ghost !py-1.5 !px-3 !text-[12px]' : 'btn btn-ghost !py-1.5 !px-3 !text-[12px] opacity-50'}
+                onClick={() => setTab('relations')}
+              >
+                {c.tabRelations}
+              </button>
+            )}
             <button
               type='button'
               className='btn btn-ghost !py-1.5 !px-3 !text-[12px] ml-auto'
@@ -156,8 +170,13 @@ export function CastSheetCard({
             </button>
           </div>
 
-          {tab === 'terms' ? (
+          {activeTab === 'terms' ? (
             <div>
+              {!axis && (
+                <p className='text-[12px] text-ink-3 mb-2'>
+                  {c.noFormality(language.label)}
+                </p>
+              )}
               {sheet.terms.length === 0 && (
                 <p className='text-[12px] text-ink-3 mb-2'>{c.emptyTerms}</p>
               )}
@@ -172,9 +191,9 @@ export function CastSheetCard({
                   <span className='text-ink-3'>→</span>
                   <input
                     className='input !py-1.5 flex-1'
-                    placeholder={c.termKoLabel}
-                    value={term.ko}
-                    onChange={(e) => updateTerm(i, { ko: e.target.value })}
+                    placeholder={c.termTargetLabel(language.label)}
+                    value={term.target}
+                    onChange={(e) => updateTerm(i, { target: e.target.value })}
                   />
                   <button
                     type='button'
@@ -207,8 +226,8 @@ export function CastSheetCard({
                     onChange={(e) => updateRelation(i, { from: e.target.value })}
                   >
                     {sheet.terms.map((t) => (
-                      <option key={t.ko} value={t.ko}>
-                        {t.ko}
+                      <option key={t.target} value={t.target}>
+                        {t.target}
                       </option>
                     ))}
                   </select>
@@ -219,13 +238,13 @@ export function CastSheetCard({
                     onChange={(e) => updateRelation(i, { to: e.target.value })}
                   >
                     {sheet.terms.map((t) => (
-                      <option key={t.ko} value={t.ko}>
-                        {t.ko}
+                      <option key={t.target} value={t.target}>
+                        {t.target}
                       </option>
                     ))}
                   </select>
                   <div className='flex gap-1'>
-                    {c.speechOptions.map((option) => (
+                    {SPEECH_FORMALITIES.map((option) => (
                       <button
                         key={option}
                         type='button'
@@ -237,7 +256,7 @@ export function CastSheetCard({
                         }
                         onClick={() => updateRelation(i, { speech: option })}
                       >
-                        {option}
+                        {axis?.[option] ?? option}
                       </button>
                     ))}
                   </div>

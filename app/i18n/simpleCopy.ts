@@ -202,18 +202,21 @@ export const COPY = {
     castSheet: {
       title: '등장인물·용어 일관성',
       badge: '고급',
-      hint: '이름·지명 표기와 존댓말을 파일 전체에서 통일해요. 준비에 20~40초 걸려요.',
+      hint: '이름·지명 표기와 말투를 파일 전체에서 통일해요. 준비에 20~40초 걸려요.',
       extracting: '분석하고 있어요…',
       count: (n: number) => `${n}개`,
       tabTerms: '표기',
       tabRelations: '말투',
       termSourceLabel: '원문',
-      termKoLabel: '한국어 표기',
+      /** Doubles as the placeholder, so it names the actual target language. */
+      termTargetLabel: (language: string) => `${language} 표기`,
       addTerm: '+ 새 항목',
       removeRow: '삭제',
       emptyTerms: '표기 항목이 없어요. 직접 추가할 수 있어요.',
       emptyRelations: '아직 파악된 말투 관계가 없어요.',
-      speechOptions: ['존댓말', '반말', '혼용'] as const,
+      /** Shown when the target language has no formality axis (영어·중국어). */
+      noFormality: (language: string) =>
+        `${language}에는 존댓말/반말 같은 말투 구분이 없어서, 표기만 통일해요.`,
       relationRange: (from: number, to: number) => `${from}~${to}번 구간`,
       refetch: '다시 추출',
     },

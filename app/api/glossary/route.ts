@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '../../lib/server/auth';
 import { extractCastSheet } from '../../lib/server/extractCastSheet';
 import { EMPTY_CAST_SHEET } from '../../types/glossary';
+import { DEFAULT_TARGET_LANG } from '../../config/languages';
 
 export const maxDuration = 60;
 
@@ -16,6 +17,9 @@ interface GlossaryRequest {
     era?: string;
     tone?: string;
   };
+  /** Target language code; decides the spelling language and whether a
+   * formality axis is asked for at all. Defaults to Korean. */
+  targetLang?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -43,7 +47,10 @@ export async function POST(request: NextRequest) {
       country: body.movieInfo?.country,
       era: body.movieInfo?.era,
       tone: body.movieInfo?.tone,
-    });
+    },
+    // resolveTargetLang falls back to Korean for anything unknown — this
+    // prepass is best-effort and must never 400 the info step.
+    typeof body.targetLang === 'string' ? body.targetLang : DEFAULT_TARGET_LANG);
     return NextResponse.json(sheet);
   } catch (error) {
     console.error('[glossary] request failed:', error);

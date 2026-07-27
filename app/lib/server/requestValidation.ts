@@ -13,6 +13,11 @@ import type {
   TranslationStyle,
 } from '../../types/translation';
 import type { CastSheet, GlossaryTerm, SpeechRelation } from '../../types/glossary';
+import { SPEECH_FORMALITIES, type SpeechFormality } from '../../types/glossary';
+import {
+  DEFAULT_TARGET_LANG,
+  getEnabledTargetLang,
+} from '../../config/languages';
 
 export class RequestValidationError extends Error {
   constructor(message: string) {
@@ -74,36 +79,58 @@ function parseModel(value: unknown): AllowedModel {
   return value as AllowedModel;
 }
 
+/**
+ * The gate between a request and the prompt builder: only codes that are
+ * actually enabled get through, so a stale client (or a hand-rolled request)
+ * can never reach translationContent with a language it has no rules for.
+ */
 function parseTargetLanguage(value: unknown): string {
-  if (value === undefined) return 'ko';
-  if (typeof value !== 'string' || !value.trim() || value.length > 50) {
-    throw new RequestValidationError('Invalid target language');
+  if (value === undefined) return DEFAULT_TARGET_LANG;
+  if (typeof value !== 'string' || !getEnabledTargetLang(value.trim())) {
+    throw new RequestValidationError(`Unsupported target language: ${String(value)}`);
   }
   return value.trim();
 }
 
 const TERM_KINDS: GlossaryTerm['kind'][] = ['person', 'place', 'org', 'term'];
-const SPEECH_VALUES: SpeechRelation['speech'][] = ['존댓말', '반말', '혼용'];
+
+/**
+ * A client loaded before the multi-language change still sends `ko` /
+ * '존댓말' shaped sheets; map them rather than dropping the whole sheet
+ * mid-deploy. Removable once no such tab can still be open.
+ */
+const LEGACY_SPEECH: Record<string, SpeechFormality> = {
+  존댓말: 'formal',
+  반말: 'informal',
+  혼용: 'mixed',
+};
+
+function parseFormality(value: unknown): SpeechFormality | null {
+  if (typeof value !== 'string') return null;
+  if (SPEECH_FORMALITIES.includes(value as SpeechFormality)) {
+    return value as SpeechFormality;
+  }
+  return LEGACY_SPEECH[value] ?? null;
+}
 
 function parseGlossaryTerm(value: unknown): GlossaryTerm | null {
   if (!isRecord(value)) return null;
   const source = typeof value.source === 'string' ? value.source.trim() : '';
-  const ko = typeof value.ko === 'string' ? value.ko.trim() : '';
-  if (!source || !ko) return null;
+  const rawTarget = typeof value.target === 'string' ? value.target : value.ko;
+  const target = typeof rawTarget === 'string' ? rawTarget.trim() : '';
+  if (!source || !target) return null;
   const kind = TERM_KINDS.includes(value.kind as GlossaryTerm['kind'])
     ? (value.kind as GlossaryTerm['kind'])
     : 'term';
   const note = typeof value.note === 'string' ? value.note.trim() : undefined;
-  return note ? { source, ko, kind, note } : { source, ko, kind };
+  return note ? { source, target, kind, note } : { source, target, kind };
 }
 
 function parseSpeechRelation(value: unknown): SpeechRelation | null {
   if (!isRecord(value)) return null;
   const from = typeof value.from === 'string' ? value.from.trim() : '';
   const to = typeof value.to === 'string' ? value.to.trim() : '';
-  const speech = SPEECH_VALUES.includes(value.speech as SpeechRelation['speech'])
-    ? (value.speech as SpeechRelation['speech'])
-    : null;
+  const speech = parseFormality(value.speech);
   const fromBlock = value.fromBlock;
   const toBlock = value.toBlock;
   if (

@@ -1,0 +1,18 @@
+
+[할 일 2 — 말투 관계표(relations)]
+- {{targetLanguage}}에는 상대에 따라 달라지는 말투 축이 있다: {{formalLabel}} / {{informalLabel}}.
+  대사가 많은 주요 인물들 사이에서 from이 to에게 말할 때 어느 쪽인지 정해.
+  A→B와 B→A는 다를 수 있으니 각각 적어.
+- speech 값은 반드시 "formal"({{formalLabel}}), "informal"({{informalLabel}}),
+  "mixed"({{mixedLabel}}) 중 하나로 써.
+- 판단 근거는 자막에서 실제로 관찰되는 것만 써. 호칭(sir, Mr., 직책), 나이·직위 차,
+  친밀도, 공적/사적 상황. 근거가 없으면 그 쌍은 아예 빼. 추측으로 채우지 마.
+- from/to에는 반드시 terms에 넣은 {{targetLanguage}} 표기(target)를 그대로 써.
+- 관계가 도중에 바뀌면 항목을 둘로 쪼개. 예를 들어 초반엔 {{formalLabel}}이다가 가까워진
+  뒤 {{informalLabel}}로 바뀌면, 바뀌는 지점의 자막 번호를 경계로 두 항목을 만들어:
+  {from:"A", to:"B", speech:"formal", fromBlock:1, toBlock:412} 와
+  {from:"A", to:"B", speech:"informal", fromBlock:413, toBlock:1480}.
+  자막 번호는 각 대사 앞의 [숫자] 표식이야.
+- 끝까지 안 바뀌면 fromBlock/toBlock에 전체 범위를 그대로 넣어.
+- 한쪽이 상황에 따라 오갈 뿐 뚜렷한 경계가 없으면 speech를 "mixed"로 하고 범위는 전체로.
+

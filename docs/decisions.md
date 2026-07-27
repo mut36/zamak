@@ -649,6 +649,56 @@ era/tone 추출(Gemini 호출)을 미루고 후보 목록만** 반환한다(`enr
 - `MAX_ENRICH_CANDIDATES`는 "화면에 몇 개 보여줄지"만 자르는 값이다. 후보가 몇 개든
   1개 초과면 무조건 선택 UI가 뜨는 기준 자체는 안 바뀐다.
 
+### 2-11. 도착어 6개 추가 — 언어별 값은 표 하나로 모으고, 존대 축은 언어 중립으로 저장한다 — 2026-07-27
+
+**문제**: 도착어가 한국어뿐이었다. `TARGET_LANGS`에 en/ja/es/fr/zh가 `enabled: false`로
+스캐폴딩돼 있어서 "플래그만 켜면 된다"고 적혀 있었지만, 실제로는 켜면 **잘못 번역된다**:
+`translationContent.ts`의 `getLanguageConfig`가 ko/en만 분기하고 나머지는 전부 영어 룰로
+폴백했고(중국어를 고르면 영어 자막 규칙으로 번역됐다), `parseTargetLanguage`는 50자 이하
+아무 문자열이나 통과시켰다. 줄 길이(25자)·문장부호(마침표 제거)·리딩스피드(12 CPS)·
+글로사리(`GlossaryTerm.ko`)·존대관계(`'존댓말'|'반말'|'혼용'`)가 전부 한국어 전제로
+하드코딩돼 있었다.
+
+**결정 1 — 언어별 값은 `app/config/languages.ts` 한 표에 모은다.** 한 행이 picker
+표시(label/mono/enabled), 프롬프트(promptLabel/lineMaxChars/formality), 후처리
+(trailingPunctuation/reading)를 전부 들고 있다. 다른 파일에 `if (lang === 'ko')`를
+다시 만들지 않는 것이 이 결정의 핵심이다 — 그 분기가 곧 "언어를 늘렸는데 한 곳만 안
+고쳐진" 버그다. 활성 언어: 한국어·영어·일본어·스페인어·프랑스어·중국어(간체)·독일어.
+
+**결정 2 — 룰 프롬프트를 공통 형식 + 도착어 델타로 쪼갠다.** 번호 무결성·블록 수·2줄
+상한 같은 **불변식**은 언어와 무관하므로 `translation_rules_format.txt` 하나가 갖고
+(`{{lineMaxChars}}`만 언어별 치환), 문체·말투·문장부호만
+`translation_rules_<code>.txt`에 남긴다. 7벌 복사였다면 불변식 1(블록 수 계약)이
+언어마다 조금씩 다른 문장으로 갈라졌을 것이고, 그 드리프트는 자막 밀림으로 나타난다.
+
+**결정 3 — 검증은 화이트리스트로 조인다.** `parseTargetLanguage`가 **enabled 코드만**
+통과시키고, 프롬프트 빌더(`requireTargetLang`)는 모르는 코드를 만나면 던진다. 이전처럼
+조용히 다른 언어 규칙으로 폴백하면, 사용자는 "왜 중국어를 골랐는데 영어 자막 관행이
+적용됐는지" 알 방법이 없다. 실패가 보이는 쪽이 낫다.
+
+**결정 4 — 존대/격식은 언어 중립으로 저장하고 표시할 때만 그 언어의 어휘로 번역한다.**
+`SpeechRelation.speech`는 `'formal' | 'informal' | 'mixed'`이고, 프롬프트·UI에 나갈 때만
+`TargetLang.formality`의 라벨(존댓말·반말 / 敬語·タメ口 / usted·tú / Sie·du / vous·tu)로
+바뀐다. 모델에 "formal"만 던지면 어떤 문법 형태를 쓰라는 건지 알 수 없으므로 라벨은
+반드시 그 언어의 말로 나가야 한다. `GlossaryTerm.ko`는 `target`으로 이름을 바꿨다.
+**영어·중국어는 문법적 말투 축이 없어 `formality: null`** — 추출 프롬프트에서 관계
+파트를 아예 빼고, `<speech_relations>` 태그도 만들지 않는다. 없는 축을 만들어내는 것보다
+표기만 고정하는 게 정확하다.
+
+**결정 5 — 후처리도 언어를 따른다.** 문장 끝 마침표 제거는 **한국어·일본어·중국어 자막
+관행**이지 보편 규칙이 아니다. 영어/스페인어/프랑스어/독일어는 문장부호를 유지하는 게
+표준이므로 `trailingPunctuation`이 빈 문자열이고 `enforceTextRules`가 그 단계를 건너뛴다.
+리딩스피드도 마찬가지 — 라틴 문자는 글자당 정보량이 작아 20 CPS대가 정상이고, 한국어의
+12를 그대로 쓰면 라틴계 자막이 불필요하게 늘어난다(`tuning/reading-speed.md`).
+
+**확인 방법**: 5개 언어에 실제 Gemini 호출로 12블록을 번역해 블록 수 12/12·미매칭 0을
+확인했다(2026-07-27). 재현은 opt-in 스모크 테스트 —
+`LIVE_LANG_SMOKE=1 npx vitest run app/lib/prompts/liveLang.smoke.test.ts`.
+
+**남은 것**: 한국어 외 리딩스피드 값은 공개 스타일 가이드 기반 **추정치**다
+(`tuning/reading-speed.md`). cinematic 철학 파일은 여전히 한국어 전용이지만, 스타일이
+UI에 노출되지 않아(`page.tsx`가 `'meaning'` 하드코딩) 이번 범위 밖이다.
+
 ---
 
 ## 3. 검토 후 각하한 대안들
