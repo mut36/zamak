@@ -83,11 +83,18 @@ export async function translateChunkWithRetry(
       if (blocks.length > 1) {
         state.budget--;
         const mid = Math.ceil(blocks.length / 2);
-        try {
-          const [first, second] = await Promise.all([
-            translate(blocks.slice(0, mid).join('\n\n'), signal),
-            translate(blocks.slice(mid).join('\n\n'), signal),
-          ]);
+        // allSettled, not all: with Promise.all the loser of a double failure
+        // is never awaited, and its rejection surfaces later as an unhandled
+        // one. Both halves are in flight either way, so both get collected.
+        const halves = await Promise.allSettled([
+          translate(blocks.slice(0, mid).join('\n\n'), signal),
+          translate(blocks.slice(mid).join('\n\n'), signal),
+        ]);
+        const splitError = halves.find((h) => h.status === 'rejected')?.reason;
+        if (splitError === undefined) {
+          const [first, second] = halves.map(
+            (h) => (h as PromiseFulfilledResult<ChunkOutcome>).value,
+          );
           return {
             content: `${first.content}\n\n${second.content}`,
             unmatchedBlocks: first.unmatchedBlocks + second.unmatchedBlocks,
@@ -96,12 +103,14 @@ export async function translateChunkWithRetry(
               ...second.unmatchedIndices,
             ],
           };
-        } catch (splitError) {
-          if (signal.aborted) throw splitError;
-          const splitCode = classifyError(splitError);
-          if (isFatalCode(splitCode)) state.fatalCode = splitCode;
-          throw error; // original oversize error, not the split's
         }
+        if (signal.aborted) throw splitError;
+        for (const half of halves) {
+          if (half.status !== 'rejected') continue;
+          const splitCode = classifyError(half.reason);
+          if (isFatalCode(splitCode)) state.fatalCode = splitCode;
+        }
+        throw error; // original oversize error, not the split's
       }
       throw error;
     }
