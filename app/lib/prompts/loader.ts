@@ -25,15 +25,10 @@ export function loadSystemPromptTemplate(): Promise<string> {
 }
 
 /**
- * Language-neutral output-format rules (marker integrity, block count, line
- * cap). Shared by every target language so invariants 1-2 can't drift as
- * languages are added — the per-language file below carries style only.
- * Contains a {{lineMaxChars}} placeholder the caller renders.
+ * Full translation rules for one target language (format invariants + style).
+ * Written in that language. Contains a {{lineMaxChars}} placeholder the
+ * caller renders from languages.ts.
  */
-export function loadTranslationFormatRules(): Promise<string> {
-  return loadPromptFile('common/translation_rules_format.txt');
-}
-
 export function loadTranslationRules(
   language: TargetLangCode,
 ): Promise<string> {

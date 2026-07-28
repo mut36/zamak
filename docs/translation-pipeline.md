@@ -6,7 +6,7 @@
 [`TODO.md`](TODO.md), 청크 수치 유도는 [`tuning/`](tuning/) 참조.
 
 > 파일 경로 + 함수/심볼 이름으로만 가리킨다(줄 번호는 금방 어긋나서 안 적음).
-> 기준 시점: 2026-07-27. 구조가 바뀌면 이 문서도 같이 고칠 것.
+> 기준 시점: 2026-07-28. 구조가 바뀌면 이 문서도 같이 고칠 것.
 
 메인 경로는 **영화·드라마 분기**다. "기타 영상" 분기는 3단계에서 갈린다.
 
@@ -197,10 +197,10 @@
       실제로 등장)
     - `{{translationPhilosophy}}` → `prompts/common/cinematic_translation_philosophy_ko.txt`
       (**cinematic 스타일에서만**; meaning은 빈 문자열)
-    - `{{translationRules}}` → **공통 형식 규칙 `prompts/common/translation_rules_format.txt`
-      (도착어 무관, `{{lineMaxChars}}`만 언어별로 치환) + 도착어 규칙
-      `prompts/common/translation_rules_<code>.txt`**를 이어붙인 것
-      (`translationContent.ts`의 `buildTranslationRules`)
+    - `{{translationRules}}` → **도착어별 독립 파일
+      `prompts/common/translation_rules_<code>.txt`**(형식 불변식 + 문체·말투·문장부호가
+      한 파일에, **그 언어로 작성**; `{{lineMaxChars}}`만 `languages.ts` 값으로 치환 —
+      `translationContent.ts`의 `buildTranslationRules`)
   - **유저 턴**: `<content_metadata>`(`formatMovieInfo` — 제목/연도/장르/배경·시대/톤앤매너)
     + `<user_notes>` + 청크 위치 + `<glossary>`(파일 전체 표기, §2-C 켰을 때만) +
     `<speech_relations>`(이 청크의 블록 범위와 겹치는 관계만, `getBlockIndexRange` +
@@ -208,22 +208,20 @@
     `[N] 대사` 표식** — `formatBlocksForModel`, `srt.ts`) + 블록 수 지시(구조 기반
     카운트, `parseSrtBlocks(...).length`)
 - **품질 레버 (여기가 가장 큰 번역 품질 레버들)**:
-  - 번호·블록 수·2줄 상한 같은 **형식 불변식**(모든 언어 공통) →
-    **`translation_rules_format.txt`** — 여기를 고치면 7개 언어가 동시에 바뀐다
-  - 특정 도착어의 문체·말투·문장부호 → **`translation_rules_<code>.txt`**
-    (예: 직역투/마침표는 `translation_rules_ko.txt`)
+  - 특정 도착어의 번호·블록 수·2줄 상한·문체·말투·문장부호 →
+    **`translation_rules_<code>.txt`** (예: 한국어 직역투/마침표는
+    `translation_rules_ko.txt`). 언어마다 파일이 독립이라 한 언어를 고쳐도 다른
+    언어는 안 바뀐다 — 불변식 문구를 고칠 때는 7개 파일을 같이 점검할 것
   - 영화적 번역 철학(인물 목소리·감정·압축) → **`cinematic_translation_philosophy_ko.txt`**
     (cinematic에서만 적용)
   - 페르소나/프롬프트 인젝션 방어 → `subtitle_translation_system.txt`
   - 메타데이터가 프롬프트에 실리는 형식 → `translationContent.ts` (`formatMovieInfo`)
-  - 도착어별 규칙 로딩·조립 → `translationContent.ts` (`requireTargetLang`,
-    `buildTranslationRules`), `loader.ts` (`loadTranslationFormatRules` /
-    `loadTranslationRules`)
+  - 도착어별 규칙 로딩 → `translationContent.ts` (`requireTargetLang`,
+    `buildTranslationRules`), `loader.ts` (`loadTranslationRules`)
   - 줄 길이 상한 → `languages.ts`의 `lineMaxChars`(ko 25 / ja 20 / zh 18 / 라틴계 42)
-  - 이름 표기·말투가 청크마다 흔들림 → §2-C(추출) 참조. 표기 고정은
-    `translation_rules_format.txt` 규칙 5·10에 못박혀 있음(모든 언어 공통)
-- **주의**: `translation_rules_ko_original.txt`는 참고용 원본 사본(파이프라인 미사용).
-  `castSheet`가 없으면(토글 OFF, 기본값) `<glossary>`/`<speech_relations>`는
+  - 이름 표기·말투가 청크마다 흔들림 → §2-C(추출) 참조. 표기 고정은 각
+    `translation_rules_<code>.txt`의 글로사리·우선순위 규칙에 못박혀 있음
+- **주의**: `castSheet`가 없으면(토글 OFF, 기본값) `<glossary>`/`<speech_relations>`는
   `.filter(Boolean)`으로 완전히 드롭돼 프롬프트가 이 기능 도입 이전과 바이트 단위로
   같다 — `composer.test.ts` 회귀 테스트로 고정됨.
 
@@ -340,28 +338,32 @@
 - **코드**: **`app/lib/srt.ts` (`enforceTextRules`)**, `useTranslation.ts`에서 청크 합친
   직후 · §9.5 타이밍 조정 **이전**에 1회 호출(글자 수가 바뀌면 CPS가 그 결과 위에서
   계산돼야 하므로 순서가 중요).
-- **왜 이 세 개만 코드가 처리하나**: `translation_rules_ko.txt`의 12개 규칙 중 정답이
+- **왜 이 세 개만 코드가 처리하나**: `translation_rules_ko.txt` 규칙 중 정답이
   **하나뿐**인 것만 골랐다 — 나머지(줄바꿈 지점, 인물 말투, 정보 추가 금지)는 의미
   판단이 필요해서 코드가 잘못 "고치면" 오히려 품질을 해칠 수 있다(`decisions.md` §2-8).
   - **말줄임표 정규화**: ASCII 마침표 2개 이상 연속(`..`/`...`/`....`)을 전부 `…` 한
     글자로 치환. 이 단계가 먼저 돌아야 다음 단계가 말줄임표를 문장 종결 마침표로
     오인하지 않는다(치환 후엔 끝에 남는 게 `.`이 아니라 `…`이라 애초에 안 걸림).
-  - **규칙 9 (2줄 상한)**: 같은 마커에 줄이 3개 이상이면 2번째 줄부터 공백으로 합쳐
-    강제로 2줄로 만든다. 텍스트 유실 없음(공백으로 이어붙일 뿐 아무것도 버리지 않음).
+  - **2줄 상한**(`translation_rules_ko.txt` 규칙 8): 같은 마커에 줄이 3개 이상이면
+    2번째 줄부터 공백으로 합쳐 강제로 2줄로 만든다. 텍스트 유실 없음(공백으로
+    이어붙일 뿐 아무것도 버리지 않음).
   - **문장 끝 마침표·줄 끝 쉼표 생략**: 각 줄 끝의 문장부호 하나를 제거. **어떤 문자를
     지울지는 도착어가 정한다** — `languages.ts`의 `trailingPunctuation`(ko `.,` /
     ja `.,。、` / zh `.,。，` / 영어·스페인어·프랑스어·독일어는 빈 문자열이라 **아예
     건드리지 않는다** — 라틴계 자막 관행은 문장부호를 유지한다).
-- **8번(25자 초과 시 의미 단위로 두 줄 나누기)은 여전히 AI 담당**이다 — 어디서 끊어야
-  자연스러운지는 의미 판단이라 코드가 임의 지점(예: 중간 공백)에서 자르면 어색한
-  줄바꿈을 강제로 만들 위험이 더 크다. 규칙 9는 "AI가 8번을 못 지켰을 때의 안전망"이지
-  8번 자체를 대신하는 게 아니다.
-- **11번(스타일 태그 위치·의미 유지)은 스코프에서 제외**: 출력만 보고 고칠 수 있는
-  7·9번과 달리, 11번은 원본 블록과 번역 블록을 태그 단위로 비교해야 판단이 서서 성격이
-  다르다 — 검토는 했으나(`decisions.md` §2-8) 이번엔 넣지 않았다.
-- **6번(고어체 금지)·5번(인물 말투 일관성)**: 판단이 필요해 자동 고침 대상 아님.
-  5번은 §2-C 글로사리·존대관계 프리패스(`decisions.md` §2-9, opt-in)가 담당하는 영역 —
-  파일 단위로 존댓말/반말 관계를 뽑아 모든 청크에 동일 주입해서 청크 격리 문제를 푼다.
+- **줄 길이 초과 시 의미 단위 두 줄 나누기**(`translation_rules_ko.txt` 규칙 7)는
+  여전히 AI 담당이다 — 어디서 끊어야 자연스러운지는 의미 판단이라 코드가 임의
+  지점(예: 중간 공백)에서 자르면 어색한 줄바꿈을 강제로 만들 위험이 더 크다.
+  코드의 2줄 상한은 "AI가 규칙 7을 못 지켰을 때의 안전망"이지 규칙 7 자체를
+  대신하는 게 아니다.
+- **스타일 태그 위치·의미 유지**(`translation_rules_ko.txt` 규칙 11)는 스코프에서
+  제외: 출력만 보고 고칠 수 있는 말줄임표·2줄 상한과 달리, 원본 블록과 번역 블록을
+  태그 단위로 비교해야 판단이 서서 성격이 다르다 — 검토는 했으나(`decisions.md`
+  §2-8) 이번엔 넣지 않았다.
+- **고어체 금지·인물 말투 일관성**(`translation_rules_ko.txt` 규칙 5·6): 판단이
+  필요해 자동 고침 대상 아님. 말투는 §2-C 글로사리·존대관계 프리패스
+  (`decisions.md` §2-9, opt-in)가 담당하는 영역 — 파일 단위로 존댓말/반말 관계를
+  뽑아 모든 청크에 동일 주입해서 청크 격리 문제를 푼다.
 - **리포트만, 아직 미표시**: `enforceTextRules`는 무엇을 몇 번 고쳤는지
   `TextRuleReport`로 반환하고 `useTranslation.ts`가 콘솔에 로그만 남긴다 — 화면에
   보여주거나 하네스(`prompt-ab.mts`)에 집계하는 건 아직 안 함(향후 §9.6처럼 확장 가능).
@@ -396,9 +398,9 @@
 | 존댓말/반말·인물 말투가 안 맞음(말투 축이 있는 언어) | 먼저 InfoStep의 "등장인물·용어 일관성" 토글을 켜봤는지 확인(§2-C, 기본 OFF) — 켰다면 `cast_sheet_extraction.txt` 또는 카드에서 직접 관계 수정. 안 켰거나 그래도 안 맞으면 `translation_rules_ko.txt`, (cinematic) `cinematic_translation_philosophy_ko.txt`, `InfoStep`에서 사람이 톤 입력 |
 | 같은 이름이 청크마다 다르게 번역됨(표기 흔들림) | InfoStep 토글을 켜지 않았으면 그게 원인(§2-C, 기본 OFF). 켰는데도 흔들리면 `extractCastSheet.ts` `sanitizeCastSheet`(환각 필터로 그 이름이 버려졌을 수 있음) 또는 카드에서 직접 추가 |
 | 감정/뉘앙스가 밋밋함 | `cinematic_translation_philosophy_ko.txt` (+ 스타일을 cinematic로) |
-| 줄이 25자 넘는데 안 나뉨(의미 단위 줄바꿈) | `translation_rules_ko.txt` 규칙 8 — 프롬프트로만 유도, 코드 강제 없음(의미 판단이라 §9.7 스코프 밖) |
+| 줄이 25자 넘는데 안 나뉨(의미 단위 줄바꿈) | `translation_rules_ko.txt` 규칙 7 — 프롬프트로만 유도, 코드 강제 없음(의미 판단이라 §9.7 스코프 밖) |
 | 마침표·쉼표가 줄 끝에 남아 있음 / 3줄 이상 나옴 / `...`가 `…`로 안 바뀜 | `srt.ts` (`enforceTextRules`) — 이 셋은 코드가 강제하므로 재발하면 버그. `decisions.md` §2-8 — §9.7 |
-| 두 줄 자막이 한 줄에 `/`로 붙어 나옴 | `translation_rules_ko.txt` 규칙 8·10 예시(같은 번호 줄을 실제 줄바꿈으로 표기, 슬래시 구분 금지). 재조립은 같은 번호를 `\n`으로 합침 → `srt.ts` `indexTranslatedBodies` |
+| 두 줄 자막이 한 줄에 `/`로 붙어 나옴 | `translation_rules_ko.txt` 규칙 7·8 예시(같은 번호 줄을 실제 줄바꿈으로 표기, 슬래시 구분 금지). 재조립은 같은 번호를 `\n`으로 합침 → `srt.ts` `indexTranslatedBodies` |
 | 자막이 밀림(번호 재배열) | 청크 크기 ↓ `constants.ts` `SERVER_CHUNK_SIZE` (**≥300 금지**), 재조립 `srt.ts`. 조절 절차는 위 §5 |
 | 특정 구간에서 자막이 대거 미번역(원문 그대로) | 대사 자체가 숫자인 장면(카운트다운 등) → `srt.ts` `[N]` 표식(§7·§9, `decisions.md` §2-1)이 이미 방지함. 그래도 재발하면 그 청크의 `matched`/`unmatched` 로그 확인 |
 | 청크가 대화 중간을 자름 | `srt.ts` (`chunkSrtBlocksAtGaps` 파라미터) |

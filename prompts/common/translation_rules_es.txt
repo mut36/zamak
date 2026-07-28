@@ -1,4 +1,15 @@
-- 중남미에도 통하는 중립적인 스페인어(español neutro) 구어체로 옮겨. 특정 지역에서만 쓰는 속어나 스페인 본토 전용 표현(vosotros 등)은 피하고, 2인칭 복수는 ustedes를 써.
-- 격식은 usted/tú로 드러난다. `<speech_relations>`가 없으면 호칭(señor, don, 직책)·나이·직위·친밀도로 추론하고, 한 인물이 같은 상대에게 쓰는 인칭은 장면이 바뀌어도 일관되게 유지해.
-- 스페인어 자막 관행대로 문장부호를 살리고, 의문문·감탄문은 여는 부호(¿, ¡)를 반드시 함께 써. 말줄임은 마침표 세 개(`...`) 대신 말줄임표 한 글자(`…`)를 써.
-- 스페인어는 원문보다 길어지기 쉽다. 뜻을 잃지 않는 선에서 군더더기를 덜어 줄 길이를 지켜.
+1. **Todas las líneas de salida deben tener el formato `[número] traducción`** (p. ej. `[801] traducción`). Las líneas sin número se descartan, así que no omitas ninguna. Conserva los corchetes y números exactamente como en la entrada: **nunca** los modifiques, omitas ni reordenes. El orden de salida debe coincidir con el de entrada.
+2. Nunca fusionar ni dividir bloques de subtítulos. Si en la entrada son bloques separados, en la salida también deben serlo. Los bloques solo con nombre de hablante, los cortos y los que parecen continuación siguen siendo independientes — sin excepciones.
+3. Salida solo de líneas `[número] traducción`. Si el diálogo es un número (p. ej. "8", "1999"), escríbelo en la ranura de traducción sin corchetes — los corchetes solo van en el marcador inicial. No escribas marcas de tiempo, comentarios, saludos, repetición del original, bloques de código (```) ni markdown.
+4. Conserva el sentido y la intención del hablante, pero exprésalo en español neutro hablado que se entienda en Latinoamérica. Evita calcos y jerga solo regional o exclusiva de España (p. ej. vosotros); usa ustedes para la 2.ª persona del plural. No añadas información ni interpretaciones que no estén en el original. El español suele alargarse: recorta lo superfluo sin perder el sentido para respetar la longitud de línea.
+5. Si `<glossary>` fija grafías de personas, lugares o términos, úsalas tal cual (no reinventes transliteraciones). Si hay `<speech_relations>`, tómalo como registro por defecto; si la escena cambia de forma explícita (tratamiento, ruptura de relación), prioriza la escena. La formalidad se marca con usted/tú: sin relaciones, infiere por tratamiento (señor, don, cargo), edad, rango e intimidad, y mantén el mismo tratamiento de un hablante hacia el mismo destinatario entre escenas.
+6. Si una línea supera {{lineMaxChars}} caracteres contando espacios, divídela en **dos líneas con el mismo número** (sin números nuevos; la segunda también debe llevar número). Cada una en su propia línea real — no las unas con barra (`/`) u otro separador en una sola línea. Parte por oración, frase o unidad de sentido y equilibra longitudes si puedes. Ejemplo:
+   [801] (primera unidad de sentido)
+   [801] (segunda unidad de sentido)
+7. **Como máximo dos líneas por bloque.** Si aún desborda o harían falta tres, comprime el sentido en dos líneas en lugar de partir más.
+8. Si varios hablantes comparten un bloque, empieza cada línea con '- ' tras el número, cada una en su propia línea real. Ejemplo:
+   [803] - (hablante A)
+   [803] - (hablante B)
+9. Sigue la convención de subtítulos en español: conserva la puntuación e incluye siempre los signos de apertura (¿, ¡) en preguntas y exclamaciones. Para cortes o suspenso usa un solo carácter de puntos suspensivos (`…`), no tres puntos (`...`).
+10. Conserva la posición y el sentido de cualquier etiqueta HTML o de estilo del original.
+11. Si hay conflicto de reglas, prioriza: integridad de números (orden, cantidad, sin reordenar) > grafías del glosario fijas > exactitud de sentido > coherencia de registro (pistas de escena primero) > longitud de línea.

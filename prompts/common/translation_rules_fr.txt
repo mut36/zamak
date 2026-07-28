@@ -1,4 +1,15 @@
-- 표준 프랑스어(français standard) 구어체로 옮겨. 캐나다 프랑스어 전용 표현은 피하고, 대사에서는 실제 회화처럼 축약(t'as, j'suis 등)을 쓰되 격식을 차리는 인물은 예외로 둬.
-- 격식은 vous/tu로 드러난다. `<speech_relations>`가 없으면 호칭(monsieur, madame, 직책)·나이·직위·친밀도로 추론하고, 한 인물이 같은 상대에게 쓰는 인칭은 장면이 바뀌어도 일관되게 유지해. tu로 넘어가는 순간(tutoiement)은 원문에 그 계기가 있을 때만 반영해.
-- 프랑스어 자막 관행대로 문장부호를 살리고, `?` `!` `:` `;` 앞에는 좁은 붙임 공백 대신 일반 공백 하나를 둬. 말줄임은 마침표 세 개(`...`) 대신 말줄임표 한 글자(`…`)를 써.
-- 프랑스어는 원문보다 길어지기 쉽다. 뜻을 잃지 않는 선에서 군더더기를 덜어 줄 길이를 지켜.
+1. **Chaque ligne de sortie doit être au format `[numéro] traduction`** (ex. : `[801] traduction`). Les lignes sans numéro sont jetées : n’en omets aucune. Conserve crochets et numéros tels que dans l’entrée — **ne jamais** les modifier, omettre ou réordonner. L’ordre de sortie doit suivre l’entrée.
+2. Ne jamais fusionner ni scinder les blocs de sous-titres. Des blocs distincts en entrée restent distincts en sortie. Blocs avec seul le nom du locuteur, blocs courts, répliques qui semblent continuer : ce sont toujours des blocs indépendants — sans exception.
+3. N’écris que des lignes `[numéro] traduction`. Si la réplique est un nombre (ex. : « 8 », « 1999 »), place-le dans la traduction sans crochets — les crochets ne servent qu’au marqueur de tête. Pas d’horodatage, de commentaire, de salutation, de reprise de l’original, de bloc de code (```) ni de markdown.
+4. Conserve le sens et l’intention du locuteur, mais rends-le en français standard parlé. Évite les calques et les tournures propres au français canadien. En dialogue, utilise des formes parlées (t’as, j’suis, etc.) sauf personnage très formel. Le français s’allonge souvent : coupe le superflu sans perdre le sens pour tenir la longueur de ligne. N’ajoute rien qui ne soit pas dans l’original.
+5. Si `<glossary>` fixe des graphies (personnes, lieux, termes), verrouille-les — pas de nouvelle translittération. Si `<speech_relations>` est présent, c’est le registre par défaut ; si la scène change clairement (tutoiement, rupture), privilégie la scène. La formalité passe par vous/tu : sans relations, déduis via appellatifs (monsieur, madame, titre), âge, rang et intimité, et garde le même traitement d’un locuteur vers le même destinataire d’une scène à l’autre. Ne passe au tu (tutoiement) que si l’original le justifie.
+6. Si une ligne dépasse {{lineMaxChars}} caractères espaces compris, coupe-la en **deux lignes portant le même numéro** (pas de nouveau numéro ; la seconde aussi numérotée). Une vraie ligne chacune — ne les colle pas avec une barre (`/`) sur une seule ligne. Coupe à la phrase, au groupe ou à l’unité de sens, et équilibre les longueurs si possible. Exemple :
+   [801] (première unité de sens)
+   [801] (seconde unité de sens)
+7. **Au plus deux lignes par bloc.** Si deux lignes ne suffisent pas ou qu’il en faudrait trois, comprime le sens en deux lignes au lieu de découper davantage.
+8. Plusieurs locuteurs dans un même bloc : commence chaque réplique par '- ' après le numéro, chacune sur sa propre ligne. Exemple :
+   [803] - (locuteur A)
+   [803] - (locuteur B)
+9. Suit les conventions de sous-titrage français : conserve la ponctuation ; mets une espace ordinaire avant `?` `!` `:` `;`. Pour une phrase coupée ou en suspens, un seul caractère points de suspension (`…`), pas trois points (`...`).
+10. Conserve la position et le sens des balises HTML ou de style du texte source.
+11. En cas de conflit : intégrité des numéros (ordre, nombre, pas de réordonnancement) > graphies du glossaire figées > exactitude du sens > cohérence de registre (indices de scène d’abord) > longueur de ligne.

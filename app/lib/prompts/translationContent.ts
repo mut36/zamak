@@ -1,5 +1,5 @@
 import type { MovieInfo } from './types';
-import { loadTranslationFormatRules, loadTranslationRules } from './loader';
+import { loadTranslationRules } from './loader';
 import { renderPromptTemplate } from './renderer';
 import { getEnabledTargetLang, type TargetLang } from '../../config/languages';
 
@@ -18,20 +18,14 @@ function requireTargetLang(targetLanguage: string): TargetLang {
 }
 
 /**
- * Shared format invariants first, then the target language's style delta
- * under its own heading — see prompts/common/translation_rules_format.txt.
+ * One self-contained rules file per target language (written in that language).
+ * Renders {{lineMaxChars}} from languages.ts.
  */
 async function buildTranslationRules(lang: TargetLang): Promise<string> {
-  const [formatTemplate, languageRules] = await Promise.all([
-    loadTranslationFormatRules(),
-    loadTranslationRules(lang.code),
-  ]);
-
-  const formatRules = renderPromptTemplate(formatTemplate, {
+  const template = await loadTranslationRules(lang.code);
+  return renderPromptTemplate(template, {
     lineMaxChars: String(lang.lineMaxChars),
   });
-
-  return `${formatRules}\n\n[도착어(${lang.promptLabel}) 지침]\n${languageRules}`;
 }
 
 export function formatMovieInfo(

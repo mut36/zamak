@@ -182,6 +182,18 @@ describe('prompt composition', () => {
   });
 
   it('builds every enabled target language with its own rules and line cap', async () => {
+    // Each language has a self-contained rules file written in that language —
+    // assert a distinctive phrase from each, plus the rendered line budget.
+    const rulesSnippet: Record<string, string> = {
+      ko: '한 블록은 최대 두 줄까지만 허용돼',
+      en: 'At most two lines per block',
+      ja: '1ブロックは最大2行まで',
+      es: 'Como máximo dos líneas por bloque',
+      fr: 'Au plus deux lignes par bloc',
+      zh: '每个块最多两行',
+      de: 'Höchstens zwei Zeilen pro Block',
+    };
+
     for (const lang of TARGET_LANGS.filter((l) => l.enabled)) {
       const { system } = await composeTranslationPrompt('gemini', {
         movieInfo,
@@ -194,11 +206,9 @@ describe('prompt composition', () => {
 
       expect(system).not.toContain('{{');
       expect(system).toContain(`목표 언어: ${lang.promptLabel}`);
-      expect(system).toContain(`[도착어(${lang.promptLabel}) 지침]`);
-      expect(system).toContain(`공백 포함 ${lang.lineMaxChars}자`);
-      // The shared format invariants must survive in every language.
-      expect(system).toContain('출력하는 모든 줄은 `[번호] 번역문` 형식이어야 해');
-      expect(system).toContain('한 블록은 최대 두 줄까지만 허용돼');
+      expect(system).not.toContain(`[도착어(${lang.promptLabel}) 지침]`);
+      expect(system).toContain(String(lang.lineMaxChars));
+      expect(system).toContain(rulesSnippet[lang.code]);
     }
   });
 

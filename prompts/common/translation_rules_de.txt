@@ -1,4 +1,15 @@
-- 표준 독일어(Hochdeutsch) 구어체로 옮겨. 지역 방언은 원문이 방언을 의도한 경우에만 쓰고, 대사에서는 실제 회화처럼 축약(ich hab', geht's 등)을 자연스럽게 써.
-- 격식은 Sie/du로 드러난다. `<speech_relations>`가 없으면 호칭(Herr, Frau, 직책)·나이·직위·친밀도로 추론하고, 한 인물이 같은 상대에게 쓰는 인칭은 장면이 바뀌어도 일관되게 유지해. du로 넘어가는 순간은 원문에 그 계기가 있을 때만 반영해.
-- 독일어 자막 관행대로 문장부호를 살리고, 명사는 대문자로 쓰는 정서법을 지켜. 말줄임은 마침표 세 개(`...`) 대신 말줄임표 한 글자(`…`)를 써.
-- 독일어는 합성어와 후치 동사 때문에 줄이 길어지기 쉽다. 뜻을 잃지 않는 선에서 압축하고, 두 줄로 나눌 때는 동사 묶음을 쪼개지 마.
+1. **Jede Ausgabezeile muss das Format `[Nummer] Übersetzung` haben** (z. B. `[801] Übersetzung`). Zeilen ohne Nummer werden verworfen — lass keine aus. Klammern und Nummern bleiben exakt wie in der Eingabe: **niemals** ändern, weglassen oder umordnen. Die Ausgabe-Reihenfolge entspricht der Eingabe.
+2. Untertitelblöcke niemals zusammenführen oder aufteilen. Getrennte Blöcke in der Eingabe bleiben getrennt in der Ausgabe. Bloße Sprechernamen, kurze Blöcke und Fortsetzungs-ähnliche Zeilen sind trotzdem eigene Blöcke — ohne Ausnahme.
+3. Nur Zeilen `[Nummer] Übersetzung` ausgeben. Ist der Dialog selbst eine Zahl (z. B. „8“, „1999“), schreibe sie ohne Klammern in den Übersetzungsteil — Klammern nur am führenden Marker. Keine Zeitstempel, Kommentare, Begrüßungen, Originalwiederholung, Codeblöcke (```) oder Markdown.
+4. Bewahre Sinn und Sprecherabsicht, aber formuliere natürliches gesprochenes Hochdeutsch passend zu Genre, Epoche und Beziehungen. Vermeide Lehnübersetzungen. Dialekt nur, wenn das Original Dialekt meint. In Dialogen natürliche Kurzformen (ich hab', geht's usw.), sofern der Charakter nicht bewusst steif spricht. Deutsch wird durch Komposita und Verbklammern oft länger: kürzen, ohne den Sinn zu verlieren. Nichts hinzufügen, was nicht im Original steht.
+5. Stehen in `<glossary>` Personen-, Orts- oder Termschreibweisen, fixiere sie — keine neuen Umschriften. Bei `<speech_relations>` das als Standardregister; wechselt die Szene klar (Anrede, Beziehungsbruch), hat die Szene Vorrang. Formalität läuft über Sie/du: ohne Relationen aus Anrede (Herr, Frau, Titel), Alter, Rang und Nähe ableiten und die Anrede eines Sprechers zum selben Adressaten über Szenen hinweg konstant halten. Duzen nur, wenn das Original den Wechsel rechtfertigt.
+6. Überschreitet eine Zeile {{lineMaxChars}} Zeichen inklusive Leerzeichen, teile sie in **zwei Zeilen mit derselben Nummer** (keine neue Nummer; die zweite Zeile ebenfalls nummeriert). Jede auf einer echten eigenen Zeile — nicht mit Schrägstrich (`/`) o. Ä. in einer Zeile verbinden. An Satz-, Phrasen- oder Sinneinheiten teilen und Längen möglichst ausgleichen. Verbklammern beim Umbruch nicht zerreißen. Beispiel:
+   [801] (erste Sinneinheit)
+   [801] (zweite Sinneinheit)
+7. **Höchstens zwei Zeilen pro Block.** Reichen zwei nicht oder wären drei nötig, verdichte den Sinn auf zwei Zeilen statt weiter zu splitten.
+8. Mehrere Sprecher in einem Block: jede Sprecherzeile nach der Nummer mit '- ' beginnen, jeweils auf eigener Zeile. Beispiel:
+   [803] - (Sprecher A)
+   [803] - (Sprecher B)
+9. Deutsche Untertitelkonventionen: Zeichensetzung beibehalten, Substantive großschreiben. Bei Abbruch oder Nachhall ein einziges Auslassungszeichen (`…`), nicht drei Punkte (`...`).
+10. Position und Bedeutung von HTML- oder Untertitel-Stil-Tags aus dem Original beibehalten.
+11. Bei Regelkonflikten Priorität: Nummernintegrität (Reihenfolge, Anzahl, kein Umsortieren) > feste Glossarschreibweisen > Sinngenauigkeit > Registerkonsistenz (Szenenhinweise zuerst) > Zeilenlänge.
