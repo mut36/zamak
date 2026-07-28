@@ -20,12 +20,30 @@ export interface MovieInfo {
 /** Content type chosen on the upload screen — drives the info-step branch. */
 export type ContentType = 'movie' | 'other';
 
+/** One downloadable rendering of the finished translation. */
+export interface DownloadOption {
+  /** Extension without the dot, e.g. `vtt`. Doubles as the button label. */
+  extension: string;
+  filename: string;
+  content: string;
+  mime: string;
+}
+
 /** Final translation result, surfaced on the completion screen. */
 export interface TranslationResult {
-  /** Translated SRT content (for download + preview). */
+  /**
+   * Translated content in canonical SRT, whatever format was uploaded. This is
+   * what the completion screen counts and previews; the bytes the user
+   * actually receives are in `downloads`.
+   */
   content: string;
-  /** Suggested output filename, e.g. `movie_ko.srt`. */
+  /** Suggested output filename, e.g. `movie_ko.srt`. Mirrors `downloads[0]`. */
   filename: string;
+  /**
+   * Renderings offered on the completion screen, best first: the uploaded
+   * format when it can be rebuilt, then always SRT.
+   */
+  downloads: DownloadOption[];
   /** Number of translated subtitle blocks. */
   lineCount: number;
   /** Wall-clock duration in milliseconds. */

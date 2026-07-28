@@ -27,8 +27,11 @@ const QUALITY_TAGS = [
 ];
 
 export function parseFilename(filename: string): FilenameMetadata {
-  // Remove .srt extension
-  let name = filename.replace(/\.srt$/i, '');
+  // Remove supported subtitle extension (.srt/.vtt/.smi/.ass/…)
+  let name = filename.replace(
+    /\.(srt|vtt|smi|sami|ass|ssa)$/i,
+    '',
+  );
 
   // Replace dots and underscores with spaces (preserve hyphens in words)
   name = name.replace(/[._]/g, ' ');

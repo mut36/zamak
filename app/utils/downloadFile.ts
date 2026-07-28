@@ -1,8 +1,12 @@
 /**
  * Downloads a string as a file via anchor-click (browser default download folder).
  */
-export function downloadFile(content: string, filename: string): void {
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+export function downloadFile(
+  content: string,
+  filename: string,
+  mime = 'text/plain;charset=utf-8',
+): void {
+  const blob = new Blob([content], { type: mime });
   const url = window.URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;

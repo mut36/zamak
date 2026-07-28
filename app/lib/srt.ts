@@ -709,18 +709,27 @@ export function reassembleTranslatedChunk(
 export function buildOutputFilename(
   originalName: string,
   targetLanguage: string,
+  outputExtension = 'srt',
 ): string {
   const rawSuffix =
     LANG_SUFFIX[targetLanguage] ??
     targetLanguage.trim().toLowerCase().replace(/\s+/g, '-').slice(0, 10);
   const suffix = rawSuffix || 'translated';
 
-  const match = originalName.match(/^(.*)(\.srt)$/i);
+  // Any supported input extension is accepted, and the output extension is the
+  // format actually being downloaded. When the two match, the input's own
+  // casing is kept (`movie.SRT` → `movie.ko.SRT`).
+  const match = originalName.match(
+    /^(.*)(\.(?:srt|vtt|smi|sami|ass|ssa))$/i,
+  );
   const stem = match?.[1] ?? originalName;
-  const ext = match?.[2] ?? '.srt';
+  const inputExt = match?.[2] ?? '.srt';
+  const outputExt = `.${outputExtension}`;
+  const ext = inputExt.toLowerCase() === outputExt ? inputExt : outputExt;
 
   // movie.it.srt → movie.ko.srt (replace known source lang)
   // movie.srt / movie.hd.srt → movie.ko.srt / movie.hd.ko.srt (append)
+  // movie.vtt → movie.ko.srt, or movie.ko.vtt when downloading as VTT
   const langMatch = stem.match(/\.([a-z]{2})$/i);
   if (langMatch && isSourceLangCode(langMatch[1])) {
     return `${stem.slice(0, -langMatch[0].length)}.${suffix}${ext}`;

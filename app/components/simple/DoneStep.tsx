@@ -31,9 +31,11 @@ function previewBodies(content: string, n: number): string[] {
 
 export function DoneStep({ result, originalContent, onStartOver }: DoneStepProps) {
   const time = formatDuration(result.durationMs);
+  // Preview and counts read the canonical SRT whatever the download format is.
   const originals = previewBodies(originalContent, 3);
   const translations = previewBodies(result.content, 3);
   const rows = originals.slice(0, translations.length);
+  const [primary, ...alternates] = result.downloads;
 
   return (
     <div className='animate-fade-slide-up'>
@@ -66,20 +68,41 @@ export function DoneStep({ result, originalContent, onStartOver }: DoneStepProps
         </div>
       ) : null}
 
-      {/* Download card */}
+      {/* Download card. A second button appears only when the uploaded format
+          could be rebuilt — primary is that format, SRT is always the
+          fallback, so there is never a state with no way to download. */}
       <div className='card dl-card mt-6'>
         <div className='dl-file'>
           <FileIcon />
-          <span className='nm'>{result.filename}</span>
+          <span className='nm'>{primary.filename}</span>
         </div>
         <button
           type='button'
           className='btn btn-primary btn-block'
-          onClick={() => downloadFile(result.content, result.filename)}
+          onClick={() => downloadFile(primary.content, primary.filename, primary.mime)}
         >
           <DownloadIcon />
-          {c.download}
+          {alternates.length > 0 ? c.downloadAs(primary.extension) : c.download}
         </button>
+        {alternates.length > 0 && (
+          <>
+            <p className='mt-2 text-[12px] text-ink-3'>
+              {c.downloadAsHint(primary.extension)}
+            </p>
+            {alternates.map((option) => (
+              <button
+                key={option.extension}
+                type='button'
+                className='btn btn-ghost btn-block mt-1'
+                onClick={() =>
+                  downloadFile(option.content, option.filename, option.mime)
+                }
+              >
+                {c.downloadAs(option.extension)}
+              </button>
+            ))}
+          </>
+        )}
       </div>
 
       {/* Summary */}

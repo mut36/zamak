@@ -95,7 +95,7 @@ export const COPY = {
       title: '필요한 것만\n깔끔하게.',
       items: [
         { label: '지원 형식', value: 'SRT · VTT · SMI · ASS' },
-        { label: '출력', value: 'SRT' },
+        { label: '출력', value: '올린 형식 또는 SRT' },
         { label: '번역 모델', value: 'Flash · Pro' },
         {
           label: '도착어',
@@ -114,7 +114,7 @@ export const COPY = {
         },
         {
           title: '다운로드',
-          body: '번역된 .srt 파일을 받아요.',
+          body: '번역된 자막 파일을 받아요.',
         },
       ],
     },
@@ -175,7 +175,7 @@ export const COPY = {
     dropTitle: '파일을 여기에 끌어다 놓으세요',
     dropOr: '또는',
     browse: '파일 선택',
-    formats: 'SRT · VTT · SMI · ASS 지원 · 결과는 .srt',
+    formats: 'SRT · VTT · SMI · ASS 지원',
     langLabel: '어떤 언어로 바꿔드릴까요?',
     langDetect: '언어 감지',
     comingSoon: '곧 지원',
@@ -185,6 +185,12 @@ export const COPY = {
     typeOtherHint: '유튜브 · 인터뷰 · 강연 등',
     reassure: ['빠른 번역 · 고급 번역', '후속 자막 밀림 방지', '설치 없이 바로'],
     invalidFile: 'SRT, VTT, SMI, ASS 파일만 올릴 수 있어요.',
+    unreadableFile:
+      '자막을 읽지 못했어요. 파일이 손상되지 않았는지 확인하고 다시 올려주세요.',
+    // 두 언어가 한 파일에 든 SMI는 큐마다 어느 쪽을 번역할지 정할 수 없어,
+    // 섞인 결과를 내놓느니 여기서 돌려보낸다. 트랙 선택 UI는 docs/TODO.md.
+    bilingualSmi:
+      '두 개 언어가 함께 담긴 SMI 파일이에요. 아직 지원하지 않아요 — 한 언어만 담긴 파일로 올려주세요.',
     // 업로드가 저작권 리스크가 실제로 발생하는 시점이라, 동의 모달 대신 여기에
     // 상시 노출한다. 모달은 "30초면 번역돼요"라는 제품 약속과 정면으로 충돌한다.
     rightsNotice: '권리가 있는 자막만 올려주세요.',
@@ -296,6 +302,11 @@ export const COPY = {
     subtitle: (lines: number, time: string) =>
       `${lines.toLocaleString()}줄을 ${time} 만에 번역했어요. 자막 번호에 맞춰 다시 결합했어요.`,
     download: '번역 자막 다운로드',
+    // 올린 형식 그대로 받을 수 있을 때만 두 버튼이 뜬다. 첫 버튼이 원본 형식,
+    // 두 번째가 어떤 파일이든 항상 가능한 SRT.
+    downloadAs: (extension: string) => `.${extension}로 다운로드`,
+    downloadAsHint: (extension: string) =>
+      `올린 형식 그대로 받아요. 자막 스타일·설정은 원본을 유지하고 대사만 바뀌어요. (.${extension})`,
     summaryLines: '번역된 줄',
     summaryTime: '걸린 시간',
     summaryTimecodeValue: '번호 매칭',

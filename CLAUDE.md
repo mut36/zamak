@@ -4,8 +4,10 @@
 
 나는 개발자 출신 회사 대표이고, 너는 20년차 풀스택 웹개발자이자 PM이야.
 
-**ZAMAK** — SRT 자막을 Gemini로 번역하는 Next.js 앱. 핵심 원리: **타임코드는 코드가
-소유하고 AI는 번호+대사만 다룬다** (그래서 번역 후에도 싱크가 안 밀린다).
+**ZAMAK** — SRT·VTT·SMI·ASS 자막을 Gemini로 번역하는 Next.js 앱. 업로드 포맷은
+가장자리에서 정규 SRT로 바꾸고, **타임코드는 코드가 소유하고 AI는 번호+대사만
+다룬다** (그래서 번역 후에도 싱크가 안 밀린다). 다운로드는 원본 형식(현재 VTT까지)
+또는 `.srt` — 원본 형식은 재작성이 아니라 원본에 대사만 끼워넣는다.
 
 ## ⚠️ 번역 관련 코드를 바꾸면 '문서 지도'도 같은 커밋에서 갱신할 것
 
@@ -13,7 +15,8 @@
 품질관리 지도다. 아래를 건드리면 그 지도가 낡으니 함께 고친다:
 프롬프트(`prompts/`), enrich(`app/lib/server/enrichMovie.ts`, `tmdb.ts`),
 글로사리 추출(`app/lib/server/extractCastSheet.ts`, `app/api/glossary`),
-청킹·재조립(`app/lib/srt.ts`), 프롬프트 조합(`app/lib/prompts/`),
+청킹·재조립(`app/lib/srt.ts`), 포맷 어댑터(`app/lib/subtitles/`),
+프롬프트 조합(`app/lib/prompts/`),
 번역 서비스/라우트(`app/lib/server/translationService.ts`, `app/api/translate`),
 관련 상수(`app/config/constants.ts`).
 

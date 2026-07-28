@@ -17,6 +17,12 @@ import {
   readBlockIndex,
 } from '../lib/srt';
 import {
+  emitInOriginalFormat,
+  formatExtension,
+  subtitleMime,
+  type SubtitleDoc,
+} from '../lib/subtitles';
+import {
   computeSweepBudget,
   countTranslatableLeftovers,
   runRecoverySweep,
@@ -24,6 +30,7 @@ import {
 import { runOrderedPool } from '../lib/client/concurrency';
 import { computeRetryBudget } from '../lib/translationErrors';
 import type {
+  DownloadOption,
   MovieInfo,
   TranslationStyle,
   TranslationProgress,
@@ -109,6 +116,43 @@ async function analyzeContent(
   }
 }
 
+/**
+ * The renderings offered on the completion screen. SRT is always available
+ * because it is what the pipeline produces; the uploaded format is added when
+ * its document can be rebuilt. A writer that throws must not cost the user a
+ * finished translation, so it degrades to the SRT-only list.
+ */
+function buildDownloads(
+  doc: SubtitleDoc | null,
+  originalName: string,
+  targetLang: string,
+  translatedSrt: string,
+): DownloadOption[] {
+  const asSrt: DownloadOption = {
+    extension: 'srt',
+    filename: buildOutputFilename(originalName, targetLang, 'srt'),
+    content: translatedSrt,
+    mime: subtitleMime('srt'),
+  };
+  if (!doc || doc.format === 'srt' || !doc.roundTrip) return [asSrt];
+
+  try {
+    const extension = formatExtension(doc.format);
+    return [
+      {
+        extension,
+        filename: buildOutputFilename(originalName, targetLang, extension),
+        content: emitInOriginalFormat(doc, translatedSrt),
+        mime: subtitleMime(doc.format),
+      },
+      asSrt,
+    ];
+  } catch (err) {
+    console.error('[translate] round-trip failed, offering SRT only', err);
+    return [asSrt];
+  }
+}
+
 const IDLE_PROGRESS: TranslationProgress = {
   stage: 'idle',
   currentChunk: 0,
@@ -139,6 +183,8 @@ export function useTranslation(
   /** Set when the server declined to open a job (out of credits, file too big). */
   const [refusal, setRefusal] = useState<JobRefusedError | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  /** Parsed source document, kept for round-trip output at download time. */
+  const docRef = useRef<SubtitleDoc | null>(null);
   const processFileIdRef = useRef(0);
   const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -151,12 +197,16 @@ export function useTranslation(
 
   useEffect(() => cancelScheduledReset, [cancelScheduledReset]);
 
-  // On file upload: parse filename + read content + analyze genre/tone in background
-  const processFile = useCallback(async (selectedFile: File) => {
+  // On file upload: parse filename + adopt the parsed document + analyze in
+  // background. Reading and parsing happen in the caller, which owns the
+  // upload screen and can keep a bad file there instead of advancing a step.
+  const processFile = useCallback(async (selectedFile: File, doc: SubtitleDoc) => {
     cancelScheduledReset();
     const fileId = ++processFileIdRef.current;
 
     setFile(selectedFile);
+    docRef.current = doc;
+    setFileContent(doc.srt);
     setState((prev) => ({ ...prev, error: '' }));
     setTranslationProgress(IDLE_PROGRESS);
     setResult(null);
@@ -165,12 +215,7 @@ export function useTranslation(
     const meta = parseFilename(selectedFile.name);
     onMetaUpdate?.(meta);
 
-    // 2. Read file content
-    const content = await selectedFile.text();
-    if (processFileIdRef.current !== fileId) return;
-    setFileContent(content);
-
-    // 3. Background: infer title/year from the filename.
+    // 2. Background: infer title/year from the filename.
     setAnalysis({ isAnalyzing: true, completed: false });
     const result = await analyzeContent(selectedFile.name, msg);
     if (processFileIdRef.current !== fileId) return;
@@ -208,7 +253,7 @@ export function useTranslation(
     abortControllerRef.current = controller;
 
     try {
-      const content = fileContent || (await file.text());
+      const content = docRef.current?.srt || fileContent;
       const blocks = parseSrtBlocks(content);
 
       if (blocks.length === 0) {
@@ -424,7 +469,12 @@ export function useTranslation(
           minDurationMs: MIN_SUBTITLE_DURATION_MS,
         },
       );
-      const outputFilename = buildOutputFilename(file.name, targetLang);
+      const downloads = buildDownloads(
+        docRef.current,
+        file.name,
+        targetLang,
+        translated,
+      );
 
       setTranslationProgress({
         stage: 'finalizing',
@@ -441,7 +491,8 @@ export function useTranslation(
       // no auto-reset. The user downloads explicitly and can start over.
       setResult({
         content: translated,
-        filename: outputFilename,
+        filename: downloads[0].filename,
+        downloads,
         lineCount: parseSrtBlocks(translated).length,
         durationMs: Date.now() - startedAt,
         failedChunks,
@@ -498,6 +549,7 @@ export function useTranslation(
     cancelScheduledReset();
     processFileIdRef.current++;
     setFile(null);
+    docRef.current = null;
     setFileContent('');
     setAnalysis({ isAnalyzing: false, completed: false });
     setState((prev) => ({ ...prev, error: '' }));
@@ -514,9 +566,10 @@ export function useTranslation(
     translationProgress,
     result,
     refusal,
-    // Extension checking belongs to the caller — it owns the upload screen and
-    // the error slot that names the problem. This just takes an SRT file and
-    // starts reading/analyzing it.
+    // Reading and parsing belong to the caller — it owns the upload screen and
+    // the error slot that names the problem, and a file that fails to parse
+    // should never leave that screen. This takes the parsed document and
+    // starts analyzing it.
     processFile,
     clearFile,
     translate,

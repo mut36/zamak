@@ -492,11 +492,12 @@ export const LANG_SUFFIX: Record<string, string> = {
 };
 
 /**
- * Source-language codes that may appear immediately before `.srt` in a
- * filename (e.g. `movie.it.srt`). When present, `buildOutputFilename`
- * replaces them with the target suffix instead of appending another code.
- * ISO 639-1 two-letter codes only — keeps `.hd` / `.tv` from being treated
- * as languages.
+ * Source-language codes that may appear immediately before the subtitle
+ * extension in a filename (e.g. `movie.it.srt`, `movie.it.vtt`). When present,
+ * `buildOutputFilename` replaces that token with the target language code
+ * instead of appending (so `movie.it.vtt` → `movie.ko.srt`, not
+ * `movie.it.ko.srt`). ISO 639-1 two-letter codes only — keeps `.hd` / `.tv`
+ * from being treated as languages.
  */
 export const SOURCE_LANG_CODES = [
   'en', 'ko', 'ja', 'zh', 'es', 'fr', 'de', 'it', 'pt', 'ru',

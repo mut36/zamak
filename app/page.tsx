@@ -16,6 +16,11 @@ import { useEnrich, type EnrichCandidate } from './hooks/useEnrich';
 import { useCastSheet } from './hooks/useCastSheet';
 import { useAuth } from './hooks/useAuth';
 import { parseSrtBlocks } from './lib/srt';
+import {
+  BilingualSmiError,
+  isSupportedSubtitleFilename,
+  loadSubtitleFile,
+} from './lib/subtitles';
 import { isSupabaseConfigured } from './lib/supabase/env';
 import { DEFAULT_TARGET_LANG } from './config/languages';
 import type { AllowedModel } from './config/constants';
@@ -24,10 +29,17 @@ import { COPY } from './i18n/simpleCopy';
 
 const EMPTY_MOVIE_INFO: MovieInfo = { title: '', year: '', notes: '' };
 // Keep in sync with package.json version.
-const APP_VERSION = '0.14.1';
+const APP_VERSION = '0.15.0';
 
-function isSrt(file: File): boolean {
-  return file.name.toLowerCase().endsWith('.srt');
+/**
+ * A bilingual SAMI is the one failure with a fix the user can act on (upload a
+ * single-language file), so it gets its own message. Everything else — an
+ * unrecognized body, no cues, a decode failure — reads the same from here.
+ */
+function uploadErrorMessage(err: unknown): string {
+  return err instanceof BilingualSmiError
+    ? COPY.upload.bilingualSmi
+    : COPY.upload.unreadableFile;
 }
 
 export default function Home() {
@@ -232,15 +244,27 @@ export default function Home() {
   };
 
   const handleFile = async (selected: File) => {
-    if (!isSrt(selected)) {
+    if (!isSupportedSubtitleFilename(selected.name)) {
       setUploadError(COPY.upload.invalidFile);
       return;
     }
     setUploadError('');
+
+    // Parsing is awaited here rather than inside the hook so a file we can't
+    // use never leaves this screen: the error belongs next to the dropzone,
+    // not on the info step behind a spinner.
+    let doc;
+    try {
+      doc = await loadSubtitleFile(selected);
+    } catch (err) {
+      setUploadError(uploadErrorMessage(err));
+      return;
+    }
+
     setMovieInfo(EMPTY_MOVIE_INFO);
     resetAnalysis();
     // Step 1 goes up immediately so the "분석 중" spinner covers the wait.
-    processFile(selected);
+    processFile(selected, doc);
     setStep(1);
   };
 

@@ -857,6 +857,52 @@ UI에 노출되지 않아(`page.tsx`가 `'meaning'` 하드코딩) 이번 범위 
 **확인**: `composer.test.ts`가 언어마다 규칙 파일의 고유 문구·줄 길이 숫자·헤딩
 미사용을 검사. `LIVE_LANG_SMOKE`는 기존과 동일.
 
+### 2-13. 다중 자막 포맷은 가장자리 어댑터, 출력은 원본 형식 + SRT — 2026-07-28
+
+**문제**: 사용자가 올리는 자막이 SRT만이 아니다. VTT(웹), SMI(국내 구형), ASS/SSA
+(팬서브)가 흔하고, 업로드 게이트가 `.srt`만 받으면 그 파일을 쓰려면 사용자가
+직접 변환해야 한다. 그리고 VTT를 올린 사람은 VTT를 돌려받길 기대한다.
+
+**결정**: 업로드 직후 `app/lib/subtitles/`에서 포맷을 감지·파싱해 **정규 SRT 문자열**로
+바꾼 뒤, 기존 파이프라인(`parseSrtBlocks` → 청킹 → Gemini → 재조립)은 손대지 않는다.
+AI 와이어 포맷(`[N] 대사`)과 프롬프트 규칙은 포맷 비종속이라 **거의 변경 없음**
+(철학 문구의 "SRT 구조" → "자막 블록 구조" 정도).
+
+| 포맷 | 파서가 하는 일 | 잃는 것 |
+|---|---|---|
+| VTT | cue 타임(`.` ms) → cues, 태그 strip | (라운드트립 시 없음 — 아래) |
+| SMI | `SYNC Start` + 다음 sync로 end, `&nbsp;`는 클리어 | CSS/클래스; UTF-8 실패 시 EUC-KR/CP949로 디코드 |
+| ASS/SSA | `[Events]` Dialogue만, override strip | Style/위치/karaoke/레이어 |
+
+**출력은 SRT로 재조립하지 않고 원본에 끼워넣는다(splice)**. 파서가 큐를 뽑을 때
+대사와 타임코드 토큰이 **원본 문자열 어디에 있는지**(`CueRef.text`/`start`/`end`
+= 문자 오프셋)를 같이 기록해두고, 번역이 끝나면 원본을 뼈대로 그 구간만 치환한다.
+
+정규 SRT에서 VTT를 새로 써내는 방식(writer)도 검토했지만 각하했다. writer는
+우리가 모델링한 것만 복원할 수 있어서 VTT의 NOTE/STYLE/REGION·cue id·cue settings,
+ASS의 `[Script Info]`/스타일/레이어가 통째로 날아간다. splice는 **모르는 건 애초에
+다시 쓰지 않으므로** 보존이 노력이 아니라 구조적 보장이 된다. 검증도 한 줄로 끝난다 —
+"슬롯에 원래 내용을 그대로 넣으면 원본과 동일"(`spliceIdentity` 테스트).
+
+**타임코드는 움직였을 때만 재기입한다.** 그래서 CPS 확장이 건드리지 않은 큐는 원본
+토큰 표기(`00:10.000` 같은 짧은 형태)까지 그대로 남는다.
+
+**1차 범위는 VTT만.** ASS/SMI는 파싱은 되지만 writer가 없어 `.srt`로만 내려간다
+(`SubtitleDoc.roundTrip = false`). ASS·SMI writer와 그 타임코드 트레이드오프는
+`docs/TODO.md`. 완료 화면은 항상 **원본 형식 + SRT 두 버튼**을 주고, splice가 어떤
+이유로든 실패하면 SRT 단독으로 조용히 물러선다 — 직렬화 버그로 다 끝난 번역을 못
+받는 일은 없어야 한다.
+
+**이중 언어 SMI는 거절한다.** KRCC+ENCC처럼 실질 트랙이 2개 이상이면
+`BilingualSmiError`로 업로드 단계에서 돌려보낸다. 이전에는 SYNC마다 "비어 있지 않은
+첫 `<P>`"를 골랐는데, 한쪽이 `&nbsp;`인 구간이 흔해서 큐마다 언어가 갈리는 파일이
+나왔다 — 깨진 파일보다 나쁜, 멀쩡해 보이는 오역이다. 트랙 선택은 UI가 필요해
+`docs/TODO.md`로 미뤘다.
+
+**코드**: `parseSubtitleDocument`/`emitInOriginalFormat`(`document.ts`),
+`parseVttWithSlots`, `serializeCues`(시간순 정렬 + 블록↔큐 맵), `resolveTrack`(`smi.ts`),
+`TranslationResult.downloads`, `buildOutputFilename(_, _, ext)`. 버전 0.15.0.
+
 ---
 
 ## 3. 검토 후 각하한 대안들

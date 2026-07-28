@@ -15,7 +15,8 @@
 ## 전체 흐름 (한눈에)
 
 ```
-업로드
+업로드 (.srt/.vtt/.smi/.ass)
+  → 포맷 → 정규 SRT (`app/lib/subtitles/`)
   → 파일명 파싱 (제목/연도 추측)
   → /api/analyze         제목·연도 확정 (AUX 모델)
   → [영화] /api/enrich    TMDB + 그라운딩 → 제목/연도/감독/포스터 + 장르/배경/톤
@@ -27,19 +28,28 @@
   → 청크별 병렬 /api/translate
        └ 프롬프트 조합 → Gemini 호출 → 타임코드 재조립
   → 잔여 수거 패스   원문으로 남은 블록만 재포장해 재요청 (§9.65)
-  → 조립 → 다운로드
+  → 조립 → 다운로드 (원본 형식 + .srt)
 ```
 
 ---
 
 ## 단계별 상세 + 품질 레버
 
-### 0. 업로드 & SRT 파싱
+### 0. 업로드 & 포맷 정규화 (→ SRT)
 - **코드**: `app/components/simple/UploadStep.tsx`, `app/hooks/useTranslation.ts`
-  (`processFile`), `app/lib/srt.ts` (`parseSrtBlocks`)
-- **하는 일**: `.srt` 검증, 블록 분리(번호/타임코드/본문).
-- **품질 레버**: 거의 없음(형식 파싱). 이상한 SRT가 안 걸러진다면 `isSrt` /
-  `parseSrtBlocks`.
+  (`processFile`), **`app/lib/subtitles/`** (`toCanonicalSrt`, `detect`, `parseVtt`/
+  `parseSmi`/`parseAss`, `readSubtitleFile`), 이후 `app/lib/srt.ts` (`parseSrtBlocks`)
+- **하는 일**: `.srt`/`.vtt`/`.smi`/`.ass`/`.ssa` 검증 → 바이트 디코드(SMI는 UTF-8
+  실패 시 EUC-KR/CP949) → `parseSubtitleDocument`가 **정규 SRT + 원본 오프셋 맵**
+  (`SubtitleDoc`)을 만듦 → 블록 분리(번호/타임코드/본문). 이후 파이프라인은 SRT만 본다.
+  원본과 맵은 다운로드 단계에서 원본 형식으로 되돌리는 데만 쓰인다 (`decisions.md` §2-13).
+- **읽기 실패는 여기서 끝난다**: 파싱은 `page.tsx`의 `handleFile`이 await하므로,
+  읽히지 않는 파일·이중 언어 SMI는 업로드 화면에 머무른다(다음 단계로 안 넘어감).
+- **품질 레버**: 포맷 파싱 이상 → `app/lib/subtitles/*`. 정규화 이후 SRT 파싱 문제 →
+  `parseSrtBlocks`. 프롬프트는 건드릴 필요 없음(모델은 `[N] 대사`만 봄).
+- **불변식**: 큐 본문에 빈 줄이 들어가면 SRT 블록이 쪼개져 번호 없는 고아 블록이 되므로
+  `serializeCues`가 내부 빈 줄을 접는다. 같은 함수가 큐를 시간순으로 정렬하고
+  (ASS는 문서 순서 ≠ 시간 순서), 블록 번호 ↔ 원본 큐 대응(`cueIndexByBlock`)을 만든다.
 
 ### 1. 파일명 → 제목·연도 추정
 - **코드**: `app/utils/metadataInference.ts` (`parseFilename`) → `app/api/analyze/route.ts`
@@ -379,14 +389,21 @@
 
 ### 10. 조립 & 다운로드
 - **코드**: `useTranslation`(청크 결과 합치기 + §9.7 텍스트 규칙 강제 + §9.5 조정 +
-  §9.6 재시도/폴백 집계), `app/lib/srt.ts` (`buildOutputFilename`),
+  §9.6 재시도/폴백 집계 + `buildDownloads`), `app/lib/subtitles/document.ts`
+  (`emitInOriginalFormat`), `app/lib/srt.ts` (`buildOutputFilename`),
   `app/components/simple/DoneStep.tsx`,
-  `TranslationResult`(`failedChunks`/`fallbackBlocks`/`totalChunks`/`stopReason`)
+  `TranslationResult`(`downloads`/`failedChunks`/`fallbackBlocks`/`totalChunks`/`stopReason`)
+- **출력 형식**: `TranslationResult.content`는 **항상 정규 SRT**(미리보기·줄 수 집계가
+  이걸 읽는다). 사용자가 받는 바이트는 `downloads[]`에 있고, 원본 형식으로 되돌릴 수
+  있으면 `[원본 형식, srt]`, 아니면 `[srt]` 하나다. 되돌리기는 재작성이 아니라 원본
+  문자열의 슬롯 치환(`emitInOriginalFormat`) — 실패하면 SRT 단독으로 물러선다.
 - **품질 레버**: 출력 파일명 규칙 → `buildOutputFilename` / `constants.ts`
   `LANG_SUFFIX`(이제 `TARGET_LANGS`에서 파생 — 언어를 추가해도 따로 손댈 필요 없음)
-  + `SOURCE_LANG_CODES`. `.srt` 직전 토큰이 화이트리스트 언어
-  코드면 도착어로 **교체**(`movie.it.srt` → `movie.ko.srt`), 아니면 **추가**
-  (`movie.srt` → `movie.ko.srt`). 완료 화면 실패 개수 표시 → `DoneStep.tsx`.
+  + `SOURCE_LANG_CODES`. 입력 확장자(`.srt`/`.vtt`/`.smi`/`.ass`/…)를 벗긴 stem에서
+  직전 토큰이 화이트리스트 언어 코드면 도착어로 **교체**(`movie.it.vtt` →
+  `movie.ko.vtt`), 아니면 **추가**(`movie.ass` → `movie.ko.srt`). 세 번째 인자가 받는
+  확장자를 정하고, 입력과 같은 형식이면 원본 대소문자를 유지한다.
+  완료 화면 실패 개수 표시 → `DoneStep.tsx`.
 
 ---
 
@@ -394,6 +411,11 @@
 
 | 증상 | 1차로 볼 곳 |
 |---|---|
+| VTT/SMI/ASS가 안 열리거나 큐가 비었다 | `app/lib/subtitles/` (`detect`/`parseVtt`/`parseSmi`/`parseAss`/`decode`), 업로드 `accept` — §0 · `decisions.md` §2-13 |
+| SMI 한글이 깨짐 | `decodeSubtitleBytes` (UTF-8 → EUC-KR/CP949 폴백) — §0 |
+| 올린 형식으로 받는 버튼이 안 뜬다 | `SubtitleDoc.roundTrip` — writer가 있는 포맷만 뜬다(현재 VTT). `document.ts`의 `WRITERS` — §10 |
+| 받은 파일에서 스타일·헤더가 사라졌다 | splice가 아니라 SRT 폴백으로 내려갔을 가능성. `buildDownloads`의 콘솔 경고 확인 — §10 |
+| 번역문에 원문 언어가 섞여 있다(SMI) | `resolveTrack` (`smi.ts`) — 트랙 2개 이상이면 업로드에서 거절되어야 한다 — §0 |
 | 제목/연도가 파일명에서 잘못 뽑힘 | `content_analysis.txt`, `metadataInference.ts` |
 | 감독/포스터 안 뜸·틀림 | `tmdb.ts` (`searchCandidates`/`lookupById`), `enrichMovie.ts` (`buildGroundedPrompt`) |
 | 재검색해도 계속 다른(엉뚱한) 작품이 나옴 | `tmdb.ts` (`searchCandidates` 정렬), `enrichMovie.ts` (`searchMovie`의 후보 임계값), `InfoStep.tsx` (`CandidatePicker`) — §2-A "후보가 여러 개일 때" |

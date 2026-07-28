@@ -111,7 +111,7 @@ export function UploadStep({
         <input
           ref={inputRef}
           type='file'
-          accept='.srt'
+          accept='.srt,.vtt,.smi,.sami,.ass,.ssa'
           className='hidden'
           onChange={(e) => {
             const file = e.target.files?.[0];

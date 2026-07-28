@@ -49,6 +49,20 @@ describe('SRT utilities', () => {
       'movie.2024.ko.srt',
     );
   });
+
+  it('maps non-SRT inputs to .srt output by default', () => {
+    expect(buildOutputFilename('movie.vtt', 'ko')).toBe('movie.ko.srt');
+    expect(buildOutputFilename('movie.smi', 'ko')).toBe('movie.ko.srt');
+    expect(buildOutputFilename('movie.it.ass', 'ko')).toBe('movie.ko.srt');
+    expect(buildOutputFilename('show.ssa', 'en')).toBe('show.en.srt');
+  });
+
+  it('keeps the input extension when downloading in that same format', () => {
+    expect(buildOutputFilename('movie.vtt', 'ko', 'vtt')).toBe('movie.ko.vtt');
+    expect(buildOutputFilename('movie.it.vtt', 'ko', 'vtt')).toBe('movie.ko.vtt');
+    expect(buildOutputFilename('movie.VTT', 'ko', 'vtt')).toBe('movie.ko.VTT');
+    expect(buildOutputFilename('movie.hd.vtt', 'ko', 'vtt')).toBe('movie.hd.ko.vtt');
+  });
 });
 
 describe('formatBlocksForModel', () => {
