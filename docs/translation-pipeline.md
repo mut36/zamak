@@ -460,6 +460,7 @@
 | 두 줄 자막이 한 줄로 붙어 나옴 | `translation_rules_<code>.txt` 규칙 2(`|` 하나로 끊기). 재조립이 `|`를 `\n`으로 바꾼다 → `srt.ts` `LINE_BREAK_MARK`, `indexTranslatedBodies` |
 | 자막 본문에 `|`가 그대로 보임 | 재조립을 안 거친 산출물이거나(하네스 원본 등) `|`가 두 개 이상이라 2줄 상한에 걸린 경우 → `srt.ts` `indexTranslatedBodies`, `enforceTextRules` |
 | 블록이 합쳐져 나옴(한 자막에 두 자막 내용) | 한 번호 = 한 줄 위반이라 블록 수 불일치로 잡힌다. 규칙 1·2를 확인하고, 재발하면 `decisions.md` §2-1 (3)의 실측 절차대로 하네스로 재현 |
+| 이웃 자막 본문에 `[N me]` 같은 깨진 마커가 끼어 있고 그 번호는 원문 폴백 | 모델이 마커 안에 잡텍스트를 섞음 → `srt.ts` `MARKER_LINE`이 `[숫자…]`를 흡수함(`decisions.md` §2-1·§2-3-3). 재발 시 정규식·`srt.test.ts` 회귀 확인 |
 | 자막이 밀림(번호 재배열) | 청크 크기 ↓ `constants.ts` `SERVER_CHUNK_SIZE` (**≥300 금지**), 재조립 `srt.ts`. 조절 절차는 위 §5 |
 | 특정 구간에서 자막이 대거 미번역(원문 그대로) | 대사 자체가 숫자인 장면(카운트다운 등) → `srt.ts` `[N]` 표식(§7·§9, `decisions.md` §2-1)이 이미 방지함. 그래도 재발하면 그 청크의 `matched`/`unmatched` 로그 확인 |
 | 청크가 대화 중간을 자름 | `srt.ts` (`chunkSrtBlocksAtGaps` 파라미터) |

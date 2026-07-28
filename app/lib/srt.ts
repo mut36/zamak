@@ -536,8 +536,13 @@ function stripCodeFence(text: string): string {
   return trimmed.replace(/^```[^\n]*\n?/, '').replace(/\n?```$/, '');
 }
 
-/** `[123] text` — the marker owns the line it labels; text may be empty. */
-const MARKER_LINE = /^\[(\d+)\]\s?(.*)$/;
+/**
+ * `[123] text` — the marker owns the line it labels; text may be empty.
+ * Digits may be followed by junk inside the brackets (`[177 me]`) — the model
+ * sometimes leaks adjacent tokens into the marker; we keep the number and
+ * discard the junk. Dialogue like `8.` never matches because it has no `[`.
+ */
+const MARKER_LINE = /^\[(\d+)[^\]]*\]\s?(.*)$/;
 
 /**
  * In-line break mark: `[123] 앞 | 뒤` becomes a two-line subtitle.
@@ -564,7 +569,7 @@ const LINE_BREAK_MARK = '|';
  * line above it. Lines sharing a marker are joined in order, which is how a
  * two-line subtitle comes back.
  *
- * The model doesn't always oblige, so three deviations are absorbed:
+ * The model doesn't always oblige, so four deviations are absorbed:
  *
  * - **Marker alone on its own line** (the previous wire format, and a habit
  *   the model sometimes falls back into). It matches with empty text and the
@@ -572,6 +577,8 @@ const LINE_BREAK_MARK = '|';
  * - **An unmarked continuation line**, i.e. the model split a subtitle across
  *   two lines but only labelled the first. It attaches to the run in progress.
  * - **A code fence, a preamble, or echoed timestamps** — dropped.
+ * - **Junk inside the brackets** (`[177 me]`, observed twice in harness runs).
+ *   The leading digits still identify the block; the trailing junk is ignored.
  *
  * What is deliberately *not* absorbed: text that appears after a blank line
  * with no marker of its own. A blank line separates blocks in both directions,

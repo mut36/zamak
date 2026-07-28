@@ -109,7 +109,7 @@ console.log = (...params: unknown[]) => {
 
 // ---------- helpers -------------------------------------------------------
 
-const MARKER_LINE = /^\[(\d+)\]/;
+const MARKER_LINE = /^\[(\d+)[^\]]*\]/;
 
 /**
  * Distinct blocks the model actually labelled. Counts unique markers, not

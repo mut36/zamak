@@ -229,6 +229,49 @@ describe('reassembleTranslatedChunk', () => {
     expect(result.content).toContain('5\n00:00:09,000 --> 00:00:10,000\n끝');
   });
 
+  it('regression: bare numeric dialogue is never a marker after MARKER_LINE widen', () => {
+    // Widening MARKER_LINE to absorb `[177 me]` must keep the §2-1 guarantee:
+    // dialogue "8." has no brackets, so it is never a marker — even when 8 is
+    // in the chunk's expected set. Here "8." sits unmarked under an open run
+    // and must attach as dialogue, not open (or steal) block 8.
+    const counting = [
+      '1\n00:00:01,000 --> 00:00:02,000\nReady',
+      '8\n00:00:03,000 --> 00:00:04,000\n8.',
+      '9\n00:00:05,000 --> 00:00:06,000\n9.',
+    ].join('\n\n');
+    const output = '[1] 준비\n8.\n\n[8] 팔\n\n[9] 구';
+    const result = reassembleTranslatedChunk(counting, output);
+
+    expect(result).toMatchObject({ matched: 3, unmatched: 0 });
+    expect(result.content).toContain(
+      '1\n00:00:01,000 --> 00:00:02,000\n준비\n8.',
+    );
+    expect(result.content).toContain('8\n00:00:03,000 --> 00:00:04,000\n팔');
+    expect(result.content).toContain('9\n00:00:05,000 --> 00:00:06,000\n구');
+  });
+
+  it('regression: junk inside brackets still starts the numbered block', () => {
+    // Observed twice in harness (2026-07-25 `[1434 me]`, 2026-07-28 `[177 me]`):
+    // the model leaks an adjacent token into the marker. Without tolerance the
+    // line fails MARKER_LINE and attaches to the open neighbour — so 176's body
+    // becomes "레오! / [177 me] 저를 따라오세요." and 177 falls back to source.
+    const pair = [
+      '176\n00:00:01,000 --> 00:00:02,000\nLeo!',
+      '177\n00:00:03,000 --> 00:00:04,000\nFollow me.',
+    ].join('\n\n');
+    const output = '[176] 레오!\n\n[177 me] 저를 따라오세요.';
+    const result = reassembleTranslatedChunk(pair, output);
+
+    expect(result).toMatchObject({ matched: 2, unmatched: 0, total: 2 });
+    expect(result.content).toContain(
+      '176\n00:00:01,000 --> 00:00:02,000\n레오!',
+    );
+    expect(result.content).toContain(
+      '177\n00:00:03,000 --> 00:00:04,000\n저를 따라오세요.',
+    );
+    expect(result.content).not.toContain('[177 me]');
+  });
+
   it('regression: a dropped marker cannot corrupt the neighbouring block', () => {
     // Observed in a real run: the model translated every block but omitted one
     // marker, leaving its text orphaned after a blank line. That text used to
