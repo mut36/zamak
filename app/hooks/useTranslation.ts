@@ -45,6 +45,7 @@ import {
   MIN_SUBTITLE_DURATION_MS,
   MIN_SUBTITLE_GAP_MS,
   resolveTier,
+  type AllowedModel,
 } from '../config/constants';
 import { resolveTargetLang } from '../config/languages';
 
@@ -264,7 +265,7 @@ export function useTranslation(
       // Spend the credit before any chunk goes out. Doing it here — once per
       // file rather than once per chunk — is what makes a credit worth one
       // title, and it means a refusal costs nothing.
-      const jobId = await beginTranslationJob(blocks.length);
+      const jobId = await beginTranslationJob(blocks.length, model as AllowedModel);
 
       // Concurrency comes from the tier, which is the one place the
       // billing/session gate will hook into. Chunk size is model-specific

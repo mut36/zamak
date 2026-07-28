@@ -53,7 +53,7 @@ export default function Home() {
 
   const {
     user,
-    balance,
+    credits,
     loading: authLoading,
     signIn,
     signOut,
@@ -313,7 +313,7 @@ export default function Home() {
     <header className='flex items-center justify-between w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 h-16'>
       <BrandMark onClick={resetAll} />
       <div className='flex items-center gap-2.5'>
-        {user && balance !== null && (
+        {user && credits && (
           // The balance doubles as the way in to topping it up — there is no
           // other entry point except running out mid-flow.
           <button
@@ -321,7 +321,7 @@ export default function Home() {
             className='lang-pill'
             onClick={() => setPurchasing(true)}
           >
-            {COPY.auth.creditsLeft(balance)}
+            {COPY.auth.creditsLeft(credits.lite)}
           </button>
         )}
         {user ? (
@@ -387,7 +387,7 @@ export default function Home() {
             file and its analysis survive, so a top-up mid-flow returns to the
             same step. */}
         {purchasing ? (
-          <PurchaseStep balance={balance} onClose={() => setPurchasing(false)} />
+          <PurchaseStep balance={credits?.lite ?? null} onClose={() => setPurchasing(false)} />
         ) : (
         <>
         {!refusal && <StepTracker current={step} />}
