@@ -27,6 +27,7 @@
 - `docs/decisions.md` — "왜 이렇게 되어 있나" (뒤집힌 결정 포함).
 - `docs/TODO.md` — 미착수 개선안.
 - `docs/tuning/` — 청크 크기 등 수치 유도.
+- `docs/standards/` — 외부 스타일 가이드 참조(Netflix 한국어 자막 번역·갭 검토).
 
 ## 명령
 

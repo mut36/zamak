@@ -4,6 +4,9 @@
 적고, **각 단계에서 품질을 바꾸려면 어느 파일/함수를 고치면 되는지**를 표시한다.
 "왜 이렇게 되어 있는가"는 [`decisions.md`](decisions.md), 미착수 개선안은
 [`TODO.md`](TODO.md), 청크 수치 유도는 [`tuning/`](tuning/) 참조.
+Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
+[`standards/netflix-korean-subtitles.md`](standards/netflix-korean-subtitles.md) ·
+[`standards/netflix-korean-gap-review.md`](standards/netflix-korean-gap-review.md).
 
 > 파일 경로 + 함수/심볼 이름으로만 가리킨다(줄 번호는 금방 어긋나서 안 적음).
 > 기준 시점: 2026-07-28. 구조가 바뀌면 이 문서도 같이 고칠 것.
