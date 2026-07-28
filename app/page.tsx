@@ -104,11 +104,11 @@ export default function Home() {
     translationProgress,
     result,
     refusal,
-    handleFileDrop,
+    processFile,
     translate,
     cancelTranslation,
     clearFile,
-  } = useTranslation(onMetaUpdate);
+  } = useTranslation(COPY.translateErrors, onMetaUpdate);
 
   const {
     status: enrichStatus,
@@ -240,7 +240,7 @@ export default function Home() {
     setMovieInfo(EMPTY_MOVIE_INFO);
     resetAnalysis();
     // Step 1 goes up immediately so the "분석 중" spinner covers the wait.
-    handleFileDrop(selected);
+    processFile(selected);
     setStep(1);
   };
 

@@ -60,6 +60,12 @@ export interface TranslationProgress {
   estimatedRemainingMs: number;
   lastUpdateTimestamp: number;
   totalEstimateMs: number;
+  /** Blocks the recovery sweep has rescued so far. Meaningful only while
+   * `stage === 'recovering'` — the chunk ring is already pinned at its ceiling
+   * by then, so these two are the only numbers that still move. */
+  sweepRecovered: number;
+  /** Blocks still holding original text, as the sweep sees it right now. */
+  sweepRemaining: number;
 }
 
 export interface TranslationRequestBase {

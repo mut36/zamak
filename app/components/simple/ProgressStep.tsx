@@ -126,10 +126,19 @@ export function ProgressStep({ progress, totalLines, onCancel }: ProgressStepPro
       </div>
 
       <div className='pstatus'>{status}</div>
-      {totalLines > 0 && (
+      {/* While the sweep runs, the ring and the countdown are both frozen at
+          their ceiling — swap the readout for the one pair of numbers that is
+          still moving, so the extra wait doesn't look like a hang. */}
+      {progress.stage === 'recovering' ? (
         <div className='psub mono'>
-          {c.remaining(processed, totalLines, remainingSec)}
+          {c.recoveringDetail(progress.sweepRecovered, progress.sweepRemaining)}
         </div>
+      ) : (
+        totalLines > 0 && (
+          <div className='psub mono'>
+            {c.remaining(processed, totalLines, remainingSec)}
+          </div>
+        )
       )}
 
       <p className='text-[13px] text-ink-2 text-center mt-6'>{c.reassure}</p>

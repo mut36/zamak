@@ -270,9 +270,23 @@ export const COPY = {
     recentLabel: '방금 번역한 대사',
     remaining: (lines: number, total: number, sec: number) =>
       `${lines.toLocaleString()} / ${total.toLocaleString()}줄 · 약 ${sec}초 남음`,
+    // Sweep readout. The ring is already pinned at its ceiling by the time the
+    // sweep runs, so this line is the only thing that can show it progressing.
+    recoveringDetail: (recovered: number, remaining: number) =>
+      `${recovered.toLocaleString()}줄 복구 · ${remaining.toLocaleString()}줄 남음`,
     reassure: '번역이 끝날 때까지 이 창을 열어두세요.',
     cancel: '취소',
     cancelConfirm: '번역을 취소할까요?',
+  },
+
+  // Failure strings for the translation run. useTranslation takes these as a
+  // parameter rather than importing COPY, so the hook stays locale-agnostic —
+  // but this is the only place they are actually written.
+  translateErrors: {
+    serverError: (status: number) => `서버에 문제가 생겼어요. (오류 ${status})`,
+    noResponse: '번역 결과를 받지 못했어요. 다시 시도해주세요.',
+    emptyFile: '자막 블록을 찾지 못했어요. 올바른 SRT 파일인지 확인해주세요.',
+    generalError: '번역 중 문제가 생겼어요. 다시 시도해주세요.',
   },
 
   done: {

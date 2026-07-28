@@ -109,6 +109,29 @@ function indexBlocks(content: string): Map<number, string> {
   return byIndex;
 }
 
+/**
+ * How many leftovers are worth reporting to the user — the ones that actually
+ * hold text a translator could have produced.
+ *
+ * `SweepResult.remaining` already applies this rule (via `untranslatable`),
+ * but a fatal error skips the sweep entirely, and that path still has to
+ * describe the delivered file. Without this it counted `♪` and bare numbers
+ * as failures, so the same file reported more untranslated lines when it hit
+ * a quota error than when it simply ran badly.
+ */
+export function countTranslatableLeftovers(
+  sourceContent: string,
+  leftover: readonly number[],
+): number {
+  const sourceByIndex = indexBlocks(sourceContent);
+  let count = 0;
+  for (const index of new Set(leftover)) {
+    const source = sourceByIndex.get(index);
+    if (source && hasTranslatableText(source)) count++;
+  }
+  return count;
+}
+
 export async function runRecoverySweep({
   sourceContent,
   translatedContent,

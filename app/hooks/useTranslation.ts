@@ -18,6 +18,7 @@ import {
 } from '../lib/srt';
 import {
   computeSweepBudget,
+  countTranslatableLeftovers,
   runRecoverySweep,
 } from '../lib/client/recoverySweep';
 import { runOrderedPool } from '../lib/client/concurrency';
@@ -51,16 +52,17 @@ interface AnalysisState {
   completed: boolean;
 }
 
+/**
+ * Every user-facing string this hook can produce. Passed in rather than
+ * imported from COPY so the hook stays locale-agnostic — and required, not
+ * optional, because an English default here would silently surface in the
+ * Korean UI (which is exactly what it used to do).
+ */
 export interface TranslationMessages {
   serverError: (status: number) => string;
   noResponse: string;
-  invalidFile: string;
   emptyFile: string;
   generalError: string;
-}
-
-function isSrtFile(file: File): boolean {
-  return file.name.toLowerCase().endsWith('.srt');
 }
 
 const EMPTY_ANALYSIS = { title: '', year: '' };
@@ -79,7 +81,10 @@ interface AnalysisOutcome {
 // A failure here still falls back to manual input, but we carry the server's
 // error up: an invalid API key used to look identical to "title not found",
 // which sent people hunting for a bad filename instead of a bad key.
-async function analyzeContent(filenameHint: string): Promise<AnalysisOutcome> {
+async function analyzeContent(
+  filenameHint: string,
+  msg: TranslationMessages,
+): Promise<AnalysisOutcome> {
   try {
     const response = await fetch('/api/analyze', {
       method: 'POST',
@@ -92,14 +97,14 @@ async function analyzeContent(filenameHint: string): Promise<AnalysisOutcome> {
         ...EMPTY_ANALYSIS,
         error:
           (body && typeof body.error === 'string' && body.error) ||
-          `Server error (${response.status})`,
+          msg.serverError(response.status),
       };
     }
     return await response.json();
   } catch (error) {
     return {
       ...EMPTY_ANALYSIS,
-      error: error instanceof Error ? error.message : 'Analysis failed',
+      error: error instanceof Error ? error.message : msg.generalError,
     };
   }
 }
@@ -111,19 +116,14 @@ const IDLE_PROGRESS: TranslationProgress = {
   estimatedRemainingMs: 0,
   lastUpdateTimestamp: 0,
   totalEstimateMs: 0,
+  sweepRecovered: 0,
+  sweepRemaining: 0,
 };
 
 export function useTranslation(
+  msg: TranslationMessages,
   onMetaUpdate?: (meta: FilenameMetadata) => void,
-  messages?: TranslationMessages,
 ) {
-  const msg: TranslationMessages = messages ?? {
-    serverError: (status: number) => `Server error (${status})`,
-    noResponse: 'No translation response received',
-    invalidFile: 'Please select a valid SRT file',
-    emptyFile: 'No valid subtitle blocks in SRT file',
-    generalError: 'An error occurred',
-  };
   const [file, setFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
   const [state, setState] = useState<TranslationState>({
@@ -172,7 +172,7 @@ export function useTranslation(
 
     // 3. Background: infer title/year from the filename.
     setAnalysis({ isAnalyzing: true, completed: false });
-    const result = await analyzeContent(selectedFile.name);
+    const result = await analyzeContent(selectedFile.name, msg);
     if (processFileIdRef.current !== fileId) return;
 
     if (result.error) {
@@ -187,35 +187,7 @@ export function useTranslation(
     onMetaUpdate?.(updatedMeta);
     setAnalysis({ isAnalyzing: false, completed: true });
     return result;
-  }, [cancelScheduledReset, onMetaUpdate]);
-
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const selectedFile = e.target.files?.[0];
-      if (selectedFile) {
-        if (isSrtFile(selectedFile)) {
-          processFile(selectedFile);
-        } else {
-          setState((prev) => ({ ...prev, error: msg.invalidFile }));
-          setFile(null);
-        }
-      }
-    },
-    [msg.invalidFile, processFile],
-  );
-
-  const handleFileDrop = useCallback(
-    (droppedFile: File) => {
-      if (isSrtFile(droppedFile)) {
-        // Returned so the caller can react to an analysis failure.
-        return processFile(droppedFile);
-      } else {
-        setState((prev) => ({ ...prev, error: msg.invalidFile }));
-        setFile(null);
-      }
-    },
-    [msg.invalidFile, processFile],
-  );
+  }, [cancelScheduledReset, msg, onMetaUpdate]);
 
   const translate = async (
     movieInfo: MovieInfo,
@@ -266,6 +238,8 @@ export function useTranslation(
         estimatedRemainingMs: totalEstimateMs,
         lastUpdateTimestamp: Date.now(),
         totalEstimateMs,
+        sweepRecovered: 0,
+        sweepRemaining: 0,
       });
 
       // A failed chunk keeps its original (untranslated) text so the output
@@ -357,10 +331,17 @@ export function useTranslation(
       // only fail the same way — the sweep is skipped and the stop reason
       // stands. See app/lib/client/recoverySweep.ts for the cost bounds.
       let sweptContent = mainPassContent;
-      let remainingBlocks = leftover.length;
+      // Same accounting on both paths: only leftovers that actually hold
+      // translatable text are the user's problem.
+      let remainingBlocks = countTranslatableLeftovers(content, leftover);
       let recoveredBlocks = 0;
       if (leftover.length > 0 && !retryState.fatalCode) {
-        setTranslationProgress((prev) => ({ ...prev, stage: 'recovering' }));
+        setTranslationProgress((prev) => ({
+          ...prev,
+          stage: 'recovering',
+          sweepRecovered: 0,
+          sweepRemaining: remainingBlocks,
+        }));
         const sweep = await runRecoverySweep({
           sourceContent: content,
           translatedContent: mainPassContent,
@@ -369,6 +350,14 @@ export function useTranslation(
           concurrency,
           signal: controller.signal,
           budget: computeSweepBudget(totalChunks),
+          // The chunk ring is pinned at its ceiling by now, so these counters
+          // are the only thing left that can show the sweep making progress.
+          onProgress: ({ recovered, remaining }) =>
+            setTranslationProgress((prev) => ({
+              ...prev,
+              sweepRecovered: recovered,
+              sweepRemaining: remaining,
+            })),
           // Deliberately the bare request, not translateChunkWithRetry: the
           // sweep's own rounds are its retry, and layering the per-chunk
           // budget on top would double-count the same failure.
@@ -444,6 +433,8 @@ export function useTranslation(
         estimatedRemainingMs: 0,
         lastUpdateTimestamp: 0,
         totalEstimateMs: 0,
+        sweepRecovered: recoveredBlocks,
+        sweepRemaining: remainingBlocks,
       });
 
       // Persist the result for the completion screen — no auto-download,
@@ -467,6 +458,8 @@ export function useTranslation(
         estimatedRemainingMs: 0,
         lastUpdateTimestamp: 0,
         totalEstimateMs: 0,
+        sweepRecovered: recoveredBlocks,
+        sweepRemaining: remainingBlocks,
       });
 
       onSuccess?.();
@@ -521,8 +514,10 @@ export function useTranslation(
     translationProgress,
     result,
     refusal,
-    handleFileChange,
-    handleFileDrop,
+    // Extension checking belongs to the caller — it owns the upload screen and
+    // the error slot that names the problem. This just takes an SRT file and
+    // starts reading/analyzing it.
+    processFile,
     clearFile,
     translate,
     cancelTranslation,
