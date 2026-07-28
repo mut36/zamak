@@ -26,7 +26,7 @@
 - `docs/translation-pipeline.md` — 번역 파이프라인 단계별 + 품질 레버.
 - `docs/decisions.md` — "왜 이렇게 되어 있나" (뒤집힌 결정 포함).
 - `docs/TODO.md` — 미착수 개선안.
-- `docs/tuning/` — 청크 크기 등 수치 유도.
+- `docs/tuning/` — 청크 크기 등 수치 유도. 블록당 실측 원가는 `cost-per-block.md`.
 - `docs/standards/` — 외부 스타일 가이드 참조(Netflix 한국어 자막 번역·갭 검토).
 
 ## 명령
