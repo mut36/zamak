@@ -19,16 +19,34 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 
 import {
   parseSrtBlocks,
-  chunkSrtBlocks,
+  chunkSrtBlocksAtGaps,
+  adjustSubtitleTiming,
+  enforceTextRules,
+  readBlockIndex,
   reassembleTranslatedChunk,
 } from '../app/lib/srt';
 import { composeTranslationPrompt } from '../app/lib/prompts/composer';
 import { geminiProvider } from '../app/lib/providers/gemini';
+import { runOrderedPool } from '../app/lib/client/concurrency';
 import {
+  type RetryState,
+  translateChunkWithRetry,
+} from '../app/lib/client/chunkRetry';
+import {
+  computeSweepBudget,
+  countTranslatableLeftovers,
+  runRecoverySweep,
+} from '../app/lib/client/recoverySweep';
+import { computeRetryBudget } from '../app/lib/translationErrors';
+import { resolveTargetLang } from '../app/config/languages';
+import {
+  getReadingSpeed,
+  MIN_SUBTITLE_DURATION_MS,
+  MIN_SUBTITLE_GAP_MS,
   SERVER_CHUNK_SIZE,
   SERVER_CONCURRENCY,
-  THINKING_LEVEL,
   TRANSLATION_MODEL,
+  thinkingLevelForModel,
 } from '../app/config/constants';
 import type { TranslationStyle } from '../app/types/translation';
 
@@ -83,8 +101,8 @@ interface ChunkUsage {
  * the chunk whose async context it was emitted from — console.log runs inside
  * the caller's context, so this survives the concurrent pool.
  */
-const callContext = new AsyncLocalStorage<{ id: number }>();
-const usageByChunk = new Map<number, ChunkUsage>();
+const callContext = new AsyncLocalStorage<{ id: string }>();
+const usageByChunk = new Map<string, ChunkUsage>();
 const USAGE_LINE =
   /^\[gemini\].*prompt=(\d+) cached=(\d+) thoughts=(\d+) output=(\d+)/;
 
@@ -95,11 +113,17 @@ console.log = (...params: unknown[]) => {
   if (store && typeof first === 'string') {
     const match = USAGE_LINE.exec(first);
     if (match) {
+      const prev = usageByChunk.get(store.id) ?? {
+        prompt: 0,
+        cached: 0,
+        thoughts: 0,
+        output: 0,
+      };
       usageByChunk.set(store.id, {
-        prompt: Number(match[1]),
-        cached: Number(match[2]),
-        thoughts: Number(match[3]),
-        output: Number(match[4]),
+        prompt: prev.prompt + Number(match[1]),
+        cached: prev.cached + Number(match[2]),
+        thoughts: prev.thoughts + Number(match[3]),
+        output: prev.output + Number(match[4]),
       });
       return; // swallow: the summary reports these
     }
@@ -138,25 +162,6 @@ function fitPromptTokens(points: { blocks: number; prompt: number }[]) {
   return { tIn, pFixed: (sy - tIn * sx) / n };
 }
 
-async function pool<T, R>(
-  items: T[],
-  size: number,
-  run: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(size, items.length) }, async () => {
-      for (;;) {
-        const index = next++;
-        if (index >= items.length) return;
-        results[index] = await run(items[index], index);
-      }
-    }),
-  );
-  return results;
-}
-
 /** Body text of each block, keyed by sequence number. */
 function bodiesByIndex(srt: string): Map<number, string> {
   const bodies = new Map<number, string>();
@@ -178,6 +183,8 @@ interface VariantResult {
   apiFailures: number;
   countMismatchChunks: number;
   unmatched: number;
+  recovered: number;
+  sweepCalls: number;
   seconds: number;
   usage: ChunkUsage;
   fit: { tIn: number; pFixed: number };
@@ -200,12 +207,20 @@ async function runVariant(
   const startedAt = Date.now();
   let apiFailures = 0;
   let countMismatchChunks = 0;
-  let unmatched = 0;
+  const controller = new AbortController();
+  const leftover: number[] = [];
+  const retryState: RetryState = {
+    budget: computeRetryBudget(sourceChunks.length),
+    fatalCode: null,
+  };
+  let sweepRecovered = 0;
+  let sweepCalls = 0;
 
-  const translated = await pool(
-    sourceChunks,
-    SERVER_CONCURRENCY,
-    async (chunk, index) => {
+  async function translateChunk(
+    chunk: string,
+    callId: string,
+    chunkPosition: { index: number; total: number },
+  ) {
       const expected = parseSrtBlocks(chunk).length;
       const { system, user } = await composeTranslationPrompt('gemini', {
         movieInfo,
@@ -213,19 +228,49 @@ async function runVariant(
         translationMode: 'chunk',
         translationStyle: variant.style,
         subtitleContent: chunk,
-        chunkPosition: { index: index + 1, total: sourceChunks.length },
+        chunkPosition,
       });
 
       let output = '';
+      output = await callContext.run({ id: callId }, () =>
+        geminiProvider.generateText({
+          model: TRANSLATION_MODEL,
+          prompt: user,
+          systemInstruction: system,
+          translationMode: 'chunk',
+        }),
+      );
+
+      if (countReturnedBlocks(output) !== expected) countMismatchChunks++;
+      const rebuilt = reassembleTranslatedChunk(chunk, output);
+      realLog(
+        `  chunk ${chunkPosition.index}/${chunkPosition.total} · ${rebuilt.matched}/${rebuilt.total} matched`,
+      );
+      return {
+        content: rebuilt.content,
+        unmatchedBlocks: rebuilt.unmatched,
+        unmatchedIndices: rebuilt.unmatchedIndices,
+      };
+  }
+
+  const translated = await runOrderedPool<string, string>({
+    items: sourceChunks,
+    concurrency: SERVER_CONCURRENCY,
+    signal: controller.signal,
+    worker: async (chunk, index) => {
       try {
-        output = await callContext.run({ id: index }, () =>
-          geminiProvider.generateText({
-            model: TRANSLATION_MODEL,
-            prompt: user,
-            systemInstruction: system,
-            translationMode: 'chunk',
-          }),
+        const outcome = await translateChunkWithRetry(
+          chunk,
+          controller.signal,
+          (content) =>
+            translateChunk(content, `main:${index}`, {
+              index: index + 1,
+              total: sourceChunks.length,
+            }),
+          retryState,
         );
+        leftover.push(...outcome.unmatchedIndices);
+        return outcome.content;
       } catch (error) {
         apiFailures++;
         realLog(
@@ -233,18 +278,48 @@ async function runVariant(
             error instanceof Error ? error.message : String(error)
           }`,
         );
+        for (const raw of parseSrtBlocks(chunk)) {
+          const blockIndex = readBlockIndex(raw);
+          if (blockIndex !== null) leftover.push(blockIndex);
+        }
         return chunk; // production keeps the source chunk on failure
       }
-
-      if (countReturnedBlocks(output) !== expected) countMismatchChunks++;
-      const rebuilt = reassembleTranslatedChunk(chunk, output);
-      unmatched += rebuilt.unmatched;
-      realLog(
-        `  chunk ${index + 1}/${sourceChunks.length} · ${rebuilt.matched}/${rebuilt.total} matched`,
-      );
-      return rebuilt.content;
     },
-  );
+  });
+
+  const mainPassContent = translated.join('\n\n');
+  let sweptContent = mainPassContent;
+  let unmatched = countTranslatableLeftovers(source, leftover);
+  if (leftover.length > 0 && !retryState.fatalCode) {
+    let sweepChunkId = 0;
+    const sweep = await runRecoverySweep({
+      sourceContent: source,
+      translatedContent: mainPassContent,
+      leftover,
+      chunkSize: SERVER_CHUNK_SIZE,
+      concurrency: SERVER_CONCURRENCY,
+      signal: controller.signal,
+      budget: computeSweepBudget(sourceChunks.length),
+      translate: (chunkContent) =>
+        translateChunk(chunkContent, `sweep:${sweepChunkId++}`, {
+          index: 1,
+          total: 1,
+        }),
+    });
+    sweptContent = sweep.content;
+    sweepRecovered = sweep.recovered;
+    sweepCalls = sweep.calls;
+    unmatched = sweep.remaining.length;
+  }
+
+  const { content: ruleEnforced } = enforceTextRules(sweptContent, {
+    trailingPunctuation: resolveTargetLang(P.lang).trailingPunctuation,
+  });
+  const translatedFinal = adjustSubtitleTiming(ruleEnforced, {
+    ...getReadingSpeed(P.lang),
+    minGapMs: MIN_SUBTITLE_GAP_MS,
+    minDurationMs: MIN_SUBTITLE_DURATION_MS,
+  });
 
   const seconds = (Date.now() - startedAt) / 1000;
   const usage = [...usageByChunk.values()].reduce(
@@ -261,19 +336,21 @@ async function runVariant(
     sourceChunks
       .map((chunk, index) => ({
         blocks: parseSrtBlocks(chunk).length,
-        prompt: usageByChunk.get(index)?.prompt ?? NaN,
+        prompt: usageByChunk.get(`main:${index}`)?.prompt ?? NaN,
       }))
       .filter((point) => Number.isFinite(point.prompt)),
   );
 
   return {
     name,
-    srt: translated.join('\n\n'),
+    srt: translatedFinal,
     blocks: sourceChunks.reduce((a, c) => a + parseSrtBlocks(c).length, 0),
     chunks: sourceChunks.length,
     apiFailures,
     countMismatchChunks,
     unmatched,
+    recovered: sweepRecovered,
+    sweepCalls,
     seconds,
     usage,
     fit,
@@ -300,8 +377,8 @@ function summaryMarkdown(results: VariantResult[]): string {
     `# 프롬프트 A/B — ${new Date().toISOString()}`,
     '',
     `- 파일: \`${P.file}\``,
-    `- 모델: \`${TRANSLATION_MODEL}\` · THINKING_LEVEL=**${THINKING_LEVEL}**`,
-    `- 청크 크기 ${SERVER_CHUNK_SIZE} · 동시성 ${SERVER_CONCURRENCY}`,
+    `- 모델: \`${TRANSLATION_MODEL}\` · THINKING_LEVEL=**${thinkingLevelForModel(TRANSLATION_MODEL)}**`,
+    `- 청크 크기 ${SERVER_CHUNK_SIZE} (gap-based target) · 동시성 ${SERVER_CONCURRENCY}`,
     '',
     '| 변형 | 블록 | 청크 | API실패 | 블록수불일치 | 정렬실패 | 시간 | 입력tok | 캐시tok | thinking | 출력tok | P_fixed | t_in | 비용 |',
     '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
@@ -353,12 +430,12 @@ if (blocks.length === 0) {
   process.exit(1);
 }
 
-let sourceChunks = chunkSrtBlocks(blocks, SERVER_CHUNK_SIZE);
+let sourceChunks = chunkSrtBlocksAtGaps(blocks, SERVER_CHUNK_SIZE);
 if (P.limit > 0) sourceChunks = sourceChunks.slice(0, P.limit);
 
 realLog(
   `${P.file}: ${blocks.length} blocks → ${sourceChunks.length} chunks ` +
-    `(B=${SERVER_CHUNK_SIZE}, K=${SERVER_CONCURRENCY}, thinking=${THINKING_LEVEL})`,
+    `(target B=${SERVER_CHUNK_SIZE}, gap-based, K=${SERVER_CONCURRENCY}, thinking=${thinkingLevelForModel(TRANSLATION_MODEL)})`,
 );
 
 const results: VariantResult[] = [];
@@ -377,7 +454,7 @@ for (const result of results) {
 writeFileSync(
   path.join(outDir, 'summary.json'),
   JSON.stringify(
-    { file: P.file, thinking: THINKING_LEVEL, model: TRANSLATION_MODEL, results:
+    { file: P.file, thinking: thinkingLevelForModel(TRANSLATION_MODEL), model: TRANSLATION_MODEL, results:
       results.map(({ srt: _srt, ...rest }) => rest) },
     null,
     2,
