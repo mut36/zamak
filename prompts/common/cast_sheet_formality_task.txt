@@ -3,6 +3,9 @@
 - {{targetLanguage}}에는 상대에 따라 달라지는 말투 축이 있다: {{formalLabel}} / {{informalLabel}}.
   대사가 많은 주요 인물들 사이에서 from이 to에게 말할 때 어느 쪽인지 정해.
   A→B와 B→A는 다를 수 있으니 각각 적어.
+- **from/to는 실제로 대사를 하는 인물(terms의 kind="person")만 가능해.** 지명·조직명·
+  용어(kind="place"/"org"/"term")는 말을 하지 못하므로 from/to에 절대 쓰지 마 — 예를
+  들어 도시 이름이나 기관명을 화자 자리에 넣는 건 오류다.
 - speech 값은 반드시 "formal"({{formalLabel}}), "informal"({{informalLabel}}),
   "mixed"({{mixedLabel}}) 중 하나로 써.
 - 판단 근거는 자막에서 실제로 관찰되는 것만 써. 호칭(sir, Mr., 직책), 나이·직위 차,

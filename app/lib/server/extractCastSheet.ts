@@ -247,7 +247,13 @@ function sanitizeCastSheet(
     )
     .slice(0, GLOSSARY_MAX_TERMS);
 
-  const validTargets = new Set(terms.map((t) => t.target));
+  // Only a person can be a speaker or listener — a place/org/term slipping
+  // into from/to (e.g. the model picking a city as a speaker) is a prompt
+  // failure the schema alone doesn't prevent, so code closes the gap here
+  // instead of trusting the model to self-restrict.
+  const validTargets = new Set(
+    terms.filter((t) => t.kind === 'person').map((t) => t.target),
+  );
 
   // A language with no formality axis has nothing to say here — drop whatever
   // the model produced rather than shipping an axis its grammar lacks.

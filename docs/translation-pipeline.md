@@ -84,7 +84,11 @@
     (`searchCandidates`의 정렬 기준), 후보 노출 상한 `constants.ts`
     `MAX_ENRICH_CANDIDATES`, 후보 카드 UI `InfoStep.tsx` (`CandidatePicker`)
   - 장르/배경·시대/톤앤매너 품질 → **`enrichMovie.ts`의 `buildKeywordPrompt`
-    (TMDB 매치용) / `buildGroundedPrompt` (미스용)**
+    (TMDB 매치용) / `buildGroundedPrompt` (미스용)**. **배경/시대는 "시대, 지역"
+    짧은 구절 하나로 못박혀 있다**(2026-07-28) — 전엔 "사회/문화적 특이사항"까지
+    요청해서 줄거리·소재 키워드(마피아 부패, 환경보호 등)가 섞여 나왔다. 이 칸은
+    말투 추론의 핵심 힌트라 짧게 유지해야 함(§2-C, `translation_rules_<code>.txt`
+    규칙 5)
   - 한국어 제목 없을 때 음차 → `enrichMovie.ts` (`needsTransliteration` + 프롬프트)
   - 관련 결정: 배경/시대가 개봉연도로 나오던 버그는 그라운딩 전환으로 해결(커밋
     `9bf6e1c`). 인물별 말투·글로사리는 의도적으로 보류 → `TODO.md`.
@@ -121,6 +125,9 @@
     있는 언어에서만 주입됨, `extractCastSheet.ts`의 `buildSystemInstruction`)
   - 지어낸 이름이 섞임(환각) → `extractCastSheet.ts`의 `sanitizeCastSheet`
     (실제 자막 문자열에 없는 `source`는 버림 — 이게 이 기능의 핵심 방어선)
+  - **지명·조직명이 화자(from/to)로 섞임** → `sanitizeCastSheet`의 `validTargets`가
+    `kind==='person'`인 term만 허용(2026-07-28). 전엔 kind 무관 전체 term이 후보였음
+    — 프롬프트(`cast_sheet_formality_task.txt`)도 "from/to는 인물만" 명시로 이중 방어
   - 인물명 표기가 TMDB와 다름 → `tmdb.ts`의 `cast`(상위 12명, 배역명+배우명, 한국어
     표기는 아님 — 식별 힌트일 뿐 모델이 직접 음차)
   - 청크당 프롬프트 비용이 커짐 → `constants.ts` `GLOSSARY_MAX_TERMS`/`_RELATIONS`/`_CHARS`
