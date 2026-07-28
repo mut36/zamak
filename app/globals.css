@@ -173,25 +173,28 @@ button:disabled {
     color: #fff;
     box-shadow: 0 0 0 5px var(--accent-soft);
   }
-  /* Repeating light ripple radiating out from the active dot */
+  /* Repeating light ripple radiating out from the active dot.
+     --accent-soft is already the accent hex at 0.45 alpha (rgba(255,216,77,0.45))
+     so it doubles as the ripple's start color; the fade-out target reuses the
+     same hue at 0 alpha rather than a deleted --accent-rgbish component var. */
   .step.active .dot::after {
     content: '';
     position: absolute;
     inset: -2px;
     border-radius: 50%;
-    box-shadow: 0 0 0 0 oklch(var(--accent-rgbish) / 0.45);
+    box-shadow: 0 0 0 0 var(--accent-soft);
     animation: dot-ripple 2s ease-out infinite;
     pointer-events: none;
   }
   @keyframes dot-ripple {
     0% {
-      box-shadow: 0 0 0 0 oklch(var(--accent-rgbish) / 0.45);
+      box-shadow: 0 0 0 0 var(--accent-soft);
     }
     70% {
-      box-shadow: 0 0 0 14px oklch(var(--accent-rgbish) / 0);
+      box-shadow: 0 0 0 14px rgba(255, 216, 77, 0);
     }
     100% {
-      box-shadow: 0 0 0 0 oklch(var(--accent-rgbish) / 0);
+      box-shadow: 0 0 0 0 rgba(255, 216, 77, 0);
     }
   }
   .step.done .dot {
@@ -332,10 +335,11 @@ button:disabled {
   .btn-primary {
     background: var(--accent);
     color: #fff;
-    box-shadow: 0 2px 8px oklch(var(--accent-rgbish) / 0.28);
+    box-shadow: 0 2px 8px rgba(255, 216, 77, 0.28);
   }
   .btn-primary:not(:disabled):hover {
-    background: var(--accent-press);
+    background: var(--accent);
+    box-shadow: var(--shadow-hover);
   }
   .btn-ghost {
     background: var(--surface);
@@ -457,7 +461,7 @@ button:disabled {
     background: var(--surface);
     border: 1.5px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-hover);
     padding: 6px;
     max-height: 280px;
     overflow-y: auto;
