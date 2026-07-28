@@ -225,6 +225,8 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 | `GLOSSARY_MAX_TERMS` / `GLOSSARY_MAX_RELATIONS` | 40 / 16 | 시트 항목 상한 — 청크당 프롬프트 세금을 제한 |
 | `GLOSSARY_MAX_CHARS` | 1200 | `<glossary>`+`<speech_relations>` 렌더 결과 총 길이 상한(문자) |
 | `GLOSSARY_WAIT_MS` | 15000 | 번역 시작 시 아직 추출 중이면 최대 이만큼만 기다리고 빈 시트로 진행 |
+| `ANTHROPIC_API_KEY` / `CLAUDE_MODEL` | — / `claude-sonnet-5` | **`scripts/glossary-ab.mts` 등 모델 비교 실험 전용.** production 라우트는 안 씀 — `registry.ts`/`ALLOWED_MODELS`는 여전히 Gemini 고정(`app/lib/providers/claude.ts`) |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | — / — | 위와 같은 실험 전용. `OPENAI_MODEL`은 기본값 없음 — 모델명이 빨리 바뀌어 잘못된 값을 추측해 넣느니 직접 지정하게 함(`app/lib/providers/openai.ts`) |
 
 ### 글로사리·존대관계 (opt-in)
 

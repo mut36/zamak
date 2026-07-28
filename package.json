@@ -1,6 +1,6 @@
 {
   "name": "srt-translator-web",
-  "version": "0.15.1",
+  "version": "0.16.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,14 +8,17 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "harness": "node --import ./scripts/harness/loader.mjs --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/prompt-ab.mts"
+    "harness": "node --import ./scripts/harness/loader.mjs --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/prompt-ab.mts",
+    "glossary": "node --import ./scripts/harness/loader.mjs --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/glossary-ab.mts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@google/genai": "^1.38.0",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
     "@tosspayments/tosspayments-sdk": "^2.7.1",
     "next": "^16.2.9",
+    "openai": "^7.0.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "server-only": "^0.0.1"

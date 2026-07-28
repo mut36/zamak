@@ -100,8 +100,13 @@ function excerptBlocks(blocks: readonly string[], maxBlocks: number): string {
  * half is injected only when the language has a formality axis, so English or
  * Chinese runs ask for spellings alone instead of inventing an axis their
  * grammar doesn't have.
+ *
+ * Exported (along with buildUserTurn, sanitizeCastSheet, fetchCastAnchors)
+ * so scripts/glossary-ab.mts can run the exact same prompt through
+ * non-Gemini providers for an apples-to-apples model comparison — only the
+ * API call differs, not the prompt.
  */
-async function buildSystemInstruction(lang: TargetLang): Promise<string> {
+export async function buildSystemInstruction(lang: TargetLang): Promise<string> {
   const [template, formalityTemplate] = await Promise.all([
     loadCastSheetExtractionPrompt(),
     lang.formality ? loadCastSheetFormalityTask() : Promise.resolve(''),
@@ -142,7 +147,7 @@ function buildCastAnchorTag(cast: readonly TmdbCastMember[]): string {
  * run standalone. Failures (no TMDB key, no match, network error) degrade to
  * no anchor, same as every other best-effort path in this feature.
  */
-async function fetchCastAnchors(
+export async function fetchCastAnchors(
   title: string,
   year: string,
 ): Promise<TmdbCastMember[]> {
@@ -159,7 +164,7 @@ async function fetchCastAnchors(
   }
 }
 
-function buildUserTurn(
+export function buildUserTurn(
   movieInfo: Pick<MovieInfo, 'title' | 'year' | 'genre' | 'country' | 'era' | 'tone'>,
   cast: readonly TmdbCastMember[],
   subtitleContent: string,
@@ -210,7 +215,7 @@ const TERM_KINDS: GlossaryTerm['kind'][] = ['person', 'place', 'org', 'term'];
  * a made-up name would otherwise pollute the fixed spelling used by every
  * parallel chunk, which is a worse outcome than no glossary at all.
  */
-function sanitizeCastSheet(
+export function sanitizeCastSheet(
   raw: RawCastSheet,
   sourceContent: string,
   blockCount: number,
@@ -259,6 +264,8 @@ function sanitizeCastSheet(
   // the model produced rather than shipping an axis its grammar lacks.
   const rawRelations =
     hasFormalityAxis && Array.isArray(raw.relations) ? raw.relations : [];
+  const targetKind = new Map(terms.map((t) => [t.target, t.kind]));
+  let droppedNonPerson = 0;
   const relations = rawRelations
     .filter(isRecord)
     .map((r): SpeechRelation | null => {
@@ -274,7 +281,18 @@ function sanitizeCastSheet(
       const toBlockRaw = typeof r.toBlock === 'number' ? r.toBlock : NaN;
 
       if (!from || !to || !speech) return null;
-      if (!validTargets.has(from) || !validTargets.has(to)) return null;
+      if (!validTargets.has(from) || !validTargets.has(to)) {
+        // Distinguish "the model named a real non-person term as a speaker"
+        // from "the model named something not in terms at all" — only the
+        // former is the prompt failure this counter tracks.
+        if (
+          (targetKind.has(from) && targetKind.get(from) !== 'person') ||
+          (targetKind.has(to) && targetKind.get(to) !== 'person')
+        ) {
+          droppedNonPerson++;
+        }
+        return null;
+      }
       if (!Number.isFinite(fromBlockRaw) || !Number.isFinite(toBlockRaw)) {
         return null;
       }
@@ -289,6 +307,16 @@ function sanitizeCastSheet(
     })
     .filter((r): r is SpeechRelation => r !== null)
     .slice(0, GLOSSARY_MAX_RELATIONS);
+
+  if (process.env.GLOSSARY_DEBUG) {
+    const kindCounts = TERM_KINDS.map(
+      (k) => `${k}=${terms.filter((t) => t.kind === k).length}`,
+    ).join(' ');
+    console.log(
+      `[glossary-sanitize] terms=${terms.length} (${kindCounts}) ` +
+        `relations raw=${rawRelations.length} kept=${relations.length} droppedNonPerson=${droppedNonPerson}`,
+    );
+  }
 
   return { terms, relations };
 }
@@ -335,6 +363,14 @@ export async function extractCastSheet(
         responseSchema: CAST_SHEET_SCHEMA,
       },
     });
+
+    // Same shape as gemini.ts's [gemini] line — one call per file, so this is
+    // the only place glossary cost/quality can be read off logs (no per-chunk
+    // volume to amortize measurement error across).
+    const usage = response.usageMetadata;
+    console.log(
+      `[glossary] model=${GLOSSARY_MODEL} thinking=${GLOSSARY_THINKING_LEVEL} prompt=${usage?.promptTokenCount} thoughts=${usage?.thoughtsTokenCount ?? 0} output=${usage?.candidatesTokenCount}`,
+    );
 
     const parsed = JSON.parse(response.text ?? '{}') as RawCastSheet;
     return sanitizeCastSheet(

@@ -136,6 +136,16 @@
     (`glossaryContent.ts` `renderGlossaryTags`)
   - 사람이 잘못된 항목을 고치고 싶음 → InfoStep 카드에서 직접 편집(표기/삭제/추가,
     말투 드롭다운) 가능, `CastSheetCard.tsx`
+- **모델·비용 비교 실험**: `scripts/glossary-ab.mts` (`npm run glossary`)가
+  `extractCastSheet.ts`에서 export된 `buildSystemInstruction`/`buildUserTurn`/
+  `sanitizeCastSheet`/`fetchCastAnchors`를 그대로 재사용해 **같은 프롬프트**를
+  Gemini(기본)·Claude·OpenAI 세 프로바이더에 각각 태운다(`provider=gemini|claude|openai`).
+  Claude·OpenAI 호출은 `app/lib/providers/claude.ts`/`openai.ts` —
+  **production 경로(`registry.ts`, `ALLOWED_MODELS`)는 안 건드림**, 실험 스크립트 전용.
+  키는 `.env.local`의 `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`만 채우면 됨(README §환경변수).
+  `GLOSSARY_DEBUG=1`(스크립트가 자동 설정)이 `[glossary-sanitize]` 줄로 kind별
+  term 개수·`droppedNonPerson`(지명이 화자로 잘못 뽑힌 뒤 코드가 걸러낸 수)을 찍는다 —
+  2026-07-28 지명 오분류 버그의 회귀 감시 지표.
 
 ### 3. 사용자 검토·수정 (InfoStep)
 - **코드**: `app/components/simple/InfoStep.tsx`, 문구 `app/i18n/simpleCopy.ts`
