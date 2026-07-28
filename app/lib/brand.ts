@@ -14,8 +14,10 @@ export const BRAND = {
 
 export const SITE = {
   name: 'ZAMAK',
-  title: 'ZAMAK — 자막 번역기',
+  // Title focuses on the structural guarantee (timecode integrity), not speed.
+  title: 'ZAMAK — 타임코드가 밀리지 않는 SRT 자막 번역기',
+  // Description covers: SRT, timecode safety, 7 target languages, no install.
   description:
-    '자막 파일을 올리면 약 30초 만에 AI 번역 자막을 받아보세요.',
+    'AI는 SRT 대사를 번역하고, 코드는 각 타임코드를 다시 연결해 후속 자막의 연쇄 밀림을 막습니다. 7개 도착어 지원.',
   locale: 'ko_KR',
 } as const;

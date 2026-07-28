@@ -238,6 +238,14 @@ button:disabled {
     margin: 0 0 8px;
     color: var(--ink);
   }
+  /* Section sub-headings on the landing page */
+  .head h2 {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    margin: 0 0 8px;
+    color: var(--ink);
+  }
   .head p {
     font-size: 15px;
     color: var(--ink-2);
@@ -509,11 +517,12 @@ button:disabled {
     margin-left: auto;
     flex: none;
   }
-  /* Reassurance line */
+  /* Reassurance line — flex-wrap so items stack on narrow screens (320px) */
   .reassure {
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-wrap: wrap;
     gap: 8px;
     font-size: 13.5px;
     color: var(--ink-2);
@@ -626,6 +635,9 @@ button:disabled {
     padding: 4px 10px;
     border-radius: 999px;
     margin-top: 9px;
+  }
+  .dbadge-inline {
+    margin-top: 0;
   }
   .dbadge b {
     width: 5px;
@@ -886,6 +898,51 @@ button:disabled {
     font-weight: 500;
     margin-top: 3px;
   }
+
+  /* ── Landing: dark terminal SRT comparison panel ────────────────
+     Uses hardcoded near-black warm neutrals so the panel reads as a
+     "file viewer" without introducing a full dark theme. WCAG AA
+     contrast: terminal-text (0.87L) on terminal-bg (0.17L) ≈ 12:1. */
+  .srt-terminal {
+    background: oklch(0.17 0.012 80);
+    border: 1px solid oklch(0.27 0.012 80);
+    border-radius: var(--radius-sm);
+    padding: 18px 20px;
+    overflow: hidden;
+  }
+  .srt-terminal-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    color: var(--ink-3);
+  }
+  .srt-terminal-label.accent {
+    color: var(--accent);
+  }
+  .srt-terminal-no {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: oklch(0.68 0.01 80);
+    line-height: 1.2;
+  }
+  /* Timecode stays on one line; truncate rather than wrap to preserve layout */
+  .srt-terminal-tc {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: oklch(0.72 0.1 162);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+  }
+  .srt-terminal-text {
+    font-size: 13.5px;
+    color: oklch(0.87 0.008 70);
+    line-height: 1.5;
+    margin-top: 3px;
+  }
 }
 
 /* ============================================================
@@ -914,4 +971,69 @@ button:disabled {
 }
 .animate-fade-in {
   animation: fadeIn 0.3s ease both;
+}
+
+/* Scroll reveal — blocks stay hidden until IntersectionObserver adds
+   .is-visible. Transition-delay on the element creates card stagger. */
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  will-change: auto;
+}
+/* No-JS browsers: never leave content invisible. */
+@media (scripting: none) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+    will-change: auto;
+  }
+}
+
+/* ============================================================
+   Accessibility
+   ============================================================ */
+
+/* Keyboard focus ring — only shown for keyboard/sequential navigation,
+   not for mouse or touch interactions. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+/* Input fields render focus via box-shadow; suppress the double ring. */
+.input:focus-visible {
+  outline: none;
+}
+
+/* Respect the user's motion preference: disable spatial animations and
+   shorten transitions to an imperceptible duration. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+  .animate-fade-slide-up,
+  .animate-fade-in {
+    animation: none;
+  }
+  .step.active .dot::after {
+    animation: none;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+    will-change: auto;
+  }
 }

@@ -90,7 +90,7 @@ export function DoneStep({ result, originalContent, onStartOver }: DoneStepProps
           <div className='k'>{c.summaryTime}</div>
         </div>
         <div className='sum'>
-          <div className='v mono'>100%</div>
+          <div className='v mono'>{c.summaryTimecodeValue}</div>
           <div className='k'>{c.summaryTimecode}</div>
         </div>
       </div>

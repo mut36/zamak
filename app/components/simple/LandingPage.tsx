@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { COPY } from '../../i18n/simpleCopy';
 import { BrandMark } from '../BrandMark';
+import { Reveal } from './Reveal';
 
 const c = COPY.landing;
 
@@ -80,7 +81,7 @@ function GoogleCta({
   );
 }
 
-/** One pane of the before/after sample, styled like a real .srt file. */
+/** One pane of the before/after SRT sample — dark terminal style. */
 function SrtPane({
   label,
   accent,
@@ -88,27 +89,19 @@ function SrtPane({
 }: {
   label: string;
   accent?: boolean;
-  text: (b: (typeof c.sample.blocks)[number]) => string;
+  text: (b: (typeof c.proof.blocks)[number]) => string;
 }) {
   return (
     <div className='min-w-0'>
-      <div
-        className={`text-[11.5px] font-bold uppercase tracking-[0.04em] mb-2 ${
-          accent ? 'text-accent' : 'text-ink-3'
-        }`}
-      >
+      <div className={`srt-terminal-label${accent ? ' accent' : ''}`}>
         {label}
       </div>
-      <div className='bg-surface-2 border border-border rounded-sm p-4 overflow-x-auto'>
-        {c.sample.blocks.map((b, i) => (
+      <div className='srt-terminal'>
+        {c.proof.blocks.map((b, i) => (
           <div key={b.no} className={i > 0 ? 'mt-4' : ''}>
-            <div className='mono text-[11px] text-ink-3'>{b.no}</div>
-            <div className='mono text-[11px] text-accent whitespace-nowrap'>
-              {b.tc}
-            </div>
-            <div className='text-[13.5px] text-ink leading-snug mt-0.5'>
-              {text(b)}
-            </div>
+            <div className='srt-terminal-no'>{b.no}</div>
+            <div className='srt-terminal-tc'>{b.tc}</div>
+            <div className='srt-terminal-text'>{text(b)}</div>
           </div>
         ))}
       </div>
@@ -126,30 +119,45 @@ interface LandingPageProps {
 /**
  * What an anonymous visitor sees. Every model route is login-gated, so this
  * page's whole job is to give people a reason to press the sign-in button —
- * with static content only (zero API cost). Lives at `/` for now; if routes
- * ever split, move this component behind a marketing route as-is.
+ * with static content only (zero API cost).
+ *
+ * Structure: Hero → SRT proof → 4 differentiators → 3-step how-to →
+ *            product specs → closing CTA.
+ * Accessibility: single h1, section landmarks with aria-labelledby,
+ *                keyboard focus-visible, prefers-reduced-motion in globals.css.
+ * Motion: hero appears immediately; below-the-fold blocks use scroll reveal.
  */
 export function LandingPage({ onSignIn, error, configured }: LandingPageProps) {
   return (
-    <div className='animate-fade-slide-up'>
+    <div>
       {(error || !configured) && (
         <div
-          className='card p-4 mb-[14px] text-sm'
+          className='card p-4 mb-3.5 text-sm'
           style={{ color: 'oklch(0.55 0.2 25)' }}
         >
           {configured ? error : COPY.auth.notConfigured}
         </div>
       )}
 
-      {/* Hero */}
-      <section className='text-center pt-8 pb-2'>
-        <div className='head mb-7'>
-          <h1>{c.hero.title}</h1>
-          <p>{c.hero.subtitle}</p>
+      {/* ── Hero — always visible on first paint ──────────────────── */}
+      <section
+        aria-labelledby='hero-title'
+        className='text-center pt-8 pb-2 animate-fade-slide-up'
+      >
+        <div className='mb-7'>
+          <h1
+            id='hero-title'
+            className='text-3xl sm:text-4xl font-extrabold tracking-[-0.04em] text-ink mb-3 leading-tight text-balance'
+          >
+            {c.hero.title}
+          </h1>
+          <p className='text-[15px] sm:text-base text-ink-2 m-0 leading-relaxed max-w-130 mx-auto text-pretty'>
+            {c.hero.subtitle}
+          </p>
         </div>
         <GoogleCta onSignIn={onSignIn} configured={configured} />
-        <div className='reassure'>
-          {COPY.upload.reassure.map((item, i) => (
+        <div className='reassure mt-5'>
+          {c.reassure.map((item, i) => (
             <span key={item} className='flex items-center gap-2'>
               {i > 0 && <span className='dot-sep' />}
               {item}
@@ -158,81 +166,138 @@ export function LandingPage({ onSignIn, error, configured }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Before / after sample */}
-      <section className='mt-14'>
-        <div className='head text-center mb-6'>
-          <h1 className='text-[22px]'>{c.sample.title}</h1>
-          <p>{c.sample.subtitle}</p>
-        </div>
-        <div className='card p-5'>
-          <div className='grid gap-5 lg:grid-cols-2'>
-            <SrtPane label={c.sample.srcLabel} text={(b) => b.src} />
-            <SrtPane label={c.sample.dstLabel} accent text={(b) => b.dst} />
+      {/* ── Before / After SRT ────────────────────────────────────── */}
+      <section aria-labelledby='proof-title' className='mt-24 sm:mt-32'>
+        <Reveal>
+          <div className='head text-center mb-6'>
+            <h2 id='proof-title'>{c.proof.title}</h2>
+            <p>{c.proof.subtitle}</p>
           </div>
-        </div>
-        <div className='grid gap-3 lg:grid-cols-2 mt-3'>
-          {c.sample.points.map((p) => (
-            <div key={p.title} className='card p-5'>
-              <div className='dbadge mb-2'>
-                <b />
-                {p.title}
-              </div>
-              <p className='text-[13.5px] text-ink-2 leading-relaxed m-0'>
-                {p.body}
-              </p>
+          <div className='card p-5'>
+            <div className='grid gap-5 lg:grid-cols-2'>
+              <SrtPane label={c.proof.srcLabel} text={(b) => b.src} />
+              <SrtPane label={c.proof.dstLabel} accent text={(b) => b.dst} />
             </div>
+            <p className='text-[12.5px] text-ink-3 leading-relaxed mt-4 mb-0'>
+              {c.proof.note}
+            </p>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* ── Differentiating features ──────────────────────────────── */}
+      <section aria-labelledby='features-title' className='mt-24 sm:mt-32'>
+        <Reveal>
+          <div className='head text-center mb-6'>
+            <h2 id='features-title'>{c.features.title}</h2>
+          </div>
+        </Reveal>
+        <div className='grid gap-3 lg:grid-cols-2'>
+          {c.features.items.map((f, i) => (
+            <Reveal key={f.title} delayMs={i * 70}>
+              <div className='card p-5 h-full'>
+                <div className='flex items-center gap-2 flex-wrap mb-2'>
+                  <span className='text-[15px] font-bold text-ink'>
+                    {f.title}
+                  </span>
+                  {'badge' in f && (
+                    <span className='dbadge dbadge-inline'>
+                      <b />
+                      {(f as { badge: string }).badge}
+                    </span>
+                  )}
+                </div>
+                <p className='text-[13.5px] text-ink-2 leading-relaxed m-0'>
+                  {f.body}
+                </p>
+              </div>
+            </Reveal>
           ))}
         </div>
       </section>
 
-      {/* How it works */}
-      <section className='mt-14'>
-        <div className='head text-center mb-6'>
-          <h1 className='text-[22px]'>{c.how.title}</h1>
-        </div>
+      {/* ── How it works ──────────────────────────────────────────── */}
+      <section aria-labelledby='steps-title' className='mt-24 sm:mt-32'>
+        <Reveal>
+          <div className='head text-center mb-6'>
+            <h2 id='steps-title'>{c.how.title}</h2>
+          </div>
+        </Reveal>
         <div className='grid gap-3 lg:grid-cols-3'>
           {c.how.steps.map((s, i) => (
-            <div key={s.title} className='card p-5 text-center'>
-              <div className='step mx-auto mb-3 w-fit'>
-                <span className='dot'>{i + 1}</span>
+            <Reveal key={s.title} delayMs={i * 80}>
+              <div className='card p-5 text-center h-full'>
+                <div className='step mx-auto mb-3 w-fit'>
+                  <span className='dot'>{i + 1}</span>
+                </div>
+                <div className='text-[15px] font-bold text-ink'>{s.title}</div>
+                <p className='text-[13.5px] text-ink-2 mt-1 m-0'>{s.body}</p>
               </div>
-              <div className='text-[15px] font-bold text-ink'>{s.title}</div>
-              <p className='text-[13.5px] text-ink-2 mt-1 m-0'>{s.body}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
 
-      {/* Free credit + closing CTA */}
-      <section className='mt-14'>
-        <div className='card p-8 text-center'>
-          <div className='head mb-5'>
-            <h1 className='text-[22px]'>{c.closing.title}</h1>
-            <p className='max-w-[480px] mx-auto'>{c.closing.body}</p>
+      {/* ── Product specs ─────────────────────────────────────────── */}
+      <section aria-labelledby='specs-title' className='mt-24 sm:mt-32'>
+        <Reveal>
+          <div className='head text-center mb-6'>
+            <h2 id='specs-title'>{c.specs.title}</h2>
           </div>
-          <GoogleCta onSignIn={onSignIn} configured={configured} />
-          <p className='text-[12px] text-ink-3 mt-4 m-0'>
-            {COPY.auth.gateNote}
-          </p>
-        </div>
+          <dl className='card overflow-hidden'>
+            {c.specs.items.map((spec, i) => (
+              <div
+                key={spec.label}
+                className={`flex items-baseline gap-4 px-5 py-3.5 flex-wrap${
+                  i < c.specs.items.length - 1 ? ' border-b border-border' : ''
+                }`}
+              >
+                <dt className='text-[13px] font-semibold text-ink-3 w-24 flex-none'>
+                  {spec.label}
+                </dt>
+                <dd className='text-[13.5px] text-ink m-0 leading-snug flex-1'>
+                  {spec.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </Reveal>
       </section>
 
-      <footer className='mt-14 pt-6 border-t border-border text-[12.5px] text-ink-3'>
-        <div className='flex items-center justify-center gap-2.5 flex-wrap'>
-          <BrandMark size={16} wordmarkSize={0} />
-          <span className='font-bold text-ink-2'>{COPY.brand}</span>
-          <span className='dot-sep' />
-          <span>{c.footerNote}</span>
-        </div>
-        <div className='flex items-center justify-center gap-2.5 mt-2'>
-          <Link href={COPY.legal.termsHref} className='underline'>
-            {COPY.legal.terms}
-          </Link>
-          <span className='dot-sep' />
-          <Link href={COPY.legal.privacyHref} className='underline'>
-            {COPY.legal.privacy}
-          </Link>
-        </div>
+      {/* ── Closing CTA ───────────────────────────────────────────── */}
+      <section aria-labelledby='closing-title' className='mt-24 sm:mt-32'>
+        <Reveal>
+          <div className='card p-8 text-center'>
+            <div className='head mb-5'>
+              <h2 id='closing-title'>{c.closing.title}</h2>
+              <p className='max-w-120 mx-auto'>{c.closing.body}</p>
+            </div>
+            <GoogleCta onSignIn={onSignIn} configured={configured} />
+            <p className='text-[12px] text-ink-3 mt-4 m-0'>
+              {COPY.auth.gateNote}
+            </p>
+          </div>
+        </Reveal>
+      </section>
+
+      <footer className='mt-24 sm:mt-32 pt-6 border-t border-border text-[12.5px] text-ink-3'>
+        <Reveal>
+          <div className='flex items-center justify-center gap-2.5 flex-wrap'>
+            <BrandMark size={16} wordmarkSize={0} />
+            <span className='font-bold text-ink-2'>{COPY.brand}</span>
+            <span className='dot-sep' />
+            <span>{c.footerNote}</span>
+          </div>
+          <div className='flex items-center justify-center gap-2.5 mt-2'>
+            <Link href={COPY.legal.termsHref} className='underline'>
+              {COPY.legal.terms}
+            </Link>
+            <span className='dot-sep' />
+            <Link href={COPY.legal.privacyHref} className='underline'>
+              {COPY.legal.privacy}
+            </Link>
+          </div>
+        </Reveal>
       </footer>
     </div>
   );

@@ -21,19 +21,22 @@ export const COPY = {
   },
 
   // Anonymous landing. Static content only — proving product value in front
-  // of the sign-in wall costs zero API calls. Two claims carry the page:
-  // timecode integrity and work-context-aware tone.
+  // of the sign-in wall costs zero API calls. Primary claim: structural
+  // timecode integrity (the code, not the AI, owns every timestamp).
+  // Secondary: work-context enrichment and opt-in cast-sheet consistency.
   landing: {
     hero: {
-      title: 'SRT 자막, 30초면 번역돼요',
-      subtitle:
-        '타임코드는 100% 그대로. 작품의 톤과 인물의 말투까지 반영해요.',
+      title: '번역해도, 뒤 자막이 밀리지 않도록.',
+      subtitle: 'AI는 대사만 번역하고, 코드가 타임코드를 복원합니다.',
       cta: 'Google로 무료 시작하기',
       // 베타 한시적: 3편. 정식 오픈 시 1편으로 되돌릴 것 (docs/decisions.md 2026-07-27).
       ctaHint: '가입 즉시 번역권 3편 무료 · 카드 등록 없음',
     },
-    sample: {
-      title: '결과물로 보여드릴게요',
+    // Landing-specific reassurance row — separate from upload.reassure so
+    // the two pages can evolve independently.
+    reassure: ['SRT 전용', '설치 없이 바로', '로그인만으로 시작'] as readonly string[],
+    proof: {
+      title: '결과물로 먼저 보여드릴게요',
       subtitle:
         '자체 제작 예문이에요. 형사물에서 선배와 신입이 나누는 대화로, 타임코드와 말투를 눈으로 확인하세요.',
       srcLabel: '원본 SRT',
@@ -58,23 +61,59 @@ export const COPY = {
           dst: '잘 판단했어. 당분간 우리끼리만 알고 있자.',
         },
       ],
-      points: [
+      // Timecode numbers are identical across both panes — point that out.
+      note: '타임코드는 코드가 원본에서 복원합니다. AI가 줄을 합치거나 빠뜨려도 이후 자막이 밀리는 건 구조적으로 막혀 있어요.',
+    },
+    features: {
+      title: '다른 번역기와 다른 점',
+      items: [
         {
-          title: '타임코드가 한 글자도 안 달라져요',
-          body: '타임코드는 AI가 아니라 코드가 관리해요. AI가 줄을 합치거나 빠뜨려도 이후 자막이 밀리는 일은 구조적으로 일어나지 않아요.',
+          title: '타임코드는 코드가 복원해요',
+          body: 'AI에는 대사만 보내고, 타임코드는 코드가 원본과 재결합합니다. AI가 자막을 합쳐도 그 뒤 타임코드가 밀리지 않아요.',
         },
         {
-          title: '누가 누구에게 말하는지 알아요',
-          body: '작품 정보를 검색해 인물 관계와 말투 지침을 만들어요. 선배는 반말, 신입은 존댓말 — 문장마다 흔들리지 않아요.',
+          title: '작품 맥락을 검색해요',
+          body: 'TMDB와 Google 검색을 바탕으로 장르·배경·톤을 보강해요. 번역 문체가 작품 분위기에 맞도록 도와줍니다.',
         },
+        {
+          title: '말투·용어 일관성을 잡아요',
+          badge: 'opt-in',
+          body: '켜면 파일 전체를 스캔해 인물 간 존댓말/반말 관계와 고유명사 표기를 청크마다 통일합니다.',
+        },
+        {
+          title: '실패한 구간은 원문을 유지해요',
+          body: '번역에 실패한 청크가 있어도 원문을 그대로 남겨 항상 재생 가능한 완전한 SRT를 돌려줍니다.',
+        },
+      ],
+    },
+    specs: {
+      title: '제품 사양',
+      items: [
+        { label: '지원 형식', value: 'SRT' },
+        { label: '번역 모델', value: '빠른번역 (Flash) · 고급번역 (Pro)' },
+        {
+          label: '도착어',
+          value: '한국어 · 영어 · 일본어 · 스페인어 · 프랑스어 · 중국어 · 독일어',
+        },
+        {
+          label: '타임코드',
+          value: '코드가 재결합 — 후속 자막의 연쇄 밀림 방지',
+        },
+        { label: '실패 구간', value: '원문 보존 · 부분 실패 허용' },
       ],
     },
     how: {
       title: '쓰는 법은 세 단계예요',
       steps: [
-        { title: '업로드', body: '.srt 파일을 끌어다 놓아요.' },
-        { title: '확인', body: 'AI가 찾은 작품 정보를 확인하고 시작을 눌러요.' },
-        { title: '다운로드', body: '평균 30초 뒤, 번역된 .srt를 받아요.' },
+        { title: 'SRT 업로드', body: '.srt 파일을 끌어다 놓아요.' },
+        {
+          title: '작품 정보 확인',
+          body: 'AI가 찾은 제목·장르·감독을 확인하고 번역을 시작해요.',
+        },
+        {
+          title: '번역 자막 다운로드',
+          body: '번역이 끝나면 선택한 언어의 .srt 파일을 받아요.',
+        },
       ],
     },
     closing: {
@@ -130,11 +169,11 @@ export const COPY = {
 
   upload: {
     title: '자막을 올려주세요',
-    subtitle: '한 번의 업로드로 끝. 평균 30초면 자연스러운 번역 자막을 받아요.',
+    subtitle: '한 번의 업로드로 끝. 작품 맥락을 반영한 번역 자막을 받아요.',
     dropTitle: '파일을 여기에 끌어다 놓으세요',
     dropOr: '또는',
     browse: '파일 선택',
-    formats: 'SRT 파일 · 최대 5MB',
+    formats: 'SRT 파일만 지원',
     langLabel: '어떤 언어로 바꿔드릴까요?',
     langDetect: '언어 감지',
     comingSoon: '곧 지원',
@@ -142,7 +181,7 @@ export const COPY = {
     typeMovie: '영화 · 드라마',
     typeOther: '기타 영상',
     typeOtherHint: '유튜브 · 인터뷰 · 강연 등',
-    reassure: ['평균 30초 소요', '타임코드 100% 보존', '설치 없이 바로'],
+    reassure: ['빠른 번역 · 고급 번역', '후속 자막 밀림 방지', '설치 없이 바로'],
     invalidFile: 'SRT 파일만 올릴 수 있어요.',
     // 업로드가 저작권 리스크가 실제로 발생하는 시점이라, 동의 모달 대신 여기에
     // 상시 노출한다. 모달은 "30초면 번역돼요"라는 제품 약속과 정면으로 충돌한다.
@@ -230,7 +269,7 @@ export const COPY = {
     recentLabel: '방금 번역한 대사',
     remaining: (lines: number, total: number, sec: number) =>
       `${lines.toLocaleString()} / ${total.toLocaleString()}줄 · 약 ${sec}초 남음`,
-    reassure: '창을 닫아도 번역은 계속 진행돼요.',
+    reassure: '번역이 끝날 때까지 이 창을 열어두세요.',
     cancel: '취소',
     cancelConfirm: '번역을 취소할까요?',
   },
@@ -238,11 +277,12 @@ export const COPY = {
   done: {
     title: '번역이 완료됐어요!',
     subtitle: (lines: number, time: string) =>
-      `${lines.toLocaleString()}줄을 ${time} 만에 번역했어요. 타임코드는 그대로예요.`,
+      `${lines.toLocaleString()}줄을 ${time} 만에 번역했어요. 자막 번호에 맞춰 다시 결합했어요.`,
     download: '번역 자막 다운로드',
     summaryLines: '번역된 줄',
     summaryTime: '걸린 시간',
-    summaryTimecode: '타임코드 보존',
+    summaryTimecodeValue: '번호 매칭',
+    summaryTimecode: '타임코드 처리',
     previewTitle: '번역 미리보기',
     startOver: '새 파일 번역하기',
     // failedChunks: whole chunks that errored out entirely. fallbackBlocks:
