@@ -899,10 +899,228 @@ button:disabled {
     margin-top: 3px;
   }
 
-  /* ── Landing: dark terminal SRT comparison panel ────────────────
-     Uses hardcoded near-black warm neutrals so the panel reads as a
-     "file viewer" without introducing a full dark theme. WCAG AA
-     contrast: terminal-text (0.87L) on terminal-bg (0.17L) ≈ 12:1. */
+  /* ── Landing (Toss-like full-bleed chapters) ─────────────────
+     Anonymous `/` only. Wide rhythm, large type, one idea per band.
+     Signed-in wizard keeps the tighter .card / .head primitives. */
+  .landing {
+    width: 100%;
+  }
+  .landing-inner {
+    width: 100%;
+    max-width: 980px;
+    margin-inline: auto;
+    padding-inline: 24px;
+  }
+  .landing-inner-narrow {
+    max-width: 720px;
+  }
+  .landing-hero {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: min(88vh, 820px);
+    padding: 72px 0 88px;
+  }
+  .landing-hero-title {
+    margin: 0;
+    font-size: clamp(2.25rem, 5.2vw, 3.75rem);
+    font-weight: 800;
+    letter-spacing: -0.045em;
+    line-height: 1.18;
+    color: var(--ink);
+    white-space: pre-line;
+    text-wrap: balance;
+  }
+  .landing-hero-sub {
+    margin: 22px auto 0;
+    max-width: 34rem;
+    font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+    line-height: 1.6;
+    color: var(--ink-2);
+    text-wrap: pretty;
+  }
+  .landing-reassure {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 8px;
+    list-style: none;
+    margin: 36px 0 0;
+    padding: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-3);
+  }
+  .landing-reassure li:not(:last-child)::after {
+    content: '·';
+    margin-left: 8px;
+    color: var(--ink-3);
+  }
+  .landing-band {
+    padding: 96px 0;
+  }
+  .landing-band-soft {
+    background: var(--surface-2);
+  }
+  .landing-band-accent {
+    background: var(--accent-soft);
+  }
+  .landing-chapter-head {
+    margin-bottom: 20px;
+  }
+  .landing-eyebrow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0 0 14px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--accent);
+  }
+  .landing-title {
+    margin: 0;
+    font-size: clamp(1.85rem, 4vw, 2.75rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.22;
+    color: var(--ink);
+    white-space: pre-line;
+    text-wrap: balance;
+  }
+  .landing-title-center {
+    text-align: center;
+  }
+  .landing-body {
+    margin: 0;
+    max-width: 36rem;
+    font-size: clamp(1rem, 1.4vw, 1.125rem);
+    line-height: 1.7;
+    color: var(--ink-2);
+    text-wrap: pretty;
+  }
+  .landing-body-center {
+    margin-inline: auto;
+    text-align: center;
+    margin-top: 18px;
+  }
+  .landing-note {
+    margin: 20px 0 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--ink-3);
+    max-width: 40rem;
+  }
+  .landing-proof-grid {
+    display: grid;
+    gap: 16px;
+    margin-top: 40px;
+  }
+  .landing-steps {
+    list-style: none;
+    margin: 48px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 28px;
+  }
+  .landing-step {
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+  }
+  .landing-step-num {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+    display: grid;
+    place-items: center;
+  }
+  .landing-step-title {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .landing-step-body {
+    margin: 6px 0 0;
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--ink-2);
+  }
+  .landing-specs {
+    margin: 40px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0;
+    border-top: 1px solid var(--border);
+  }
+  .landing-spec {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr;
+    gap: 16px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: baseline;
+  }
+  .landing-spec dt {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink-3);
+  }
+  .landing-spec dd {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+    line-height: 1.45;
+  }
+  .landing-footer {
+    padding: 56px 0 72px;
+    border-top: 1px solid var(--border);
+  }
+  @media (min-width: 768px) {
+    .landing-band {
+      padding: 128px 0;
+    }
+    .landing-proof-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .landing-steps {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+    }
+    .landing-step {
+      flex-direction: column;
+      gap: 16px;
+    }
+    .landing-spec {
+      grid-template-columns: 9rem 1fr;
+      gap: 24px;
+      padding: 26px 0;
+    }
+  }
+  @media (min-width: 1024px) {
+    .landing-inner {
+      padding-inline: 32px;
+    }
+    .landing-band {
+      padding: 152px 0;
+    }
+    .landing-hero {
+      padding: 96px 0 120px;
+    }
+  }
+  /* Dark terminal SRT comparison panel — hardcoded near-black warm
+     neutrals (file-viewer look, not a full dark theme). WCAG AA ≈ 12:1. */
   .srt-terminal {
     background: oklch(0.17 0.012 80);
     border: 1px solid oklch(0.27 0.012 80);

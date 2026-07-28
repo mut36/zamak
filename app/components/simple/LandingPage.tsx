@@ -46,8 +46,6 @@ function GoogleCta({
     try {
       await onSignIn();
     } finally {
-      // The OAuth redirect usually navigates away before this runs; it matters
-      // only when the redirect fails to start.
       setBusy(false);
     }
   };
@@ -63,10 +61,8 @@ function GoogleCta({
         <GoogleIcon />
         {busy ? COPY.auth.signingIn : c.hero.cta}
       </button>
-      <p className='text-[12.5px] text-ink-3 text-center'>{c.hero.ctaHint}</p>
-      {/* signup-wrap: binding the notice to the sign-in action holds up better
-          than a footer link alone, without a modal's friction. */}
-      <p className='text-[11.5px] text-ink-3 text-center max-w-[320px]'>
+      <p className='text-[13px] text-ink-3 text-center m-0'>{c.hero.ctaHint}</p>
+      <p className='text-[12px] text-ink-3 text-center max-w-[340px] m-0'>
         {COPY.legal.consentPrefix}
         <Link href={COPY.legal.termsHref} className='underline'>
           {COPY.legal.terms}
@@ -81,7 +77,6 @@ function GoogleCta({
   );
 }
 
-/** One pane of the before/after SRT sample — dark terminal style. */
 function SrtPane({
   label,
   accent,
@@ -98,7 +93,7 @@ function SrtPane({
       </div>
       <div className='srt-terminal'>
         {c.proof.blocks.map((b, i) => (
-          <div key={b.no} className={i > 0 ? 'mt-4' : ''}>
+          <div key={b.no} className={i > 0 ? 'mt-5' : ''}>
             <div className='srt-terminal-no'>{b.no}</div>
             <div className='srt-terminal-tc'>{b.tc}</div>
             <div className='srt-terminal-text'>{text(b)}</div>
@@ -109,155 +104,166 @@ function SrtPane({
   );
 }
 
+function ChapterTitle({
+  id,
+  eyebrow,
+  title,
+  badge,
+}: {
+  id: string;
+  eyebrow?: string;
+  title: string;
+  badge?: string;
+}) {
+  return (
+    <div className='landing-chapter-head'>
+      {eyebrow && (
+        <p className='landing-eyebrow'>
+          {eyebrow}
+          {badge && (
+            <span className='dbadge dbadge-inline ml-2'>
+              <b />
+              {badge}
+            </span>
+          )}
+        </p>
+      )}
+      <h2 id={id} className='landing-title'>
+        {title}
+      </h2>
+    </div>
+  );
+}
+
 interface LandingPageProps {
   onSignIn: () => Promise<void>;
-  /** Server-side auth misconfiguration, or a failed OAuth round-trip. */
   error?: string;
   configured: boolean;
 }
 
 /**
- * What an anonymous visitor sees. Every model route is login-gated, so this
- * page's whole job is to give people a reason to press the sign-in button —
- * with static content only (zero API cost).
- *
- * Structure: Hero → SRT proof → 4 differentiators → 3-step how-to →
- *            product specs → closing CTA.
- * Accessibility: single h1, section landmarks with aria-labelledby,
- *                keyboard focus-visible, prefers-reduced-motion in globals.css.
- * Motion: hero appears immediately; below-the-fold blocks use scroll reveal.
+ * Marketing landing for anonymous visitors — Toss-like full-bleed chapters:
+ * one idea per section, large type, generous whitespace. Auth CTA only;
+ * zero API cost. Signed-in wizard stays on the tighter content column.
  */
 export function LandingPage({ onSignIn, error, configured }: LandingPageProps) {
   return (
-    <div>
+    <div className='landing'>
       {(error || !configured) && (
-        <div
-          className='card p-4 mb-3.5 text-sm'
-          style={{ color: 'oklch(0.55 0.2 25)' }}
-        >
-          {configured ? error : COPY.auth.notConfigured}
+        <div className='landing-inner pt-4'>
+          <div
+            className='card p-4 text-sm'
+            style={{ color: 'oklch(0.55 0.2 25)' }}
+          >
+            {configured ? error : COPY.auth.notConfigured}
+          </div>
         </div>
       )}
 
-      {/* ── Hero — always visible on first paint ──────────────────── */}
+      {/* ── Hero ──────────────────────────────────────────────────── */}
       <section
         aria-labelledby='hero-title'
-        className='text-center pt-8 pb-2 animate-fade-slide-up'
+        className='landing-hero animate-fade-slide-up'
       >
-        <div className='mb-7'>
-          <h1
-            id='hero-title'
-            className='text-3xl sm:text-4xl font-extrabold tracking-[-0.04em] text-ink mb-3 leading-tight text-balance'
-          >
+        <div className='landing-inner text-center'>
+          <h1 id='hero-title' className='landing-hero-title'>
             {c.hero.title}
           </h1>
-          <p className='text-[15px] sm:text-base text-ink-2 m-0 leading-relaxed max-w-130 mx-auto text-pretty'>
-            {c.hero.subtitle}
-          </p>
-        </div>
-        <GoogleCta onSignIn={onSignIn} configured={configured} />
-        <div className='reassure mt-5'>
-          {c.reassure.map((item, i) => (
-            <span key={item} className='flex items-center gap-2'>
-              {i > 0 && <span className='dot-sep' />}
-              {item}
-            </span>
-          ))}
+          <p className='landing-hero-sub'>{c.hero.subtitle}</p>
+          <div className='mt-10'>
+            <GoogleCta onSignIn={onSignIn} configured={configured} />
+          </div>
+          <ul className='landing-reassure'>
+            {c.reassure.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
         </div>
       </section>
 
-      {/* ── Before / After SRT ────────────────────────────────────── */}
-      <section aria-labelledby='proof-title' className='mt-24 sm:mt-32'>
-        <Reveal>
-          <div className='head text-center mb-6'>
-            <h2 id='proof-title'>{c.proof.title}</h2>
-            <p>{c.proof.subtitle}</p>
+      {/* ── Proof / SRT ───────────────────────────────────────────── */}
+      <section
+        aria-labelledby='proof-title'
+        className='landing-band landing-band-soft'
+      >
+        <Reveal className='landing-inner'>
+          <ChapterTitle
+            id='proof-title'
+            eyebrow={c.proof.eyebrow}
+            title={c.proof.title}
+          />
+          <p className='landing-body'>{c.proof.subtitle}</p>
+          <div className='landing-proof-grid'>
+            <SrtPane label={c.proof.srcLabel} text={(b) => b.src} />
+            <SrtPane label={c.proof.dstLabel} accent text={(b) => b.dst} />
           </div>
-          <div className='card p-5'>
-            <div className='grid gap-5 lg:grid-cols-2'>
-              <SrtPane label={c.proof.srcLabel} text={(b) => b.src} />
-              <SrtPane label={c.proof.dstLabel} accent text={(b) => b.dst} />
-            </div>
-            <p className='text-[12.5px] text-ink-3 leading-relaxed mt-4 mb-0'>
-              {c.proof.note}
-            </p>
-          </div>
+          <p className='landing-note'>{c.proof.note}</p>
         </Reveal>
       </section>
 
-      {/* ── Differentiating features ──────────────────────────────── */}
-      <section aria-labelledby='features-title' className='mt-24 sm:mt-32'>
-        <Reveal>
-          <div className='head text-center mb-6'>
-            <h2 id='features-title'>{c.features.title}</h2>
-          </div>
-        </Reveal>
-        <div className='grid gap-3 lg:grid-cols-2'>
-          {c.features.items.map((f, i) => (
-            <Reveal key={f.title} delayMs={i * 70}>
-              <div className='card p-5 h-full'>
-                <div className='flex items-center gap-2 flex-wrap mb-2'>
-                  <span className='text-[15px] font-bold text-ink'>
-                    {f.title}
-                  </span>
-                  {'badge' in f && (
-                    <span className='dbadge dbadge-inline'>
-                      <b />
-                      {(f as { badge: string }).badge}
-                    </span>
-                  )}
-                </div>
-                <p className='text-[13.5px] text-ink-2 leading-relaxed m-0'>
-                  {f.body}
-                </p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </section>
+      {/* ── Feature chapters (one idea each) ──────────────────────── */}
+      {c.features.items.map((f, i) => (
+        <section
+          key={f.eyebrow}
+          aria-labelledby={`feature-${i}-title`}
+          className={
+            i % 2 === 1
+              ? 'landing-band landing-band-soft'
+              : 'landing-band'
+          }
+        >
+          <Reveal className='landing-inner landing-inner-narrow'>
+            <ChapterTitle
+              id={`feature-${i}-title`}
+              eyebrow={f.eyebrow}
+              title={f.title}
+              badge={'badge' in f ? (f as { badge: string }).badge : undefined}
+            />
+            <p className='landing-body'>{f.body}</p>
+          </Reveal>
+        </section>
+      ))}
 
       {/* ── How it works ──────────────────────────────────────────── */}
-      <section aria-labelledby='steps-title' className='mt-24 sm:mt-32'>
-        <Reveal>
-          <div className='head text-center mb-6'>
-            <h2 id='steps-title'>{c.how.title}</h2>
-          </div>
-        </Reveal>
-        <div className='grid gap-3 lg:grid-cols-3'>
-          {c.how.steps.map((s, i) => (
-            <Reveal key={s.title} delayMs={i * 80}>
-              <div className='card p-5 text-center h-full'>
-                <div className='step mx-auto mb-3 w-fit'>
-                  <span className='dot'>{i + 1}</span>
+      <section
+        aria-labelledby='steps-title'
+        className='landing-band landing-band-soft'
+      >
+        <Reveal className='landing-inner'>
+          <ChapterTitle
+            id='steps-title'
+            eyebrow={c.how.eyebrow}
+            title={c.how.title}
+          />
+          <ol className='landing-steps'>
+            {c.how.steps.map((s, i) => (
+              <li key={s.title} className='landing-step'>
+                <span className='landing-step-num' aria-hidden='true'>
+                  {i + 1}
+                </span>
+                <div>
+                  <div className='landing-step-title'>{s.title}</div>
+                  <p className='landing-step-body'>{s.body}</p>
                 </div>
-                <div className='text-[15px] font-bold text-ink'>{s.title}</div>
-                <p className='text-[13.5px] text-ink-2 mt-1 m-0'>{s.body}</p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
+              </li>
+            ))}
+          </ol>
+        </Reveal>
       </section>
 
-      {/* ── Product specs ─────────────────────────────────────────── */}
-      <section aria-labelledby='specs-title' className='mt-24 sm:mt-32'>
-        <Reveal>
-          <div className='head text-center mb-6'>
-            <h2 id='specs-title'>{c.specs.title}</h2>
-          </div>
-          <dl className='card overflow-hidden'>
-            {c.specs.items.map((spec, i) => (
-              <div
-                key={spec.label}
-                className={`flex items-baseline gap-4 px-5 py-3.5 flex-wrap${
-                  i < c.specs.items.length - 1 ? ' border-b border-border' : ''
-                }`}
-              >
-                <dt className='text-[13px] font-semibold text-ink-3 w-24 flex-none'>
-                  {spec.label}
-                </dt>
-                <dd className='text-[13.5px] text-ink m-0 leading-snug flex-1'>
-                  {spec.value}
-                </dd>
+      {/* ── Specs ─────────────────────────────────────────────────── */}
+      <section aria-labelledby='specs-title' className='landing-band'>
+        <Reveal className='landing-inner'>
+          <ChapterTitle
+            id='specs-title'
+            eyebrow={c.specs.eyebrow}
+            title={c.specs.title}
+          />
+          <dl className='landing-specs'>
+            {c.specs.items.map((spec) => (
+              <div key={spec.label} className='landing-spec'>
+                <dt>{spec.label}</dt>
+                <dd>{spec.value}</dd>
               </div>
             ))}
           </dl>
@@ -265,30 +271,33 @@ export function LandingPage({ onSignIn, error, configured }: LandingPageProps) {
       </section>
 
       {/* ── Closing CTA ───────────────────────────────────────────── */}
-      <section aria-labelledby='closing-title' className='mt-24 sm:mt-32'>
-        <Reveal>
-          <div className='card p-8 text-center'>
-            <div className='head mb-5'>
-              <h2 id='closing-title'>{c.closing.title}</h2>
-              <p className='max-w-120 mx-auto'>{c.closing.body}</p>
-            </div>
+      <section
+        aria-labelledby='closing-title'
+        className='landing-band landing-band-accent'
+      >
+        <Reveal className='landing-inner text-center'>
+          <h2 id='closing-title' className='landing-title landing-title-center'>
+            {c.closing.title}
+          </h2>
+          <p className='landing-body landing-body-center'>{c.closing.body}</p>
+          <div className='mt-10'>
             <GoogleCta onSignIn={onSignIn} configured={configured} />
-            <p className='text-[12px] text-ink-3 mt-4 m-0'>
-              {COPY.auth.gateNote}
-            </p>
           </div>
+          <p className='text-[13px] text-ink-3 mt-5 m-0'>
+            {COPY.auth.gateNote}
+          </p>
         </Reveal>
       </section>
 
-      <footer className='mt-24 sm:mt-32 pt-6 border-t border-border text-[12.5px] text-ink-3'>
-        <Reveal>
-          <div className='flex items-center justify-center gap-2.5 flex-wrap'>
+      <footer className='landing-footer'>
+        <div className='landing-inner'>
+          <div className='flex items-center justify-center gap-2.5 flex-wrap text-[13px] text-ink-3'>
             <BrandMark size={16} wordmarkSize={0} />
             <span className='font-bold text-ink-2'>{COPY.brand}</span>
             <span className='dot-sep' />
             <span>{c.footerNote}</span>
           </div>
-          <div className='flex items-center justify-center gap-2.5 mt-2'>
+          <div className='flex items-center justify-center gap-2.5 mt-3 text-[13px] text-ink-3'>
             <Link href={COPY.legal.termsHref} className='underline'>
               {COPY.legal.terms}
             </Link>
@@ -297,7 +306,7 @@ export function LandingPage({ onSignIn, error, configured }: LandingPageProps) {
               {COPY.legal.privacy}
             </Link>
           </div>
-        </Reveal>
+        </div>
       </footer>
     </div>
   );

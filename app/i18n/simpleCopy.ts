@@ -26,7 +26,7 @@ export const COPY = {
   // Secondary: work-context enrichment and opt-in cast-sheet consistency.
   landing: {
     hero: {
-      title: '번역해도, 뒤 자막이 밀리지 않도록.',
+      title: '번역해도,\n뒤 자막이 밀리지 않도록.',
       subtitle: 'AI는 대사만 번역하고, 코드가 타임코드를 복원합니다.',
       cta: 'Google로 무료 시작하기',
       // 베타 한시적: 3편. 정식 오픈 시 1편으로 되돌릴 것 (docs/decisions.md 2026-07-27).
@@ -34,13 +34,14 @@ export const COPY = {
     },
     // Landing-specific reassurance row — separate from upload.reassure so
     // the two pages can evolve independently.
-    reassure: ['SRT 전용', '설치 없이 바로', '로그인만으로 시작'] as readonly string[],
+    reassure: ['SRT·VTT·SMI·ASS', '설치 없이 바로', '로그인만으로 시작'] as readonly string[],
     proof: {
-      title: '결과물로 먼저 보여드릴게요',
+      eyebrow: '결과물',
+      title: '타임코드는 그대로,\n대사는 자연스럽게.',
       subtitle:
-        '자체 제작 예문이에요. 형사물에서 선배와 신입이 나누는 대화로, 타임코드와 말투를 눈으로 확인하세요.',
-      srcLabel: '원본 SRT',
-      dstLabel: 'ZAMAK 번역',
+        '형사물 예문이에요. 선배와 신입의 말투, 그리고 번호·타임코드가 어떻게 유지되는지 눈으로 확인하세요.',
+      srcLabel: '원본',
+      dstLabel: 'ZAMAK',
       blocks: [
         {
           no: '24',
@@ -61,65 +62,66 @@ export const COPY = {
           dst: '잘 판단했어. 당분간 우리끼리만 알고 있자.',
         },
       ],
-      // Timecode numbers are identical across both panes — point that out.
       note: '타임코드는 코드가 원본에서 복원합니다. AI가 줄을 합치거나 빠뜨려도 이후 자막이 밀리는 건 구조적으로 막혀 있어요.',
     },
+    // Each item is its own full-bleed chapter (Toss-style), not a card grid.
     features: {
-      title: '다른 번역기와 다른 점',
       items: [
         {
-          title: '타임코드는 코드가 복원해요',
-          body: 'AI에는 대사만 보내고, 타임코드는 코드가 원본과 재결합합니다. AI가 자막을 합쳐도 그 뒤 타임코드가 밀리지 않아요.',
+          eyebrow: '타임코드',
+          title: 'AI가 줄을 합쳐도,\n뒤 자막은 밀리지 않아요.',
+          body: 'AI에는 대사만 보내고, 타임코드는 코드가 원본과 재결합합니다. 그래서 번역 뒤에도 싱크가 연쇄로 흐트러지지 않아요.',
         },
         {
-          title: '작품 맥락을 검색해요',
-          body: 'TMDB와 Google 검색을 바탕으로 장르·배경·톤을 보강해요. 번역 문체가 작품 분위기에 맞도록 도와줍니다.',
+          eyebrow: '작품 맥락',
+          title: '장르와 톤까지\n읽어서 번역해요.',
+          body: 'TMDB와 Google 검색으로 장르·배경·톤을 보강해요. 같은 문장이라도 작품 분위기에 맞게 나와요.',
         },
         {
-          title: '말투·용어 일관성을 잡아요',
+          eyebrow: '말투 · 용어',
+          title: '인물 말투와 고유명사,\n필요할 때만 켜요.',
           badge: 'opt-in',
-          body: '켜면 파일 전체를 스캔해 인물 간 존댓말/반말 관계와 고유명사 표기를 청크마다 통일합니다.',
+          body: '켜면 파일 전체를 스캔해 존댓말/반말 관계와 고유명사 표기를 청크마다 통일합니다. 기본은 꺼져 있어요.',
         },
         {
-          title: '빠진 줄은 자동으로 다시 번역해요',
-          body: '번역이 어긋난 줄만 따로 모아 한 번 더 요청합니다. 끝내 안 되는 줄은 원문을 남겨, 어떤 경우에도 재생 가능한 완전한 SRT를 돌려줍니다.',
+          eyebrow: '안정성',
+          title: '빠진 줄은 다시 번역하고,\n안 되면 원문을 남기요.',
+          body: '어긋난 줄만 모아 한 번 더 요청합니다. 끝내 안 되는 줄은 원문 그대로 두어, 항상 재생 가능한 완전한 자막 파일을 돌려줍니다.',
         },
       ],
     },
     specs: {
-      title: '제품 사양',
+      eyebrow: '한눈에',
+      title: '필요한 것만\n깔끔하게.',
       items: [
-        { label: '지원 형식', value: 'SRT' },
-        { label: '번역 모델', value: '빠른번역 (Flash) · 고급번역 (Pro)' },
+        { label: '지원 형식', value: 'SRT · VTT · SMI · ASS' },
+        { label: '출력', value: 'SRT' },
+        { label: '번역 모델', value: 'Flash · Pro' },
         {
           label: '도착어',
           value: '한국어 · 영어 · 일본어 · 스페인어 · 프랑스어 · 중국어 · 독일어',
         },
-        {
-          label: '타임코드',
-          value: '코드가 재결합 — 후속 자막의 연쇄 밀림 방지',
-        },
-        { label: '실패 처리', value: '빠진 줄 자동 재번역 · 남으면 원문 보존' },
       ],
     },
     how: {
-      title: '쓰는 법은 세 단계예요',
+      eyebrow: '이용 방법',
+      title: '올리면,\n확인하고,\n받아요.',
       steps: [
-        { title: 'SRT 업로드', body: '.srt 파일을 끌어다 놓아요.' },
+        { title: '업로드', body: '.srt · .vtt · .smi · .ass 파일을 올려요.' },
         {
-          title: '작품 정보 확인',
-          body: 'AI가 찾은 제목·장르·감독을 확인하고 번역을 시작해요.',
+          title: '확인',
+          body: '작품 정보를 확인하고 번역을 시작해요.',
         },
         {
-          title: '번역 자막 다운로드',
-          body: '번역이 끝나면 선택한 언어의 .srt 파일을 받아요.',
+          title: '다운로드',
+          body: '번역된 .srt 파일을 받아요.',
         },
       ],
     },
     closing: {
       // 베타 한시적: 3편. 정식 오픈 시 1편으로 되돌릴 것 (docs/decisions.md 2026-07-27).
-      title: '첫 3편은 무료예요',
-      body: '로그인하면 번역권 3편을 바로 드려요 — 영화 세 편이 통째로 들어가는 분량이에요. 사람에게 맡기면 편당 15만 원. 먼저 결과물로 판단하세요.',
+      title: '첫 3편은\n무료예요.',
+      body: '로그인하면 번역권 3편을 바로 드려요. 사람에게 맡기면 편당 15만 원. 먼저 결과물로 판단하세요.',
     },
     footerNote: '자막 번역 도구',
   },
@@ -173,7 +175,7 @@ export const COPY = {
     dropTitle: '파일을 여기에 끌어다 놓으세요',
     dropOr: '또는',
     browse: '파일 선택',
-    formats: 'SRT 파일만 지원',
+    formats: 'SRT · VTT · SMI · ASS 지원 · 결과는 .srt',
     langLabel: '어떤 언어로 바꿔드릴까요?',
     langDetect: '언어 감지',
     comingSoon: '곧 지원',
@@ -182,7 +184,7 @@ export const COPY = {
     typeOther: '기타 영상',
     typeOtherHint: '유튜브 · 인터뷰 · 강연 등',
     reassure: ['빠른 번역 · 고급 번역', '후속 자막 밀림 방지', '설치 없이 바로'],
-    invalidFile: 'SRT 파일만 올릴 수 있어요.',
+    invalidFile: 'SRT, VTT, SMI, ASS 파일만 올릴 수 있어요.',
     // 업로드가 저작권 리스크가 실제로 발생하는 시점이라, 동의 모달 대신 여기에
     // 상시 노출한다. 모달은 "30초면 번역돼요"라는 제품 약속과 정면으로 충돌한다.
     rightsNotice: '권리가 있는 자막만 올려주세요.',
@@ -285,7 +287,7 @@ export const COPY = {
   translateErrors: {
     serverError: (status: number) => `서버에 문제가 생겼어요. (오류 ${status})`,
     noResponse: '번역 결과를 받지 못했어요. 다시 시도해주세요.',
-    emptyFile: '자막 블록을 찾지 못했어요. 올바른 SRT 파일인지 확인해주세요.',
+    emptyFile: '자막 블록을 찾지 못했어요. 올바른 자막 파일인지 확인해주세요.',
     generalError: '번역 중 문제가 생겼어요. 다시 시도해주세요.',
   },
 

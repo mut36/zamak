@@ -24,7 +24,7 @@ import { COPY } from './i18n/simpleCopy';
 
 const EMPTY_MOVIE_INFO: MovieInfo = { title: '', year: '', notes: '' };
 // Keep in sync with package.json version.
-const APP_VERSION = '0.11.0';
+const APP_VERSION = '0.14.0';
 
 function isSrt(file: File): boolean {
   return file.name.toLowerCase().endsWith('.srt');
@@ -333,10 +333,15 @@ export default function Home() {
   }
 
   if (!user) {
+    // Landing is full-bleed (Toss-like chapters). The signed-in wizard keeps
+    // the tighter 600/840 content column below.
     return (
       <div className='min-h-screen'>
-        {header}
-        <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
+        <header className='flex items-center justify-between w-full max-w-[1100px] mx-auto px-6 h-16'>
+          <BrandMark onClick={resetAll} />
+          <span className='lang-pill'>{COPY.langPill}</span>
+        </header>
+        <main className='w-full'>
           <LandingPage
             onSignIn={signIn}
             error={authError}
