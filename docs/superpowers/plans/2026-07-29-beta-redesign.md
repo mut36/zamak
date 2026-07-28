@@ -43,7 +43,8 @@
 | `app/api/consent/route.ts` | GET/POST — 저작권 동의 조회·기록 |
 | `app/lib/client/feedback.ts` | 피드백 POST 클라이언트 헬퍼 |
 | `app/lib/client/waitlist.ts` | 대기자 POST 헬퍼 |
-| `app/lib/client/history.ts` | 기록 조회 + 결과물 업로드 헬퍼 |
+| `app/lib/jobHistory.ts` | 번역 기록 공용 타입 + 만료 판정 (서버·클라 공용) |
+| `app/lib/client/history.ts` | 기록 조회 + 결과물 업로드 fetch 헬퍼 |
 | `app/lib/client/consent.ts` | 동의 조회·기록 헬퍼 |
 | `app/hooks/useWizard.ts` | 위저드 상태 머신 (화면 전이, 파일·작품·설정 상태) |
 | `app/lib/progressStages.ts` | 진행 화면 4스테이지 파생 계산 (순수 함수) |
@@ -1253,29 +1254,32 @@ EOF
 - Create: `supabase/migrations/0007_job_results.sql`
 - Create: `app/api/translation/result/route.ts`
 - Create: `app/api/translation/history/route.ts`
-- Create: `app/lib/client/history.ts`
-- Create: `app/lib/client/history.test.ts`
+- Create: `app/lib/jobHistory.ts` — **공용** 타입 + 만료 판정 (서버 라우트와 클라이언트가 함께 쓴다)
+- Create: `app/lib/jobHistory.test.ts`
+- Create: `app/lib/client/history.ts` — fetch 헬퍼만 (클라이언트 전용)
 - Modify: `app/hooks/useTranslation.ts` (완료 후 업로드 + `jobId` 노출)
+
+**레이어 주의:** `isExpired`와 타입들은 `app/lib/jobHistory.ts`(공용)에 둔다. 만료 판정은 서버 라우트가 signed URL을 발급할지 결정할 때도 쓰고 화면이 버튼을 잠글 때도 쓰므로 한쪽에만 두면 로직이 갈라진다. `app/lib/`의 루트는 이 리포의 공용 레이어다(`srt.ts`, `translationErrors.ts`, `brand.ts`가 같은 자리). **서버 라우트가 `app/lib/client/`에서 import하게 만들지 않는다.**
 
 **Interfaces:**
 - Consumes: `requireUser`, `RESULT_RETENTION_DAYS` (from `app/config/constants.ts`)
 - Produces:
   - `POST /api/translation/result` body `{ jobId: string, filename: string, content: string, options: JobOptions }` → `{ ok: true }`
   - `GET /api/translation/history` → `{ items: HistoryItem[] }`
-  - `export interface JobOptions { glossary: boolean }`
-  - `export interface HistoryItem { jobId: string; filename: string; model: string | null; totalBlocks: number; createdAt: string; options: JobOptions | null; expired: boolean; downloadUrl: string | null }`
-  - `export function isExpired(createdAt: string, now: Date, retentionDays: number): boolean`
-  - `export async function saveResult(jobId, filename, content, options): Promise<boolean>`
-  - `export async function fetchHistory(): Promise<HistoryItem[]>`
+  - from `app/lib/jobHistory.ts` (공용): `export interface JobOptions { glossary: boolean }`
+  - from `app/lib/jobHistory.ts`: `export interface HistoryItem { jobId: string; filename: string; model: string | null; totalBlocks: number; createdAt: string; options: JobOptions | null; expired: boolean; downloadUrl: string | null }`
+  - from `app/lib/jobHistory.ts`: `export function isExpired(createdAt: string, now: Date, retentionDays?: number): boolean`
+  - from `app/lib/client/history.ts`: `export async function saveResult(jobId, filename, content, options): Promise<boolean>`
+  - from `app/lib/client/history.ts`: `export async function fetchHistory(): Promise<HistoryItem[]>`
   - `useTranslation()` 반환에 `jobId: string | null` 추가
 
 - [ ] **Step 1: 만료 판정 테스트를 먼저 쓴다**
 
-Create `app/lib/client/history.test.ts`:
+Create `app/lib/jobHistory.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest';
-import { isExpired } from './history';
+import { isExpired } from './jobHistory';
 
 describe('isExpired', () => {
   const created = '2026-07-01T00:00:00.000Z';
@@ -1305,17 +1309,17 @@ describe('isExpired', () => {
 - [ ] **Step 2: 실패 확인**
 
 ```bash
-npx vitest run app/lib/client/history.test.ts
+npx vitest run app/lib/jobHistory.test.ts
 ```
 
-Expected: FAIL — `./history` 모듈이 없다.
+Expected: FAIL — `./jobHistory` 모듈이 없다.
 
-- [ ] **Step 3: history 클라이언트 모듈 구현**
+- [ ] **Step 3: 공용 모듈 + 클라이언트 헬퍼 구현**
 
-Create `app/lib/client/history.ts`:
+먼저 공용 모듈. Create `app/lib/jobHistory.ts`:
 
 ```typescript
-import { RESULT_RETENTION_DAYS } from '../../config/constants';
+import { RESULT_RETENTION_DAYS } from '../config/constants';
 
 /** What was switched on for a run. Recorded so the history line can say
  *  "· 용어집" — the one option that changes both the price in time and the
@@ -1359,6 +1363,13 @@ export function isExpired(
   return now.getTime() - created > retentionDays * DAY_MS;
 }
 
+```
+
+그리고 클라이언트 전용 fetch 헬퍼. Create `app/lib/client/history.ts`:
+
+```typescript
+import type { HistoryItem, JobOptions } from '../jobHistory';
+
 /**
  * Stores the finished translation so it can be downloaded again later.
  *
@@ -1394,7 +1405,7 @@ export async function fetchHistory(): Promise<HistoryItem[]> {
 - [ ] **Step 4: 통과 확인**
 
 ```bash
-npx vitest run app/lib/client/history.test.ts
+npx vitest run app/lib/jobHistory.test.ts
 ```
 
 Expected: PASS (4개)
@@ -1595,7 +1606,7 @@ Create `app/api/translation/history/route.ts`:
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../lib/supabase/server';
 import { requireUser } from '../../../lib/server/auth';
-import { isExpired, type JobOptions } from '../../../lib/client/history';
+import { isExpired, type JobOptions } from '../../../lib/jobHistory';
 
 /** Signed URLs are minted per request and expire quickly — the link is for the
  *  click that follows, not something to keep. */
@@ -1697,7 +1708,7 @@ Supabase 대시보드에서 **비공개** Storage 버킷 `results` 생성 + `000
 - [ ] **Step 11: 커밋**
 
 ```bash
-git add supabase/migrations/0007_job_results.sql app/api/translation/result/route.ts app/api/translation/history/route.ts app/lib/client/history.ts app/lib/client/history.test.ts app/hooks/useTranslation.ts
+git add supabase/migrations/0007_job_results.sql app/api/translation/result/route.ts app/api/translation/history/route.ts app/lib/jobHistory.ts app/lib/jobHistory.test.ts app/lib/client/history.ts app/hooks/useTranslation.ts
 git commit -m "$(cat <<'EOF'
 번역 결과물을 보관하고 기록에서 다시 받게 한다.
 
