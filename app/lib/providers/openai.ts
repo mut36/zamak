@@ -1,13 +1,17 @@
 import 'server-only';
 
 /**
- * Experimentation-only provider — see claude.ts's header for why this isn't
- * wired into registry.ts/ALLOWED_MODELS. Configure by dropping OPENAI_API_KEY
- * into .env.local — nothing else to wire.
+ * OpenAI Structured Outputs helper. Production glossary extraction
+ * (`extractCastSheet`, default provider) and the A/B harness
+ * (`scripts/glossary-ab.mts`) both call this. Translation itself stays
+ * Gemini-only — this module is intentionally not in registry.ts /
+ * ALLOWED_MODELS (see claude.ts's header for the same rationale).
  *
- * No hardcoded default model: OpenAI's naming turns over fast enough that a
- * guessed default risks silently pointing at a retired model. Set
- * OPENAI_MODEL explicitly before using this provider.
+ * `openaiGenerateJson` throws when OPENAI_API_KEY is missing; production
+ * callers must soft-fail to an empty cast sheet instead of letting that
+ * escape (docs/decisions.md §2-9). `OPENAI_MODEL` has no default — set it
+ * explicitly when the harness picks a model; production glossary uses
+ * `GLOSSARY_MODEL` instead.
  */
 
 import type { StructuredJsonRequest, StructuredJsonResult } from './claude';

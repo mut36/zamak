@@ -268,13 +268,25 @@ export function thinkingLevelForModel(model: string): ThinkingLevelName {
 
 /**
  * Cast-sheet extraction (glossary + speech-relation prepass, opt-in toggle in
- * InfoStep). One call per file, so cost/latency here is negligible next to
- * per-chunk translation calls — flash (not flash-lite) for the long-context +
- * relational reasoning the task needs, MEDIUM thinking since it isn't paid
- * per chunk. Overridable via env for tuning without a redeploy.
+ * InfoStep). Default provider is OpenAI GPT-5.6-luna (`decisions.md` §2-14) —
+ * relation-reasoning quality beat Gemini flash-lite on clear dialogue evidence,
+ * not merely cost. One call per file; still material — ~₩130 was measured on a
+ * 1,100-block file under the previous Gemini flash + MEDIUM setup.
+ *
+ * `GLOSSARY_PROVIDER=openai|gemini` (default openai). Rollback without a
+ * redeploy: set provider to gemini and `GLOSSARY_MODEL` to a Gemini model id.
+ * `GLOSSARY_THINKING_LEVEL` applies only to the Gemini path (OpenAI ignores it).
  */
+export type GlossaryProvider = 'openai' | 'gemini';
+export const GLOSSARY_PROVIDER: GlossaryProvider =
+  process.env.GLOSSARY_PROVIDER === 'gemini' ? 'gemini' : 'openai';
+/** Read once at module load — set GLOSSARY_PROVIDER / GLOSSARY_MODEL before
+ *  importing this module if a harness needs a non-default combo (see
+ *  scripts/glossary-ab.mts). */
 export const GLOSSARY_MODEL =
-  process.env.GLOSSARY_MODEL || FLASH_MODEL;
+  process.env.GLOSSARY_MODEL ||
+  (GLOSSARY_PROVIDER === 'gemini' ? FLASH_MODEL : 'gpt-5.6-luna');
+/** Gemini path only — unused when `GLOSSARY_PROVIDER=openai`. */
 export const GLOSSARY_THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
   'GLOSSARY_THINKING_LEVEL',
   'MEDIUM',

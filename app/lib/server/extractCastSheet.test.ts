@@ -4,10 +4,12 @@ vi.mock('server-only', () => ({}));
 
 const mocks = vi.hoisted(() => {
   const generateContent = vi.fn();
+  const openaiGenerateJson = vi.fn();
   const searchCandidates = vi.fn();
   const lookupById = vi.fn();
   return {
     generateContent,
+    openaiGenerateJson,
     searchCandidates,
     lookupById,
     GoogleGenAI: vi.fn().mockImplementation(function GoogleGenAI(this: {
@@ -28,6 +30,11 @@ vi.mock('@google/genai', async () => {
   };
 });
 
+vi.mock('../providers/openai', () => ({
+  isOpenAiConfigured: () => Boolean(process.env.OPENAI_API_KEY),
+  openaiGenerateJson: mocks.openaiGenerateJson,
+}));
+
 vi.mock('./tmdb', async () => {
   const actual = await vi.importActual<typeof import('./tmdb')>('./tmdb');
   return {
@@ -39,7 +46,9 @@ vi.mock('./tmdb', async () => {
 
 import { extractCastSheet } from './extractCastSheet';
 
-const originalApiKey = process.env.GOOGLE_GENAI_API_KEY;
+const originalGeminiKey = process.env.GOOGLE_GENAI_API_KEY;
+const originalOpenAiKey = process.env.OPENAI_API_KEY;
+const originalProvider = process.env.GLOSSARY_PROVIDER;
 
 const movieInfo = { title: 'Test Movie', year: '2020' };
 
@@ -52,18 +61,42 @@ const SUBTITLE = [
   '2\n00:00:03,000 --> 00:00:04,000\nYes, Elizabeth.',
 ].join('\n\n');
 
-describe('extractCastSheet', () => {
+const VALID_SHEET = {
+  terms: [
+    { source: 'Jonathan', target: '조너선', kind: 'person', note: '주인공' },
+    { source: 'Elizabeth', target: '엘리자베스', kind: 'person' },
+  ],
+  relations: [
+    {
+      from: '조너선',
+      to: '엘리자베스',
+      speech: 'formal',
+      basis: '초면',
+      fromBlock: 1,
+      toBlock: 2,
+    },
+  ],
+};
+
+describe('extractCastSheet (gemini provider)', () => {
   beforeEach(() => {
+    process.env.GLOSSARY_PROVIDER = 'gemini';
     process.env.GOOGLE_GENAI_API_KEY = 'test-key';
+    delete process.env.OPENAI_API_KEY;
     mocks.generateContent.mockReset();
+    mocks.openaiGenerateJson.mockReset();
     mocks.searchCandidates.mockReset();
     mocks.lookupById.mockReset();
     mocks.searchCandidates.mockResolvedValue([]);
   });
 
   afterEach(() => {
-    if (originalApiKey === undefined) delete process.env.GOOGLE_GENAI_API_KEY;
-    else process.env.GOOGLE_GENAI_API_KEY = originalApiKey;
+    if (originalGeminiKey === undefined) delete process.env.GOOGLE_GENAI_API_KEY;
+    else process.env.GOOGLE_GENAI_API_KEY = originalGeminiKey;
+    if (originalOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalOpenAiKey;
+    if (originalProvider === undefined) delete process.env.GLOSSARY_PROVIDER;
+    else process.env.GLOSSARY_PROVIDER = originalProvider;
   });
 
   it('returns an empty sheet without calling the model when no API key is configured', async () => {
@@ -80,24 +113,7 @@ describe('extractCastSheet', () => {
   });
 
   it('passes through valid terms and relations', async () => {
-    mocks.generateContent.mockResolvedValue(
-      jsonResponse({
-        terms: [
-          { source: 'Jonathan', target: '조너선', kind: 'person', note: '주인공' },
-          { source: 'Elizabeth', target: '엘리자베스', kind: 'person' },
-        ],
-        relations: [
-          {
-            from: '조너선',
-            to: '엘리자베스',
-            speech: 'formal',
-            basis: '초면',
-            fromBlock: 1,
-            toBlock: 2,
-          },
-        ],
-      }),
-    );
+    mocks.generateContent.mockResolvedValue(jsonResponse(VALID_SHEET));
 
     const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
 
@@ -261,5 +277,79 @@ describe('extractCastSheet', () => {
     mocks.generateContent.mockRejectedValue(new Error('quota exceeded'));
     const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
     expect(result).toEqual({ terms: [], relations: [] });
+  });
+});
+
+describe('extractCastSheet (openai provider)', () => {
+  beforeEach(() => {
+    process.env.GLOSSARY_PROVIDER = 'openai';
+    process.env.OPENAI_API_KEY = 'test-openai-key';
+    delete process.env.GOOGLE_GENAI_API_KEY;
+    mocks.generateContent.mockReset();
+    mocks.openaiGenerateJson.mockReset();
+    mocks.searchCandidates.mockReset();
+    mocks.lookupById.mockReset();
+    mocks.searchCandidates.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    if (originalGeminiKey === undefined) delete process.env.GOOGLE_GENAI_API_KEY;
+    else process.env.GOOGLE_GENAI_API_KEY = originalGeminiKey;
+    if (originalOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalOpenAiKey;
+    if (originalProvider === undefined) delete process.env.GLOSSARY_PROVIDER;
+    else process.env.GLOSSARY_PROVIDER = originalProvider;
+  });
+
+  it('returns an empty sheet with a warn when OPENAI_API_KEY is missing', async () => {
+    delete process.env.OPENAI_API_KEY;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
+
+    expect(result).toEqual({ terms: [], relations: [] });
+    expect(mocks.openaiGenerateJson).not.toHaveBeenCalled();
+    expect(mocks.generateContent).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('OPENAI_API_KEY not configured'),
+    );
+    warn.mockRestore();
+  });
+
+  it('passes through valid terms and relations via openaiGenerateJson', async () => {
+    mocks.openaiGenerateJson.mockResolvedValue({
+      json: VALID_SHEET,
+      usage: { inputTokens: 100, outputTokens: 50 },
+    });
+
+    const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
+
+    expect(mocks.openaiGenerateJson).toHaveBeenCalledOnce();
+    expect(mocks.generateContent).not.toHaveBeenCalled();
+    expect(result.terms).toHaveLength(2);
+    expect(result.relations).toHaveLength(1);
+  });
+
+  it('returns an empty sheet when openaiGenerateJson throws', async () => {
+    mocks.openaiGenerateJson.mockRejectedValue(new Error('rate limited'));
+    const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
+    expect(result).toEqual({ terms: [], relations: [] });
+  });
+
+  it('still applies the hallucination filter on OpenAI output', async () => {
+    mocks.openaiGenerateJson.mockResolvedValue({
+      json: {
+        terms: [
+          { source: 'Jonathan', target: '조너선', kind: 'person', note: '' },
+          { source: 'Made-Up Name', target: '지어낸이름', kind: 'person', note: '' },
+        ],
+        relations: [],
+      },
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
+    expect(result.terms).toHaveLength(1);
+    expect(result.terms[0].source).toBe('Jonathan');
   });
 });

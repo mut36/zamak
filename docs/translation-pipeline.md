@@ -101,10 +101,12 @@
 
 ### 2-C. 글로사리·존대관계 추출 (opt-in, 모델·콘텐츠 유형 무관)
 - **코드**: `app/api/glossary/route.ts` → `app/lib/server/extractCastSheet.ts`
-  (`extractCastSheet` → `fetchCastAnchors`(TMDB cast, best-effort) + Gemini
-  `responseSchema` 호출 → `sanitizeCastSheet`), 렌더 `app/lib/prompts/glossaryContent.ts`
-  (`renderGlossaryTags`), 프롬프트 `prompts/common/cast_sheet_extraction.txt`, 토글
-  훅 `app/hooks/useCastSheet.ts`, 카드 `app/components/simple/CastSheetCard.tsx`.
+  (`extractCastSheet` → `fetchCastAnchors`(TMDB cast, best-effort) + 프로바이더
+  분기(`GLOSSARY_PROVIDER`, 기본 `openai` → `openaiGenerateJson` Structured
+  Outputs / `gemini` → Gemini `responseSchema`) → `sanitizeCastSheet`), 렌더
+  `app/lib/prompts/glossaryContent.ts` (`renderGlossaryTags`), 프롬프트
+  `prompts/common/cast_sheet_extraction.txt`, 토글 훅 `app/hooks/useCastSheet.ts`,
+  카드 `app/components/simple/CastSheetCard.tsx`.
 - **하는 일**: InfoStep의 "등장인물·용어 일관성" 토글(기본 **OFF**, `localStorage`에
   기억)을 켜면 전체 자막을 한 번 스캔해 ①인물·지명·용어의 확정 **도착어 표기**(글로사리,
   `GlossaryTerm.target`)와 ②인물 간 말투(방향성 있음, 자막 블록 범위가 붙음)를 뽑는다.
@@ -136,21 +138,23 @@
     (`glossaryContent.ts` `renderGlossaryTags`)
   - 사람이 잘못된 항목을 고치고 싶음 → InfoStep 카드에서 직접 편집(표기/삭제/추가,
     말투 드롭다운) 가능, `CastSheetCard.tsx`
+  - **모델·프로바이더** → `GLOSSARY_PROVIDER`(기본 `openai`) + `GLOSSARY_MODEL`(기본
+    `gpt-5.6-luna`). 실패·키 없음은 빈 시트 + warn 로그 — 번역을 막지 않음(§2-9).
+    `GLOSSARY_THINKING_LEVEL`은 Gemini 경로에서만 의미 있음. 비용 관측은
+    `[glossary] provider=… model=… prompt=… output=…` 한 줄(파일당 1회)
 - **모델·비용 비교 실험**: `scripts/glossary-ab.mts` (`npm run glossary`)가
   `extractCastSheet.ts`에서 export된 `buildSystemInstruction`/`buildUserTurn`/
-  `sanitizeCastSheet`/`fetchCastAnchors`를 그대로 재사용해 **같은 프롬프트**를
-  Gemini(기본)·Claude·OpenAI 세 프로바이더에 각각 태운다(`provider=gemini|claude|openai`).
-  Claude·OpenAI 호출은 `app/lib/providers/claude.ts`/`openai.ts` —
-  **production 경로(`registry.ts`, `ALLOWED_MODELS`)는 안 건드림**, 실험 스크립트 전용.
-  키는 `.env.local`의 `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`만 채우면 됨(README §환경변수).
+  `sanitizeCastSheet`/`fetchCastAnchors`/`CAST_SHEET_JSON_SCHEMA`를 그대로 재사용해
+  **같은 프롬프트**를 Gemini(기본)·Claude·OpenAI 세 프로바이더에 각각 태운다
+  (`provider=gemini|claude|openai`). Claude 호출은 `app/lib/providers/claude.ts` —
+  **번역 production 경로(`registry.ts`, `ALLOWED_MODELS`)는 안 건드림**. OpenAI는
+  글로사리 production에도 쓰이므로 `OPENAI_API_KEY`가 실험 전용이 아니다.
   `GLOSSARY_DEBUG=1`(스크립트가 자동 설정)이 `[glossary-sanitize]` 줄로 kind별
   term 개수·`droppedNonPerson`(지명이 화자로 잘못 뽑힌 뒤 코드가 걸러낸 수)을 찍는다 —
   2026-07-28 지명 오분류 버그의 회귀 감시 지표.
-  **결정: 글로사리 모델을 GPT-5.6-luna로 전환**(`decisions.md` §2-14) — 근거는
-  비용이 아니라 관계 추론 역량 차이(flash-lite는 명백한 증거가 있는 관계도 놓침).
-  **단, production 배선은 미착수** — 위 문단대로 지금은 실험 스크립트만 luna를
-  호출하고, `extractCastSheet.ts`는 여전히 Gemini 고정이다. 전환 작업 목록은
-  `docs/TODO.md` "글로사리 모델을 GPT-5.6-luna로 전환" 절.
+  **프로덕션 기본 모델: GPT-5.6-luna**(`decisions.md` §2-14) — 근거는 비용이 아니라
+  관계 추론 역량 차이(flash-lite는 명백한 증거가 있는 관계도 놓침). Gemini로
+  롤백하려면 `GLOSSARY_PROVIDER=gemini` + Gemini `GLOSSARY_MODEL`.
 
 ### 3. 사용자 검토·수정 (InfoStep)
 - **코드**: `app/components/simple/InfoStep.tsx`, 문구 `app/i18n/simpleCopy.ts`

@@ -147,20 +147,21 @@ VTT는 올린 형식 그대로 내려받을 수 있게 됐다(splice 방식). �
 
 ## 글로사리 모델을 GPT-5.6-luna로 전환 (2026-07-28, `decisions.md` §2-14 후속)
 
-실험 배선(`scripts/glossary-ab.mts`, `app/lib/providers/openai.ts`)으로 결정까지 냈지만,
-실서비스 코드(`extractCastSheet.ts`)는 아직 Gemini 하드코딩이다. 실제 전환에 필요한 것:
+실험 배선(`scripts/glossary-ab.mts`, `app/lib/providers/openai.ts`)으로 결정까지 냈고,
+0.17.0에서 프로덕션(`extractCastSheet.ts`)도 OpenAI 기본으로 전환했다.
 
-- [ ] `extractCastSheet.ts`에 프로바이더 분기 추가 — 지금은 `GoogleGenAI`를 직접
-      호출. `app/lib/providers/openai.ts`의 `openaiGenerateJson`을 재사용
-- [ ] 실패 시 폴백 보강 — Gemini 경로는 실패하면 빈 시트를 반환하는데(§2-9),
-      `openai.ts`는 지금 그냥 throw. 동일한 "이 프리패스는 절대 번역을 막지 않는다"
-      보장이 필요
-- [ ] `OPENAI_API_KEY` 미설정 환경(로컬 개발 등)에서의 동작 정의
-- [ ] `GLOSSARY_MODEL`/`GLOSSARY_THINKING_LEVEL`의 의미가 OpenAI 경로에선 달라지므로
-      `constants.ts` 주석·기본값 재정리 (`GLOSSARY_THINKING_LEVEL`은 OpenAI엔 해당 없음)
-- [ ] README §환경변수 표에 `GLOSSARY_MODEL` 기본값이 여전히 Gemini 모델명으로
-      적혀 있으면 갱신
-- [ ] `docs/translation-pipeline.md` §2-C의 "품질 레버" 절도 실제 프로바이더에 맞게 갱신
+- [x] ~~`extractCastSheet.ts`에 프로바이더 분기 추가~~ — `GLOSSARY_PROVIDER`
+      (기본 openai) → `openaiGenerateJson` / gemini `responseSchema`. 프롬프트·
+      sanitize는 공유
+- [x] ~~실패 시 폴백 보강~~ — OpenAI 경로도 키 없음·API 에러·파싱 실패 시
+      `EMPTY_CAST_SHEET` (throw가 밖으로 새지 않음, §2-9)
+- [x] ~~`OPENAI_API_KEY` 미설정 환경 동작 정의~~ — 빈 시트 +
+      `[glossary] OPENAI_API_KEY not configured` warn. Gemini로 캐스케이드하지 않음
+- [x] ~~`GLOSSARY_MODEL`/`GLOSSARY_THINKING_LEVEL` 재정리~~ — 기본 모델
+      `gpt-5.6-luna`, thinking은 Gemini 전용 주석. 비용 "무시 가능" 서술 삭제
+- [x] ~~README §환경변수 표 갱신~~ — `GLOSSARY_PROVIDER`, 기본 모델, `OPENAI_API_KEY`가
+      글로사리 프로덕션 키임을 반영
+- [x] ~~`docs/translation-pipeline.md` §2-C 갱신~~ — production 배선 완료 상태로
 
 미해결로 남겨둔 품질 이슈(§2-14 참조, 코드 수정 없이는 luna로 바꿔도 안 사라짐):
 - [ ] 이름 표기가 실행마다 흔들림(아녜세/아네세 등) — 글로사리의 핵심 가치(표기 고정)를

@@ -7,6 +7,7 @@ import {
   GLOSSARY_MAX_TERMS,
   GLOSSARY_MODEL,
   GLOSSARY_THINKING_LEVEL,
+  type GlossaryProvider,
 } from '../../config/constants';
 import type { CastSheet, GlossaryTerm, SpeechRelation } from '../../types/glossary';
 import { EMPTY_CAST_SHEET, SPEECH_FORMALITIES } from '../../types/glossary';
@@ -66,6 +67,51 @@ const CAST_SHEET_SCHEMA = {
     },
   },
   required: ['terms', 'relations'],
+};
+
+/**
+ * Plain JSON Schema for OpenAI Structured Outputs (strict) / Claude tool
+ * input. Every property is required and `additionalProperties: false` at
+ * every object level — optional fields (note/basis) are always-present
+ * strings (empty = absent), which sanitizeCastSheet already treats as absent.
+ * Exported so scripts/glossary-ab.mts shares one schema with production.
+ */
+export const CAST_SHEET_JSON_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    terms: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          source: { type: 'string' },
+          target: { type: 'string' },
+          kind: { type: 'string', enum: ['person', 'place', 'org', 'term'] },
+          note: { type: 'string' },
+        },
+        required: ['source', 'target', 'kind', 'note'],
+        additionalProperties: false,
+      },
+    },
+    relations: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          from: { type: 'string' },
+          to: { type: 'string' },
+          speech: { type: 'string', enum: [...SPEECH_FORMALITIES] },
+          basis: { type: 'string' },
+          fromBlock: { type: 'integer' },
+          toBlock: { type: 'integer' },
+        },
+        required: ['from', 'to', 'speech', 'basis', 'fromBlock', 'toBlock'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['terms', 'relations'],
+  additionalProperties: false,
 };
 
 /**
@@ -321,25 +367,91 @@ export function sanitizeCastSheet(
   return { terms, relations };
 }
 
+/** Read at call time so harnesses can flip provider after module load. */
+function resolveGlossaryProvider(): GlossaryProvider {
+  return process.env.GLOSSARY_PROVIDER === 'gemini' ? 'gemini' : 'openai';
+}
+
+async function generateViaOpenAi(
+  systemInstruction: string,
+  userTurn: string,
+): Promise<RawCastSheet> {
+  const { openaiGenerateJson } = await import('../providers/openai');
+  const { json, usage } = await openaiGenerateJson({
+    model: GLOSSARY_MODEL,
+    system: systemInstruction,
+    user: userTurn,
+    jsonSchema: CAST_SHEET_JSON_SCHEMA,
+    schemaName: 'cast_sheet',
+  });
+  // Same cost-observation role as the Gemini branch — one call per file.
+  console.log(
+    `[glossary] provider=openai model=${GLOSSARY_MODEL} prompt=${usage.inputTokens} output=${usage.outputTokens}`,
+  );
+  return json as RawCastSheet;
+}
+
+async function generateViaGemini(
+  apiKey: string,
+  systemInstruction: string,
+  userTurn: string,
+): Promise<RawCastSheet> {
+  const ai = new GoogleGenAI({ apiKey });
+  const response = await ai.models.generateContent({
+    model: GLOSSARY_MODEL,
+    contents: userTurn,
+    config: {
+      systemInstruction,
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel[GLOSSARY_THINKING_LEVEL],
+      },
+      responseMimeType: 'application/json',
+      responseSchema: CAST_SHEET_SCHEMA,
+    },
+  });
+
+  const usage = response.usageMetadata;
+  console.log(
+    `[glossary] provider=gemini model=${GLOSSARY_MODEL} thinking=${GLOSSARY_THINKING_LEVEL} prompt=${usage?.promptTokenCount} thoughts=${usage?.thoughtsTokenCount ?? 0} output=${usage?.candidatesTokenCount}`,
+  );
+
+  return JSON.parse(response.text ?? '{}') as RawCastSheet;
+}
+
 /**
  * One-shot cast-sheet extraction: a glossary of confirmed name/place/term
  * spellings plus directional speech-formality relations, so parallel chunks
  * agree on both instead of drifting per-chunk. Opt-in (InfoStep toggle,
  * default off) — this never runs unless the user turns it on.
  *
- * Any failure (missing key, API error, unparseable JSON) returns an empty
- * sheet rather than throwing: this prepass must never block translation.
+ * Default provider is OpenAI (GPT-5.6-luna); set `GLOSSARY_PROVIDER=gemini`
+ * to roll back. Any failure (missing key, API error, unparseable JSON)
+ * returns an empty sheet rather than throwing: this prepass must never
+ * block translation.
  */
 export async function extractCastSheet(
   subtitleContent: string,
   movieInfo: Pick<MovieInfo, 'title' | 'year' | 'genre' | 'country' | 'era' | 'tone'>,
   targetLang: string,
 ): Promise<CastSheet> {
-  const apiKey = process.env.GOOGLE_GENAI_API_KEY;
-  if (!apiKey) return EMPTY_CAST_SHEET;
-
   const blockCount = parseSrtBlocks(subtitleContent).length;
   if (blockCount === 0) return EMPTY_CAST_SHEET;
+
+  const provider = resolveGlossaryProvider();
+
+  if (provider === 'openai') {
+    if (!process.env.OPENAI_API_KEY) {
+      console.warn(
+        '[glossary] OPENAI_API_KEY not configured — returning empty cast sheet (provider=openai)',
+      );
+      return EMPTY_CAST_SHEET;
+    }
+  } else if (!process.env.GOOGLE_GENAI_API_KEY) {
+    console.warn(
+      '[glossary] GOOGLE_GENAI_API_KEY not configured — returning empty cast sheet (provider=gemini)',
+    );
+    return EMPTY_CAST_SHEET;
+  }
 
   const lang = resolveTargetLang(targetLang);
 
@@ -350,29 +462,15 @@ export async function extractCastSheet(
     ]);
     const userTurn = buildUserTurn(movieInfo, cast, subtitleContent, blockCount);
 
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: GLOSSARY_MODEL,
-      contents: userTurn,
-      config: {
-        systemInstruction,
-        thinkingConfig: {
-          thinkingLevel: ThinkingLevel[GLOSSARY_THINKING_LEVEL],
-        },
-        responseMimeType: 'application/json',
-        responseSchema: CAST_SHEET_SCHEMA,
-      },
-    });
+    const parsed =
+      provider === 'openai'
+        ? await generateViaOpenAi(systemInstruction, userTurn)
+        : await generateViaGemini(
+            process.env.GOOGLE_GENAI_API_KEY!,
+            systemInstruction,
+            userTurn,
+          );
 
-    // Same shape as gemini.ts's [gemini] line — one call per file, so this is
-    // the only place glossary cost/quality can be read off logs (no per-chunk
-    // volume to amortize measurement error across).
-    const usage = response.usageMetadata;
-    console.log(
-      `[glossary] model=${GLOSSARY_MODEL} thinking=${GLOSSARY_THINKING_LEVEL} prompt=${usage?.promptTokenCount} thoughts=${usage?.thoughtsTokenCount ?? 0} output=${usage?.candidatesTokenCount}`,
-    );
-
-    const parsed = JSON.parse(response.text ?? '{}') as RawCastSheet;
     return sanitizeCastSheet(
       parsed,
       subtitleContent,

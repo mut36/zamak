@@ -4,9 +4,9 @@
 //
 //   npm run glossary -- file=samples/subtitles/drama-episode.srt title="Esterno Notte" year=2022
 //
-//   provider=gemini (default, one combo per process — GLOSSARY_MODEL /
-//     GLOSSARY_THINKING_LEVEL are read once at constants.ts module load,
-//     same reasoning as prompt-ab.mts's THINKING_LEVEL):
+//   provider=gemini (default for this harness — forces GLOSSARY_PROVIDER=gemini
+//     before constants load so GLOSSARY_MODEL defaults to FLASH_MODEL; production
+//     defaults to openai/gpt-5.6-luna). Override model:
 //     GLOSSARY_MODEL=gemini-3.5-flash-lite npm run glossary -- title=...
 //
 //   provider=claude / openai: uses app/lib/providers/claude.ts / openai.ts
@@ -20,7 +20,8 @@
 // All providers run the *same* system/user prompt (buildSystemInstruction /
 // buildUserTurn, exported from extractCastSheet.ts for this reuse) through
 // sanitizeCastSheet, so the comparison is apples-to-apples — only the API
-// call and structured-output mechanism differ.
+// call and structured-output mechanism differ. CAST_SHEET_JSON_SCHEMA is
+// shared with production (exported from extractCastSheet.ts).
 //
 // GLOSSARY_DEBUG=1 (set by this script) makes sanitizeCastSheet log a
 // [glossary-sanitize] line with term-kind counts and the droppedNonPerson
@@ -30,19 +31,6 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 
 process.env.GLOSSARY_DEBUG = '1';
-
-const {
-  extractCastSheet,
-  buildSystemInstruction,
-  buildUserTurn,
-  sanitizeCastSheet,
-  fetchCastAnchors,
-} = await import('../app/lib/server/extractCastSheet');
-const { GLOSSARY_MODEL, GLOSSARY_THINKING_LEVEL } = await import(
-  '../app/config/constants'
-);
-const { resolveTargetLang } = await import('../app/config/languages');
-const { parseSrtBlocks } = await import('../app/lib/srt');
 
 const args = Object.fromEntries(
   process.argv.slice(2).map((pair) => {
@@ -71,6 +59,26 @@ const P = {
   pout: Number(args.pout ?? 0),
 };
 
+// Force Gemini before constants.ts evaluates GLOSSARY_MODEL's default
+// (production default is openai → gpt-5.6-luna).
+if (P.provider === 'gemini') {
+  process.env.GLOSSARY_PROVIDER = 'gemini';
+}
+
+const {
+  extractCastSheet,
+  buildSystemInstruction,
+  buildUserTurn,
+  sanitizeCastSheet,
+  fetchCastAnchors,
+  CAST_SHEET_JSON_SCHEMA,
+} = await import('../app/lib/server/extractCastSheet');
+const { GLOSSARY_MODEL, GLOSSARY_THINKING_LEVEL } = await import(
+  '../app/config/constants'
+);
+const { resolveTargetLang } = await import('../app/config/languages');
+const { parseSrtBlocks } = await import('../app/lib/srt');
+
 const movieInfo = {
   title: P.title,
   year: P.year,
@@ -81,49 +89,6 @@ const movieInfo = {
 };
 
 const source = readFileSync(path.resolve(P.file), 'utf8');
-
-// Plain JSON Schema (not Gemini's Type-enum flavor) — shared by the
-// claude/openai paths. OpenAI's strict mode requires every property listed
-// in `required` and `additionalProperties: false` at every object level, so
-// optional fields (note/basis) are modeled as always-present strings (empty
-// = absent), which sanitizeCastSheet already treats as "no note"/"no basis".
-const CAST_SHEET_JSON_SCHEMA = {
-  type: 'object',
-  properties: {
-    terms: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          source: { type: 'string' },
-          target: { type: 'string' },
-          kind: { type: 'string', enum: ['person', 'place', 'org', 'term'] },
-          note: { type: 'string' },
-        },
-        required: ['source', 'target', 'kind', 'note'],
-        additionalProperties: false,
-      },
-    },
-    relations: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          from: { type: 'string' },
-          to: { type: 'string' },
-          speech: { type: 'string', enum: ['formal', 'informal', 'mixed'] },
-          basis: { type: 'string' },
-          fromBlock: { type: 'integer' },
-          toBlock: { type: 'integer' },
-        },
-        required: ['from', 'to', 'speech', 'basis', 'fromBlock', 'toBlock'],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ['terms', 'relations'],
-  additionalProperties: false,
-};
 
 type Sheet = { terms: unknown[]; relations: unknown[] };
 
@@ -137,6 +102,8 @@ interface RunResult {
 }
 
 async function runGemini(): Promise<RunResult> {
+  // extractCastSheet reads GLOSSARY_PROVIDER at call time; keep gemini forced.
+  process.env.GLOSSARY_PROVIDER = 'gemini';
   const usageLine = /^\[glossary\].*prompt=(\d+) thoughts=(\d+) output=(\d+)/;
   let usage = { prompt: 0, thoughts: 0, output: 0 };
   const realLog = console.log;

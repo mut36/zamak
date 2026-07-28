@@ -947,16 +947,10 @@ relations를 2배 뽑았다 — "싸지만 불안정"(flash-lite)이 아니라 "
 - **"Red Brigades"/"RedBrigades" 같은 표기 변형 중복 term** — 셋 다에서 재현. 둘 다
   같은 target으로 매핑돼 번역 결과엔 해가 없지만 `GLOSSARY_MAX_TERMS` 슬롯을 낭비.
 
-**남은 작업 — production 배선 (미착수)**: 지금 `app/lib/providers/openai.ts`는
-`scripts/glossary-ab.mts` 전용이고, 실제 서비스 코드(`extractCastSheet.ts`)는 여전히
-`GoogleGenAI`를 직접 호출한다. luna를 실서비스에 태우려면:
-1. `extractCastSheet.ts`에 프로바이더 분기 추가(지금은 Gemini 하드코딩)
-2. 실패 시 폴백 — Gemini 경로는 실패하면 빈 시트를 반환하는데(§2-9), OpenAI 경로도
-   동일 보장 필요(`app/lib/providers/openai.ts`는 지금 그냥 throw)
-3. `OPENAI_API_KEY` 없는 환경(개발자 로컬 등)에서의 동작 정의
-4. `GLOSSARY_MODEL`/`GLOSSARY_THINKING_LEVEL`이 OpenAI 경로에선 의미가 달라지므로
-   `constants.ts` 주석·기본값 재정리
-`docs/TODO.md`에 항목 추가할 것.
+**남은 작업 — production 배선**: ~~미착수~~ → **0.17.0에서 완료.**
+`extractCastSheet.ts`가 `GLOSSARY_PROVIDER`(기본 openai)로 분기하고, 실패·키 없음은
+빈 시트 + warn. `GLOSSARY_MODEL` 기본 `gpt-5.6-luna`. 상세는 `docs/TODO.md` 해당
+절(완료 항목 취소선).
 
 **코드**: `parseSubtitleDocument`/`emitInOriginalFormat`(`document.ts`),
 `parseVttWithSlots`, `serializeCues`(시간순 정렬 + 블록↔큐 맵), `resolveTrack`(`smi.ts`),

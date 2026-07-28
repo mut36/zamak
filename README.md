@@ -219,14 +219,16 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 | `JOB_VALIDITY_MINUTES` | 60 | 결제된 job이 유효한 시간 |
 | `TOSS_SECRET_KEY` | — | 결제 승인용 시크릿 키 (서버 전용). 없으면 결제 라우트만 닫히고 번역은 그대로 동작 |
 | `NEXT_PUBLIC_TOSS_CLIENT_KEY` | — | 결제창을 여는 클라이언트 키. 브라우저에 노출되며 그래도 안전 — 이 키로는 승인을 못 함 |
-| `GLOSSARY_MODEL` | `gemini-3.6-flash` | 글로사리·존대관계 추출(opt-in, InfoStep 토글) 모델. 파일당 1회 호출이라 번역 모델과 별도로 조정 가능 |
-| `GLOSSARY_THINKING_LEVEL` | `MEDIUM` | 위와 같은 네 값. 파일당 1회라 번역 flash의 LOW보다 여유를 둠 |
+| `GLOSSARY_PROVIDER` | `openai` | 글로사리·존대관계 추출 프로바이더 (`openai`\|`gemini`). 기본은 OpenAI(GPT-5.6-luna, `decisions.md` §2-14). Gemini로 롤백하려면 `gemini` + 아래 `GLOSSARY_MODEL`을 Gemini 모델명으로 |
+| `GLOSSARY_MODEL` | `gpt-5.6-luna` (`GLOSSARY_PROVIDER=gemini`이면 `gemini-3.6-flash`) | 글로사리·존대관계 추출(opt-in, InfoStep 토글) 모델. 파일당 1회. 1,100블록 기준 예전 Gemini flash+MEDIUM에서 ~130원 관측 — 무시할 수준은 아님 |
+| `GLOSSARY_THINKING_LEVEL` | `MEDIUM` | **Gemini 경로 전용.** OpenAI 경로에서는 무시. `MINIMAL`\|`LOW`\|`MEDIUM`\|`HIGH` |
 | `GLOSSARY_MAX_BLOCKS` | 3000 | 이 블록 수를 넘는 파일은 앞/중간/뒤를 고르게 발췌해 추출(이름·관계가 파일 전체에 흩어져 있어 summarize처럼 앞부분만 보지 않음) |
 | `GLOSSARY_MAX_TERMS` / `GLOSSARY_MAX_RELATIONS` | 40 / 16 | 시트 항목 상한 — 청크당 프롬프트 세금을 제한 |
 | `GLOSSARY_MAX_CHARS` | 1200 | `<glossary>`+`<speech_relations>` 렌더 결과 총 길이 상한(문자) |
 | `GLOSSARY_WAIT_MS` | 15000 | 번역 시작 시 아직 추출 중이면 최대 이만큼만 기다리고 빈 시트로 진행 |
 | `ANTHROPIC_API_KEY` / `CLAUDE_MODEL` | — / `claude-sonnet-5` | **`scripts/glossary-ab.mts` 등 모델 비교 실험 전용.** production 라우트는 안 씀 — `registry.ts`/`ALLOWED_MODELS`는 여전히 Gemini 고정(`app/lib/providers/claude.ts`) |
-| `OPENAI_API_KEY` / `OPENAI_MODEL` | — / — | 위와 같은 실험 전용. `OPENAI_MODEL`은 기본값 없음 — 모델명이 빨리 바뀌어 잘못된 값을 추측해 넣느니 직접 지정하게 함(`app/lib/providers/openai.ts`) |
+| `OPENAI_API_KEY` | — | **글로사리 추출 프로덕션에 필요** (`GLOSSARY_PROVIDER=openai` 기본). 없으면 추출은 빈 시트로 물러서고 번역은 계속됨. A/B 하네스(`scripts/glossary-ab.mts`)에도 사용 |
+| `OPENAI_MODEL` | — | 하네스 전용(기본값 없음 — 모델명이 빨리 바뀌어 추측 기본값을 두지 않음). 프로덕션 글로사리는 `GLOSSARY_MODEL`을 씀 |
 
 ### 글로사리·존대관계 (opt-in)
 
@@ -346,7 +348,7 @@ npm run build
 vercel deploy
 ```
 
-Vercel Project Settings → Environment Variables에 `TMDB_API_KEY`, `GOOGLE_GENAI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL=https://zamak.app`, `TOSS_SECRET_KEY`, `NEXT_PUBLIC_TOSS_CLIENT_KEY`를 추가합니다.
+Vercel Project Settings → Environment Variables에 `TMDB_API_KEY`, `GOOGLE_GENAI_API_KEY`, `OPENAI_API_KEY`(글로사리 토글 ON 시), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL=https://zamak.app`, `TOSS_SECRET_KEY`, `NEXT_PUBLIC_TOSS_CLIENT_KEY`를 추가합니다.
 
 Domains에 `zamak.app`과 `www.zamak.app`을 연결하고, Supabase Redirect URLs에
 `https://zamak.app/auth/callback`과 `https://www.zamak.app/auth/callback`을 등록해야
