@@ -26,6 +26,7 @@
   → 청킹 (장면 갭 기준)
   → 청크별 병렬 /api/translate
        └ 프롬프트 조합 → Gemini 호출 → 타임코드 재조립
+  → 잔여 수거 패스   원문으로 남은 블록만 재포장해 재요청 (§9.65)
   → 조립 → 다운로드
 ```
 
@@ -301,12 +302,39 @@
   개의 "추가 호출"(재시도+분할 합산) 상한. 소진되면 이후 실패는 재시도 없이 폴백. 이게
   `decisions.md` §2-2의 20분/5,000원 사고를 **구조적으로** 못 일어나게 만드는 장치 —
   최악의 비용 증가가 +20%로 고정된다.
-- **보고**: 청크 전체 실패(`failedChunks`)와 청크 안에서 일부 블록만 못 맞춘 경우
-  (`fallbackBlocks`, 서버 `TranslationOutcome.unmatchedBlocks` 합산)를 분리해서 화면에
-  보여준다 — 전자만 보이던 예전엔 후자가 조용히 원문으로 나가도 "실패 0"으로 표시됐다.
-  전역 중단이 있었으면 `TranslationResult.stopReason`(`'quota'|'auth'`)으로 그 사유를
-  따로 표시(`DoneStep.tsx`, `simpleCopy.ts` `done.stopReason`).
+- **수거**: 이 단계에서 원문으로 남은 블록은 **여기서 끝나지 않는다.** 청크 전체 실패면
+  그 청크의 전 시퀀스 번호를, 부분 실패면 재조립이 돌려준 `unmatchedIndices`를 모아
+  §9.65 잔여 수거 패스로 넘긴다.
 - **미룬 것(다음 커밋)**: 크레딧 환불 정책, "실패한 부분만 재번역" 버튼. `TODO.md` 참조.
+
+### 9.65. 잔여 수거 패스 (recovery sweep) — 원문으로 남은 블록 재시도
+- **코드**: **`app/lib/client/recoverySweep.ts`**, `useTranslation.ts`가 본 패스 풀이
+  비워진 직후 · §9.7 텍스트 규칙 **이전**에 1회 호출. 상수는 `constants.ts` `RECOVERY`.
+- **왜 있나**: §9.6의 청크 재시도로는 **부분 실패를 한 줄도 못 고친다.** 청크가 성공하고
+  일부 블록만 안 맞은 경우(`unmatched > 0`)는 `translateOnce`가 성공으로 반환하므로
+  `chunkRetry`에 도달하지 않는다. 그리고 실무에서 원문이 남는 대부분이 이쪽이다.
+  청크 재시도 예산을 올리는 건 이 경로에 대해 아무 효과가 없고 비용만 는다.
+- **핵심은 재포장**: 잔여 블록은 흩어져 있다(30개 청크에 40줄). 그 청크들을 다시 돌리면
+  40줄 고치는 데 30회지만, 잔여만 모아 새 청크(B=100)로 묶으면 **1회**다. 비용이
+  "실패한 블록 수"에 비례하지 "그게 어느 청크에 있었나"에 비례하지 않는다.
+- **타임코드**: 재포장해도 시퀀스 번호는 원본 그대로 실려가므로 서버 재조립(§9)이
+  각 번역을 원래 타임코드에 되붙인다. 재포장은 **요청 안에서** 블록을 옮기지
+  타임코드를 옮기지 않는다 — 불변식 2 위반이 아니다.
+- **중단 조건**(먼저 걸리는 것): 최대 `RECOVERY.MAX_ROUNDS`(2) 라운드 / 최대
+  `computeSweepBudget(totalChunks) = max(2, ceil(청크수*0.5))` 호출 /
+  **한 라운드가 아무것도 못 건지면 예산이 남아도 즉시 중단**(안전필터에 걸린 줄 등은
+  매번 같은 방식으로 실패하므로 두 번 확인할 값어치가 없다) / `quota`·`auth`면 sweep
+  자체를 건너뜀. 번역할 게 없는 블록(`♪`, 숫자만 — `hasTranslatableText`)은 애초에
+  잔여에서 제외한다.
+- **블록 단위 경로는 의도적으로 없다** — `decisions.md` §2-2의 사고에서 청크 하나를
+  200회로 불린 그 메커니즘이고, 재포장이 있으면 필요하지도 않다(잔여 20블록 = 1회).
+  §9.6의 +20%와 합쳐 파일당 최악 비용이 본 패스의 **~1.7배로 고정**된다.
+- **보고**: sweep까지 끝난 뒤에도 원문인 줄 수가 `TranslationResult.fallbackBlocks`,
+  sweep이 건진 줄 수가 `recoveredBlocks`. `failedChunks`는 진단용으로만 남기고
+  **화면에는 쓰지 않는다** — sweep이 블록 단위로 동작하므로 "구간 2개 실패"는
+  사용자가 받지 않는 중간 상태를 설명하게 된다. 전역 중단이 있었으면
+  `stopReason`(`'quota'|'auth'`)을 대신 표시(`DoneStep.tsx`, `simpleCopy.ts`
+  `done.stopReason`). 진행 중에는 `TranslationProgress.stage === 'recovering'`.
 
 ### 9.7. 기계적 번역 규칙 강제 (말줄임표·마침표·2줄 상한, 도착어별)
 - **코드**: **`app/lib/srt.ts` (`enforceTextRules`)**, `useTranslation.ts`에서 청크 합친
@@ -377,8 +405,10 @@
 | 한국어 자막이 너무 빨리 지나감(읽기 힘듦) | `srt.ts` (`adjustSubtitleTiming`), `constants.ts` `CPS_TARGET`/`MIN_SUBTITLE_GAP_MS` — §9.5 |
 | 자막이 너무 짧게 스쳐 지나감(대사와 무관하게) | `srt.ts` (`adjustSubtitleTiming`), `constants.ts` `MIN_SUBTITLE_DURATION_MS` — §9.5 |
 | 번역이 느림/비쌈 | `constants.ts` `SERVER_CHUNK_SIZE`/`CONCURRENCY`/`thinkingLevelForModel`, 모델(고급/빠른) |
-| 특정 청크만 원문 그대로 | 그 청크 호출 실패(원문 폴백) — `gemini.ts` 로그, `translationService.ts`, 재시도 판단은 `chunkRetry.ts` — §9.6 |
-| 청크는 성공했는데 일부 줄만 원문 그대로 (화면엔 "성공"으로만 뜸) | `translationService.ts` `unmatchedBlocks` → `TranslationResult.fallbackBlocks` 집계 확인 — §9.6 |
+| 특정 청크만 원문 그대로 | 그 청크 호출 실패 + sweep도 못 건짐 — `gemini.ts` 로그, `chunkRetry.ts`(1차 판단), `[sweep]` 콘솔 로그의 `stoppedBy` — §9.6·§9.65 |
+| 일부 줄만 원문 그대로 | sweep을 통과하고도 남은 줄. `[sweep] ... stopped by` 로그로 원인 구분: `no-progress`(모델이 계속 같은 실패) / `budget`(호출 상한) / `fatal`(quota·auth) — §9.65 |
+| 원문으로 남은 줄이 늘었는데 비용은 그대로 | sweep이 안 돌았다는 뜻. `leftover` 수거(`useTranslation.ts`)나 `unmatchedIndices` 배관(`srt.ts`→SSE)이 끊겼는지 확인 — §9.65 |
+| sweep 때문에 비용이 걱정됨 | 상한은 `constants.ts` `RECOVERY`(라운드)와 `computeSweepBudget`(호출 수). 실제 소비는 `[sweep] ... calls N` 로그 — §9.65 |
 | API 한도 초과 이후 남은 파일이 통째로 원문 | 의도된 전역 중단(quota/auth) — `chunkRetry.ts` `RetryState.fatalCode`, 화면엔 `stopReason` 배너 — §9.6 |
 | 에러 종류에 따라 재시도/중단 동작을 바꾸고 싶음 | `translationErrors.ts` 분류(`classifyError`)·성격 함수(`isFatalCode`/`isRetryableCode`) — §9.6 |
 | 진행 링이 너무 빨리 차서 99%에서 오래 기다림(또는 그 반대) | `constants.ts` `TRANSLATION_ESTIMATE_MS`(모델별), 이징 곡선은 `ProgressStep.tsx` — §6 |
