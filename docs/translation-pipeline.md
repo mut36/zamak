@@ -146,6 +146,11 @@
   `GLOSSARY_DEBUG=1`(스크립트가 자동 설정)이 `[glossary-sanitize]` 줄로 kind별
   term 개수·`droppedNonPerson`(지명이 화자로 잘못 뽑힌 뒤 코드가 걸러낸 수)을 찍는다 —
   2026-07-28 지명 오분류 버그의 회귀 감시 지표.
+  **결정: 글로사리 모델을 GPT-5.6-luna로 전환**(`decisions.md` §2-14) — 근거는
+  비용이 아니라 관계 추론 역량 차이(flash-lite는 명백한 증거가 있는 관계도 놓침).
+  **단, production 배선은 미착수** — 위 문단대로 지금은 실험 스크립트만 luna를
+  호출하고, `extractCastSheet.ts`는 여전히 Gemini 고정이다. 전환 작업 목록은
+  `docs/TODO.md` "글로사리 모델을 GPT-5.6-luna로 전환" 절.
 
 ### 3. 사용자 검토·수정 (InfoStep)
 - **코드**: `app/components/simple/InfoStep.tsx`, 문구 `app/i18n/simpleCopy.ts`

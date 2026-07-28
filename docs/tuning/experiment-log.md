@@ -20,6 +20,11 @@
 | 2026-07-28 | glossary: flash LOW | 〃 | 입력 9,231(동일)·thinking 1,187·출력 1,140, $0.0313. terms 10(person 5), **relations 2**(부부만, 부녀·부자·경호원 놓침) | 같은 파일·같은 모델인데 사고만 줄여도 관계 6→2로 급감 — 사고가 관계 추출 커버리지에 직접 기여 |
 | 2026-07-28 | glossary: flash-lite MEDIUM | 〃 | 입력 9,231·**thinking 0**·출력 921, **$0.0051**. terms 6(person 4), relations 4(블록범위 137-160/370-376로 구체적) | flash MEDIUM 대비 10.5배 저렴. flash-lite는 MEDIUM/LOW 둘 다 thoughts=0 — 이 모델에선 사고 노브 자체가 무의미 |
 | 2026-07-28 | glossary: flash-lite LOW | 〃 | 입력 9,231·thinking 0·출력 929, $0.0051. terms 7(person 7), relations 4(범위는 전부 1-461 뭉뚱그림) | 같은 모델 반복인데 인물 수(4→7)·범위 정밀도가 흔들림 — 표본 노이즈가 모델 등급 차보다 큼. 이름 표기도 실행마다 다름("아녜세" flash vs "아네세" lite) — 글로사리 고정 자체가 흔들릴 수 있는 리스크. 결론 보류, 반복 필요 |
+| 2026-07-28 | glossary: Claude haiku-4.5 | 〃 | 입력 9,826·출력 2,150. terms 11(person 2), **relations 0** | 지명·조직 분류는 정확(droppedNonPerson=0)했으나 인물 인식 자체가 약함(가족 관계 전원 누락) |
+| 2026-07-28 | glossary: GPT-5.4-nano/mini | 〃 | nano 입력 7,515·출력 1,301(person 1) / mini 입력 7,515·출력 1,331(person 2) | 둘 다 relations 0 — 정당명·직책명(kind=term)은 잘 뽑지만 인물 식별이 약함. 실사용 후보에서 제외 |
+| 2026-07-28 | glossary: GPT-5.6-luna | 〃 | 입력 7,519·출력 3,550, **$0.0288**(단가 in$1.00/out$6.00/1M). terms 26(person 14), **relations 12** | flash MEDIUM 대비 46%↓ 비용에 relations 2배. 블록범위도 137-140/259-289 등 구체적 |
+| 2026-07-28 | glossary: flash-lite ×2 | full-movie.srt(1874블록), title="La Buca" | 평균 4.0s·$0.0103, terms 7, relations 4→6 | 파브리치오(986-1066블록 "Caro Fabrizio"·"Vai, Fabrizio, vai" 등 명백한 직접대화)·보데마이어(전화 통화) 관계를 **2회 모두 놓침** |
+| 2026-07-28 | glossary: GPT-5.6-luna ×2 | 〃 | 평균 16.7s·$0.0398, terms 18, relations 10→6 | 파브리치오·보데마이어 관계를 **2회 모두 정확한 블록범위(986-1065)까지 포착**. flash-lite와 동일 텍스트인데 근거 추적 능력이 다름 → **결정**: 글로사리 모델을 GPT-5.6-luna로 전환, `decisions.md` §2-14 |
 
 비용(달러)은 실행 시점 하네스 단가로 찍히므로, 단가가 바뀐 뒤(`gemini-limits.md` §4)
 비교하려면 표에 있는 원시 토큰 수(`.harness/<타임스탬프>/summary.md`가 아직 로컬에

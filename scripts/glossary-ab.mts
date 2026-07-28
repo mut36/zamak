@@ -1,23 +1,23 @@
 #!/usr/bin/env node
 // Glossary prepass A/B — runs the cast-sheet extraction against a real
-// sample and reports cost + quality for one combo per process (same
-// reasoning as prompt-ab.mts: model/thinking constants are read once at
-// module load, so a combo comparison is one process per combo).
+// sample and reports cost + quality.
 //
 //   npm run glossary -- file=samples/subtitles/drama-episode.srt title="Esterno Notte" year=2022
 //
-//   provider=gemini (default): GLOSSARY_MODEL / GLOSSARY_THINKING_LEVEL env
+//   provider=gemini (default, one combo per process — GLOSSARY_MODEL /
+//     GLOSSARY_THINKING_LEVEL are read once at constants.ts module load,
+//     same reasoning as prompt-ab.mts's THINKING_LEVEL):
 //     GLOSSARY_MODEL=gemini-3.5-flash-lite npm run glossary -- title=...
 //
-//   provider=claude: uses app/lib/providers/claude.ts (ANTHROPIC_API_KEY),
-//     model=claude-sonnet-5 or CLAUDE_MODEL env
-//     npm run glossary -- provider=claude title=... file=...
+//   provider=claude / openai: uses app/lib/providers/claude.ts / openai.ts
+//     (ANTHROPIC_API_KEY / OPENAI_API_KEY). Pass ONE model (model=... or
+//     CLAUDE_MODEL/OPENAI_MODEL env), or MULTIPLE with models= (comma list) —
+//     the multi-model form builds the prompt once and fans out to every
+//     model in parallel, since (unlike Gemini's env-level constants) the
+//     model name here is just a function argument:
+//     npm run glossary -- provider=openai models=gpt-5.6-luna,gpt-5.6-mini,gpt-5-nano title=...
 //
-//   provider=openai: uses app/lib/providers/openai.ts (OPENAI_API_KEY),
-//     model= or OPENAI_MODEL env is REQUIRED (no guessed default)
-//     npm run glossary -- provider=openai model=gpt-5 title=... file=...
-//
-// All three run the *same* system/user prompt (buildSystemInstruction /
+// All providers run the *same* system/user prompt (buildSystemInstruction /
 // buildUserTurn, exported from extractCastSheet.ts for this reuse) through
 // sanitizeCastSheet, so the comparison is apples-to-apples — only the API
 // call and structured-output mechanism differ.
@@ -54,6 +54,7 @@ const args = Object.fromEntries(
 const P = {
   provider: args.provider ?? 'gemini',
   model: args.model ?? '',
+  models: args.models ?? '',
   file: args.file ?? 'samples/subtitles/drama-episode.srt',
   lang: args.lang ?? 'ko',
   title: args.title ?? '',
@@ -63,9 +64,9 @@ const P = {
   era: args.era ?? '',
   tone: args.tone ?? '',
   out: args.out ?? '.harness/glossary',
-  // Per-model $/1M — gemini-limits.md §4 for flash/flash-lite. Claude/OpenAI
-  // defaults are rough placeholders; pass pin=/pout= to override with your
-  // own dashboard's numbers when precision matters.
+  // Per-model $/1M — pass pin=/pout= with your own dashboard's numbers when
+  // precision matters; left unset here since exact non-Gemini pricing isn't
+  // hardcoded (model names/rates turn over too fast to bake in safely).
   pin: Number(args.pin ?? 0),
   pout: Number(args.pout ?? 0),
 };
@@ -124,10 +125,15 @@ const CAST_SHEET_JSON_SCHEMA = {
   additionalProperties: false,
 };
 
+type Sheet = { terms: unknown[]; relations: unknown[] };
+
 interface RunResult {
-  sheet: { terms: unknown[]; relations: unknown[] };
-  usage: { prompt: number; thoughts: number; output: number };
+  provider: string;
   model: string;
+  sheet: Sheet;
+  usage: { prompt: number; thoughts: number; output: number };
+  seconds: number;
+  error?: string;
 }
 
 async function runGemini(): Promise<RunResult> {
@@ -148,12 +154,22 @@ async function runGemini(): Promise<RunResult> {
     }
     realLog(...params);
   };
+  const startedAt = Date.now();
   const sheet = await extractCastSheet(source, movieInfo, P.lang);
   console.log = realLog;
-  return { sheet, usage, model: GLOSSARY_MODEL };
+  return { provider: 'gemini', model: GLOSSARY_MODEL, sheet, usage, seconds: (Date.now() - startedAt) / 1000 };
 }
 
-async function runNonGemini(provider: 'claude' | 'openai'): Promise<RunResult> {
+/**
+ * Builds the shared system/user prompt once, then fans out to every model in
+ * parallel — the whole point of the multi-model form is that the prompt
+ * doesn't change, only which model answers it, so preparing it once keeps
+ * the comparison honest and avoids redundant TMDB cast-anchor lookups.
+ */
+async function runNonGeminiModels(
+  provider: 'claude' | 'openai',
+  models: string[],
+): Promise<RunResult[]> {
   const blockCount = parseSrtBlocks(source).length;
   const lang = resolveTargetLang(P.lang);
   const [systemInstruction, cast] = await Promise.all([
@@ -162,47 +178,58 @@ async function runNonGemini(provider: 'claude' | 'openai'): Promise<RunResult> {
   ]);
   const userTurn = buildUserTurn(movieInfo, cast, source, blockCount);
 
-  let json: unknown;
-  let usage: { inputTokens: number; outputTokens: number };
-  let model: string;
+  return Promise.all(
+    models.map(async (model): Promise<RunResult> => {
+      const startedAt = Date.now();
+      try {
+        let json: unknown;
+        let usage: { inputTokens: number; outputTokens: number };
 
-  if (provider === 'claude') {
-    const { claudeGenerateJson, CLAUDE_MODEL } = await import(
-      '../app/lib/providers/claude'
-    );
-    model = P.model || CLAUDE_MODEL;
-    ({ json, usage } = await claudeGenerateJson({
-      model,
-      system: systemInstruction,
-      user: userTurn,
-      jsonSchema: CAST_SHEET_JSON_SCHEMA,
-      schemaName: 'cast_sheet',
-    }));
-  } else {
-    const { openaiGenerateJson, requireOpenAiModel } = await import(
-      '../app/lib/providers/openai'
-    );
-    model = P.model || requireOpenAiModel();
-    ({ json, usage } = await openaiGenerateJson({
-      model,
-      system: systemInstruction,
-      user: userTurn,
-      jsonSchema: CAST_SHEET_JSON_SCHEMA,
-      schemaName: 'cast_sheet',
-    }));
-  }
+        if (provider === 'claude') {
+          const { claudeGenerateJson } = await import('../app/lib/providers/claude');
+          ({ json, usage } = await claudeGenerateJson({
+            model,
+            system: systemInstruction,
+            user: userTurn,
+            jsonSchema: CAST_SHEET_JSON_SCHEMA,
+            schemaName: 'cast_sheet',
+          }));
+        } else {
+          const { openaiGenerateJson } = await import('../app/lib/providers/openai');
+          ({ json, usage } = await openaiGenerateJson({
+            model,
+            system: systemInstruction,
+            user: userTurn,
+            jsonSchema: CAST_SHEET_JSON_SCHEMA,
+            schemaName: 'cast_sheet',
+          }));
+        }
 
-  const sheet = sanitizeCastSheet(
-    json as { terms?: unknown; relations?: unknown },
-    source,
-    blockCount,
-    lang.formality !== null,
+        const sheet = sanitizeCastSheet(
+          json as { terms?: unknown; relations?: unknown },
+          source,
+          blockCount,
+          lang.formality !== null,
+        );
+        return {
+          provider,
+          model,
+          sheet,
+          usage: { prompt: usage.inputTokens, thoughts: 0, output: usage.outputTokens },
+          seconds: (Date.now() - startedAt) / 1000,
+        };
+      } catch (error) {
+        return {
+          provider,
+          model,
+          sheet: { terms: [], relations: [] },
+          usage: { prompt: 0, thoughts: 0, output: 0 },
+          seconds: (Date.now() - startedAt) / 1000,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }),
   );
-  return {
-    sheet,
-    usage: { prompt: usage.inputTokens, thoughts: 0, output: usage.outputTokens },
-    model,
-  };
 }
 
 if (!['gemini', 'claude', 'openai'].includes(P.provider)) {
@@ -210,64 +237,92 @@ if (!['gemini', 'claude', 'openai'].includes(P.provider)) {
   process.exit(1);
 }
 
-const startedAt = Date.now();
-const { sheet, usage, model } =
-  P.provider === 'gemini' ? await runGemini() : await runNonGemini(P.provider as 'claude' | 'openai');
-const seconds = (Date.now() - startedAt) / 1000;
+let results: RunResult[];
+if (P.provider === 'gemini') {
+  results = [await runGemini()];
+} else {
+  const modelList = P.models
+    ? P.models.split(',').map((m) => m.trim()).filter(Boolean)
+    : P.model
+      ? [P.model]
+      : [];
+  if (modelList.length === 0) {
+    const envVar = P.provider === 'claude' ? 'CLAUDE_MODEL' : 'OPENAI_MODEL';
+    console.error(
+      `No model given — pass model=<one> or models=<a,b,c>, or set ${envVar}.`,
+    );
+    process.exit(1);
+  }
+  results = await runNonGeminiModels(P.provider as 'claude' | 'openai', modelList);
+}
 
-const costUsd =
-  P.pin || P.pout
-    ? (usage.prompt * P.pin + (usage.thoughts + usage.output) * P.pout) / 1e6
-    : NaN;
+function kindCounts(sheet: Sheet): string {
+  return ['person', 'place', 'org', 'term']
+    .map((k) => `${k}=${(sheet.terms as { kind: string }[]).filter((t) => t.kind === k).length}`)
+    .join(' ');
+}
 
-const kindCounts = ['person', 'place', 'org', 'term']
-  .map(
-    (k) =>
-      `${k}=${(sheet.terms as { kind: string }[]).filter((t) => t.kind === k).length}`,
-  )
-  .join(' ');
+function costLine(usage: RunResult['usage']): string {
+  if (!P.pin && !P.pout) return '—';
+  const usd = (usage.prompt * P.pin + (usage.thoughts + usage.output) * P.pout) / 1e6;
+  return `$${usd.toFixed(4)}`;
+}
 
-const costLine = Number.isFinite(costUsd)
-  ? `$${costUsd.toFixed(4)}`
-  : '(pin=/pout= 안 줌 — 토큰 수만 참고)';
+const comparisonRows = results.map(
+  (r) =>
+    `| ${r.model} | ${r.error ? '❌' : '✅'} | ${r.seconds.toFixed(1)}s | ${r.usage.prompt} | ${r.usage.output} | ${costLine(r.usage)} | ${r.sheet.terms.length} (${kindCounts(r.sheet)}) | ${r.sheet.relations.length} |`,
+);
+
+const detailSections = results.flatMap((r) => [
+  '',
+  `## ${r.model}${r.error ? ' — 실패' : ''}`,
+  ...(r.error
+    ? [`오류: ${r.error}`]
+    : [
+        '',
+        '### terms',
+        ...(r.sheet.terms as { kind: string; source: string; target: string; note?: string }[]).map(
+          (t) => `- [${t.kind}] ${t.source} → ${t.target}${t.note ? ` (${t.note})` : ''}`,
+        ),
+        '',
+        '### relations',
+        ...(
+          r.sheet.relations as {
+            from: string;
+            to: string;
+            speech: string;
+            fromBlock: number;
+            toBlock: number;
+            basis?: string;
+          }[]
+        ).map(
+          (rel) =>
+            `- ${rel.from} → ${rel.to}: ${rel.speech} (블록 ${rel.fromBlock}-${rel.toBlock})${rel.basis ? ` — ${rel.basis}` : ''}`,
+        ),
+      ]),
+]);
 
 const summary = [
   `# 글로사리 A/B — ${new Date().toISOString()}`,
   '',
   `- 파일: \`${P.file}\``,
-  `- 프로바이더: **${P.provider}** · 모델: \`${model}\`${
-    P.provider === 'gemini' ? ` · THINKING_LEVEL=**${GLOSSARY_THINKING_LEVEL}**` : ''
+  `- 프로바이더: **${P.provider}**${
+    P.provider === 'gemini' ? ` · 모델: \`${GLOSSARY_MODEL}\` · THINKING_LEVEL=**${GLOSSARY_THINKING_LEVEL}**` : ''
   }`,
   '',
-  `| 시간 | 입력tok | thinking | 출력tok | 비용 | terms(${kindCounts}) | relations |`,
-  '|---|---|---|---|---|---|---|',
-  `| ${seconds.toFixed(1)}s | ${usage.prompt} | ${usage.thoughts} | ${usage.output} | ${costLine} | ${sheet.terms.length} | ${sheet.relations.length} |`,
-  '',
-  '## terms',
-  ...(sheet.terms as { kind: string; source: string; target: string; note?: string }[]).map(
-    (t) => `- [${t.kind}] ${t.source} → ${t.target}${t.note ? ` (${t.note})` : ''}`,
-  ),
-  '',
-  '## relations',
-  ...(
-    sheet.relations as {
-      from: string;
-      to: string;
-      speech: string;
-      fromBlock: number;
-      toBlock: number;
-      basis?: string;
-    }[]
-  ).map(
-    (r) =>
-      `- ${r.from} → ${r.to}: ${r.speech} (블록 ${r.fromBlock}-${r.toBlock})${r.basis ? ` — ${r.basis}` : ''}`,
-  ),
+  '| 모델 | 성공 | 시간 | 입력tok | 출력tok | 비용 | terms | relations |',
+  '|---|---|---|---|---|---|---|---|',
+  ...comparisonRows,
+  ...detailSections,
 ].join('\n');
 
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const outDir = path.resolve(P.out, stamp);
 mkdirSync(outDir, { recursive: true });
 writeFileSync(path.join(outDir, 'summary.md'), summary);
-writeFileSync(path.join(outDir, 'sheet.json'), JSON.stringify(sheet, null, 2));
+for (const r of results) {
+  const safeModel = r.model.replace(/[^a-zA-Z0-9_.-]/g, '_');
+  writeFileSync(path.join(outDir, `sheet.${safeModel}.json`), JSON.stringify(r.sheet, null, 2));
+}
 
 console.log(`\n${summary}\n\n→ ${outDir}`);

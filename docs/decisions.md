@@ -899,6 +899,65 @@ ASS의 `[Script Info]`/스타일/레이어가 통째로 날아간다. splice는 
 나왔다 — 깨진 파일보다 나쁜, 멀쩡해 보이는 오역이다. 트랙 선택은 UI가 필요해
 `docs/TODO.md`로 미뤘다.
 
+### 2-14. 글로사리 추출 모델을 GPT-5.6-luna로 전환한다 — 2026-07-28
+
+**문제**: 글로사리·존대관계 프리패스(§2-9) 원가가 실사용 파일(1,100블록)에서 130원
+찍혔다. `GLOSSARY_MODEL`(flash)·`GLOSSARY_THINKING_LEVEL`(MEDIUM) 둘 다 env
+오버라이드가 있어 코드 변경 없이 내릴 수 있었지만, 어느 조합이 80원 목표를 품질
+손실 없이 통과하는지가 문제였다.
+
+**실험**: `scripts/glossary-ab.mts`(신설, `npm run glossary`)로 같은 프롬프트를
+Gemini(flash MEDIUM/LOW·flash-lite MEDIUM/LOW)·Claude(haiku-4.5)·OpenAI(nano/mini/
+gpt-5.6-luna 3종 병렬)에 태워 비교했다. 세 프로바이더 다 `extractCastSheet.ts`에서
+export한 `buildSystemInstruction`/`buildUserTurn`/`sanitizeCastSheet`를 그대로
+재사용해 프롬프트 자체는 완전히 동일하게 유지했다(§7 참조, `app/lib/providers/
+claude.ts`/`openai.ts` — production 경로 `registry.ts`는 안 건드림).
+
+| 조합 | drama-episode(461블록) | full-movie(1874블록, 2회 평균) |
+|---|---|---|
+| flash MEDIUM(구 기본값) | $0.0536, relations 6 | — |
+| flash-lite | $0.0051, relations 4(편차 큼) | **$0.0103, 4.0s**, relations 5 |
+| GPT-5.4-nano/mini | relations **0** (인물 인식 자체가 약함) | 미측정 |
+| **GPT-5.6-luna** | **$0.0288, relations 12** | **$0.0398, 16.7s**, relations 8 |
+
+**결정**: `GLOSSARY_MODEL`을 GPT-5.6-luna로 전환한다.
+
+**근거**: drama-episode에서 luna가 현행(flash MEDIUM) 대비 46% 저렴하면서
+relations를 2배 뽑았다 — "싸지만 불안정"(flash-lite)이 아니라 "싸면서 더
+정확"이라는, 이번 조사에서 유일하게 나온 조합이다. full-movie(장편)에서는 격차가
+좁혀지고 flash-lite가 시간·비용 모두 앞섰지만, **근거 추적 능력 자체가 다르다는
+게 확인됐다** — 986~1066블록의 "Caro Fabrizio", "Vai, Fabrizio, vai" 같은 명백한
+직접 대화 증거를 flash-lite는 2회 실행 모두 놓쳤고, luna는 2회 모두 정확한 블록
+범위(986-1065)까지 잡아냈다. 콘수엘로처럼 실제로 증거가 얕은 경우(7번 언급 중
+6번이 제3자가 화제로 삼는 문장)는 두 모델 다 올바르게 생략했다 — 즉 flash-lite의
+누락은 "근거 부족에 따른 정당한 생략"이 아니라 **모델 자체의 관계 추론 역량
+한계**다. 비용·시간이 아니라 이 역량 차이가 결정적이었다.
+
+**미해결로 남기는 것**:
+- **표본이 작다** — drama-episode 2회, full-movie 2회. 큰 파일에서 luna의 relations가
+  10→8→6으로 실행마다 흔들리는 것도 확인됐다. 반복 축적이 필요하지만, 지금
+  드러난 "flash-lite가 명백한 증거도 놓친다"는 질적 차이는 반복 없이도 결정
+  근거로 충분하다고 판단했다.
+- **이름 표기가 프로바이더·실행마다 흔들린다**(아녜세/아네세, 파브리시오/파브리치오) —
+  luna를 써도 사라지지 않는 문제. 글로사리의 존재 이유(표기 고정)를 갉아먹는
+  별개 리스크로 남겨둔다.
+- **fromBlock/toBlock이 대부분 "1-전체"로 뭉뚱그려진다** — luna의 `basis` 텍스트엔
+  정확한 구간이 있는데(예: "대사 194~450, 629~637..."), 숫자 필드엔 반영이 안 된다.
+  프롬프트가 그 정보를 필드로 옮기라고 충분히 강제하지 못한다.
+- **"Red Brigades"/"RedBrigades" 같은 표기 변형 중복 term** — 셋 다에서 재현. 둘 다
+  같은 target으로 매핑돼 번역 결과엔 해가 없지만 `GLOSSARY_MAX_TERMS` 슬롯을 낭비.
+
+**남은 작업 — production 배선 (미착수)**: 지금 `app/lib/providers/openai.ts`는
+`scripts/glossary-ab.mts` 전용이고, 실제 서비스 코드(`extractCastSheet.ts`)는 여전히
+`GoogleGenAI`를 직접 호출한다. luna를 실서비스에 태우려면:
+1. `extractCastSheet.ts`에 프로바이더 분기 추가(지금은 Gemini 하드코딩)
+2. 실패 시 폴백 — Gemini 경로는 실패하면 빈 시트를 반환하는데(§2-9), OpenAI 경로도
+   동일 보장 필요(`app/lib/providers/openai.ts`는 지금 그냥 throw)
+3. `OPENAI_API_KEY` 없는 환경(개발자 로컬 등)에서의 동작 정의
+4. `GLOSSARY_MODEL`/`GLOSSARY_THINKING_LEVEL`이 OpenAI 경로에선 의미가 달라지므로
+   `constants.ts` 주석·기본값 재정리
+`docs/TODO.md`에 항목 추가할 것.
+
 **코드**: `parseSubtitleDocument`/`emitInOriginalFormat`(`document.ts`),
 `parseVttWithSlots`, `serializeCues`(시간순 정렬 + 블록↔큐 맵), `resolveTrack`(`smi.ts`),
 `TranslationResult.downloads`, `buildOutputFilename(_, _, ext)`. 버전 0.15.0.

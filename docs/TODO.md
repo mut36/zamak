@@ -144,3 +144,28 @@ VTT는 올린 형식 그대로 내려받을 수 있게 됐다(splice 방식). �
   맡기고 프롬프트에 원어별 지시가 없다(§4 항목 7 "비영어 원어 커버리지"와 같은 뿌리).
 - [ ] **레거시 캐스트시트 호환 코드 제거** — `requestValidation.ts`의 `LEGACY_SPEECH` /
   `value.ko` 폴백은 배포 시점에 열려 있던 구버전 탭을 위한 것이다. 충분히 지나면 지울 것.
+
+## 글로사리 모델을 GPT-5.6-luna로 전환 (2026-07-28, `decisions.md` §2-14 후속)
+
+실험 배선(`scripts/glossary-ab.mts`, `app/lib/providers/openai.ts`)으로 결정까지 냈지만,
+실서비스 코드(`extractCastSheet.ts`)는 아직 Gemini 하드코딩이다. 실제 전환에 필요한 것:
+
+- [ ] `extractCastSheet.ts`에 프로바이더 분기 추가 — 지금은 `GoogleGenAI`를 직접
+      호출. `app/lib/providers/openai.ts`의 `openaiGenerateJson`을 재사용
+- [ ] 실패 시 폴백 보강 — Gemini 경로는 실패하면 빈 시트를 반환하는데(§2-9),
+      `openai.ts`는 지금 그냥 throw. 동일한 "이 프리패스는 절대 번역을 막지 않는다"
+      보장이 필요
+- [ ] `OPENAI_API_KEY` 미설정 환경(로컬 개발 등)에서의 동작 정의
+- [ ] `GLOSSARY_MODEL`/`GLOSSARY_THINKING_LEVEL`의 의미가 OpenAI 경로에선 달라지므로
+      `constants.ts` 주석·기본값 재정리 (`GLOSSARY_THINKING_LEVEL`은 OpenAI엔 해당 없음)
+- [ ] README §환경변수 표에 `GLOSSARY_MODEL` 기본값이 여전히 Gemini 모델명으로
+      적혀 있으면 갱신
+- [ ] `docs/translation-pipeline.md` §2-C의 "품질 레버" 절도 실제 프로바이더에 맞게 갱신
+
+미해결로 남겨둔 품질 이슈(§2-14 참조, 코드 수정 없이는 luna로 바꿔도 안 사라짐):
+- [ ] 이름 표기가 실행마다 흔들림(아녜세/아네세 등) — 글로사리의 핵심 가치(표기 고정)를
+      갉아먹는 리스크. 여러 번 뽑아 다수결하는 등의 안정화 방안 검토
+- [ ] `fromBlock`/`toBlock`이 거의 항상 "1-전체"로 뭉뚱그려짐 — `basis` 텍스트엔 정확한
+      구간이 있는데 숫자 필드에 반영이 안 됨. 프롬프트 보강 필요
+- [ ] "Red Brigades"/"RedBrigades" 같은 표기 변형이 별개 term으로 중복 등록됨 —
+      `sanitizeCastSheet`에 정규화/병합 단계 추가 검토
