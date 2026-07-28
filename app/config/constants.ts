@@ -5,6 +5,20 @@
 import { resolveTargetLang, TARGET_LANGS } from './languages';
 
 /**
+ * Build version, shown in the footer. Kept here rather than in page.tsx so the
+ * one hardcoded copy sits next to every other constant — a test pins it to
+ * package.json.
+ */
+export const APP_VERSION = '0.19.0';
+
+/**
+ * How long a finished translation stays downloadable. The beta ships without
+ * automatic cleanup, so this is what the UI promises and what the history
+ * screen enforces by disabling the button — not what a cron job deletes.
+ */
+export const RESULT_RETENTION_DAYS = 30;
+
+/**
  * SRT chunking & concurrency — the two knobs for parallel translation, split
  * per tier. Set a very large chunk size to force a single request (no
  * chunking). All four overridable via env for quick tuning.

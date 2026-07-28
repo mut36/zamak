@@ -3,56 +3,41 @@
 /* ============================================================
    ZAMAK Design Tokens
    Source of truth: design_handoff_zamak_redesign
-   Default theme = "Simple" (warm green). The "Pro" workspace
-   theme (cool blue) swaps only the accent + ink hue via
-   [data-theme='pro'] so both share one primitive layer.
+   Apple-style gray + yellow palette (beta redesign prototype).
    ============================================================ */
 :root {
-  --bg: oklch(0.987 0.006 84);
+  --bg: #f5f5f7;
   --surface: #ffffff;
-  --surface-2: oklch(0.975 0.008 84);
-  --border: oklch(0.925 0.008 80);
-  --border-strong: oklch(0.87 0.012 78);
-  --ink: oklch(0.26 0.013 68);
-  --ink-2: oklch(0.49 0.013 68);
-  --ink-3: oklch(0.64 0.011 70);
-  --accent: oklch(0.57 0.115 162);
-  --accent-press: oklch(0.5 0.115 162);
-  --accent-soft: oklch(0.955 0.035 162);
-  --accent-line: oklch(0.86 0.06 162);
-  /* raw accent lightness/chroma/hue for shadow composition */
-  --accent-rgbish: 0.57 0.115 162;
+  --surface-2: #fbfbfd;
+  --border: rgba(0, 0, 0, 0.12);
+  --border-strong: rgba(0, 0, 0, 0.25);
+  --ink: #161614;
+  --ink-body: #1d1d1f;
+  --ink-2: #424245;
+  --ink-3: #6e6e73;
+  --ink-4: #86868b;
+  --ink-5: #a1a1a6;
+  --accent: #ffd84d;
+  --accent-soft: rgba(255, 216, 77, 0.45);
+  --accent-line: rgba(225, 178, 61, 0.55);
+  --accent-wash: rgba(255, 216, 77, 0.14);
+  --success: #34c759;
+  --danger: #ff3b30;
 
-  --radius: 18px;
+  --radius: 16px;
+  --radius-lg: 20px;
   --radius-sm: 12px;
 
-  --shadow:
-    0 1px 2px oklch(0.4 0.02 80 / 0.04), 0 12px 32px oklch(0.45 0.03 80 / 0.06);
-  --shadow-lg:
-    0 2px 4px oklch(0.4 0.02 80 / 0.04), 0 18px 48px oklch(0.45 0.03 80 / 0.09);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 30px rgba(0, 0, 0, 0.05);
+  --shadow-modal: 0 24px 80px rgba(0, 0, 0, 0.25);
+
+  --nav-bg: rgba(245, 245, 247, 0.72);
 
   --mono: var(--font-jetbrains-mono), ui-monospace, 'SFMono-Regular', monospace;
   --sans:
-    'Pretendard Variable', 'Pretendard', var(--font-jetbrains-mono), system-ui,
-    sans-serif;
-}
-
-/* Pro workspace theme — cool blue. Applied via <html data-theme="pro">. */
-[data-theme='pro'] {
-  --bg: oklch(0.984 0.003 255);
-  --surface-2: oklch(0.975 0.004 255);
-  --border: oklch(0.918 0.006 255);
-  --border-strong: oklch(0.86 0.01 255);
-  --ink: oklch(0.24 0.02 258);
-  --ink-2: oklch(0.46 0.02 258);
-  --ink-3: oklch(0.62 0.015 258);
-  --accent: oklch(0.55 0.17 256);
-  --accent-press: oklch(0.48 0.17 256);
-  --accent-soft: oklch(0.955 0.03 256);
-  --accent-line: oklch(0.84 0.07 256);
-  --accent-rgbish: 0.55 0.17 256;
-  --radius: 12px;
-  --radius-sm: 8px;
+    'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont,
+    system-ui, sans-serif;
 }
 
 /* Expose tokens to Tailwind utilities (bg-surface, text-ink, border-border …).
@@ -64,17 +49,23 @@
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-ink: var(--ink);
+  --color-ink-body: var(--ink-body);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-ink-5: var(--ink-5);
   --color-accent: var(--accent);
-  --color-accent-press: var(--accent-press);
   --color-accent-soft: var(--accent-soft);
   --color-accent-line: var(--accent-line);
+  --color-accent-wash: var(--accent-wash);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
 
   --font-sans: var(--sans);
   --font-mono: var(--mono);
 
   --radius-card: var(--radius);
+  --radius-card-lg: var(--radius-lg);
   --radius-sm: var(--radius-sm);
 }
 
@@ -1255,3 +1246,21 @@ button:disabled {
     will-change: auto;
   }
 }
+
+/* ── 프로토타입 모션 ── */
+@keyframes zslide {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes zbreathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+@keyframes zblink {
+  0%, 49%   { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.animate-zslide { animation: zslide 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-zbreathe { animation: zbreathe 1.2s ease-in-out infinite; }
+.animate-zblink { animation: zblink 1.06s step-end infinite; }

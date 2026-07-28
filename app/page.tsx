@@ -23,13 +23,11 @@ import {
 } from './lib/subtitles';
 import { isSupabaseConfigured } from './lib/supabase/env';
 import { DEFAULT_TARGET_LANG } from './config/languages';
-import type { AllowedModel } from './config/constants';
+import { APP_VERSION, type AllowedModel } from './config/constants';
 import type { ContentType, MovieInfo } from './types/translation';
 import { COPY } from './i18n/simpleCopy';
 
 const EMPTY_MOVIE_INFO: MovieInfo = { title: '', year: '', notes: '' };
-// Keep in sync with package.json version.
-const APP_VERSION = '0.15.0';
 
 /**
  * A bilingual SAMI is the one failure with a fix the user can act on (upload a
