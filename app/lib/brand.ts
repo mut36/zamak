@@ -14,6 +14,8 @@ export const BRAND = {
 
 export const SITE = {
   name: 'ZAMAK',
+  /** Canonical production origin (apex). www redirects here via vercel.json. */
+  url: 'https://zamak.app',
   // Title focuses on the structural guarantee (timecode integrity), not speed.
   title: 'ZAMAK — 타임코드가 밀리지 않는 자막 번역기',
   // Description covers: formats, timecode safety, 7 target languages, no install.

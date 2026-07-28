@@ -1,0 +1,10 @@
+{
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.zamak.app" }],
+      "destination": "https://zamak.app/:path*",
+      "permanent": true
+    }
+  ]
+}

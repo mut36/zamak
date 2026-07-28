@@ -16,6 +16,9 @@ function siteUrl(): URL {
   if (process.env.NEXT_PUBLIC_SITE_URL) {
     return new URL(process.env.NEXT_PUBLIC_SITE_URL);
   }
+  if (process.env.VERCEL_ENV === 'production') {
+    return new URL(SITE.url);
+  }
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
     return new URL(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`);
   }
@@ -46,6 +49,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: SITE.locale,
+    url: SITE.url,
     siteName: SITE.name,
     title: SITE.title,
     description: SITE.description,

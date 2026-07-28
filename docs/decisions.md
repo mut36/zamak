@@ -189,6 +189,17 @@ Toss 호출은 `app/lib/server/toss.ts` 한 곳에만 두고 라우트는 "주�
 
 비로그인 랜딩을 [토스 랜딩](https://toss.im/)처럼 **넓은 여백 · 큰 타이포 · 섹션당 하나의 메시지**로 재구성했다. 카드 그리드 차별점 나열을 버리고, 기능마다 풀블리드 챕터(eyebrow + 대형 제목 + 짧은 본문)로 쌓는다. 로그인 후 위저드 폭(600/840)은 그대로 두고, 랜딩만 `max-w: 980px` 이너 + full-bleed 밴드로 분리했다. 버전 `0.14.0`.
 
+### 1-14. 프로덕션 도메인 `zamak.app` — 2026-07-28
+
+커스텀 도메인 `zamak.app`(www 포함)을 캐논 오리진으로 고정했다. 토스 가맹점 심사·
+OAuth 리다이렉트·OG 절대 URL이 Vercel 기본 호스트에 묶이지 않게 하기 위함이다.
+
+- `SITE.url = https://zamak.app` (`app/lib/brand.ts`) — `/legal` 홈페이지·OG url
+- `metadataBase`: env → 프로덕션이면 `SITE.url` → Vercel URL → localhost
+- `vercel.json`: `www.zamak.app` → apex 301
+- 버전 `0.14.1`. Vercel Domains·`NEXT_PUBLIC_SITE_URL`·Supabase Redirect URLs는
+  대시보드에서 이미 등록됨.
+
 ### 1-11. 법적 고지 — 저작권보다 규제 준수가 먼저였다 — 2026-07-27
 
 자막 번역 서비스의 리스크를 저작권으로만 보고 약관을 강화하려다, 실제 순위가

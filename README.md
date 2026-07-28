@@ -1,6 +1,6 @@
 # ZAMAK
 
-**v0.14.0 Beta**
+**v0.14.1 Beta**
 
 SRT 자막을 Gemini로 번역하는 웹 애플리케이션입니다. AI에는 대사만 보내고 코드가 타임코드를 복원하는 구조라, 번역 후에도 자막 싱크가 밀리지 않습니다.
 
@@ -96,7 +96,10 @@ npx tsc --noEmit && npx eslint app && npx vitest run
 2. **Google OAuth 클라이언트 생성** (Google Cloud Console → APIs & Services → Credentials → OAuth client ID → Web application)
    - Authorized redirect URI: `https://<project>.supabase.co/auth/v1/callback`
 3. **Supabase 대시보드** → Authentication → Providers → Google을 켜고 위에서 받은 Client ID/Secret 입력
-4. **Supabase 대시보드** → Authentication → URL Configuration → Redirect URLs에 `http://localhost:3000/auth/callback`(개발)과 배포 도메인의 같은 경로를 추가
+4. **Supabase 대시보드** → Authentication → URL Configuration
+   - Site URL: `https://zamak.app`
+   - Redirect URLs: `http://localhost:3000/auth/callback`(개발),
+     `https://zamak.app/auth/callback`, `https://www.zamak.app/auth/callback`
 5. **스키마 적용**: `supabase/migrations/0001_credits.sql`을 SQL Editor에 붙여넣고 실행
 
 ### 크레딧
@@ -208,6 +211,7 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 | `TRANSLATION_STRICT_MODE` | `false` | 아래 참조 |
 | `GOOGLE_GENAI_API_KEY` | — | **필수.** analyze/enrich/summarize/translate 4개 라우트 전부가 이 키로 동작. grounding 때문에 결제 연결 프로젝트여야 함 |
 | `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` | — | **필수.** 없으면 모델 라우트가 전부 500으로 닫힘 |
+| `NEXT_PUBLIC_SITE_URL` | `https://zamak.app` (프로덕션) | OG·메타 `metadataBase`용 캐논 오리진. 없으면 프로덕션에서 `SITE.url`, 프리뷰는 Vercel URL |
 | `NEXT_PUBLIC_MAX_BLOCKS_PER_CREDIT` | 2000 | 크레딧 1개가 커버하는 자막 블록 수 |
 | `JOB_VALIDITY_MINUTES` | 60 | 결제된 job이 유효한 시간 |
 | `TOSS_SECRET_KEY` | — | 결제 승인용 시크릿 키 (서버 전용). 없으면 결제 라우트만 닫히고 번역은 그대로 동작 |
@@ -325,14 +329,18 @@ scripts/chunk-model.mjs         # 청크 크기 계산기
 
 ## Deploy
 
+프로덕션 도메인: [https://zamak.app](https://zamak.app) (`www.zamak.app` → apex 301, `vercel.json`).
+
 ```bash
 npm run build
 vercel deploy
 ```
 
-Vercel Project Settings → Environment Variables에 `TMDB_API_KEY`, `GOOGLE_GENAI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `TOSS_SECRET_KEY`, `NEXT_PUBLIC_TOSS_CLIENT_KEY`를 추가합니다.
+Vercel Project Settings → Environment Variables에 `TMDB_API_KEY`, `GOOGLE_GENAI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL=https://zamak.app`, `TOSS_SECRET_KEY`, `NEXT_PUBLIC_TOSS_CLIENT_KEY`를 추가합니다.
 
-배포 도메인을 Supabase의 Redirect URLs(`https://<도메인>/auth/callback`)에도 등록해야 로그인이 돌아옵니다.
+Domains에 `zamak.app`과 `www.zamak.app`을 연결하고, Supabase Redirect URLs에
+`https://zamak.app/auth/callback`과 `https://www.zamak.app/auth/callback`을 등록해야
+로그인이 돌아옵니다.
 
 ## License
 
