@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  runOrderedPool,
-  takeContiguousResults,
-} from './concurrency';
+import { runOrderedPool } from './concurrency';
 
 describe('runOrderedPool', () => {
   it('preserves input order despite out-of-order completion', async () => {
@@ -34,11 +31,5 @@ describe('runOrderedPool', () => {
     ).rejects.toThrow('failed');
 
     expect(started).toEqual([0, 1]);
-  });
-
-  it('keeps only the leading completed results for partial downloads', () => {
-    expect(takeContiguousResults(['first', 'second', undefined, 'fourth'])).toEqual(
-      ['first', 'second'],
-    );
   });
 });

@@ -84,6 +84,16 @@ export interface CpsResult {
 }
 
 /**
+ * Visible character count of a block's body: sequence + timing lines dropped,
+ * style tags stripped, line breaks not counted, counted by code point.
+ */
+function visibleCharCount(raw: string): number {
+  const body = raw.split('\n').slice(2).join('\n');
+  const visible = body.replace(STYLE_TAG, '').replace(/\n/g, '').trim();
+  return [...visible].length;
+}
+
+/**
  * Reading-speed (characters-per-second) metric for a single subtitle block.
  *
  * Not wired to any feature yet — this is a measured primitive kept ready for a
@@ -97,16 +107,6 @@ export interface CpsResult {
  * multibyte glyphs count as one; line breaks are dropped, not counted. Returns
  * null when the block has no parseable timing.
  */
-/**
- * Visible character count of a block's body: sequence + timing lines dropped,
- * style tags stripped, line breaks not counted, counted by code point.
- */
-function visibleCharCount(raw: string): number {
-  const body = raw.split('\n').slice(2).join('\n');
-  const visible = body.replace(STYLE_TAG, '').replace(/\n/g, '').trim();
-  return [...visible].length;
-}
-
 export function computeCps(raw: string): CpsResult | null {
   const timing = parseBlockTiming(raw);
   if (!timing) return null;
@@ -461,6 +461,26 @@ export function hasTranslatableText(raw: string): boolean {
   return /\p{L}/u.test(body);
 }
 
+export interface BlockIndexRange {
+  min: number;
+  max: number;
+}
+
+/**
+ * The real (source-file) sequence-number span covered by a chunk. Blocks
+ * keep their original numbering through chunking, so this is what lets the
+ * composer tell which cast-sheet speech relations (each tagged with a block
+ * range) actually apply to a given chunk. Null when the chunk has no
+ * well-formed blocks.
+ */
+export function getBlockIndexRange(content: string): BlockIndexRange | null {
+  const indexes = parseSrtBlocks(content)
+    .map((raw) => readSourceBlock(raw).index)
+    .filter((index): index is number => index !== null);
+  if (indexes.length === 0) return null;
+  return { min: Math.min(...indexes), max: Math.max(...indexes) };
+}
+
 /**
  * Format a chunk for the model: timestamps dropped (the model never sees or
  * returns them — reassembleTranslatedChunk restores them from the source) and
@@ -493,26 +513,6 @@ export function hasTranslatableText(raw: string): boolean {
  * Malformed blocks (no parseable sequence+timing) pass through with only a
  * timestamp-shaped line stripped, since there's no reliable index to marker.
  */
-export interface BlockIndexRange {
-  min: number;
-  max: number;
-}
-
-/**
- * The real (source-file) sequence-number span covered by a chunk. Blocks
- * keep their original numbering through chunking, so this is what lets the
- * composer tell which cast-sheet speech relations (each tagged with a block
- * range) actually apply to a given chunk. Null when the chunk has no
- * well-formed blocks.
- */
-export function getBlockIndexRange(content: string): BlockIndexRange | null {
-  const indexes = parseSrtBlocks(content)
-    .map((raw) => readSourceBlock(raw).index)
-    .filter((index): index is number => index !== null);
-  if (indexes.length === 0) return null;
-  return { min: Math.min(...indexes), max: Math.max(...indexes) };
-}
-
 export function formatBlocksForModel(content: string): string {
   return parseSrtBlocks(content)
     .map((raw) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { SpinnerIcon, SparkleIcon, PencilIcon } from '../icons';
 import { CastSheetCard } from './CastSheetCard';
 import type { EnrichCandidate, EnrichStatus } from '../../hooks/useEnrich';
@@ -41,8 +41,6 @@ interface InfoStepProps {
   onCastSheetRefetch: () => void;
   /** Target language code — the cast sheet's 표기/말투 columns follow it. */
   targetLang: string;
-  /** Optional content rendered just above the action buttons. */
-  beforeActions?: ReactNode;
   onBack: () => void;
   onTranslate: (model: AllowedModel) => void;
 }
@@ -76,7 +74,6 @@ function MovieInfo({
   onCastSheetChange,
   onCastSheetRefetch,
   targetLang,
-  beforeActions,
   onBack,
   onTranslate,
 }: InfoStepProps) {
@@ -263,7 +260,6 @@ function MovieInfo({
         />
       )}
 
-      {!busy && !awaitingSelection && beforeActions}
       <Actions
         onBack={onBack}
         onTranslate={onTranslate}
@@ -286,7 +282,6 @@ function OtherInfo({
   onCastSheetChange,
   onCastSheetRefetch,
   targetLang,
-  beforeActions,
   onBack,
   onTranslate,
 }: InfoStepProps) {
@@ -329,7 +324,6 @@ function OtherInfo({
         />
       )}
 
-      {!summarizing && beforeActions}
       <Actions onBack={onBack} onTranslate={onTranslate} disabled={summarizing} />
     </div>
   );

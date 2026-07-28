@@ -48,14 +48,3 @@ export async function runOrderedPool<T, R>({
   if (firstError !== undefined) throw firstError;
   return results;
 }
-
-export function takeContiguousResults<T>(
-  results: readonly (T | undefined)[],
-): T[] {
-  const contiguous: T[] = [];
-  for (const result of results) {
-    if (result === undefined) break;
-    contiguous.push(result);
-  }
-  return contiguous;
-}

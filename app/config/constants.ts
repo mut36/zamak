@@ -390,9 +390,8 @@ export function estimateTranslationMs(model: string): number {
  *    8–10 band. Aiming at the top of the band spends the least gap to reach
  *    "comfortable"; when a block can't reach it, it still gets as close as room
  *    allows.
- *  - CPS_RECOMMENDED_MIN (8): the comfortable floor. We never extend past
- *    CPS_TARGET, so nothing is ever pushed below this — it documents the band's
- *    lower edge for any future reporting.
+ *  - The band's lower edge (8) is not a constant: we never extend past
+ *    CPS_TARGET, so nothing is ever pushed below it and no code has to know it.
  *
  * MIN_SUBTITLE_GAP_MS keeps a ~2-frame (24fps) silence between adjacent
  * subtitles so a widened line never visually touches the next.
@@ -410,10 +409,6 @@ export const CPS_HARD_MAX = readPositiveIntEnv(
 export const CPS_TARGET = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_CPS_TARGET,
   10,
-);
-export const CPS_RECOMMENDED_MIN = readPositiveIntEnv(
-  process.env.NEXT_PUBLIC_CPS_RECOMMENDED_MIN,
-  8,
 );
 export const MIN_SUBTITLE_GAP_MS = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_MIN_SUBTITLE_GAP_MS,
@@ -448,8 +443,6 @@ export function getReadingSpeed(targetLang: string): {
 export const TIMING = {
   /** SSE heartbeat interval to prevent gateway timeout */
   HEARTBEAT_MS: 5_000,
-  /** Delay before resetting UI after successful translation */
-  SUCCESS_RESET_MS: 5_000,
 } as const;
 
 /**
