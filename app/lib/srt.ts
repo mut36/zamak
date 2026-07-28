@@ -437,6 +437,30 @@ function readSourceBlock(raw: string): SourceBlock {
   };
 }
 
+/** Sequence number of one raw SRT block, or null when its header is malformed
+ * (and so the block can't be addressed by number at all). */
+export function readBlockIndex(raw: string): number | null {
+  return readSourceBlock(raw).index;
+}
+
+/**
+ * Whether a block holds text worth sending to a translator.
+ *
+ * A body of `♪`, `- ...`, or a bare `1999` has nothing to translate, so the
+ * model will never "recover" it no matter how often it is re-sent — the
+ * recovery sweep drops these instead of spending a round on them every time.
+ * The test is "contains at least one letter in any script", which keeps
+ * Hangul, Han, Cyrillic and Latin dialogue in and leaves symbol/number-only
+ * cards out.
+ */
+export function hasTranslatableText(raw: string): boolean {
+  const lines = raw.split('\n');
+  const body = readSourceBlock(raw).index === null
+    ? raw
+    : lines.slice(2).join('\n');
+  return /\p{L}/u.test(body);
+}
+
 /**
  * Format a chunk for the model: timestamps dropped (the model never sees or
  * returns them — reassembleTranslatedChunk restores them from the source) and

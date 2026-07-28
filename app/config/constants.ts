@@ -468,6 +468,28 @@ export const RETRY = {
   BASE_DELAY_MS: 1_000,
 } as const;
 
+/**
+ * Recovery sweep: the pass that runs after the main one, re-collecting every
+ * block still holding its original text and re-sending them repacked into
+ * fresh chunks (see app/lib/client/recoverySweep.ts, docs/decisions.md §2-2).
+ *
+ * Both knobs exist to keep the 20-minute/₩5,000 incident structurally
+ * impossible. Repacking already removes the incident's mechanism — scattered
+ * leftovers cost one call per CHUNK, never one per block — and these cap what
+ * is left: at most MAX_ROUNDS rounds, and at most BUDGET_RATIO × (main-pass
+ * chunk count) calls across all of them. With the retry budget's +20% that
+ * puts the worst case for a file at ~1.7× the main pass, fixed.
+ *
+ * A round that recovers nothing stops the sweep regardless of budget — the
+ * blocks that keep failing (safety-filtered lines, say) fail the same way
+ * every time, and paying to confirm that twice is waste.
+ */
+export const RECOVERY = {
+  MAX_ROUNDS: 2,
+  BUDGET_RATIO: 0.5,
+  MIN_BUDGET: 2,
+} as const;
+
 /** Target-language code → output file suffix (before `.srt`). */
 export const LANG_SUFFIX: Record<string, string> = {
   ...Object.fromEntries(TARGET_LANGS.map((lang) => [lang.code, lang.code])),
