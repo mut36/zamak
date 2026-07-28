@@ -182,16 +182,19 @@ describe('prompt composition', () => {
   });
 
   it('builds every enabled target language with its own rules and line cap', async () => {
-    // Each language has a self-contained rules file written in that language —
-    // assert a distinctive phrase from each, plus the rendered line budget.
+    // Each language has a self-contained rules file written in that language.
+    // The snippets below are each file's *localization* guidance — the part no
+    // other language's file could contain, and the part `enforceTextRules`
+    // cannot supply from code. Asserting on those rather than on a mechanical
+    // rule keeps this test meaningful as mechanical rules move into srt.ts.
     const rulesSnippet: Record<string, string> = {
-      ko: '한 블록은 최대 두 줄까지만 허용돼',
-      en: 'At most two lines per block',
-      ja: '1ブロックは最大2行まで',
-      es: 'Como máximo dos líneas por bloque',
-      fr: 'Au plus deux lignes par bloc',
-      zh: '每个块最多两行',
-      de: 'Höchstens zwei Zeilen pro Block',
+      ko: '실제 한국인이 사용하는 한국어',
+      en: 'English has no grammatical formality axis',
+      ja: '日本の字幕慣行',
+      es: 'usa ustedes, no vosotros',
+      fr: 'français standard parlé',
+      zh: '不要用繁体字或台港用语',
+      de: 'natürliches gesprochenes Hochdeutsch',
     };
 
     for (const lang of TARGET_LANGS.filter((l) => l.enabled)) {

@@ -1,15 +1,9 @@
-1. **Chaque ligne de sortie doit être au format `[numéro] traduction`** (ex. : `[801] traduction`). Les lignes sans numéro sont jetées : n’en omets aucune. Conserve crochets et numéros tels que dans l’entrée — **ne jamais** les modifier, omettre ou réordonner. L’ordre de sortie doit suivre l’entrée.
-2. Ne jamais fusionner ni scinder les blocs de sous-titres. Des blocs distincts en entrée restent distincts en sortie. Blocs avec seul le nom du locuteur, blocs courts, répliques qui semblent continuer : ce sont toujours des blocs indépendants — sans exception.
-3. N’écris que des lignes `[numéro] traduction`. Si la réplique est un nombre (ex. : « 8 », « 1999 »), place-le dans la traduction sans crochets — les crochets ne servent qu’au marqueur de tête. Pas d’horodatage, de commentaire, de salutation, de reprise de l’original, de bloc de code (```) ni de markdown.
-4. Conserve le sens et l’intention du locuteur, mais rends-le en français standard parlé. Évite les calques et les tournures propres au français canadien. En dialogue, utilise des formes parlées (t’as, j’suis, etc.) sauf personnage très formel. Le français s’allonge souvent : coupe le superflu sans perdre le sens pour tenir la longueur de ligne. N’ajoute rien qui ne soit pas dans l’original.
-5. Si `<glossary>` fixe des graphies (personnes, lieux, termes), verrouille-les — pas de nouvelle translittération. Si `<speech_relations>` est présent, c’est le registre par défaut ; si la scène change clairement (tutoiement, rupture), privilégie la scène. La formalité passe par vous/tu : sans relations, déduis via appellatifs (monsieur, madame, titre), âge, rang et intimité, et garde le même traitement d’un locuteur vers le même destinataire d’une scène à l’autre. Ne passe au tu (tutoiement) que si l’original le justifie.
-6. Si une ligne dépasse {{lineMaxChars}} caractères espaces compris, coupe-la en **deux lignes portant le même numéro** (pas de nouveau numéro ; la seconde aussi numérotée). Une vraie ligne chacune — ne les colle pas avec une barre (`/`) sur une seule ligne. Coupe à la phrase, au groupe ou à l’unité de sens, et équilibre les longueurs si possible. Exemple :
-   [801] (première unité de sens)
-   [801] (seconde unité de sens)
-7. **Au plus deux lignes par bloc.** Si deux lignes ne suffisent pas ou qu’il en faudrait trois, comprime le sens en deux lignes au lieu de découper davantage.
-8. Plusieurs locuteurs dans un même bloc : commence chaque réplique par '- ' après le numéro, chacune sur sa propre ligne. Exemple :
-   [803] - (locuteur A)
-   [803] - (locuteur B)
-9. Suit les conventions de sous-titrage français : conserve la ponctuation ; mets une espace ordinaire avant `?` `!` `:` `;`. Pour une phrase coupée ou en suspens, un seul caractère points de suspension (`…`), pas trois points (`...`).
-10. Conserve la position et le sens des balises HTML ou de style du texte source.
-11. En cas de conflit : intégrité des numéros (ordre, nombre, pas de réordonnancement) > graphies du glossaire figées > exactitude du sens > cohérence de registre (indices de scène d’abord) > longueur de ligne.
+1. N’écris que des lignes `[numéro] traduction`. N’omets aucun numéro de l’entrée et garde l’ordre de l’entrée.
+   Un numéro fait exactement une ligne — n’écris jamais deux fois le même numéro.
+2. Si un sous-titre doit tenir sur deux lignes, mets un seul `|` à l’intérieur de cette ligne (deux lignes au plus). Deux locuteurs : `- A | - B`.
+   Coupe quand la ligne dépasse {{lineMaxChars}} caractères ; si ça déborde encore, comprime.
+3. Si la réplique est un nombre (ex. : « 8 »), place-le dans la traduction sans crochets. Pas d’horodatage, de commentaire ni de markdown.
+4. Une traduction libre et naturelle est permise, mais ne perds ni n’ajoute de sens. Rends-le en français standard parlé, avec des formes parlées en dialogue (t’as, j’suis) sauf personnage très formel ; évite les tournures propres au français canadien. Le français s’allonge : coupe le superflu. Conserve la ponctuation et mets une espace avant `?` `!` `:` `;`.
+5. Détermine le traitement (vous/tu) selon les appellatifs (monsieur, madame, titre), l’âge, le rang et l’intimité.
+6. Conserve la position et le sens des balises HTML ou de style.
+7. En cas de conflit, l’intégrité des numéros prime.

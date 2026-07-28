@@ -1,15 +1,9 @@
-1. **Every output line must be in the form `[number] translation`** (e.g. `[801] translation`). Lines without a number are discarded, so omit none. Keep the brackets and numbers exactly as in the input — **never** alter, drop, or reorder them. Output order must match input order.
-2. Never merge or split subtitle blocks. If blocks are separate in the input, they must stay separate in the output. Speaker-name-only blocks, short blocks, and lines that look like continuations are still independent blocks — no exceptions.
-3. Output only `[number] translation` lines. If the dialogue itself is a number (e.g. "8", "1999"), write it in the translation slot without brackets — brackets are only for the leading marker. Do not output timestamps, commentary, greetings, repeated source text, code fences (```), or markdown.
-4. Preserve the source meaning and the speaker’s intent, but render it as natural spoken English fitting the work’s genre, era, and relationships. Avoid calqued word order. Prefer contractions in dialogue (don't, I'm, gonna) unless the character is formal or archaic. Do not add information or interpretation absent from the source.
-5. If `<glossary>` lists person/place/term spellings, lock them — do not invent new transliterations. If `<speech_relations>` is present, treat it as the default register; when the scene itself clearly shifts (address forms change, relationships rupture), prefer the scene. English has no grammatical formality axis — show relationships through vocabulary, address (sir, Mr./Ms., first name, nickname), and register, and keep one character’s register toward the same addressee consistent across scenes.
-6. If a line exceeds {{lineMaxChars}} characters including spaces, split it into **two lines sharing the same number** (no new numbers; the second line must also carry the number). Put each on its own real line — do not join them with a slash (`/`) or similar on one line. Split at sentence, phrase, or sense boundaries and balance line lengths when you can. Example:
-   [801] (first sense unit)
-   [801] (second sense unit)
-7. **At most two lines per block.** If two lines still overflow or a third would be needed, compress the meaning into two lines instead of splitting further.
-8. When several speakers share one block, start each speaker’s line with '- ' after the number, each on its own real line. Example:
-   [803] - (speaker A)
-   [803] - (speaker B)
-9. Follow English subtitle punctuation: keep periods, question marks, and exclamation marks. For trailing off or unfinished speech, use a single ellipsis character (`…`), not three dots (`...`).
-10. Preserve the position and meaning of any HTML or subtitle style tags from the source.
-11. If rules conflict, prioritize: number integrity (order, count, no reordering) > locked glossary spellings > meaning accuracy > register consistency (scene cues win when present) > line length.
+1. Output only `[number] translation` lines. Omit none of the input numbers and keep them in input order.
+   One number is exactly one line — never write the same number twice.
+2. If a subtitle needs two lines, put a single `|` inside that one line (two lines max). Two speakers: `- A | - B`.
+   Split when a line exceeds {{lineMaxChars}} characters; if it still overflows, compress.
+3. If the dialogue itself is a number (e.g. "8"), write it in the translation slot without brackets. No timestamps, commentary, or markdown.
+4. Natural idiomatic rendering is welcome, but never drop or add meaning. Write spoken English a native speaker would actually say — prefer contractions (don't, I'm) unless the character is formal or archaic. Keep standard English subtitle punctuation, including sentence-final periods.
+5. Decide register from address forms, age, rank, and intimacy. English has no grammatical formality axis, so carry it through vocabulary and address (sir, Mr./Ms., first name, nickname).
+6. Keep the position and meaning of HTML/subtitle tags.
+7. On conflict, number integrity wins.

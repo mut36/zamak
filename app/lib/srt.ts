@@ -540,6 +540,22 @@ function stripCodeFence(text: string): string {
 const MARKER_LINE = /^\[(\d+)\]\s?(.*)$/;
 
 /**
+ * In-line break mark: `[123] 앞 | 뒤` becomes a two-line subtitle.
+ *
+ * The older wire format expressed a two-line subtitle as the same marker on
+ * two lines, which made a *merge* of two blocks indistinguishable from a legal
+ * line split — `[269]` twice is valid either way, so the model had a
+ * legal-looking path to the one thing it must never do. With one marker per
+ * line, a repeated marker is unambiguously an error and the block-count check
+ * catches it. Both formats are accepted here: repeated markers still join, so
+ * output from the older prompt keeps working.
+ *
+ * `|` is not valid subtitle text (0 occurrences across both sample files); a
+ * translation that legitimately contained one would be split here.
+ */
+const LINE_BREAK_MARK = '|';
+
+/**
  * Index the model's output by sequence number.
  *
  * Every line the model is asked for carries its own `[number] ` prefix (see
@@ -616,8 +632,9 @@ function indexTranslatedBodies(
   const bodies = new Map<number, string>();
   for (const [index, parts] of collected) {
     const body = parts
-      .map((part) => part.trimEnd())
-      .filter((part) => part.trim() !== '')
+      .flatMap((part) => part.split(LINE_BREAK_MARK))
+      .map((part) => part.trim())
+      .filter((part) => part !== '')
       .join('\n');
     if (body) bodies.set(index, body);
   }

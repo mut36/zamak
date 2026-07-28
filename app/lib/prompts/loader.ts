@@ -25,6 +25,17 @@ export function loadSystemPromptTemplate(): Promise<string> {
 }
 
 /**
+ * Prompt A/B knob: `TRANSLATION_RULES_VARIANT=foo` loads
+ * `translation_rules_<lang>_foo.txt` instead of the canonical file, so a rules
+ * rewrite can be measured against the live one before replacing it (that is
+ * how the current lean rules were adopted — docs/tuning/experiment-log.md,
+ * 2026-07-28). Unset in production. Read once at module load, same as
+ * THINKING_LEVEL — a variant comparison is one process per variant, not one
+ * run with a flag.
+ */
+const RULES_VARIANT = process.env.TRANSLATION_RULES_VARIANT ?? '';
+
+/**
  * Full translation rules for one target language (format invariants + style).
  * Written in that language. Contains a {{lineMaxChars}} placeholder the
  * caller renders from languages.ts.
@@ -32,7 +43,8 @@ export function loadSystemPromptTemplate(): Promise<string> {
 export function loadTranslationRules(
   language: TargetLangCode,
 ): Promise<string> {
-  return loadPromptFile(`common/translation_rules_${language}.txt`);
+  const suffix = RULES_VARIANT ? `_${RULES_VARIANT}` : '';
+  return loadPromptFile(`common/translation_rules_${language}${suffix}.txt`);
 }
 
 export function loadTranslationPhilosophy(
