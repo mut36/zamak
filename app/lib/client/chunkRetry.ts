@@ -12,6 +12,8 @@ export interface ChunkOutcome {
   content: string;
   /** Blocks within this chunk that fell back to original text. */
   unmatchedBlocks: number;
+  /** Sequence numbers of those blocks — what the recovery sweep re-sends. */
+  unmatchedIndices: number[];
 }
 
 export type TranslateFn = (
@@ -89,6 +91,10 @@ export async function translateChunkWithRetry(
           return {
             content: `${first.content}\n\n${second.content}`,
             unmatchedBlocks: first.unmatchedBlocks + second.unmatchedBlocks,
+            unmatchedIndices: [
+              ...first.unmatchedIndices,
+              ...second.unmatchedIndices,
+            ],
           };
         } catch (splitError) {
           if (signal.aborted) throw splitError;

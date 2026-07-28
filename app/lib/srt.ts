@@ -607,6 +607,17 @@ export interface ChunkReassembly {
   matched: number;
   /** Blocks that kept their original text because no translation lined up. */
   unmatched: number;
+  /**
+   * Sequence numbers of the unmatched blocks — the addressable subset of
+   * `unmatched`, which is what the recovery sweep re-collects and re-sends.
+   *
+   * A block whose own source header is malformed has no sequence number to
+   * address it by, so it counts toward `unmatched` but never appears here:
+   * there is no way to ask the model for it again and no way to put the answer
+   * back. `unmatchedIndices.length <= unmatched` is therefore expected, not a
+   * bug.
+   */
+  unmatchedIndices: number[];
   total: number;
 }
 
@@ -633,10 +644,14 @@ export function reassembleTranslatedChunk(
   const bodies = indexTranslatedBodies(modelOutput, expected);
 
   let matched = 0;
+  const unmatchedIndices: number[] = [];
   const rebuilt = sourceBlocks.map((block) => {
     if (block.index === null) return block.raw;
     const body = bodies.get(block.index);
-    if (!body) return block.raw;
+    if (!body) {
+      unmatchedIndices.push(block.index);
+      return block.raw;
+    }
     matched++;
     return `${block.sequenceLine}\n${block.timingLine}\n${body}`;
   });
@@ -645,6 +660,7 @@ export function reassembleTranslatedChunk(
     content: rebuilt.join('\n\n'),
     matched,
     unmatched: sourceBlocks.length - matched,
+    unmatchedIndices,
     total: sourceBlocks.length,
   };
 }

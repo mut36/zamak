@@ -23,6 +23,10 @@ export interface TranslationOutcome {
    * model's output didn't line up with them (non-strict mode only — strict
    * mode fully validates or throws, so it's always 0 there). */
   unmatchedBlocks: number;
+  /** Sequence numbers of those blocks, so the client's recovery sweep can
+   * re-collect and re-send exactly them. See ChunkReassembly.unmatchedIndices
+   * for why this can be shorter than `unmatchedBlocks`. */
+  unmatchedIndices: number[];
 }
 
 interface TranslateOptions {
@@ -284,7 +288,7 @@ export async function translateSubtitle({
     // sequence number — this is what makes line shifting impossible, and it
     // costs no extra API call. Blocks the model merged or skipped keep their
     // original text instead of dragging every later subtitle out of sync.
-    const { content: rebuilt, matched, unmatched, total } =
+    const { content: rebuilt, matched, unmatched, unmatchedIndices, total } =
       reassembleTranslatedChunk(content, modelOutput);
     const position = chunkPosition
       ? `${chunkPosition.index}/${chunkPosition.total}`
@@ -306,7 +310,7 @@ export async function translateSubtitle({
       );
     }
 
-    return { content: rebuilt, unmatchedBlocks: unmatched };
+    return { content: rebuilt, unmatchedBlocks: unmatched, unmatchedIndices };
   }
 
   // Strict path (opt-in via TRANSLATION_STRICT_MODE): validate the output,
@@ -371,7 +375,7 @@ export async function translateSubtitle({
     const content = await translateContentStrict(subtitleContent);
     // Strict mode validates every block matches or throws, so there is never
     // a partial fallback to report.
-    return { content, unmatchedBlocks: 0 };
+    return { content, unmatchedBlocks: 0, unmatchedIndices: [] };
   }
   return translateOnce(subtitleContent);
 }

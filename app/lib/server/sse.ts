@@ -23,11 +23,12 @@ export function createTranslationStream(
       }, TIMING.HEARTBEAT_MS);
 
       try {
-        const { content, unmatchedBlocks } = await task();
+        const { content, unmatchedBlocks, unmatchedIndices } = await task();
         controller.enqueue(
           encodeEvent(encoder, {
             translatedContent: content,
             unmatchedBlocks,
+            unmatchedIndices,
           }),
         );
       } catch (error) {

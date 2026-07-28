@@ -77,6 +77,8 @@ export interface TranslationEvent {
   /** Blocks within this chunk that fell back to original text (see
    * TranslationOutcome.unmatchedBlocks server-side). */
   unmatchedBlocks?: number;
+  /** Sequence numbers of those blocks, for the client's recovery sweep. */
+  unmatchedIndices?: number[];
   error?: string;
   code?: TranslationErrorCode;
 }

@@ -21,12 +21,12 @@ const twoBlockChunk = [
 
 describe('translateChunkWithRetry', () => {
   it('returns the result unchanged on first-try success, spending no budget', async () => {
-    const translate = vi.fn().mockResolvedValue({ content: 'ok', unmatchedBlocks: 0 });
+    const translate = vi.fn().mockResolvedValue({ content: 'ok', unmatchedBlocks: 0, unmatchedIndices: [] });
     const state = freshState();
 
     await expect(
       translateChunkWithRetry(singleBlockChunk, new AbortController().signal, translate, state),
-    ).resolves.toEqual({ content: 'ok', unmatchedBlocks: 0 });
+    ).resolves.toEqual({ content: 'ok', unmatchedBlocks: 0, unmatchedIndices: [] });
     expect(translate).toHaveBeenCalledTimes(1);
     expect(state.budget).toBe(3);
   });
@@ -35,12 +35,12 @@ describe('translateChunkWithRetry', () => {
     const translate = vi
       .fn()
       .mockRejectedValueOnce(new TranslationError('blip', 'transient'))
-      .mockResolvedValueOnce({ content: 'ok', unmatchedBlocks: 0 });
+      .mockResolvedValueOnce({ content: 'ok', unmatchedBlocks: 0, unmatchedIndices: [] });
     const state = freshState();
 
     await expect(
       translateChunkWithRetry(singleBlockChunk, new AbortController().signal, translate, state),
-    ).resolves.toEqual({ content: 'ok', unmatchedBlocks: 0 });
+    ).resolves.toEqual({ content: 'ok', unmatchedBlocks: 0, unmatchedIndices: [] });
     expect(translate).toHaveBeenCalledTimes(2);
     expect(state.budget).toBe(2);
   });
@@ -88,8 +88,8 @@ describe('translateChunkWithRetry', () => {
     const translate = vi
       .fn()
       .mockRejectedValueOnce(new TranslationError('too big', 'oversize'))
-      .mockResolvedValueOnce({ content: 'first-half', unmatchedBlocks: 0 })
-      .mockResolvedValueOnce({ content: 'second-half', unmatchedBlocks: 1 });
+      .mockResolvedValueOnce({ content: 'first-half', unmatchedBlocks: 0, unmatchedIndices: [] })
+      .mockResolvedValueOnce({ content: 'second-half', unmatchedBlocks: 1, unmatchedIndices: [7] });
     const state = freshState();
 
     await expect(
@@ -97,6 +97,7 @@ describe('translateChunkWithRetry', () => {
     ).resolves.toEqual({
       content: 'first-half\n\nsecond-half',
       unmatchedBlocks: 1,
+      unmatchedIndices: [7],
     });
     expect(translate).toHaveBeenCalledTimes(3);
     expect(state.budget).toBe(2);

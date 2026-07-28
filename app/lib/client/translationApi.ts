@@ -13,6 +13,8 @@ export interface ChunkTranslationOutcome {
   /** Blocks within this chunk that fell back to original text — see
    * TranslationOutcome.unmatchedBlocks on the server side. */
   unmatchedBlocks: number;
+  /** Sequence numbers of those blocks — what the recovery sweep re-sends. */
+  unmatchedIndices: number[];
 }
 
 async function requestTranslation(
@@ -68,6 +70,7 @@ async function requestTranslation(
   return {
     content: event.translatedContent,
     unmatchedBlocks: event.unmatchedBlocks ?? 0,
+    unmatchedIndices: event.unmatchedIndices ?? [],
   };
 }
 

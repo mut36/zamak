@@ -105,6 +105,8 @@ describe('reassembleTranslatedChunk', () => {
     const result = reassembleTranslatedChunk(source, output);
 
     expect(result).toMatchObject({ matched: 2, unmatched: 1 });
+    // The sweep needs the sequence number, not just the count, to re-send it.
+    expect(result.unmatchedIndices).toEqual([802]);
     // 802 falls back to the original line rather than pulling 803's timecode up.
     expect(result.content).toContain(
       '802\n00:01:26,100 --> 00:01:28,000\nJust looking around.',
@@ -268,6 +270,7 @@ describe('reassembleTranslatedChunk', () => {
   it('reports no matches when the output is unusable', () => {
     const result = reassembleTranslatedChunk(source, '죄송하지만 번역할 수 없습니다.');
     expect(result).toMatchObject({ matched: 0, unmatched: 3, total: 3 });
+    expect(result.unmatchedIndices).toEqual([801, 802, 803]);
     expect(result.content).toBe(source);
   });
 });
