@@ -47,9 +47,12 @@ export function DoneStep({ result, originalContent, onStartOver }: DoneStepProps
         </div>
       </div>
 
-      {/* Partial-failure notice — some chunks/blocks kept their original
-          text, or a fatal error (quota/auth) stopped the job early. */}
-      {result.stopReason || result.failedChunks || result.fallbackBlocks ? (
+      {/* Partial-failure notice — lines that were still original after the
+          recovery sweep retried them, or a fatal error (quota/auth) that
+          stopped the job early. failedChunks is deliberately not a trigger:
+          a chunk the main pass lost is usually recovered block by block, so
+          it says nothing about the file being downloaded. */}
+      {result.stopReason || result.fallbackBlocks ? (
         <div
           className='card p-4 mt-6 text-[13px] leading-relaxed'
           style={{
@@ -59,7 +62,7 @@ export function DoneStep({ result, originalContent, onStartOver }: DoneStepProps
         >
           {result.stopReason
             ? c.stopReason[result.stopReason]
-            : c.partialWarning(result.failedChunks ?? 0, result.fallbackBlocks ?? 0)}
+            : c.partialWarning(result.fallbackBlocks ?? 0)}
         </div>
       ) : null}
 

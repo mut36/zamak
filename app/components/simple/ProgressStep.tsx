@@ -73,8 +73,17 @@ export function ProgressStep({ progress, totalLines, onCancel }: ProgressStepPro
   // Never let the ring go backwards: a chunk landing early should pull it
   // forward, but a slow chunk must not undo what the estimate already showed.
   const displayPct = done ? 100 : Math.min(CEIL, Math.max(realPct, pct));
+  // The sweep runs after every chunk has landed, so the ring is already
+  // pinned at its ceiling — only the label can tell the user that the extra
+  // wait is a second attempt at the lines that came back untranslated.
   const status =
-    displayPct < 25 ? c.analyzing : displayPct < 92 ? c.translating : c.finalizing;
+    progress.stage === 'recovering'
+      ? c.recovering
+      : displayPct < 25
+        ? c.analyzing
+        : displayPct < 92
+          ? c.translating
+          : c.finalizing;
   const processed = Math.round((displayPct / 100) * totalLines);
   // Derive the countdown from whatever the ring is actually showing, so the
   // two never disagree — the chunk-based estimatedRemainingMs used to drive

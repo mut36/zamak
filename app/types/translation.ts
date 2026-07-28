@@ -30,14 +30,19 @@ export interface TranslationResult {
   lineCount: number;
   /** Wall-clock duration in milliseconds. */
   durationMs: number;
-  /** Chunks that failed and kept their original text (0 = fully translated). */
+  /** Chunks the main pass failed outright. Diagnostic only: the recovery
+   * sweep works per block, so a "failed" chunk may be fully translated in the
+   * delivered file. Never show this to the user — use fallbackBlocks. */
   failedChunks?: number;
   /** Total chunks the file was split into. */
   totalChunks?: number;
-  /** Subtitle blocks that individually kept their original text inside an
-   * otherwise-successful chunk (model skipped/misaligned them) — distinct
-   * from failedChunks, which are whole chunks that errored out. */
+  /** Subtitle blocks still holding their original text in the delivered file,
+   * after the recovery sweep. This is the one number that describes what the
+   * user actually downloads (0 = fully translated). */
   fallbackBlocks?: number;
+  /** Blocks the recovery sweep rescued — original after the main pass,
+   * translated in the delivered file. */
+  recoveredBlocks?: number;
   /** Set when a fatal error (quota/auth) stopped the job before every chunk
    * was attempted; every chunk after the stopping point kept its original
    * text. Undefined when the job ran to completion (with or without
@@ -49,7 +54,7 @@ export type TranslationMode = 'chunk';
 export type TranslationStyle = 'meaning' | 'cinematic';
 
 export interface TranslationProgress {
-  stage: 'idle' | 'translating' | 'finalizing' | 'done';
+  stage: 'idle' | 'translating' | 'recovering' | 'finalizing' | 'done';
   currentChunk: number;
   totalChunks: number;
   estimatedRemainingMs: number;

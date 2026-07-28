@@ -14,7 +14,12 @@ import {
   chunkSrtBlocksAtGaps,
   enforceTextRules,
   parseSrtBlocks,
+  readBlockIndex,
 } from '../lib/srt';
+import {
+  computeSweepBudget,
+  runRecoverySweep,
+} from '../lib/client/recoverySweep';
 import { runOrderedPool } from '../lib/client/concurrency';
 import { computeRetryBudget } from '../lib/translationErrors';
 import type {
@@ -269,8 +274,15 @@ export function useTranslation(
       // (quota/auth) trips retryState.fatalCode, and every chunk that hasn't
       // started yet falls straight back to its original text without
       // spending a call. Only user cancellation aborts the whole job.
+      //
+      // Whatever is still original when the pool drains — a whole failed
+      // chunk, or the odd line a successful chunk's output skipped — is
+      // collected here by sequence number and handed to the recovery sweep,
+      // which repacks them into fresh chunks and asks again. Counting them
+      // rather than diffing text is what keeps a line whose translation
+      // legitimately equals its source ("OK", "♪") out of the retry set.
       let failedChunks = 0;
-      let fallbackBlocks = 0;
+      const leftover: number[] = [];
       const retryState: RetryState = {
         budget: computeRetryBudget(totalChunks),
         fatalCode: null,
@@ -301,7 +313,7 @@ export function useTranslation(
                 ),
               retryState,
             );
-            fallbackBlocks += outcome.unmatchedBlocks;
+            leftover.push(...outcome.unmatchedIndices);
             return outcome.content;
           } catch (err) {
             // Let cancellation propagate so the pool can abort.
@@ -311,6 +323,11 @@ export function useTranslation(
               `[translate] chunk ${index + 1}/${totalChunks} failed, keeping original`,
               err,
             );
+            // The whole chunk is original, so every block in it is a leftover.
+            for (const raw of parseSrtBlocks(chunk)) {
+              const blockIndex = readBlockIndex(raw);
+              if (blockIndex !== null) leftover.push(blockIndex);
+            }
             return chunk;
           }
         },
@@ -333,13 +350,66 @@ export function useTranslation(
         throw new Error(msg.noResponse);
       }
 
+      const mainPassContent = (results as string[]).join('\n\n');
+
+      // Second pass over just the blocks that came back untranslated. A fatal
+      // error means the account itself is the problem, so asking again would
+      // only fail the same way — the sweep is skipped and the stop reason
+      // stands. See app/lib/client/recoverySweep.ts for the cost bounds.
+      let sweptContent = mainPassContent;
+      let remainingBlocks = leftover.length;
+      let recoveredBlocks = 0;
+      if (leftover.length > 0 && !retryState.fatalCode) {
+        setTranslationProgress((prev) => ({ ...prev, stage: 'recovering' }));
+        const sweep = await runRecoverySweep({
+          sourceContent: content,
+          translatedContent: mainPassContent,
+          leftover,
+          chunkSize,
+          concurrency,
+          signal: controller.signal,
+          budget: computeSweepBudget(totalChunks),
+          // Deliberately the bare request, not translateChunkWithRetry: the
+          // sweep's own rounds are its retry, and layering the per-chunk
+          // budget on top would double-count the same failure.
+          translate: (chunkContent, signal) =>
+            requestChunkTranslation(
+              {
+                chunk: chunkContent,
+                chunkIndex: 1,
+                totalChunks: 1,
+                movieInfo,
+                model,
+                targetLang,
+                translationStyle,
+                jobId,
+                castSheet,
+              },
+              signal,
+            ),
+        });
+        sweptContent = sweep.content;
+        recoveredBlocks = sweep.recovered;
+        // Blocks with nothing to translate (♪, numbers) aren't the user's
+        // problem, so they don't go in the warning count.
+        remainingBlocks = sweep.remaining.length;
+        console.log(
+          `[sweep] recovered ${sweep.recovered}, remaining ${sweep.remaining.length}, untranslatable ${sweep.untranslatable.length}, calls ${sweep.calls}, stopped by ${sweep.stoppedBy}`,
+        );
+      }
+
+      if (controller.signal.aborted) {
+        setTranslationProgress(IDLE_PROGRESS);
+        return false;
+      }
+
       // Mechanical text rules (2-line cap, and sentence-final punctuation for
       // the languages whose convention drops it) have exactly one correct
       // output, so code enforces them rather than hoping the model always
       // complies. Runs before timing so any char-count change lands before
       // CPS measures it.
       const { content: ruleEnforced, report: textRuleReport } = enforceTextRules(
-        (results as string[]).join('\n\n'),
+        sweptContent,
         { trailingPunctuation: resolveTargetLang(targetLang).trailingPunctuation },
       );
       if (
@@ -385,7 +455,8 @@ export function useTranslation(
         durationMs: Date.now() - startedAt,
         failedChunks,
         totalChunks,
-        fallbackBlocks,
+        fallbackBlocks: remainingBlocks,
+        recoveredBlocks,
         stopReason: retryState.fatalCode ?? undefined,
       });
 

@@ -265,6 +265,7 @@ export const COPY = {
     label: '번역 중',
     analyzing: '파일을 분석하고 있어요',
     translating: '열심히 번역하고 있어요',
+    recovering: '빠진 줄을 다시 번역하고 있어요',
     finalizing: '마지막으로 다듬는 중이에요',
     recentLabel: '방금 번역한 대사',
     remaining: (lines: number, total: number, sec: number) =>
@@ -285,15 +286,12 @@ export const COPY = {
     summaryTimecode: '타임코드 처리',
     previewTitle: '번역 미리보기',
     startOver: '새 파일 번역하기',
-    // failedChunks: whole chunks that errored out entirely. fallbackBlocks:
-    // individual lines within an otherwise-successful chunk that the model
-    // skipped or misaligned. Both, either, or neither may be non-zero.
-    partialWarning: (failedChunks: number, fallbackBlocks: number) => {
-      const parts: string[] = [];
-      if (failedChunks > 0) parts.push(`구간 ${failedChunks.toLocaleString()}개`);
-      if (fallbackBlocks > 0) parts.push(`자막 ${fallbackBlocks.toLocaleString()}줄`);
-      return `${parts.join(', ')}은 번역에 실패해 원문 그대로 남아 있어요. 해당 부분만 다시 번역하거나 직접 손봐주세요.`;
-    },
+    // Lines still holding their original text in the downloaded file, after
+    // the recovery sweep has already retried them. Counted per line, not per
+    // chunk: the sweep works block by block, so "구간 2개 실패" would describe
+    // a mid-translation state the user never receives.
+    partialWarning: (remainingLines: number) =>
+      `자막 ${remainingLines.toLocaleString()}줄은 다시 시도해도 번역되지 않아 원문 그대로 남아 있어요. 해당 줄만 직접 손봐주세요.`,
     stopReason: {
       quota:
         'API 사용 한도를 초과해 번역을 도중에 멈췄어요. 여기까지는 저장됐고, 나머지는 원문 그대로예요.',
