@@ -1925,8 +1925,18 @@ EOF
 - Consumes: `useTranslation`, `useEnrich`, `useCastSheet`, `MovieInfo`, `ContentType`, `AllowedModel`
 - Produces:
   - `export type WizardScreen = 'upload' | 'workPick' | 'settings' | 'progress' | 'done' | 'exhausted'`
-  - `export function nextScreenAfterUpload(candidateCount: number): WizardScreen` — 후보가 정확히 1건이면 `'settings'`(설정 화면 확인 배너로), 그 외에는 `'workPick'`
+  - `export function nextScreenAfterUpload(status: EnrichStatus): WizardScreen` — `'found'`이면 `'settings'`(설정 화면 확인 배너로), 그 외에는 `'workPick'`
   - `export function useWizard(...)` — 화면 상태와 전이 함수 묶음
+
+**⚠️ 후보 개수로 판단하면 안 된다 (검증된 사실).** `useEnrich`를 읽어 확인한 실제 동작:
+
+| API status | 훅 status | `candidates` | `enrich()` 반환 |
+|---|---|---|---|
+| `found` | `'found'` | **`[]`로 비운다** | `EnrichResult` |
+| `ambiguous` | `'ambiguous'` | 후보 배열 | `null` |
+| `not_found` | `'notFound'` | `[]` | `null` |
+
+즉 **자동 인식 성공(`found`)일 때 `candidates.length`가 0**이다. 후보 수로 분기하면 확정 검색된 작품이 빈 목록의 선택 화면으로 가버린다. `EnrichStatus`(`'idle' | 'searching' | 'found' | 'ambiguous' | 'notFound'`, `app/hooks/useEnrich.ts`에서 export)를 그대로 받는다.
 
 - [ ] **Step 1: 전이 규칙 테스트를 먼저 쓴다**
 
@@ -1939,19 +1949,25 @@ import { describe, it, expect } from 'vitest';
 import { nextScreenAfterUpload } from './useWizard';
 
 describe('nextScreenAfterUpload', () => {
-  it('skips the picker when the search resolved to exactly one work', () => {
-    // A single confident match is confirmed inline on the settings screen
+  it('skips the picker when the search resolved to one confident match', () => {
+    // A confident match is confirmed inline on the settings screen
     // ("'X'로 인식했어요. 맞나요?") — making the user pick from a list of one
     // is a step that asks nothing.
-    expect(nextScreenAfterUpload(1)).toBe('settings');
+    expect(nextScreenAfterUpload('found')).toBe('settings');
   });
 
   it('shows the picker when the search was ambiguous', () => {
-    expect(nextScreenAfterUpload(3)).toBe('workPick');
+    expect(nextScreenAfterUpload('ambiguous')).toBe('workPick');
   });
 
   it('shows the picker when nothing was found, so the user can search', () => {
-    expect(nextScreenAfterUpload(0)).toBe('workPick');
+    expect(nextScreenAfterUpload('notFound')).toBe('workPick');
+  });
+
+  it('does not send a confident match to the picker just because candidates is empty', () => {
+    // useEnrich clears `candidates` to [] on 'found'. Branching on the array's
+    // length would route every auto-matched film into an empty picker.
+    expect(nextScreenAfterUpload('found')).not.toBe('workPick');
   });
 });
 ```
@@ -1991,11 +2007,15 @@ export type WizardScreen =
 /**
  * Where to go once a file is read and the work search has settled.
  *
- * One confident match skips the picker: it is confirmed inline on the settings
+ * A confident match skips the picker: it is confirmed inline on the settings
  * screen instead, because a list of one asks the user nothing.
+ *
+ * Driven by the search's own status, not by how many candidates came back —
+ * useEnrich clears `candidates` to [] on a confident match, so a length check
+ * would route every auto-matched film into an empty picker.
  */
-export function nextScreenAfterUpload(candidateCount: number): WizardScreen {
-  return candidateCount === 1 ? 'settings' : 'workPick';
+export function nextScreenAfterUpload(status: EnrichStatus): WizardScreen {
+  return status === 'found' ? 'settings' : 'workPick';
 }
 ```
 
@@ -2021,18 +2041,21 @@ export interface WizardState {
 
 `workConfirmed` / `autoMatched`는 프로토타입에 있고 현재 코드에 없는 새 상태다 (`needsConfirm = autoMatched && !workConfirmed`). 여기서 도입한다.
 
-`nextScreenAfterUpload`를 쓰는 자리는 **자동 분석 effect의 enrich 완료 지점**이다. 현재 `runEnrich`는 결과를 `movieInfo`에 병합하기만 하고 화면을 옮기지 않는다(`InfoStep`이 한 화면에서 다 했으므로). 분리된 뒤에는 enrich가 끝난 시점에 후보 수로 다음 화면을 결정해야 한다:
+`nextScreenAfterUpload`를 쓰는 자리는 **자동 분석 effect의 enrich 완료 지점**이다. 현재 `runEnrich`는 결과를 `movieInfo`에 병합하기만 하고 화면을 옮기지 않는다(`InfoStep`이 한 화면에서 다 했으므로). 분리된 뒤에는 enrich가 끝난 시점에 다음 화면을 결정해야 한다.
+
+`enrich()`는 `EnrichResult | null`을 반환한다 — 확정 시에만 객체, `ambiguous`/`notFound`면 `null`이다. 반환값의 null 여부로도 판단할 수 있지만 `'ambiguous'`와 `'notFound'`가 구분되지 않으므로, 훅이 노출하는 `status`를 쓴다:
 
 ```typescript
       const data = await enrich(title, year);
-      // …setMovieInfo 병합은 그대로…
-      const count = enrichCandidates.length;
-      setAutoMatched(count === 1);
+      // …setMovieInfo 병합은 그대로 (기존 runEnrich 본문 유지)…
+      // enrich()가 값을 반환했다 = 확정 매치. 이때만 확인 배너를 띄운다.
+      const matched = data !== null;
+      setAutoMatched(matched);
       setWorkConfirmed(false);
-      setScreen(nextScreenAfterUpload(count));
+      setScreen(nextScreenAfterUpload(matched ? 'found' : enrichStatus));
 ```
 
-`enrichCandidates`는 `useEnrich`가 노출하는 배열이다. `enrich()`가 후보를 반환하지 않고 훅 상태로만 두면 그 상태를 읽는 대신 `data`에서 직접 세는 방법을 찾는다 — `useEnrich`를 읽고 실제 반환 shape에 맞춘다. **`status === 'found'`(단일 확정)와 `'ambiguous'`(후보 여러 건)를 구분하는 값이 이미 있으면 후보 수를 세는 대신 그걸 쓴다** — 그게 더 직접적인 신호다.
+`enrichStatus`는 `useEnrich()`가 반환하는 `status`다. **주의:** effect 안에서 `status`를 읽으면 이 렌더의 값이라 방금 끝난 요청의 결과가 아닐 수 있다 — 그래서 확정 여부는 `data !== null`(반환값, 항상 최신)로 판단하고, `status`는 `ambiguous`/`notFound`를 가르는 데만 쓴다. 두 경우 모두 `'workPick'`으로 가므로 이 구분이 틀려도 화면은 같다. 화면 안에서 "후보가 없어요"와 "골라 주세요"를 다르게 보여주려면 `candidates.length`를 그때 읽으면 된다.
 
 - [ ] **Step 4: 통과 확인**
 
