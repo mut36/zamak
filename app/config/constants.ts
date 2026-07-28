@@ -104,6 +104,32 @@ export const SERVER_CONCURRENCY = readPositiveIntEnv(
   16,
 );
 
+/**
+ * Pro-only chunk size (docs/decisions.md §2-15). SERVER_CHUNK_SIZE=100 above
+ * was tuned down for flash to shrink the renumbering-drift/marker-corruption
+ * blast radius — a safety ceiling, not a cost lever for that model. Pro's B
+ * moves for a different reason: at PRO_THINKING_LEVEL=HIGH, thinking tokens
+ * per chunk fall sharply as B grows (measured ~113/block at B≈120 down to
+ * ~40/block at B=250-500 on a 461-block sample) because per-chunk "who are
+ * these characters, what's the register" orientation cost amortizes over more
+ * blocks. 250 was the harness winner: same thinking/cost as B=500 within 2%,
+ * but ~half the wall-clock chunk time and 8 chunks at MAX_BLOCKS_PER_CREDIT
+ * (2000/250) still fits one wave under SERVER_CONCURRENCY=16.
+ *
+ * Only measured up to 461 blocks (one drama episode) — full-length-film-scale
+ * HIGH chunk behavior at B=250 is not yet measured, see docs/TODO.md.
+ */
+export const PRO_CHUNK_SIZE = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_PRO_CHUNK_SIZE,
+  250,
+);
+
+/** Resolve chunk size for a translation model — Pro and flash tune B for
+ *  unrelated reasons (see PRO_CHUNK_SIZE above), so they don't share a knob. */
+export function chunkSizeForModel(model: string): number {
+  return model === PRO_MODEL ? PRO_CHUNK_SIZE : SERVER_CHUNK_SIZE;
+}
+
 export interface TierLimits {
   /** Subtitle blocks per translation request. */
   chunkSize: number;
@@ -237,7 +263,7 @@ export const THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
 
 /**
  * Thinking effort for the Pro (고급번역) path.
- * Env `PRO_THINKING_LEVEL` — default MEDIUM; same restart caveat as flash.
+ * Env `PRO_THINKING_LEVEL` — default HIGH; same restart caveat as flash.
  *
  * Unlike flash, LOW is NOT free here — confirmed 2026-07-26
  * (docs/decisions.md §2-4-1, docs/tuning/gemini-limits.md §6-2). Two things
@@ -252,13 +278,24 @@ export const THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
  *    translation cost. This is why a theoretical ~320원 estimate came in at
  *    an actual 971원.
  *
+ * MEDIUM was the default until 2026-07-28, but a same-file LOW/MEDIUM grid
+ * (docs/decisions.md §2-15) found MEDIUM never beat LOW — same or worse
+ * alignment-failure rate on every cell, up to 2.3x the cost — so it bought
+ * nothing over LOW. Separately, the founder's own quality bar for 고급번역
+ * came from an early HIGH-only prototype; a blind full-episode review this
+ * session confirmed LOW/MEDIUM read as equivalent to each other and clearly
+ * worse than HIGH. HIGH's cost problem (1,405원 on a drama episode at the
+ * prototype's B≈120) turned out to be a small-B problem, not a HIGH problem —
+ * see PRO_CHUNK_SIZE below, which is what makes HIGH affordable (~575원, same
+ * file, B=250).
+ *
  * The MAX_BLOCKS_PER_CREDIT cost estimate below predates this measurement and
  * reuses flash's `th=0` assumption for pro — treat that number as stale until
  * re-derived from real pro thoughts data.
  */
 export const PRO_THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
   'PRO_THINKING_LEVEL',
-  'MEDIUM',
+  'HIGH',
 );
 
 /** Resolve thinking level for a translation model. */

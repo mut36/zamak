@@ -4,10 +4,12 @@ import {
   FREE_CHUNK_SIZE,
   FREE_CONCURRENCY,
   MAX_BLOCKS_PER_CREDIT,
+  PRO_CHUNK_SIZE,
   PRO_MODEL,
   SERVER_CHUNK_SIZE,
   SERVER_CONCURRENCY,
   TRANSLATION_ESTIMATE_MS,
+  chunkSizeForModel,
   estimateTranslationMs,
   getTierLimits,
   resolveTier,
@@ -84,6 +86,43 @@ describe('getTierLimits', () => {
     expect(getTierLimits('server').chunkSize).toBeLessThanOrEqual(
       MAX_BLOCKS_PER_CREDIT,
     );
+  });
+});
+
+describe('chunkSizeForModel', () => {
+  it('gives Pro its own chunk size instead of the flash-tuned server one', () => {
+    // decisions.md §2-15: SERVER_CHUNK_SIZE=100 is a flash renumbering-drift
+    // safety ceiling, not a cost lever for Pro — Pro needs its own knob.
+    expect(chunkSizeForModel(PRO_MODEL)).toBe(PRO_CHUNK_SIZE);
+    expect(chunkSizeForModel(FLASH_MODEL)).toBe(SERVER_CHUNK_SIZE);
+  });
+
+  it('never splits a max-credit file into more Pro chunks than one wave covers', () => {
+    // Same one-wave property SERVER_CHUNK_SIZE already gets checked for above
+    // — MAX_BLOCKS_PER_CREDIT / PRO_CHUNK_SIZE must stay at or under
+    // SERVER_CONCURRENCY so every chunk of the largest accepted file starts in
+    // a single wave.
+    expect(Math.ceil(MAX_BLOCKS_PER_CREDIT / PRO_CHUNK_SIZE)).toBeLessThanOrEqual(
+      SERVER_CONCURRENCY,
+    );
+  });
+
+  it('keeps a Pro HIGH chunk inside the route timeout', () => {
+    // Measured, not derived (docs/decisions.md §2-15): Pro throughput ~105
+    // tok/s (vs flash's 220, chunk-size-model.md §5-2 used flash's number by
+    // mistake) and HIGH thinking ~9,500 tokens/chunk at B=250 on a 461-block
+    // sample — single-run evidence, revisit if full-length-film HIGH chunks
+    // measure meaningfully higher (docs/TODO.md).
+    const TIMEOUT_S = 300;
+    const TOKENS_PER_BLOCK = 16;
+    const PRO_TOKENS_PER_S = 105;
+    const PRO_HIGH_THINKING_PER_CHUNK = 9500;
+    const TTFT_S = 2;
+    const duration =
+      TTFT_S +
+      (PRO_CHUNK_SIZE * TOKENS_PER_BLOCK + PRO_HIGH_THINKING_PER_CHUNK) /
+        PRO_TOKENS_PER_S;
+    expect(duration).toBeLessThan(TIMEOUT_S);
   });
 });
 

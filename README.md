@@ -208,9 +208,10 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 | `TMDB_API_KEY` | — | **필수.** 작품 정보 조회 (제목·연도·감독·장르·포스터). 미매칭 시 Google Search 그라운딩으로 대체 |
 | `TMDB_LANGUAGE` | `ko-KR` | TMDB 메타데이터 언어 |
 | `THINKING_LEVEL` | `LOW` | 빠른번역(flash) thinking. `MINIMAL`\|`LOW`\|`MEDIUM`\|`HIGH`. **실측상 MINIMAL과 LOW 모두 thinking 0** — 비용이 같아 품질이 나은 LOW가 기본값. 변경 시 dev 서버 재시작 필요 |
-| `PRO_THINKING_LEVEL` | `MEDIUM` | 고급번역(Pro) thinking. 같은 네 값. 변경 시 dev 서버 재시작 필요 |
+| `PRO_THINKING_LEVEL` | `HIGH` | 고급번역(Pro) thinking. 같은 네 값. LOW/MEDIUM은 정렬 안정성 이득 없이 비용만 늘어 기각(`decisions.md` §2-15). 변경 시 dev 서버 재시작 필요 |
 | `NEXT_PUBLIC_FREE_CHUNK_SIZE` / `_FREE_CONCURRENCY` | 150 / 6 | 무료 티어 청킹 |
-| `NEXT_PUBLIC_CHUNK_SIZE` / `NEXT_PUBLIC_CONCURRENCY` | 100 / 16 | server 티어 청킹 (현재 전원). 100은 계산상 최적값이 아니라 재번호 드리프트·마커 오염을 피하려는 경험적 안전선(위 참조) |
+| `NEXT_PUBLIC_CHUNK_SIZE` / `NEXT_PUBLIC_CONCURRENCY` | 100 / 16 | server 티어 청킹, **flash 전용**(현재 전원). 100은 계산상 최적값이 아니라 재번호 드리프트·마커 오염을 피하려는 경험적 안전선(위 참조) |
+| `NEXT_PUBLIC_PRO_CHUNK_SIZE` | 250 | 고급번역(Pro) 전용 청킹. flash와 근거가 달라 별도 값 — HIGH thinking 토큰 비용이 B가 클수록 급감해서 250을 씀(`decisions.md` §2-15). `chunkSizeForModel(model)`이 분기 |
 | `TRANSLATION_STRICT_MODE` | `false` | 아래 참조 |
 | `GOOGLE_GENAI_API_KEY` | — | **필수.** analyze/enrich/summarize/translate 4개 라우트 전부가 이 키로 동작. grounding 때문에 결제 연결 프로젝트여야 함 |
 | `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` | — | **필수.** 없으면 모델 라우트가 전부 500으로 닫힘 |

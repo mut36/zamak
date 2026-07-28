@@ -200,6 +200,13 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 (마커 오염 감소까지 겸해 200→150→100으로 추가 하향, 2026-07-25 하네스 실측).
 배경·유도는 `decisions.md` §2-3·§2-3-3 / `tuning/chunk-size-model.md` §8.
 
+이 표는 **`SERVER_CHUNK_SIZE`(flash 전용)** 얘기다. Pro는 `PRO_CHUNK_SIZE`(기본
+250, `chunkSizeForModel(model)`가 분기)로 별도 관리한다 — flash의 100은 재번호
+드리프트 반경 축소가 목적이고, Pro의 250은 HIGH thinking 토큰 비용 절감이
+목적이라 근거 자체가 다르다(`decisions.md` §2-15). 300 미만 규칙은 flash에서
+관측된 실패모드라 Pro에도 안전 마진으로 유지했을 뿐, Pro 자체에서 재현된 적은
+없다.
+
 | 순서 | 파일 | 무엇을 |
 |---|---|---|
 | 1 (필수) | `app/config/constants.ts` | `SERVER_CHUNK_SIZE` 기본값(+ 주석). 런타임은 여기만 보면 됨. env `NEXT_PUBLIC_CHUNK_SIZE`로도 덮을 수 있음(핫리로드) |
@@ -279,10 +286,13 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
     `constants.ts` `ALLOWED_MODELS`. 하니스 기본은 `TRANSLATION_MODEL`(env
     `NEXT_PUBLIC_TRANSLATION_MODEL`, 기본 flash)
   - thinking 수준 → `thinkingLevelForModel(model)`: flash는
-    `THINKING_LEVEL`(기본 LOW), Pro는 `PRO_THINKING_LEVEL`(기본 MEDIUM).
-    둘 다 env, 변경 시 dev 서버 재시작. 로그에 `thinking=`로 찍힘. ⚠️ flash와 달리
-    pro는 MINIMAL을 설정할 수 없고(API가 거부) LOW도 `thoughts=0`이 아니다 — 실측·비용
-    영향은 `docs/decisions.md` §2-4-1, `docs/tuning/gemini-limits.md` §6-2 참고
+    `THINKING_LEVEL`(기본 LOW), Pro는 `PRO_THINKING_LEVEL`(기본 **HIGH**,
+    0.18.0 — `docs/decisions.md` §2-15, 체크리스트 `docs/TODO.md`). 둘 다 env,
+    변경 시 dev 서버 재시작. 로그에 `thinking=`로 찍힘. ⚠️ flash와 달리 pro는
+    MINIMAL을 설정할 수 없고(API가 거부) LOW도 `thoughts=0`이 아니다 —
+    실측·비용 영향은 `docs/decisions.md` §2-4-1, `docs/tuning/gemini-limits.md`
+    §6-2 참고. MEDIUM은 LOW 대비 정렬 안정성
+    이득이 없이 비용만 늘었다는 게 §2-15에서 확인됨 — MEDIUM을 굳이 쓸 이유는 없음
   - **엄격 모드**(출력 검증+재시도+블록단위 재번역) → `translationService.ts`,
     `TRANSLATION_STRICT_MODE=true`로 켬(기본 off, 비용 폭탄 위험 있어 신중히)
 

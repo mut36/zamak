@@ -38,6 +38,7 @@ import type {
 } from '../types/translation';
 import type { CastSheet } from '../types/glossary';
 import {
+  chunkSizeForModel,
   estimateTranslationMs,
   getReadingSpeed,
   getTierLimits,
@@ -265,9 +266,13 @@ export function useTranslation(
       // title, and it means a refusal costs nothing.
       const jobId = await beginTranslationJob(blocks.length);
 
-      // Chunk size and concurrency both come from the tier, which is the one
-      // place the billing/session gate will hook into.
-      const { chunkSize, concurrency } = getTierLimits(resolveTier());
+      // Concurrency comes from the tier, which is the one place the
+      // billing/session gate will hook into. Chunk size is model-specific
+      // instead (docs/decisions.md §2-15) — Pro tunes B for thinking-token
+      // cost, flash for renumbering-drift safety, and they don't share a
+      // sensible value.
+      const { concurrency } = getTierLimits(resolveTier());
+      const chunkSize = chunkSizeForModel(model);
       // Cut at scene breaks (large inter-subtitle gaps) near the target size
       // rather than at a fixed block count — same cost, but boundaries land
       // between scenes instead of mid-conversation.
