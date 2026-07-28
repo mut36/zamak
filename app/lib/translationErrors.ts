@@ -16,11 +16,15 @@ export type TranslationErrorCode =
   | 'unknown';
 
 export class TranslationError extends Error {
-  constructor(
-    message: string,
-    readonly code: TranslationErrorCode,
-  ) {
+  // Declared as a field and assigned in the body, not as a constructor
+  // parameter property — `scripts/prompt-ab.mts` loads this tree through
+  // node's strip-only TypeScript mode, which rejects parameter properties
+  // (they need code generation, not just type erasure). Same runtime shape.
+  readonly code: TranslationErrorCode;
+
+  constructor(message: string, code: TranslationErrorCode) {
     super(message);
+    this.code = code;
     this.name = 'TranslationError';
   }
 }
