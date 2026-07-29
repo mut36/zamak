@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { COPY } from '../../i18n/simpleCopy';
 
 interface Props {
@@ -51,8 +52,40 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
       ) : (
         <p className='text-sm text-danger'>{COPY.landing.notConfigured}</p>
       )}
+
+      {/* signup-wrap. 가입이라는 능동적 행위에 결합돼 있어 푸터 링크(browsewrap)
+          단독보다 효력이 안정적이다 — docs/decisions.md §1-11이 고른 3개 노출
+          지점 중 두 번째. 로그인 버튼이 없으면 "계속하면"이 가리킬 행위도 없다. */}
+      {configured && (
+        <p className='mt-4 max-w-[320px] text-center text-[12px] leading-[1.6] text-ink-5'>
+          {COPY.legal.consentPrefix}
+          <Link href={COPY.legal.termsHref} className='underline'>
+            {COPY.legal.terms}
+          </Link>
+          {COPY.legal.consentAnd}
+          <Link href={COPY.legal.privacyHref} className='underline'>
+            {COPY.legal.privacy}
+          </Link>
+          {COPY.legal.consentSuffix}
+        </p>
+      )}
+
       {error && <p className='mt-4 text-sm text-danger'>{error}</p>}
-      <p className='mt-14 text-[12px] text-ink-5'>{COPY.landing.badge}</p>
+
+      {/* §1-11의 세 번째 노출 지점. 로그인 전 화면은 이 푸터가 유일한 약관 경로다
+          — 로그인 후 셸의 푸터(app/page.tsx)에는 익명 방문자가 닿지 못한다. */}
+      <footer className='mt-14 flex flex-col items-center gap-1.5 text-[12px] text-ink-5'>
+        <p className='m-0'>{COPY.landing.badge}</p>
+        <div className='flex items-center gap-2.5'>
+          <Link href={COPY.legal.termsHref} className='underline'>
+            {COPY.legal.terms}
+          </Link>
+          <span className='dot-sep' />
+          <Link href={COPY.legal.privacyHref} className='underline'>
+            {COPY.legal.privacy}
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }
