@@ -20,110 +20,14 @@ export const COPY = {
     creditsLeft: (n: number) => `번역권 ${n}편`,
   },
 
-  // Anonymous landing. Static content only — proving product value in front
-  // of the sign-in wall costs zero API calls. Primary claim: structural
-  // timecode integrity (the code, not the AI, owns every timestamp).
-  // Secondary: work-context enrichment and opt-in cast-sheet consistency.
   landing: {
-    hero: {
-      title: '번역해도,\n뒤 자막이 밀리지 않도록.',
-      subtitle: 'AI는 대사만 번역하고, 코드가 타임코드를 복원합니다.',
-      cta: 'Google로 무료 시작하기',
-      // 베타 한시적: 3편. 정식 오픈 시 1편으로 되돌릴 것 (docs/decisions.md 2026-07-27).
-      ctaHint: '가입 즉시 번역권 3편 무료 · 카드 등록 없음',
-    },
-    // Landing-specific reassurance row — separate from upload.reassure so
-    // the two pages can evolve independently.
-    reassure: ['SRT·VTT·SMI·ASS', '설치 없이 바로', '로그인만으로 시작'] as readonly string[],
-    proof: {
-      eyebrow: '결과물',
-      title: '타임코드는 그대로,\n대사는 자연스럽게.',
-      subtitle:
-        '형사물 예문이에요. 선배와 신입의 말투, 그리고 번호·타임코드가 어떻게 유지되는지 눈으로 확인하세요.',
-      srcLabel: '원본',
-      dstLabel: 'ZAMAK',
-      blocks: [
-        {
-          no: '24',
-          tc: '00:12:07,332 --> 00:12:09,150',
-          src: 'You called it in yet?',
-          dst: '보고는 올렸어?',
-        },
-        {
-          no: '25',
-          tc: '00:12:09,433 --> 00:12:11,900',
-          src: 'Not yet. I thought you should see it first.',
-          dst: '아직입니다. 선배가 먼저 보셔야 할 것 같아서요.',
-        },
-        {
-          no: '26',
-          tc: '00:12:12,410 --> 00:12:15,224',
-          src: 'Good call. This stays between us for now.',
-          dst: '잘 판단했어. 당분간 우리끼리만 알고 있자.',
-        },
-      ],
-      note: '타임코드는 코드가 원본에서 복원합니다. AI가 줄을 합치거나 빠뜨려도 이후 자막이 밀리는 건 구조적으로 막혀 있어요.',
-    },
-    // Each item is its own full-bleed chapter (Toss-style), not a card grid.
-    features: {
-      items: [
-        {
-          eyebrow: '타임코드',
-          title: 'AI가 줄을 합쳐도,\n뒤 자막은 밀리지 않아요.',
-          body: 'AI에는 대사만 보내고, 타임코드는 코드가 원본과 재결합합니다. 그래서 번역 뒤에도 싱크가 연쇄로 흐트러지지 않아요.',
-        },
-        {
-          eyebrow: '작품 맥락',
-          title: '장르와 톤까지\n읽어서 번역해요.',
-          body: 'TMDB와 Google 검색으로 장르·배경·톤을 보강해요. 같은 문장이라도 작품 분위기에 맞게 나와요.',
-        },
-        {
-          eyebrow: '말투 · 용어',
-          title: '인물 말투와 고유명사,\n필요할 때만 켜요.',
-          badge: 'opt-in',
-          body: '켜면 파일 전체를 스캔해 존댓말/반말 관계와 고유명사 표기를 청크마다 통일합니다. 기본은 꺼져 있어요.',
-        },
-        {
-          eyebrow: '안정성',
-          title: '빠진 줄은 다시 번역하고,\n안 되면 원문을 남기요.',
-          body: '어긋난 줄만 모아 한 번 더 요청합니다. 끝내 안 되는 줄은 원문 그대로 두어, 항상 재생 가능한 완전한 자막 파일을 돌려줍니다.',
-        },
-      ],
-    },
-    specs: {
-      eyebrow: '한눈에',
-      title: '필요한 것만\n깔끔하게.',
-      items: [
-        { label: '지원 형식', value: 'SRT · VTT · SMI · ASS' },
-        { label: '출력', value: '올린 형식 또는 SRT' },
-        { label: '번역 모델', value: 'Flash · Pro' },
-        {
-          label: '도착어',
-          value: '한국어 · 영어 · 일본어 · 스페인어 · 프랑스어 · 중국어 · 독일어',
-        },
-      ],
-    },
-    how: {
-      eyebrow: '이용 방법',
-      title: '올리면,\n확인하고,\n받아요.',
-      steps: [
-        { title: '업로드', body: '.srt · .vtt · .smi · .ass 파일을 올려요.' },
-        {
-          title: '확인',
-          body: '작품 정보를 확인하고 번역을 시작해요.',
-        },
-        {
-          title: '다운로드',
-          body: '번역된 자막 파일을 받아요.',
-        },
-      ],
-    },
-    closing: {
-      // 베타 한시적: 3편. 정식 오픈 시 1편으로 되돌릴 것 (docs/decisions.md 2026-07-27).
-      title: '첫 3편은\n무료예요.',
-      body: '로그인하면 번역권 3편을 바로 드려요. 사람에게 맡기면 편당 15만 원. 먼저 결과물로 판단하세요.',
-    },
-    footerNote: '자막 번역 도구',
+    /** Typed out one character at a time on mount. */
+    wordmark: 'ZAMAK',
+    tagline: '자막 파일 하나로, 자연스러운 한국어 자막을.',
+    taglineSub: '타임코드는 그대로 지켜 드립니다.',
+    signIn: 'Google로 계속하기',
+    badge: '비공개 베타',
+    notConfigured: '로그인이 아직 설정되지 않았어요.',
   },
 
   credits: {

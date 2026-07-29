@@ -184,14 +184,9 @@ export default function Home() {
   }
 
   if (!user) {
-    // Landing is full-bleed (Toss-like chapters). The signed-in wizard keeps
-    // the tighter 600/840 content column below.
+    // Landing is full-bleed minimal screen for private beta. No nav.
     return (
       <div className='min-h-screen'>
-        <header className='flex items-center justify-between w-full max-w-[1100px] mx-auto px-6 h-16'>
-          <BrandMark onClick={resetAll} />
-          <span className='lang-pill'>{COPY.langPill}</span>
-        </header>
         <main className='w-full'>
           <LandingPage
             onSignIn={signIn}
