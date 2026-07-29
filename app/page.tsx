@@ -72,12 +72,12 @@ export default function Home() {
     handleTranslate,
     handleCancel,
     resetAll: resetWizard,
-    fileContent,
     error,
     analysis,
     translationProgress,
     result,
     refusal,
+    jobId,
     totalLines,
     enrichStatus,
     enrichCandidates,
@@ -351,7 +351,9 @@ export default function Home() {
         {!refusal && screen === 'done' && result && (
           <DoneStep
             result={result}
-            originalContent={fileContent}
+            movieInfo={movieInfo}
+            castSheet={castSheet.enabled ? castSheet.sheet : undefined}
+            jobId={jobId}
             onStartOver={resetAll}
           />
         )}

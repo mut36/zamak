@@ -151,6 +151,7 @@ export function useWizard(
     translationProgress,
     result,
     refusal,
+    jobId,
     processFile,
     translate,
     cancelTranslation,
@@ -468,6 +469,7 @@ export function useWizard(
     translationProgress,
     result,
     refusal,
+    jobId,
     totalLines,
     // Passed through from useEnrich.
     enrichStatus,

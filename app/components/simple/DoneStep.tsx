@@ -1,14 +1,23 @@
 'use client';
 
+import { useState } from 'react';
+import Link from 'next/link';
 import { CheckIcon, FileIcon, DownloadIcon } from '../icons';
 import { downloadFile } from '../../utils/downloadFile';
-import { parseSrtBlocks } from '../../lib/srt';
-import type { TranslationResult } from '../../types/translation';
+import { buildReport, type ReportItem } from '../../lib/doneReport';
+import { sendFeedback } from '../../lib/client/feedback';
+import type { TranslationResult, MovieInfo } from '../../types/translation';
+import type { CastSheet } from '../../types/glossary';
 import { COPY } from '../../i18n/simpleCopy';
 
 interface DoneStepProps {
   result: TranslationResult;
-  originalContent: string;
+  movieInfo: MovieInfo;
+  castSheet?: CastSheet;
+  /** Owner for a feedback rating (see sendFeedback). Null when the run never
+   *  got a job record — the feedback card has nowhere to attach, so it's
+   *  omitted rather than shown disabled. */
+  jobId: string | null;
   onStartOver: () => void;
 }
 
@@ -21,21 +30,45 @@ function formatDuration(ms: number): string {
   return m > 0 ? `${m}분 ${s}초` : `${s}초`;
 }
 
-/** Body text (lines after number + timing) of the first `n` SRT blocks. */
-function previewBodies(content: string, n: number): string[] {
-  return parseSrtBlocks(content)
-    .slice(0, n)
-    .map((block) => block.split('\n').slice(2).join(' ').trim())
-    .filter(Boolean);
+/** Renders one ReportItem through its matching COPY.done.report.* function,
+ *  spreading `params` in the order each function expects. */
+function reportLine(item: ReportItem): string {
+  const p = item.params ?? {};
+  switch (item.key) {
+    case 'timecode':
+      return c.report.timecode(Number(p.lines), Number(p.fallback));
+    case 'context':
+      return c.report.context(String(p.context));
+    case 'glossary':
+      return c.report.glossary(Number(p.terms));
+    case 'relations':
+      return c.report.relations(Number(p.pairs));
+  }
 }
 
-export function DoneStep({ result, originalContent, onStartOver }: DoneStepProps) {
+type FeedbackStatus = 'idle' | 'sending' | 'sent' | 'failed';
+
+export function DoneStep({
+  result,
+  movieInfo,
+  castSheet,
+  jobId,
+  onStartOver,
+}: DoneStepProps) {
   const time = formatDuration(result.durationMs);
-  // Preview and counts read the canonical SRT whatever the download format is.
-  const originals = previewBodies(originalContent, 3);
-  const translations = previewBodies(result.content, 3);
-  const rows = originals.slice(0, translations.length);
   const [primary, ...alternates] = result.downloads;
+  const reportItems = buildReport(result, { movieInfo, castSheet });
+
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [feedbackStatus, setFeedbackStatus] = useState<FeedbackStatus>('idle');
+
+  const handleSendFeedback = async () => {
+    if (!jobId || rating === 0) return;
+    setFeedbackStatus('sending');
+    const ok = await sendFeedback(jobId, rating, comment);
+    setFeedbackStatus(ok ? 'sent' : 'failed');
+  };
 
   return (
     <div className='animate-fade-slide-up'>
@@ -105,38 +138,70 @@ export function DoneStep({ result, originalContent, onStartOver }: DoneStepProps
         )}
       </div>
 
-      {/* Summary */}
-      <div className='sumrow'>
-        <div className='sum'>
-          <div className='v mono'>{result.lineCount.toLocaleString()}</div>
-          <div className='k'>{c.summaryLines}</div>
-        </div>
-        <div className='sum'>
-          <div className='v mono'>{time}</div>
-          <div className='k'>{c.summaryTime}</div>
-        </div>
-        <div className='sum'>
-          <div className='v mono'>{c.summaryTimecodeValue}</div>
-          <div className='k'>{c.summaryTimecode}</div>
-        </div>
+      {/* Report card — only what we actually measured (see doneReport.ts). */}
+      <div className='pvm'>
+        <div className='pvm-h'>{c.reportTitle}</div>
+        {reportItems.map((item) => (
+          <div className='pvm-row' key={item.key}>
+            <div className='t'>{reportLine(item)}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Preview */}
-      {rows.length > 0 && (
-        <div className='pvm'>
-          <div className='pvm-h'>{c.previewTitle}</div>
-          {rows.map((orig, i) => (
-            <div className='pvm-row' key={i}>
-              <div className='o'>{orig}</div>
-              <div className='t'>{translations[i]}</div>
-            </div>
-          ))}
+      {/* Feedback card — the beta's only quantitative quality signal. Omitted
+          entirely when there is no job to attach the rating to. */}
+      {jobId && (
+        <div className='card p-5 mt-4 text-center'>
+          {feedbackStatus === 'sent' ? (
+            <p className='text-[14px] text-ink-2'>{c.feedbackThanks}</p>
+          ) : (
+            <>
+              <div className='text-[14px] font-bold text-ink mb-3'>{c.feedbackTitle}</div>
+              <div className='feedback-stars' role='radiogroup' aria-label={c.feedbackTitle}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type='button'
+                    className='star-btn'
+                    aria-label={`${n}점`}
+                    aria-pressed={rating >= n}
+                    onClick={() => setRating(n)}
+                  >
+                    <span className={rating >= n ? 'on' : ''}>{rating >= n ? '★' : '☆'}</span>
+                  </button>
+                ))}
+              </div>
+              <input
+                type='text'
+                className='input'
+                placeholder={c.feedbackPlaceholder}
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+              />
+              {feedbackStatus === 'failed' && (
+                <p className='mt-2 text-[12px]' style={{ color: 'oklch(0.5 0.13 75)' }}>
+                  {c.feedbackFailed}
+                </p>
+              )}
+              <button
+                type='button'
+                className='btn btn-primary btn-block mt-3'
+                disabled={rating === 0 || feedbackStatus === 'sending'}
+                onClick={handleSendFeedback}
+              >
+                {c.feedbackSend}
+              </button>
+            </>
+          )}
         </div>
       )}
 
-      <button type='button' className='btn btn-ghost btn-block' onClick={onStartOver}>
+      <button type='button' className='btn btn-ghost btn-block mt-4' onClick={onStartOver}>
         {c.startOver}
       </button>
+      <Link href='/mypage' className='btn btn-ghost btn-block mt-2'>
+        {c.goHistory}
+      </Link>
     </div>
   );
 }

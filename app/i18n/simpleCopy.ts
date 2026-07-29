@@ -269,12 +269,26 @@ export const COPY = {
     downloadAs: (extension: string) => `.${extension}로 다운로드`,
     downloadAsHint: (extension: string) =>
       `올린 형식 그대로 받아요. 자막 스타일·설정은 원본을 유지하고 대사만 바뀌어요. (.${extension})`,
-    summaryLines: '번역된 줄',
-    summaryTime: '걸린 시간',
-    summaryTimecodeValue: '번호 매칭',
-    summaryTimecode: '타임코드 처리',
-    previewTitle: '번역 미리보기',
     startOver: '새 파일 번역하기',
+    goHistory: '내 번역 보기',
+    // 실제로 무엇을 했는지 적는 리포트 카드. buildReport()가 실측한 항목만
+    // 골라내고, 여기 함수들이 그 값을 문장으로 만든다 — 계측하지 않은
+    // "CPS 조정 23곳" 같은 줄은 buildReport 쪽에서부터 아예 나오지 않는다.
+    reportTitle: '이 번역에 실제로 적용된 것',
+    report: {
+      timecode: (lines: number, fallback: number) =>
+        fallback === 0
+          ? `타임코드 ${lines.toLocaleString()}개를 검증했어요. 원문 그대로 남은 구간은 0줄입니다`
+          : `타임코드 ${lines.toLocaleString()}개를 검증했어요. 원문 그대로 남은 구간은 ${fallback}줄입니다`,
+      context: (context: string) => `작품 맥락(${context})에 맞춰 어휘와 문체를 골랐어요`,
+      glossary: (terms: number) => `용어집 ${terms}개 표기를 자막 전체에 일관되게 적용했어요`,
+      relations: (pairs: number) => `설정한 존대·반말 관계 ${pairs}쌍을 대화 전체에 반영했어요`,
+    },
+    feedbackTitle: '이번 번역, 어땠나요?',
+    feedbackPlaceholder: '자유롭게 남겨주세요 (선택)',
+    feedbackSend: '보내기',
+    feedbackThanks: '의견 감사해요. 베타를 다듬는 데 큰 힘이 됩니다.',
+    feedbackFailed: '의견을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.',
     // Lines still holding their original text in the downloaded file, after
     // the recovery sweep has already retried them. Counted per line, not per
     // chunk: the sweep works block by block, so "구간 2개 실패" would describe
