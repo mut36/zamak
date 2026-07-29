@@ -72,6 +72,12 @@ export interface WizardState {
   targetLang: string;
   movieInfo: MovieInfo;
   uploadError: string;
+  /** True while a just-selected file is being read (parse happens before the
+   *  screen switches to 'settings' — see handleFile), so the upload screen
+   *  can show a "reading…" state instead of looking stuck. */
+  uploading: boolean;
+  /** Name of the file being read, for the "reading…" message. */
+  uploadingFileName: string;
   summarizing: boolean;
   /** True once the work has been confirmed (explicitly or via the banner). */
   workConfirmed: boolean;
@@ -105,6 +111,8 @@ export function useWizard(
   const [targetLang, setTargetLang] = useState<string>(DEFAULT_TARGET_LANG);
   const [movieInfo, setMovieInfo] = useState<MovieInfo>(EMPTY_MOVIE_INFO);
   const [uploadError, setUploadError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadingFileName, setUploadingFileName] = useState('');
   const [summarizing, setSummarizing] = useState(false);
   const [workConfirmed, setWorkConfirmed] = useState(false);
   const [autoMatched, setAutoMatched] = useState(false);
@@ -256,8 +264,17 @@ export function useWizard(
   };
 
   const handleFile = async (selected: File) => {
+    // Defensive: the upload screen locks the dropzone while contentType is
+    // null, so this should be unreachable, but never process a file dropped
+    // before a type is picked.
+    if (contentType === null) return;
+
+    setUploading(true);
+    setUploadingFileName(selected.name);
+
     if (!isSupportedSubtitleFilename(selected.name)) {
       setUploadError(messages.upload.invalidFile);
+      setUploading(false);
       return;
     }
     setUploadError('');
@@ -270,6 +287,7 @@ export function useWizard(
       doc = await loadSubtitleFile(selected);
     } catch (err) {
       setUploadError(uploadErrorMessage(err, messages.upload));
+      setUploading(false);
       return;
     }
 
@@ -277,6 +295,7 @@ export function useWizard(
     resetAnalysis();
     // Screen goes to 'settings' immediately so the "분석 중" spinner covers the wait.
     processFile(selected, doc);
+    setUploading(false);
     setScreen('settings');
   };
 
@@ -317,6 +336,8 @@ export function useWizard(
     resetAnalysis();
     setMovieInfo(EMPTY_MOVIE_INFO);
     setUploadError('');
+    setUploading(false);
+    setUploadingFileName('');
     setContentType(null);
     setWorkConfirmed(false);
     setAutoMatched(false);
@@ -341,6 +362,8 @@ export function useWizard(
     targetLang,
     movieInfo,
     uploadError,
+    uploading,
+    uploadingFileName,
     summarizing,
     workConfirmed,
     autoMatched,

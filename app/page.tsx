@@ -52,10 +52,11 @@ export default function Home() {
     contentType,
     setContentType,
     targetLang,
-    setTargetLang,
     movieInfo,
     setMovieInfo,
     uploadError,
+    uploading,
+    uploadingFileName,
     summarizing,
     handleFile,
     handleTranslate,
@@ -228,10 +229,10 @@ export default function Home() {
 
         {!refusal && screen === 'upload' && (
           <UploadStep
-            targetLang={targetLang}
-            onTargetLang={setTargetLang}
-            contentType={contentType ?? 'movie'}
+            contentType={contentType}
             onContentType={setContentType}
+            uploading={uploading}
+            uploadingFileName={uploadingFileName}
             error={uploadError}
             onFile={handleFile}
           />
