@@ -10,6 +10,7 @@ import {
   isSupportedSubtitleFilename,
   loadSubtitleFile,
 } from '../lib/subtitles';
+import { fetchConsent, recordConsent } from '../lib/client/consent';
 import { DEFAULT_TARGET_LANG } from '../config/languages';
 import { DEFAULT_MODEL, type AllowedModel } from '../config/constants';
 import type { ContentType, MovieInfo } from '../types/translation';
@@ -41,6 +42,9 @@ export interface WizardMessages {
     invalidFile: string;
   };
   cancelConfirm: string;
+  copyright: {
+    failed: string;
+  };
 }
 
 /** Screens the signed-in wizard can be on. */
@@ -117,6 +121,10 @@ export function useWizard(
    *  stale. Owned by page.tsx (via useAuth) since credits are auth/payment
    *  UI chrome, not wizard state. */
   refreshBalance: () => void,
+  /** Whether a user is signed in. The wizard renders on every visit (page.tsx
+   *  calls this hook before its auth gate), so the consent lookup keys on this
+   *  flag instead of firing for anonymous visitors who can never translate. */
+  signedIn: boolean,
 ) {
   const [screen, setScreen] = useState<WizardScreen>('upload');
   const [contentType, setContentType] = useState<ContentType | null>(null);
@@ -132,6 +140,25 @@ export function useWizard(
   const [otherType, setOtherType] = useState('');
   const [toneText, setToneText] = useState('');
   const [model, setModel] = useState<AllowedModel>(DEFAULT_MODEL);
+
+  // Copyright-consent gate (see handleTranslate). consentAgreed starts false
+  // and fetchConsent fails closed, so a lookup that never lands just means the
+  // user sees the notice once more — never that they skip it.
+  const [consentAgreed, setConsentAgreed] = useState(false);
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [consentPending, setConsentPending] = useState(false);
+  const [consentError, setConsentError] = useState('');
+
+  useEffect(() => {
+    if (!signedIn) return;
+    let stale = false;
+    fetchConsent().then((agreed) => {
+      if (!stale) setConsentAgreed(agreed);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [signedIn]);
 
   const onMetaUpdate = useCallback(
     (meta: { inferredTitle?: string; inferredYear?: string }) => {
@@ -333,7 +360,10 @@ export function useWizard(
     setScreen('workPick');
   };
 
-  const handleTranslate = async (model: AllowedModel) => {
+  // The actual translate work, entered only once consent is settled — either
+  // handleTranslate saw consentAgreed already true, or handleAgreeConsent just
+  // recorded it.
+  const startTranslate = async (model: AllowedModel) => {
     setScreen('progress');
     // Give a still-running extraction a bounded grace period rather than
     // blocking indefinitely or always shipping without it — see
@@ -355,6 +385,35 @@ export function useWizard(
     // means our cached number was stale.
     refreshBalance();
     setScreen(ok ? 'done' : 'settings');
+  };
+
+  const handleTranslate = async (model: AllowedModel) => {
+    // Consent gate: not agreed yet → modal over the settings screen (screen
+    // deliberately stays 'settings' so nothing shifts behind the overlay).
+    if (!consentAgreed) {
+      setShowConsentModal(true);
+      return;
+    }
+    await startTranslate(model);
+  };
+
+  // Modal's agree button. On a failed save the modal stays open with an error
+  // — proceeding on an unsaved consent would leave no record, which defeats
+  // the modal's purpose. On success, continues straight into the translation
+  // the gate interrupted, using the wizard's own `model` state (the settings
+  // screen set it before calling handleTranslate, so it's the same value).
+  const handleAgreeConsent = async () => {
+    setConsentPending(true);
+    const ok = await recordConsent();
+    setConsentPending(false);
+    if (!ok) {
+      setConsentError(messages.copyright.failed);
+      return;
+    }
+    setConsentAgreed(true);
+    setConsentError('');
+    setShowConsentModal(false);
+    await startTranslate(model);
   };
 
   const handleCancel = () => {
@@ -462,6 +521,11 @@ export function useWizard(
     handleCancel,
     resetAll,
     goScreen,
+    // Copyright-consent gate.
+    showConsentModal,
+    consentPending,
+    consentError,
+    handleAgreeConsent,
     // Passed through from useTranslation for the screens that still render
     // against it directly.
     fileContent,

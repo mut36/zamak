@@ -12,6 +12,7 @@ import { ProgressStep } from './components/simple/ProgressStep';
 import { DoneStep } from './components/simple/DoneStep';
 import { LandingPage } from './components/simple/LandingPage';
 import { ExhaustedStep } from './components/beta/ExhaustedStep';
+import { CopyrightModal } from './components/beta/CopyrightModal';
 import { PurchaseStep } from './components/simple/PurchaseStep';
 import { useWizard, type WizardScreen } from './hooks/useWizard';
 import { useAuth } from './hooks/useAuth';
@@ -103,6 +104,10 @@ export default function Home() {
     goWorkPick,
     model,
     setModel,
+    showConsentModal,
+    consentPending,
+    consentError,
+    handleAgreeConsent,
   } = useWizard(
     {
       translate: COPY.translateErrors,
@@ -112,8 +117,10 @@ export default function Home() {
         invalidFile: COPY.upload.invalidFile,
       },
       cancelConfirm: COPY.progress.cancelConfirm,
+      copyright: { failed: COPY.copyright.failed },
     },
     refreshBalance,
+    !!user,
   );
 
   // Settings screen's confirm banner vs. settled card — a single confident
@@ -243,6 +250,17 @@ export default function Home() {
       {header}
 
       <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
+        {/* Mandatory first-translation gate: a fixed full-screen overlay with
+            no close affordance, over whichever screen is showing (the wizard
+            stays on 'settings' behind it). */}
+        {showConsentModal && (
+          <CopyrightModal
+            onAgree={handleAgreeConsent}
+            pending={consentPending}
+            error={consentError}
+          />
+        )}
+
         {purchaseNotice && (
           <div className='card p-4 mb-[14px] text-sm'>{purchaseNotice}</div>
         )}
