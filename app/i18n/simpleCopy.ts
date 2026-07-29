@@ -314,6 +314,23 @@ export const COPY = {
     },
   },
 
+  // 내 번역(/mypage) — 번역권 잔여 + 지난 번역 기록.
+  mypage: {
+    title: '내 번역',
+    liteCredits: '라이트 번역권',
+    proCredits: '프로 번역권',
+    unit: '회',
+    historyTitle: '번역 기록',
+    retention: (days: number) => `완성된 자막은 ${days}일간 보관해요.`,
+    download: '다시 받기',
+    expired: '보관 기간 지남',
+    empty: '아직 번역한 파일이 없어요.',
+    again: '새 파일 번역하기',
+    // 용어집은 적용됐을 때만 붙는다 — 켰지만 추출이 실패한 런에는 붙지 않는다.
+    meta: (date: string, model: string, glossary: boolean) =>
+      `${date} · ${model}${glossary ? ' · 용어집' : ''}`,
+  },
+
   footer: {
     feedback: '피드백 보내기',
     feedbackEmail: 'hello@mut36.com',
