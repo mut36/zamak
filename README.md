@@ -105,6 +105,18 @@ npx tsc --noEmit && npx eslint app && npx vitest run
      `https://zamak.app/auth/callback`, `https://www.zamak.app/auth/callback`
 5. **스키마 적용**: `supabase/migrations/0001_credits.sql`을 SQL Editor에 붙여넣고 실행
 
+### 베타 리디자인 마이그레이션
+
+`0001`~`0003` 이후, 베타 리디자인이 추가한 스키마를 **순서대로** SQL Editor에서 실행합니다:
+
+1. `supabase/migrations/0004_credit_tiers.sql` — 크레딧을 라이트/프로 2종 잔액으로 분리
+2. `supabase/migrations/0005_feedback.sql` — 완료 화면 별점·의견 피드백
+3. `supabase/migrations/0006_waitlist.sql` — 번역권 소진 시 결제 오픈 대기자 등록
+4. `supabase/migrations/0007_job_results.sql` — 번역 결과물 보관(30일) + `translation_jobs` 컬럼 추가
+5. `supabase/migrations/0008_copyright_consents.sql` — 첫 번역 전 저작권 동의 기록
+
+`0007` 실행 후, Supabase 대시보드 **Storage → New bucket**에서 이름 `results`, **Public bucket OFF**(비공개)로 버킷을 생성합니다. **이 버킷을 만들지 않으면 번역 자체는 정상 동작하지만, 결과물이 저장되지 않아 `/mypage`의 번역 기록이 비어 보입니다.**
+
 ### 크레딧
 
 크레딧 1개 = 자막 파일 1개(최대 2,000블록). 가입 시 트리거가 1개를 자동 지급합니다.
