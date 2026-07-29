@@ -34,6 +34,16 @@ const STEP_TRACKER_INDEX: Record<WizardScreen, number> = {
   exhausted: 0,
 };
 
+// Work identification (enrich for the movie branch, otherType/toneText for
+// the "other" branch) is always resolved by the time handleTranslate can
+// even be called — it only fires from the settings screen, which is reached
+// through confirmWorkPick or the settings screen's own confirm banner, both
+// of which settle movieInfo first. overallPercent's `enrichDone: false`
+// branch exists for that function's own general behavior (its test suite
+// covers it directly); it is not a state this wizard's wiring ever reaches,
+// so ProgressStep always gets `true` here.
+const ENRICH_ALWAYS_DONE = true;
+
 export default function Home() {
   const [authError, setAuthError] = useState('');
   const [purchasing, setPurchasing] = useState(false);
@@ -332,6 +342,9 @@ export default function Home() {
             progress={translationProgress}
             totalLines={totalLines}
             onCancel={handleCancel}
+            enrichDone={ENRICH_ALWAYS_DONE}
+            glossaryEnabled={castSheet.enabled}
+            glossaryDone={castSheet.status !== 'extracting'}
           />
         )}
 

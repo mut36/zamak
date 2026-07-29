@@ -237,6 +237,16 @@ export const COPY = {
     reassure: '번역이 끝날 때까지 이 창을 열어두세요.',
     cancel: '취소',
     cancelConfirm: '번역을 취소할까요?',
+    stages: {
+      context: '자막 맥락을 분석하는 중',
+      glossary: '인물과 용어를 정리하는 중',
+      translate: '자막을 번역하는 중',
+      verify: '타임코드를 검증하는 중',
+    },
+    stageSkipped: '건너뜀',
+    pct: (pct: number, sec: number) =>
+      `${String(Math.floor(pct)).padStart(2, '0')}% · 약 ${sec}초 남음`,
+    keepOpen: '창을 닫아도 번역은 계속돼요',
   },
 
   // Failure strings for the translation run. useTranslation takes these as a
