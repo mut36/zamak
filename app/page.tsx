@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BrandMark } from './components/BrandMark';
 import { StepTracker } from './components/simple/StepTracker';
@@ -11,42 +11,24 @@ import { DoneStep } from './components/simple/DoneStep';
 import { LandingPage } from './components/simple/LandingPage';
 import { CreditWall } from './components/simple/CreditWall';
 import { PurchaseStep } from './components/simple/PurchaseStep';
-import { useTranslation } from './hooks/useTranslation';
-import { useEnrich, type EnrichCandidate } from './hooks/useEnrich';
-import { useCastSheet } from './hooks/useCastSheet';
+import { useWizard } from './hooks/useWizard';
 import { useAuth } from './hooks/useAuth';
-import { parseSrtBlocks } from './lib/srt';
-import {
-  BilingualSmiError,
-  isSupportedSubtitleFilename,
-  loadSubtitleFile,
-} from './lib/subtitles';
 import { isSupabaseConfigured } from './lib/supabase/env';
-import { DEFAULT_TARGET_LANG } from './config/languages';
-import { APP_VERSION, type AllowedModel } from './config/constants';
-import type { ContentType, MovieInfo } from './types/translation';
+import { APP_VERSION } from './config/constants';
 import { COPY } from './i18n/simpleCopy';
 
-const EMPTY_MOVIE_INFO: MovieInfo = { title: '', year: '', notes: '' };
-
-/**
- * A bilingual SAMI is the one failure with a fix the user can act on (upload a
- * single-language file), so it gets its own message. Everything else — an
- * unrecognized body, no cues, a decode failure — reads the same from here.
- */
-function uploadErrorMessage(err: unknown): string {
-  return err instanceof BilingualSmiError
-    ? COPY.upload.bilingualSmi
-    : COPY.upload.unreadableFile;
-}
+// Maps the wizard's screen names to the numeric steps StepTracker renders.
+// 'exhausted' has no tracker position — the credit wall replaces the tracker
+// entirely (see the `refusal` branch below).
+const STEP_TRACKER_INDEX: Record<string, number> = {
+  upload: 0,
+  workPick: 1,
+  settings: 1,
+  progress: 2,
+  done: 3,
+};
 
 export default function Home() {
-  const [step, setStep] = useState(0);
-  const [contentType, setContentType] = useState<ContentType>('movie');
-  const [targetLang, setTargetLang] = useState<string>(DEFAULT_TARGET_LANG);
-  const [movieInfo, setMovieInfo] = useState<MovieInfo>(EMPTY_MOVIE_INFO);
-  const [uploadError, setUploadError] = useState('');
-  const [summarizing, setSummarizing] = useState(false);
   const [authError, setAuthError] = useState('');
   const [purchasing, setPurchasing] = useState(false);
   const [purchaseNotice, setPurchaseNotice] = useState('');
@@ -60,6 +42,57 @@ export default function Home() {
     refreshBalance,
   } = useAuth();
 
+  const {
+    screen,
+    contentType,
+    setContentType,
+    targetLang,
+    setTargetLang,
+    movieInfo,
+    setMovieInfo,
+    uploadError,
+    summarizing,
+    handleFile,
+    handleTranslate,
+    handleCancel,
+    resetAll: resetWizard,
+    fileContent,
+    error,
+    analysis,
+    translationProgress,
+    result,
+    refusal,
+    totalLines,
+    enrichStatus,
+    director,
+    enrichError,
+    enrichCandidates,
+    runEnrich,
+    runSelectCandidate,
+    castSheet,
+    fileContentRef,
+    movieInfoRef,
+  } = useWizard(
+    {
+      translate: COPY.translateErrors,
+      upload: {
+        bilingualSmi: COPY.upload.bilingualSmi,
+        unreadableFile: COPY.upload.unreadableFile,
+        invalidFile: COPY.upload.invalidFile,
+      },
+      cancelConfirm: COPY.progress.cancelConfirm,
+    },
+    refreshBalance,
+  );
+
+  // page.tsx owns purchasing/notice (payment UI chrome, not wizard state), so
+  // "start over" clears both the wizard and this screen's own leftovers.
+  const resetAll = () => {
+    resetWizard();
+    setPurchasing(false);
+    setPurchaseNotice('');
+  };
+
   // Both round-trips that leave the app — OAuth and the Toss payment window —
   // report back through query params. Read them once, then clean the URL so a
   // refresh does not re-show a stale banner (or re-count a purchase).
@@ -69,6 +102,10 @@ export default function Home() {
     let handled = false;
 
     if (params.get('auth_error')) {
+      // This effect only runs to sync a one-time redirect query param into
+      // state on mount (an external system, per the rule's own carve-out) —
+      // there is no render-time equivalent for "the URL said auth failed".
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAuthError(COPY.auth.failed);
       handled = true;
     }
@@ -95,219 +132,6 @@ export default function Home() {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, [refreshBalance]);
-
-  const onMetaUpdate = useCallback(
-    (meta: { inferredTitle?: string; inferredYear?: string }) => {
-      setMovieInfo((prev) => ({
-        ...prev,
-        title: meta.inferredTitle || prev.title,
-        year: meta.inferredYear || prev.year,
-      }));
-    },
-    [],
-  );
-
-  const {
-    fileContent,
-    error,
-    analysis,
-    translationProgress,
-    result,
-    refusal,
-    processFile,
-    translate,
-    cancelTranslation,
-    clearFile,
-  } = useTranslation(COPY.translateErrors, onMetaUpdate);
-
-  const {
-    status: enrichStatus,
-    director,
-    error: enrichError,
-    candidates: enrichCandidates,
-    enrich,
-    selectCandidate,
-    reset: resetEnrich,
-  } = useEnrich();
-
-  const castSheet = useCastSheet();
-
-  const totalLines = useMemo(
-    () => (fileContent ? parseSrtBlocks(fileContent).length : 0),
-    [fileContent],
-  );
-
-  // Latest values for async callbacks, so the enrich/summarize lifecycle can
-  // live in the orchestrator (surviving step changes) without stale closures.
-  const movieInfoRef = useRef(movieInfo);
-  const fileContentRef = useRef(fileContent);
-  useEffect(() => {
-    movieInfoRef.current = movieInfo;
-    fileContentRef.current = fileContent;
-  }, [movieInfo, fileContent]);
-
-  const enrichStartedRef = useRef(false);
-  const summarizeStartedRef = useRef(false);
-
-  // Movie branch: one unified lookup (TMDB first, grounded search fallback —
-  // see enrichMovie() server-side). title/year/director/poster are UI-facing
-  // and overwrite the filename-guessed values with the authoritative ones;
-  // genre/era/tone are AI-facing keyword fields, never rendered. `notes`
-  // stays untouched here — it is the user's own free-text field.
-  const runEnrich = useCallback(async () => {
-    const { title, year } = movieInfoRef.current;
-    const data = await enrich(title, year);
-    setMovieInfo((prev) => ({
-      ...prev,
-      posterUrl: data?.posterUrl ?? undefined,
-      title: data?.found && data.title ? data.title : prev.title,
-      year: data?.found && data.year ? data.year : prev.year,
-      genre: data?.found ? data.genre : '',
-      era: data?.found ? data.era : '',
-      tone: data?.found ? data.tone : '',
-    }));
-  }, [enrich]);
-
-  // User picked one of several TMDB matches from the ambiguous-search
-  // candidate list (InfoStep) — resolve that specific work the same way
-  // runEnrich merges an auto-resolved one.
-  const runSelectCandidate = useCallback(
-    async (candidate: EnrichCandidate) => {
-      const { title, year } = movieInfoRef.current;
-      const data = await selectCandidate(candidate, title, year);
-      setMovieInfo((prev) => ({
-        ...prev,
-        posterUrl: data?.posterUrl ?? undefined,
-        title: data?.found && data.title ? data.title : prev.title,
-        year: data?.found && data.year ? data.year : prev.year,
-        genre: data?.found ? data.genre : '',
-        era: data?.found ? data.era : '',
-        tone: data?.found ? data.tone : '',
-      }));
-    },
-    [selectCandidate],
-  );
-
-  // Auto-analyze once per file: movie → web-search enrich + TMDB poster,
-  // other → summarize. Guarded by refs so returning never re-triggers.
-  useEffect(() => {
-    if (step !== 1) return;
-    if (contentType === 'movie') {
-      if (analysis.completed && !enrichStartedRef.current) {
-        enrichStartedRef.current = true;
-        runEnrich();
-      }
-    } else if (fileContent && !summarizeStartedRef.current) {
-      summarizeStartedRef.current = true;
-      (async () => {
-        setSummarizing(true);
-        try {
-          const res = await fetch('/api/summarize', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: fileContentRef.current }),
-          });
-          const data = res.ok ? await res.json() : { summary: '' };
-          if (data.summary) {
-            setMovieInfo((prev) => ({ ...prev, notes: prev.notes || data.summary }));
-          }
-        } catch {
-          /* leave notes empty on failure */
-        } finally {
-          setSummarizing(false);
-        }
-      })();
-    }
-  }, [step, contentType, analysis.completed, fileContent, runEnrich]);
-
-  // Cast-sheet prepass: independent opt-in toggle (see docs/decisions.md).
-  // request() no-ops while already in flight/done for this file (internal
-  // ref guard), so firing this effect on every fileContent/enabled change is
-  // safe — it only actually dispatches once per file, and only when enabled.
-  const castSheetEnabled = castSheet.enabled;
-  const requestCastSheet = castSheet.request;
-  useEffect(() => {
-    if (step !== 1) return;
-    if (!castSheetEnabled) return;
-    if (!fileContent) return;
-    requestCastSheet(fileContentRef.current, movieInfoRef.current, targetLang);
-  }, [step, castSheetEnabled, fileContent, requestCastSheet, targetLang]);
-
-  const resetAnalysis = () => {
-    enrichStartedRef.current = false;
-    summarizeStartedRef.current = false;
-    resetEnrich();
-    castSheet.reset();
-    setSummarizing(false);
-  };
-
-  const handleFile = async (selected: File) => {
-    if (!isSupportedSubtitleFilename(selected.name)) {
-      setUploadError(COPY.upload.invalidFile);
-      return;
-    }
-    setUploadError('');
-
-    // Parsing is awaited here rather than inside the hook so a file we can't
-    // use never leaves this screen: the error belongs next to the dropzone,
-    // not on the info step behind a spinner.
-    let doc;
-    try {
-      doc = await loadSubtitleFile(selected);
-    } catch (err) {
-      setUploadError(uploadErrorMessage(err));
-      return;
-    }
-
-    setMovieInfo(EMPTY_MOVIE_INFO);
-    resetAnalysis();
-    // Step 1 goes up immediately so the "분석 중" spinner covers the wait.
-    processFile(selected, doc);
-    setStep(1);
-  };
-
-  const handleTranslate = async (model: AllowedModel) => {
-    setStep(2);
-    // Give a still-running extraction a bounded grace period rather than
-    // blocking indefinitely or always shipping without it — see
-    // GLOSSARY_WAIT_MS. Never called (resolves immediately) when the toggle
-    // is off, since no extraction was ever kicked off.
-    const resolvedCastSheet = castSheet.enabled
-      ? await castSheet.awaitReady()
-      : undefined;
-    // translate() resolves true on success, false on error/abort/refusal.
-    const ok = await translate(
-      movieInfo,
-      model,
-      targetLang,
-      'meaning',
-      undefined,
-      resolvedCastSheet,
-    );
-    // The balance moved either way: a success spent the credit, and a refusal
-    // means our cached number was stale.
-    refreshBalance();
-    setStep(ok ? 3 : 1);
-  };
-
-  const handleCancel = () => {
-    if (confirm(COPY.progress.cancelConfirm)) {
-      cancelTranslation();
-      setStep(1);
-    }
-  };
-
-  const resetAll = () => {
-    cancelTranslation();
-    clearFile();
-    resetAnalysis();
-    setMovieInfo(EMPTY_MOVIE_INFO);
-    setUploadError('');
-    setContentType('movie');
-    setPurchasing(false);
-    setPurchaseNotice('');
-    setStep(0);
-  };
 
   const header = (
     <header className='flex items-center justify-between w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 h-16'>
@@ -390,7 +214,7 @@ export default function Home() {
           <PurchaseStep balance={credits?.lite ?? null} onClose={() => setPurchasing(false)} />
         ) : (
         <>
-        {!refusal && <StepTracker current={step} />}
+        {!refusal && <StepTracker current={STEP_TRACKER_INDEX[screen] ?? 0} />}
 
         {refusal && (
           <CreditWall
@@ -402,18 +226,18 @@ export default function Home() {
           />
         )}
 
-        {!refusal && step === 0 && (
+        {!refusal && screen === 'upload' && (
           <UploadStep
             targetLang={targetLang}
             onTargetLang={setTargetLang}
-            contentType={contentType}
+            contentType={contentType ?? 'movie'}
             onContentType={setContentType}
             error={uploadError}
             onFile={handleFile}
           />
         )}
 
-        {!refusal && step === 1 && (
+        {!refusal && screen === 'settings' && (
           <>
             {error && (
               <div
@@ -424,7 +248,7 @@ export default function Home() {
               </div>
             )}
             <InfoStep
-              contentType={contentType}
+              contentType={contentType ?? 'movie'}
               movieInfo={movieInfo}
               setMovieInfo={setMovieInfo}
               enrichStatus={enrichStatus}
@@ -454,7 +278,7 @@ export default function Home() {
           </>
         )}
 
-        {!refusal && step === 2 && (
+        {!refusal && screen === 'progress' && (
           <ProgressStep
             progress={translationProgress}
             totalLines={totalLines}
@@ -462,7 +286,7 @@ export default function Home() {
           />
         )}
 
-        {!refusal && step === 3 && result && (
+        {!refusal && screen === 'done' && result && (
           <DoneStep
             result={result}
             originalContent={fileContent}
