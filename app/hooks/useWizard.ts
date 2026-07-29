@@ -386,7 +386,7 @@ export function useWizard(
       // A fresh search always replaces `candidates` with a new list, so any
       // prior selection into the old list must be cleared here — otherwise
       // the same index can point at a different, never-clicked film in the
-      // new list and render as pre-selected (see docs/decisions.md).
+      // new list and render as pre-selected.
       setSelectedIndex(-1);
       enrich(query, '');
     },
