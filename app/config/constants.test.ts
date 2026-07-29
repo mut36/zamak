@@ -30,6 +30,16 @@ describe('RESULT_RETENTION_DAYS', () => {
   });
 });
 
+describe('PRO_MODEL', () => {
+  it('stays the exact literal the credit-tier migration hardcodes', () => {
+    // supabase/migrations/0004_credit_tiers.sql picks the balance to debit with
+    // a bare `p_model = 'gemini-3.1-pro-preview'` comparison, and that migration
+    // is already applied in production. If PRO_MODEL drifts without the DB
+    // following, every 프로 translation silently debits lite_balance instead.
+    expect(PRO_MODEL).toBe('gemini-3.1-pro-preview');
+  });
+});
+
 describe('resolveTier', () => {
   it('puts every request on the server tier', () => {
     expect(resolveTier()).toBe('server');

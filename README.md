@@ -115,6 +115,15 @@ npx tsc --noEmit && npx eslint app && npx vitest run
 4. `supabase/migrations/0007_job_results.sql` — 번역 결과물 보관(30일) + `translation_jobs` 컬럼 추가
 5. `supabase/migrations/0008_copyright_consents.sql` — 첫 번역 전 저작권 동의 기록
 
+**마이그레이션과 배포는 붙여서 합니다.** `0004`는 기존 `begin_translation_job(integer)`과
+5인자 `settle_order`를 **drop하고** 새 시그니처로 다시 만듭니다. 이 앱은 Next.js 한 벌이
+Supabase 한 개를 보는 구조라 블루/그린도, 버전 핀도 없습니다 — 그래서 순서가 어느 쪽이든
+그 사이에는 살아 있는 코드가 없는 함수를 호출하는 구간이 생깁니다(마이그레이션 먼저면
+구코드가 옛 시그니처를 못 찾고, 배포 먼저면 신코드가 새 시그니처를 못 찾습니다).
+1인 운영이므로 **트래픽이 적은 시간에 마이그레이션 실행 → 곧바로 배포**로 몇 분짜리
+다운타임을 감수하는 것이 가장 단순하고 정직한 방법입니다. 그 사이 진행 중이던 번역은
+실패하며, 차감된 번역권은 `/legal`의 환불 조항대로 복구해 주면 됩니다.
+
 `0007` 실행 후, Supabase 대시보드 **Storage → New bucket**에서 이름 `results`, **Public bucket OFF**(비공개)로 버킷을 생성합니다. **이 버킷을 만들지 않으면 번역 자체는 정상 동작하지만, 결과물이 저장되지 않아 `/mypage`의 번역 기록이 비어 보입니다.**
 
 ### 크레딧
