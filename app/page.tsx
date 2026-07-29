@@ -6,6 +6,7 @@ import { BrandMark } from './components/BrandMark';
 import { StepTracker } from './components/simple/StepTracker';
 import { UploadStep } from './components/simple/UploadStep';
 import { InfoStep } from './components/simple/InfoStep';
+import { WorkPickStep } from './components/beta/WorkPickStep';
 import { ProgressStep } from './components/simple/ProgressStep';
 import { DoneStep } from './components/simple/DoneStep';
 import { LandingPage } from './components/simple/LandingPage';
@@ -78,6 +79,14 @@ export default function Home() {
     castSheet,
     fileContentRef,
     movieInfoRef,
+    selectedIndex,
+    setSelectedIndex,
+    otherType,
+    setOtherType,
+    toneText,
+    setToneText,
+    searchWork,
+    confirmWorkPick,
   } = useWizard(
     {
       translate: COPY.translateErrors,
@@ -235,6 +244,30 @@ export default function Home() {
             uploadingFileName={uploadingFileName}
             error={uploadError}
             onFile={handleFile}
+          />
+        )}
+
+        {!refusal && screen === 'workPick' && (
+          <WorkPickStep
+            contentType={contentType ?? 'movie'}
+            fileName={uploadingFileName}
+            candidates={enrichCandidates}
+            selectedIndex={selectedIndex}
+            onSelect={setSelectedIndex}
+            onSearch={searchWork}
+            // Covers both the file-analysis phase and the TMDB search itself
+            // (mirrors InfoStep's old `busy` computation) so the movie branch
+            // never flashes an empty candidate list before either kicks in.
+            searching={
+              analysis.isAnalyzing ||
+              enrichStatus === 'searching' ||
+              enrichStatus === 'idle'
+            }
+            otherType={otherType}
+            onOtherType={setOtherType}
+            toneText={toneText}
+            onToneText={setToneText}
+            onConfirm={confirmWorkPick}
           />
         )}
 

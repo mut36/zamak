@@ -175,6 +175,25 @@ export const COPY = {
     },
   },
 
+  workPick: {
+    sourceLangBadge: '원본 언어: 자동 인식',
+    title: '어떤 작품인가요?',
+    subtitle: '작품을 골라 주시면 시대배경과 말투까지 조율해 번역해요.',
+    posterEmpty: 'poster',
+    kindMovie: '영화',
+    kindTv: '드라마',
+    searchOpen: '찾는 작품이 없어요',
+    searchClose: '검색 닫기',
+    searchPlaceholder: '작품 제목을 검색하세요',
+    // enrich()는 제목+연도만 받는다. 감독으로 찾아준다고 쓰면 못 지키는 약속이 된다.
+    searchHint: '제목으로 다시 찾아 드려요. 못 찾아도 번역은 계속할 수 있어요.',
+    confirm: '이 작품으로 계속',
+    otherTypeLabel: '콘텐츠 유형',
+    otherTypes: ['유튜브', '강연·인터뷰', '브이로그', '기타'],
+    toneLabel: '원하는 톤앤매너',
+    tonePlaceholder: '예: 친근한 반말, 유튜브 예능 자막처럼 리듬감 있게',
+  },
+
   progress: {
     label: '번역 중',
     analyzing: '파일을 분석하고 있어요',

@@ -84,6 +84,14 @@ export interface WizardState {
   /** True when the work came from a single confident match, so the settings
    *  screen shows the confirm banner instead of a settled card. */
   autoMatched: boolean;
+  /** Movie branch: index of the highlighted candidate card on the work-pick
+   *  screen. -1 means nothing picked yet. */
+  selectedIndex: number;
+  /** Other branch: the chosen content-type chip label (one of
+   *  COPY.workPick.otherTypes). */
+  otherType: string;
+  /** Other branch: free-text tone/manner for the work-pick screen. */
+  toneText: string;
 }
 
 /**
@@ -116,6 +124,9 @@ export function useWizard(
   const [summarizing, setSummarizing] = useState(false);
   const [workConfirmed, setWorkConfirmed] = useState(false);
   const [autoMatched, setAutoMatched] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [otherType, setOtherType] = useState('');
+  const [toneText, setToneText] = useState('');
 
   const onMetaUpdate = useCallback(
     (meta: { inferredTitle?: string; inferredYear?: string }) => {
@@ -187,7 +198,17 @@ export function useWizard(
       era: data?.found ? data.era : '',
       tone: data?.found ? data.tone : '',
     }));
-  }, [enrich]);
+    // `data` (the just-awaited return value) disambiguates a confident match
+    // reliably even though `enrichStatus` read here is a possibly-stale
+    // render-time closure value (see nextScreenAfterUpload's doc comment) —
+    // enrichStatus is only used to distinguish 'ambiguous' from 'notFound',
+    // both of which route to the same place ('workPick'), so a stale read
+    // between those two never produces a wrong screen.
+    const matched = data !== null;
+    setAutoMatched(matched);
+    setWorkConfirmed(false);
+    setScreen(nextScreenAfterUpload(matched ? 'found' : enrichStatus));
+  }, [enrich, enrichStatus]);
 
   // User picked one of several TMDB matches from the ambiguous-search
   // candidate list (InfoStep) — resolve that specific work the same way
@@ -212,7 +233,7 @@ export function useWizard(
   // Auto-analyze once per file: movie → web-search enrich + TMDB poster,
   // other → summarize. Guarded by refs so returning never re-triggers.
   useEffect(() => {
-    if (screen !== 'settings') return;
+    if (screen !== 'workPick') return;
     if (contentType === null) return;
     if (contentType === 'movie') {
       if (analysis.completed && !enrichStartedRef.current) {
@@ -261,6 +282,9 @@ export function useWizard(
     resetEnrich();
     castSheet.reset();
     setSummarizing(false);
+    setSelectedIndex(-1);
+    setOtherType('');
+    setToneText('');
   };
 
   const handleFile = async (selected: File) => {
@@ -293,10 +317,13 @@ export function useWizard(
 
     setMovieInfo(EMPTY_MOVIE_INFO);
     resetAnalysis();
-    // Screen goes to 'settings' immediately so the "분석 중" spinner covers the wait.
+    // Screen goes to 'workPick' immediately — the movie branch's TMDB search
+    // and the other branch's summarize both run while it's showing, so the
+    // user sees a live "searching"/analyzing state on the work-pick screen
+    // itself rather than looking stuck on upload.
     processFile(selected, doc);
     setUploading(false);
-    setScreen('settings');
+    setScreen('workPick');
   };
 
   const handleTranslate = async (model: AllowedModel) => {
@@ -341,12 +368,43 @@ export function useWizard(
     setContentType(null);
     setWorkConfirmed(false);
     setAutoMatched(false);
+    setSelectedIndex(-1);
+    setOtherType('');
+    setToneText('');
     setScreen('upload');
   };
 
   const confirmWork = useCallback(() => {
     setWorkConfirmed(true);
   }, []);
+
+  // Manual re-search for the work-pick screen's "찾는 작품이 없어요" toggle —
+  // empty year, since the user is searching by a new title and the file's
+  // originally-guessed year no longer applies.
+  const searchWork = useCallback(
+    (query: string) => {
+      enrich(query, '');
+    },
+    [enrich],
+  );
+
+  const confirmWorkPick = useCallback(() => {
+    if (contentType === 'movie') {
+      const candidate = enrichCandidates[selectedIndex];
+      if (!candidate) return;
+      (async () => {
+        await runSelectCandidate(candidate);
+        setWorkConfirmed(true);
+        // A manual pick, not the auto-confident-match path the settings
+        // screen's confirm banner is for.
+        setAutoMatched(false);
+        setScreen('settings');
+      })();
+    } else if (contentType === 'other') {
+      setMovieInfo((prev) => ({ ...prev, genre: otherType, tone: toneText }));
+      setScreen('settings');
+    }
+  }, [contentType, enrichCandidates, selectedIndex, runSelectCandidate, otherType, toneText]);
 
   const goWorkPick = useCallback(() => {
     setScreen('workPick');
@@ -367,6 +425,9 @@ export function useWizard(
     summarizing,
     workConfirmed,
     autoMatched,
+    selectedIndex,
+    otherType,
+    toneText,
   };
 
   return {
@@ -374,8 +435,13 @@ export function useWizard(
     setContentType,
     setTargetLang,
     setMovieInfo,
+    setSelectedIndex,
+    setOtherType,
+    setToneText,
     confirmWork,
     goWorkPick,
+    searchWork,
+    confirmWorkPick,
     handleFile,
     handleTranslate,
     handleCancel,
