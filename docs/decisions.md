@@ -1153,7 +1153,7 @@ thinking 토큰이 **출력 단가**로 과금되고(§2-4-1), 파일에 따라 
 **결정**: 토스페이먼츠 연동 서버 코드(`app/lib/server/toss.ts`,
 `/api/payments/*`, `settle_order`)는 그대로 두고, 위저드에서 `PurchaseStep`
 진입점만 뺀다(커밋 `24180b1`). 번역권이 떨어지면 결제 대신
-대기자 등록(`ExhaustedStep.tsx` → `waitlist` 테이블, §5-5 아래)으로 보낸다.
+대기자 등록(`ExhaustedStep.tsx` → `waitlist` 테이블)으로 보낸다.
 
 **근거**: 결제 코드를 걷어내 별도 feature 브랜치로 옮기면, 리디자인이 끝나고
 다시 합칠 때 그 사이 벌어진 브랜치 차이를 병합해야 한다 — **feature 브랜치를
