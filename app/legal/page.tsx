@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { CREDIT_PACKS } from '../config/packs';
-import { MAX_BLOCKS_PER_CREDIT } from '../config/constants';
+import {
+  MAX_BLOCKS_PER_CREDIT,
+  RESULT_RETENTION_DAYS,
+} from '../config/constants';
 import { COPY } from '../i18n/simpleCopy';
 import { SITE } from '../lib/brand';
 import { Contents, KeyPoint, LegalShell, Section } from './parts';
@@ -55,12 +58,11 @@ export default function LegalPage() {
       <Contents items={CONTENTS} />
 
       <KeyPoint>
-        <b className='text-ink'>
-          올리신 자막 파일은 서버에 저장하지 않습니다.
-        </b>{' '}
-        파일은 브라우저에서 열리고, 번역되는 동안에만 서버를 거쳐 갑니다. ZAMAK이
-        기록하는 것은 번역한 자막의 줄 수와 시각뿐이며 자막 내용은 포함되지
-        않습니다.
+        <b className='text-ink'>올리신 자막 원본은 저장하지 않습니다.</b> 원본은
+        브라우저에서 열리고, 번역되는 동안에만 서버를 거쳐 갑니다.{' '}
+        <b className='text-ink'>완성된 번역 결과물</b>은 다시 받으실 수 있도록
+        본인만 접근할 수 있는 비공개 저장소에 {RESULT_RETENTION_DAYS}일간
+        보관합니다.
       </KeyPoint>
 
       <Section title='판매하는 것' id='product'>
@@ -128,9 +130,15 @@ export default function LegalPage() {
 
       <Section title='파일과 데이터 처리' id='data'>
         <p className='m-0'>
-          올리신 자막 파일은 서버에 저장하지 않습니다. 파일은 브라우저에서 열려
+          올리신 자막 원본은 서버에 저장하지 않습니다. 원본은 브라우저에서 열려
           번역할 단위로 나뉘고, 번역이 진행되는 동안에만 서버를 거쳐 갑니다.
-          번역이 끝나면 결과물은 이용자의 브라우저에만 남습니다.
+        </p>
+        <p>
+          번역이 끝나면 <b>결과물</b>은 이용자가 다시 받을 수 있도록{' '}
+          {RESULT_RETENTION_DAYS}일간 보관합니다. 이용자별로 분리된 비공개
+          저장소에 두며, 검색 엔진에 노출되지 않고 본인 외에는 열람하지 않습니다.{' '}
+          {RESULT_RETENTION_DAYS}일이 지나면 다시 받으실 수 없습니다. 그 전에
+          삭제를 원하시면 아래 고객문의로 요청해주세요.
         </p>
         <p>
           번역에는 Google의 Gemini API를 사용하므로, 자막의 대사는 번역되는 동안
@@ -138,8 +146,8 @@ export default function LegalPage() {
           학습에 사용하지 않습니다.
         </p>
         <p>
-          ZAMAK이 기록하는 것은 번역한 자막의 줄 수와 시각뿐이며, 자막 내용은
-          포함되지 않습니다. 계정·결제 정보를 포함한 자세한 내용은{' '}
+          그 밖에 ZAMAK이 기록하는 것은 번역한 자막의 줄 수와 시각, 올린 파일의
+          이름뿐입니다. 계정·결제 정보를 포함한 자세한 내용은{' '}
           <Link href={COPY.legal.privacyHref} className='underline'>
             {COPY.legal.privacy}
           </Link>
@@ -177,10 +185,16 @@ export default function LegalPage() {
           </li>
         </ul>
         <p className='mt-3'>
-          다만 ZAMAK은 자막 파일이나 번역 결과물을 보관하지 않으므로, 특정 파일을
-          내리거나 접근을 차단하는 조치는 할 수 없습니다. 신고 내용을 검토해
-          반복적이거나 명백한 침해가 확인되면 해당 계정의 서비스 이용을 제한할 수
-          있습니다.
+          ZAMAK은 자막 원본을 보관하지 않으므로 원본에 대해서는 내릴 것이
+          없습니다. 다만 번역 <b>결과물</b>은 {RESULT_RETENTION_DAYS}일간
+          보관하므로, 보관 기간 안이라면 신고된 저작물에 해당하는 결과물을 계정과
+          작업 단위로 특정해 삭제하고 접근을 차단할 수 있습니다. 결과물은 처음부터
+          공개되지 않으며 올린 이용자 본인만 받을 수 있으므로, 이 조치는 공중에
+          대한 유통을 막는 것이 아니라 ZAMAK이 들고 있던 사본을 없애는 것입니다.
+        </p>
+        <p>
+          신고 내용을 검토해 반복적이거나 명백한 침해가 확인되면 해당 계정의
+          서비스 이용을 제한할 수 있습니다.
         </p>
       </Section>
 
