@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { BrandMark } from './components/BrandMark';
 import { StepTracker } from './components/simple/StepTracker';
 import { UploadStep } from './components/simple/UploadStep';
-import { InfoStep } from './components/simple/InfoStep';
 import { WorkPickStep } from './components/beta/WorkPickStep';
+import { TranslateSettingsStep } from './components/beta/TranslateSettingsStep';
 import { ProgressStep } from './components/simple/ProgressStep';
 import { DoneStep } from './components/simple/DoneStep';
 import { LandingPage } from './components/simple/LandingPage';
@@ -15,7 +15,7 @@ import { PurchaseStep } from './components/simple/PurchaseStep';
 import { useWizard, type WizardScreen } from './hooks/useWizard';
 import { useAuth } from './hooks/useAuth';
 import { isSupabaseConfigured } from './lib/supabase/env';
-import { APP_VERSION } from './config/constants';
+import { APP_VERSION, estimateTranslationMs, GLOSSARY_WAIT_MS } from './config/constants';
 import { COPY } from './i18n/simpleCopy';
 
 // Maps the wizard's screen names to the numeric steps StepTracker renders.
@@ -58,7 +58,6 @@ export default function Home() {
     uploadError,
     uploading,
     uploadingFileName,
-    summarizing,
     handleFile,
     handleTranslate,
     handleCancel,
@@ -71,11 +70,7 @@ export default function Home() {
     refusal,
     totalLines,
     enrichStatus,
-    director,
-    enrichError,
     enrichCandidates,
-    runEnrich,
-    runSelectCandidate,
     castSheet,
     fileContentRef,
     movieInfoRef,
@@ -87,6 +82,12 @@ export default function Home() {
     setToneText,
     searchWork,
     confirmWorkPick,
+    workConfirmed,
+    autoMatched,
+    confirmWork,
+    goWorkPick,
+    model,
+    setModel,
   } = useWizard(
     {
       translate: COPY.translateErrors,
@@ -98,6 +99,20 @@ export default function Home() {
       cancelConfirm: COPY.progress.cancelConfirm,
     },
     refreshBalance,
+  );
+
+  // Settings screen's confirm banner vs. settled card — a single confident
+  // TMDB match needs a yes/no before it's trusted, a manual pick or an
+  // already-confirmed one doesn't.
+  const needsConfirm = autoMatched && !workConfirmed;
+
+  // ETA promise for the settings screen's bottom bar — reuses the same
+  // per-model estimate the progress ring fills against (TRANSLATION_ESTIMATE_MS
+  // via estimateTranslationMs), plus the cast-sheet grace period when that
+  // toggle is on. No separate formula invented here.
+  const etaSeconds = Math.round(
+    (estimateTranslationMs(model) + (castSheet.enabled ? GLOSSARY_WAIT_MS : 0)) /
+      1000,
   );
 
   // page.tsx owns purchasing/notice (payment UI chrome, not wizard state), so
@@ -281,18 +296,18 @@ export default function Home() {
                 {error}
               </div>
             )}
-            <InfoStep
+            <TranslateSettingsStep
               contentType={contentType ?? 'movie'}
               movieInfo={movieInfo}
-              setMovieInfo={setMovieInfo}
-              enrichStatus={enrichStatus}
-              enrichError={enrichError}
-              director={director}
-              candidates={enrichCandidates}
-              onSelectCandidate={runSelectCandidate}
-              analysisAnalyzing={analysis.isAnalyzing}
-              onReEnrich={runEnrich}
-              summarizing={summarizing}
+              onMovieInfo={(patch) =>
+                setMovieInfo((prev) => ({ ...prev, ...patch }))
+              }
+              needsConfirm={needsConfirm}
+              onConfirmWork={confirmWork}
+              onChangeWork={goWorkPick}
+              model={model}
+              onModel={setModel}
+              credits={credits}
               targetLang={targetLang}
               castSheetEnabled={castSheet.enabled}
               onCastSheetToggle={castSheet.setEnabled}
@@ -306,8 +321,8 @@ export default function Home() {
                   targetLang,
                 )
               }
-              onBack={resetAll}
-              onTranslate={handleTranslate}
+              etaSeconds={etaSeconds}
+              onStart={() => handleTranslate(model)}
             />
           </>
         )}

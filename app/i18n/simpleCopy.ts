@@ -175,6 +175,33 @@ export const COPY = {
     },
   },
 
+  settings: {
+    title: '번역 설정',
+    subtitleAuto: '원본 언어 자동 인식 → 한국어',
+    confirmQuestion: (work: string) => `'${work}'(으)로 인식했어요. 맞나요?`,
+    confirmHint: '아니라면 다시 골라 주세요',
+    confirmYes: '맞아요',
+    confirmNo: '아니에요',
+    changeWork: '작품 변경',
+    eraLabel: '시대 · 배경',
+    eraPlaceholder: '예: 1920년대 아일랜드 해안, 고립된 등대',
+    toneLabel: '톤앤매너',
+    tonePlaceholder: '예: 고전적이고 절제된 어투, 심리극',
+    contextEditable: '(수정 가능)',
+    contextHint: '번역에 그대로 반영돼요. 비워 두면 자막만 보고 판단해요.',
+    liteName: '라이트',
+    liteDesc: '빠르고 정확한 기본 번역.',
+    proName: '프로',
+    proDesc: '작품 맥락 분석과 인물명 일관성. 후편집 시간을 줄이는 초벌 번역.',
+    creditsLeft: (n: number) => `${n}회 남음`,
+    glossaryTitle: '용어집 · 말투 설정',
+    glossaryBadge: '고급',
+    glossaryDesc:
+      '인물명 표기를 고정하고 인물 간 존대·반말을 지정해요. 약 20초 더 걸려요.',
+    eta: (sec: number) => `예상 소요 약 ${sec}초`,
+    start: '번역 시작',
+  },
+
   workPick: {
     sourceLangBadge: '원본 언어: 자동 인식',
     title: '어떤 작품인가요?',

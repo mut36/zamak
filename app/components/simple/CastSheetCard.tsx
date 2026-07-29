@@ -101,8 +101,8 @@ export function CastSheetCard({
         <span
           className='inline-flex items-center justify-center w-4 h-4 rounded border shrink-0'
           style={{
-            borderColor: enabled ? 'var(--accent)' : 'var(--border)',
-            background: enabled ? 'var(--accent)' : 'transparent',
+            borderColor: enabled ? 'var(--ink)' : 'var(--border)',
+            background: enabled ? 'var(--ink)' : 'transparent',
           }}
           aria-hidden
         >
@@ -251,7 +251,7 @@ export function CastSheetCard({
                         className='btn btn-ghost !py-1 !px-2 !text-[12px]'
                         style={
                           rel.speech === option
-                            ? { background: 'var(--accent)', color: 'white' }
+                            ? { background: 'var(--ink)', color: 'white' }
                             : undefined
                         }
                         onClick={() => updateRelation(i, { speech: option })}

@@ -11,7 +11,7 @@ import {
   loadSubtitleFile,
 } from '../lib/subtitles';
 import { DEFAULT_TARGET_LANG } from '../config/languages';
-import type { AllowedModel } from '../config/constants';
+import { DEFAULT_MODEL, type AllowedModel } from '../config/constants';
 import type { ContentType, MovieInfo } from '../types/translation';
 
 const EMPTY_MOVIE_INFO: MovieInfo = { title: '', year: '', notes: '' };
@@ -92,6 +92,10 @@ export interface WizardState {
   otherType: string;
   /** Other branch: free-text tone/manner for the work-pick screen. */
   toneText: string;
+  /** Currently-selected translation model on the settings screen — persists
+   *  across re-renders (and back-navigation from a failed translate) so the
+   *  chosen card stays highlighted instead of resetting to the default. */
+  model: AllowedModel;
 }
 
 /**
@@ -127,6 +131,7 @@ export function useWizard(
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [otherType, setOtherType] = useState('');
   const [toneText, setToneText] = useState('');
+  const [model, setModel] = useState<AllowedModel>(DEFAULT_MODEL);
 
   const onMetaUpdate = useCallback(
     (meta: { inferredTitle?: string; inferredYear?: string }) => {
@@ -371,6 +376,7 @@ export function useWizard(
     setSelectedIndex(-1);
     setOtherType('');
     setToneText('');
+    setModel(DEFAULT_MODEL);
     setScreen('upload');
   };
 
@@ -433,6 +439,7 @@ export function useWizard(
     selectedIndex,
     otherType,
     toneText,
+    model,
   };
 
   return {
@@ -443,6 +450,7 @@ export function useWizard(
     setSelectedIndex,
     setOtherType,
     setToneText,
+    setModel,
     confirmWork,
     goWorkPick,
     searchWork,
