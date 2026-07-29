@@ -28,36 +28,48 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // A job with no stored result never finished (or predates storage) — it has
+  // nothing to offer, so it does not belong on a "다시 받기" list. Filtered on
+  // result_path (the field that actually means "a result exists"), not
+  // filename — the two only coincide today because record_job_result happens
+  // to write both in the same statement.
+  const rows = (data ?? []).filter((row) => row.result_path);
+
   const now = new Date();
-  const items = await Promise.all(
-    (data ?? []).map(async (row) => {
-      const expired = isExpired(row.created_at, now);
-      let downloadUrl: string | null = null;
-
-      // Past the promised window we do not hand out a link even if the object
-      // is still there — the beta has no cleanup job, so objects outlive the
-      // promise and the UI is what keeps it.
-      if (!expired && row.result_path) {
-        const { data: signed } = await supabase.storage
-          .from('results')
-          .createSignedUrl(row.result_path, SIGNED_URL_TTL_SECONDS);
-        downloadUrl = signed?.signedUrl ?? null;
-      }
-
-      return {
-        jobId: row.id as string,
-        filename: (row.source_filename as string | null) ?? '',
-        model: (row.model as string | null) ?? null,
-        totalBlocks: (row.total_blocks as number) ?? 0,
-        createdAt: row.created_at as string,
-        options: (row.options as JobOptions | null) ?? null,
-        expired,
-        downloadUrl,
-      };
-    }),
+  const expiredById = new Map(
+    rows.map((row) => [row.id, isExpired(row.created_at, now)]),
   );
 
-  // A job with no stored result never finished (or predates storage) — it has
-  // nothing to offer, so it does not belong on a "다시 받기" list.
-  return NextResponse.json({ items: items.filter((i) => i.filename) });
+  // Past the promised window we do not hand out a link even if the object is
+  // still there — the beta has no cleanup job, so objects outlive the promise
+  // and the UI is what keeps it. One batched createSignedUrls call instead of
+  // one createSignedUrl per row: same round trip regardless of history size.
+  const pathsToSign = rows
+    .filter((row) => !expiredById.get(row.id))
+    .map((row) => row.result_path as string);
+
+  const signedUrlByPath = new Map<string, string>();
+  if (pathsToSign.length > 0) {
+    const { data: signed } = await supabase.storage
+      .from('results')
+      .createSignedUrls(pathsToSign, SIGNED_URL_TTL_SECONDS);
+    for (const entry of signed ?? []) {
+      if (!entry.error && entry.path && entry.signedUrl) {
+        signedUrlByPath.set(entry.path, entry.signedUrl);
+      }
+    }
+  }
+
+  const items = rows.map((row) => ({
+    jobId: row.id as string,
+    filename: (row.source_filename as string | null) ?? '',
+    model: (row.model as string | null) ?? null,
+    totalBlocks: (row.total_blocks as number) ?? 0,
+    createdAt: row.created_at as string,
+    options: (row.options as JobOptions | null) ?? null,
+    expired: expiredById.get(row.id) ?? true,
+    downloadUrl: signedUrlByPath.get(row.result_path as string) ?? null,
+  }));
+
+  return NextResponse.json({ items });
 }

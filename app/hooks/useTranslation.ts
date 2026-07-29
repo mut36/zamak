@@ -269,8 +269,8 @@ export function useTranslation(
       // Spend the credit before any chunk goes out. Doing it here — once per
       // file rather than once per chunk — is what makes a credit worth one
       // title, and it means a refusal costs nothing.
-      const jobId = await beginTranslationJob(blocks.length, model as AllowedModel);
-      setJobId(jobId);
+      const newJobId = await beginTranslationJob(blocks.length, model as AllowedModel);
+      setJobId(newJobId);
 
       // Concurrency comes from the tier, which is the one place the
       // billing/session gate will hook into. Chunk size is model-specific
@@ -336,7 +336,7 @@ export function useTranslation(
                     model,
                     targetLang,
                     translationStyle,
-                    jobId,
+                    jobId: newJobId,
                     castSheet,
                   },
                   signal,
@@ -427,7 +427,7 @@ export function useTranslation(
                 model,
                 targetLang,
                 translationStyle,
-                jobId,
+                jobId: newJobId,
                 castSheet,
               },
               signal,
@@ -518,7 +518,7 @@ export function useTranslation(
       // inside saveResult. `glossary` records what was actually applied, not
       // whether the toggle was on — castSheet is undefined when the toggle
       // was off or extraction never resolved.
-      void saveResult(jobId, file.name, translated, {
+      void saveResult(newJobId, file.name, translated, {
         glossary: Boolean(castSheet),
       });
 

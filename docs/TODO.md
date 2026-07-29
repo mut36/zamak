@@ -15,6 +15,12 @@
       `landing.closing.title`/`body`, `credits.emptyBody`
 - [ ] 베타 기간에 지급된 3편 중 미사용분을 회수할지 결정 (지금은 회수 안 함)
 
+### 결과물 보관 만료 정리 cron (2026-07-29, `0007_job_results.sql` 후속)
+
+지금은 UI가 다운로드 버튼만 잠그고(`isExpired`, `app/lib/jobHistory.ts`) 30일
+지난 객체를 Storage에서 실제로 지우지 않는다. RPC 실패로 행 없이 남는 orphan
+바이트 방지도 함께 고려할 것(`app/api/translation/result/route.ts`).
+
 ## enrich
 
 ### 이용자 증가 시: era/tone 추출을 그라운딩 → 모델 자체 지식으로 전환 검토 (2026-07-24)
