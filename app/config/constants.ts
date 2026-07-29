@@ -19,6 +19,13 @@ export const APP_VERSION = '0.19.0';
 export const RESULT_RETENTION_DAYS = 30;
 
 /**
+ * Version of the copyright notice the user agrees to before their first
+ * translation. Bump this when the wording changes materially and everyone is
+ * asked again — an agreement to old wording is not an agreement to new wording.
+ */
+export const COPYRIGHT_NOTICE_VERSION = '2026-07-29';
+
+/**
  * SRT chunking & concurrency — the two knobs for parallel translation, split
  * per tier. Set a very large chunk size to force a single request (no
  * chunking). All four overridable via env for quick tuning.
