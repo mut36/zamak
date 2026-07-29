@@ -140,6 +140,30 @@ export function TranslateSettingsStep({
         </div>
       )}
 
+      {/* 'other' has no TMDB card, so its "what is this" surface is the
+          auto-written summary /api/summarize put into movieInfo.notes. That
+          value ships to the prompt as <user_notes>, and notes is by invariant
+          사용자 자유 입력 전용 (CLAUDE.md) — so it must stay visible and
+          editable rather than being machine-written behind the user's back. */}
+      {contentType === 'other' && (
+        <div className='card p-[18px] mb-[14px]'>
+          <div className='dbadge mb-3'>
+            <b />
+            {COPY.info.summaryBadge}
+          </div>
+          <div className='field !mb-0'>
+            <label>{COPY.info.otherNotesLabel}</label>
+            <textarea
+              className='input'
+              rows={5}
+              placeholder={COPY.info.otherNotesHint}
+              value={movieInfo.notes}
+              onChange={(e) => onMovieInfo({ notes: e.target.value })}
+            />
+          </div>
+        </div>
+      )}
+
       <div className='card p-[18px] mb-[14px]'>
         <div className='dbadge mb-3'>
           <b />
