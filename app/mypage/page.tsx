@@ -72,7 +72,7 @@ function HistoryRow({ item }: { item: HistoryItem }) {
  */
 export default function MyPage() {
   const router = useRouter();
-  const { user, credits, loading } = useAuth();
+  const { user, credits, loading, signOut } = useAuth();
   /** null = still fetching; [] = fetched and genuinely empty. */
   const [history, setHistory] = useState<HistoryItem[] | null>(null);
 
@@ -97,7 +97,12 @@ export default function MyPage() {
 
   return (
     <div className='min-h-screen'>
-      <AppNav credits={credits} onHome={() => router.push('/')} />
+      <AppNav
+        user={user}
+        signOut={signOut}
+        credits={credits}
+        onHome={() => router.push('/')}
+      />
 
       <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
         <div className='animate-fade-slide-up'>

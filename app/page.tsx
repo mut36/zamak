@@ -40,6 +40,7 @@ export default function Home() {
     email,
     loading: authLoading,
     signIn,
+    signOut,
     refreshBalance,
   } = useAuth();
 
@@ -195,7 +196,12 @@ export default function Home() {
 
   return (
     <div className='min-h-screen'>
-      <AppNav credits={credits} onHome={resetAll} />
+      <AppNav
+        user={user}
+        signOut={signOut}
+        credits={credits}
+        onHome={resetAll}
+      />
 
       <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
         {/* Mandatory first-translation gate: a fixed full-screen overlay with

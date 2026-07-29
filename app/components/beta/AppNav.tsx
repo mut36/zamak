@@ -1,11 +1,16 @@
 'use client';
 
 import Link from 'next/link';
+import type { User } from '@supabase/supabase-js';
 import type { CreditBalances } from '../../lib/creditKind';
-import { useAuth } from '../../hooks/useAuth';
 import { COPY } from '../../i18n/simpleCopy';
 
 interface AppNavProps {
+  /** Passed in rather than read from useAuth() here: useAuth is a plain hook,
+   *  not a context, so a second call inside this nav would open its own
+   *  onAuthStateChange subscription and re-fetch /api/credits on every page. */
+  user: User | null;
+  signOut: () => void;
   credits: CreditBalances | null;
   onHome: () => void;
 }
@@ -15,9 +20,7 @@ interface AppNavProps {
  * and the credit pill both open /mypage. Avatar signs out (beta has no account
  * menu yet).
  */
-export function AppNav({ credits, onHome }: AppNavProps) {
-  const { user, signOut } = useAuth();
-
+export function AppNav({ user, signOut, credits, onHome }: AppNavProps) {
   const meta = user?.user_metadata as
     | { avatar_url?: string; picture?: string; full_name?: string }
     | undefined;
