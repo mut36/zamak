@@ -8,6 +8,7 @@ import {
   beginTranslationJob,
   JobRefusedError,
 } from '../lib/client/translationJob';
+import { saveResult } from '../lib/client/history';
 import {
   adjustSubtitleTiming,
   buildOutputFilename,
@@ -184,6 +185,9 @@ export function useTranslation(
   const [result, setResult] = useState<TranslationResult | null>(null);
   /** Set when the server declined to open a job (out of credits, file too big). */
   const [refusal, setRefusal] = useState<JobRefusedError | null>(null);
+  /** The currently (or most recently) opened job's id, exposed so the
+   *  completion screen and history can both refer to the same run. */
+  const [jobId, setJobId] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   /** Parsed source document, kept for round-trip output at download time. */
   const docRef = useRef<SubtitleDoc | null>(null);
@@ -266,6 +270,7 @@ export function useTranslation(
       // file rather than once per chunk — is what makes a credit worth one
       // title, and it means a refusal costs nothing.
       const jobId = await beginTranslationJob(blocks.length, model as AllowedModel);
+      setJobId(jobId);
 
       // Concurrency comes from the tier, which is the one place the
       // billing/session gate will hook into. Chunk size is model-specific
@@ -508,6 +513,15 @@ export function useTranslation(
         stopReason: retryState.fatalCode ?? undefined,
       });
 
+      // Fire-and-forget: the user already has the file, and a failed upload
+      // costs them the re-download, not the translation. Errors are swallowed
+      // inside saveResult. `glossary` records what was actually applied, not
+      // whether the toggle was on — castSheet is undefined when the toggle
+      // was off or extraction never resolved.
+      void saveResult(jobId, file.name, translated, {
+        glossary: Boolean(castSheet),
+      });
+
       setTranslationProgress({
         stage: 'done',
         currentChunk: totalChunks,
@@ -562,6 +576,7 @@ export function useTranslation(
     setTranslationProgress(IDLE_PROGRESS);
     setResult(null);
     setRefusal(null);
+    setJobId(null);
   };
 
   return {
@@ -572,6 +587,7 @@ export function useTranslation(
     translationProgress,
     result,
     refusal,
+    jobId,
     // Reading and parsing belong to the caller — it owns the upload screen and
     // the error slot that names the problem, and a file that fails to parse
     // should never leave that screen. This takes the parsed document and
