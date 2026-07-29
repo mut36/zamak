@@ -383,6 +383,11 @@ export function useWizard(
   // originally-guessed year no longer applies.
   const searchWork = useCallback(
     (query: string) => {
+      // A fresh search always replaces `candidates` with a new list, so any
+      // prior selection into the old list must be cleared here — otherwise
+      // the same index can point at a different, never-clicked film in the
+      // new list and render as pre-selected (see docs/decisions.md).
+      setSelectedIndex(-1);
       enrich(query, '');
     },
     [enrich],
