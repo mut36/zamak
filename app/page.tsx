@@ -11,21 +11,26 @@ import { DoneStep } from './components/simple/DoneStep';
 import { LandingPage } from './components/simple/LandingPage';
 import { CreditWall } from './components/simple/CreditWall';
 import { PurchaseStep } from './components/simple/PurchaseStep';
-import { useWizard } from './hooks/useWizard';
+import { useWizard, type WizardScreen } from './hooks/useWizard';
 import { useAuth } from './hooks/useAuth';
 import { isSupabaseConfigured } from './lib/supabase/env';
 import { APP_VERSION } from './config/constants';
 import { COPY } from './i18n/simpleCopy';
 
 // Maps the wizard's screen names to the numeric steps StepTracker renders.
+// Keyed on WizardScreen (not string) so a typo or a new screen added later
+// fails to typecheck instead of silently rendering step 0.
 // 'exhausted' has no tracker position — the credit wall replaces the tracker
-// entirely (see the `refusal` branch below).
-const STEP_TRACKER_INDEX: Record<string, number> = {
+// entirely (see the `!refusal &&` guard below, which means `screen ===
+// 'exhausted'` and `refusal` truthy are never both live at once) — its entry
+// is a structurally-required placeholder that is never actually read.
+const STEP_TRACKER_INDEX: Record<WizardScreen, number> = {
   upload: 0,
   workPick: 1,
   settings: 1,
   progress: 2,
   done: 3,
+  exhausted: 0,
 };
 
 export default function Home() {
@@ -214,7 +219,7 @@ export default function Home() {
           <PurchaseStep balance={credits?.lite ?? null} onClose={() => setPurchasing(false)} />
         ) : (
         <>
-        {!refusal && <StepTracker current={STEP_TRACKER_INDEX[screen] ?? 0} />}
+        {!refusal && <StepTracker current={STEP_TRACKER_INDEX[screen]} />}
 
         {refusal && (
           <CreditWall

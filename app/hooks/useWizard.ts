@@ -205,6 +205,7 @@ export function useWizard(
   // other → summarize. Guarded by refs so returning never re-triggers.
   useEffect(() => {
     if (screen !== 'settings') return;
+    if (contentType === null) return;
     if (contentType === 'movie') {
       if (analysis.completed && !enrichStartedRef.current) {
         enrichStartedRef.current = true;
