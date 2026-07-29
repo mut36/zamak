@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { BrandMark } from './components/BrandMark';
 import { StepTracker } from './components/simple/StepTracker';
 import { UploadStep } from './components/simple/UploadStep';
@@ -10,7 +11,7 @@ import { TranslateSettingsStep } from './components/beta/TranslateSettingsStep';
 import { ProgressStep } from './components/simple/ProgressStep';
 import { DoneStep } from './components/simple/DoneStep';
 import { LandingPage } from './components/simple/LandingPage';
-import { CreditWall } from './components/simple/CreditWall';
+import { ExhaustedStep } from './components/beta/ExhaustedStep';
 import { PurchaseStep } from './components/simple/PurchaseStep';
 import { useWizard, type WizardScreen } from './hooks/useWizard';
 import { useAuth } from './hooks/useAuth';
@@ -49,9 +50,12 @@ export default function Home() {
   const [purchasing, setPurchasing] = useState(false);
   const [purchaseNotice, setPurchaseNotice] = useState('');
 
+  const router = useRouter();
+
   const {
     user,
     credits,
+    email,
     loading: authLoading,
     signIn,
     signOut,
@@ -77,6 +81,7 @@ export default function Home() {
     translationProgress,
     result,
     refusal,
+    clearRefusal,
     jobId,
     totalLines,
     enrichStatus,
@@ -251,15 +256,49 @@ export default function Home() {
         <>
         {!refusal && <StepTracker current={STEP_TRACKER_INDEX[screen]} />}
 
-        {refusal && (
-          <CreditWall
-            code={refusal.code}
-            maxBlocks={refusal.maxBlocks}
-            totalBlocks={totalLines}
-            onStartOver={resetAll}
-            onPurchase={() => setPurchasing(true)}
+        {refusal && refusal.code === 'insufficient_credits' && (
+          <ExhaustedStep
+            kind={refusal.kind ?? 'lite'}
+            defaultEmail={email ?? ''}
+            onGoHistory={() => router.push('/mypage')}
+            onBack={clearRefusal}
           />
         )}
+
+        {refusal && refusal.code === 'file_too_large' && (
+          <div className='animate-fade-slide-up'>
+            <div className='head text-center mb-7'>
+              <h1>{COPY.credits.tooLargeTitle}</h1>
+              <p>{COPY.credits.tooLargeBody(refusal.maxBlocks ?? 0, totalLines)}</p>
+            </div>
+
+            <div className='card p-[22px] flex flex-col items-center gap-3'>
+              <button type='button' className='btn w-full' onClick={resetAll}>
+                {COPY.credits.startOver}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* unauthorized / unknown: neither documented screen applies (not a
+            credits or file-size problem), so this falls back to the app's
+            generic error copy rather than misusing the file-too-large text. */}
+        {refusal &&
+          refusal.code !== 'insufficient_credits' &&
+          refusal.code !== 'file_too_large' && (
+            <div className='animate-fade-slide-up'>
+              <div className='head text-center mb-7'>
+                <h1>{COPY.error.title}</h1>
+                <p>{COPY.error.body}</p>
+              </div>
+
+              <div className='card p-[22px] flex flex-col items-center gap-3'>
+                <button type='button' className='btn w-full' onClick={resetAll}>
+                  {COPY.error.retry}
+                </button>
+              </div>
+            </div>
+          )}
 
         {!refusal && screen === 'upload' && (
           <UploadStep

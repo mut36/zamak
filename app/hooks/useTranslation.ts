@@ -565,6 +565,13 @@ export function useTranslation(
     abortControllerRef.current?.abort();
   }, []);
 
+  /** Dismisses the refusal wall without discarding the file / work-in-progress
+   *  — unlike clearFile, which resets everything back to the upload screen.
+   *  Used by the "설정으로 돌아가기" exit on the exhausted-credits screen. */
+  const clearRefusal = useCallback(() => {
+    setRefusal(null);
+  }, []);
+
   const clearFile = () => {
     cancelScheduledReset();
     processFileIdRef.current++;
@@ -594,6 +601,7 @@ export function useTranslation(
     // starts analyzing it.
     processFile,
     clearFile,
+    clearRefusal,
     translate,
     cancelTranslation,
   };

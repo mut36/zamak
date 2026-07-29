@@ -156,6 +156,7 @@ export function useWizard(
     translate,
     cancelTranslation,
     clearFile,
+    clearRefusal,
   } = useTranslation(messages.translate, onMetaUpdate);
 
   const {
@@ -469,6 +470,7 @@ export function useWizard(
     translationProgress,
     result,
     refusal,
+    clearRefusal,
     jobId,
     totalLines,
     // Passed through from useEnrich.

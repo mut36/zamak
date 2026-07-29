@@ -31,15 +31,26 @@ export const COPY = {
   },
 
   credits: {
-    emptyTitle: '번역권을 모두 사용했어요',
-    // 베타 한시적: 3편. 정식 오픈 시 1편으로 되돌릴 것 (docs/decisions.md 2026-07-27).
-    emptyBody:
-      '무료로 드린 3편을 다 쓰셨어요. 번역권을 충전하면 이어서 번역할 수 있어요.',
-    emptyCta: '번역권 충전하기',
     tooLargeTitle: '파일이 너무 커요',
     tooLargeBody: (max: number, actual: number) =>
       `번역권 1편은 자막 ${max.toLocaleString()}줄까지 커버해요. 이 파일은 ${actual.toLocaleString()}줄이에요.`,
     startOver: '다른 파일 올리기',
+  },
+
+  // 번역권 소진 화면 (insufficient_credits). 베타에는 결제창이 없으니 막다른
+  // 골목 대신 결제 오픈 대기자 등록을 둔다.
+  exhausted: {
+    title: (kind: string) => `${kind} 번역권을 모두 썼어요`,
+    kindLite: '라이트',
+    kindPro: '프로',
+    body: '결제 기능을 준비하고 있어요.\n준비되면 가장 먼저 알려드릴게요. 파일은 안전하게 보관됩니다.',
+    waitlistLabel: '결제 오픈 대기자 등록',
+    emailPlaceholder: '이메일 주소',
+    join: '등록',
+    joined: '대기자로 등록됐어요. 오픈하면 바로 메일을 드릴게요.',
+    joinFailed: '등록하지 못했어요. 이메일을 확인해 주세요.',
+    goHistory: '지난 번역 다시 받기',
+    back: '설정으로 돌아가기',
   },
 
   // Prepaid credit packs. The anchor is deliberately the human-translator price
