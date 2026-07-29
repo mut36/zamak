@@ -5,7 +5,11 @@ export const COPY = {
   brand: 'ZAMAK',
   langPill: '한국어',
 
-  steps: ['파일', '정보', '번역', '완료'],
+  nav: {
+    history: '내 번역',
+    credits: (lite: number, pro: number) => `라이트 ${lite} · 프로 ${pro}`,
+    signOut: '로그아웃',
+  },
 
   auth: {
     signIn: 'Google로 계속하기',

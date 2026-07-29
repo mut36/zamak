@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { BrandMark } from '../components/BrandMark';
+import { AppNav } from '../components/beta/AppNav';
 import { useAuth } from '../hooks/useAuth';
 import { fetchHistory } from '../lib/client/history';
 import type { HistoryItem } from '../lib/jobHistory';
@@ -97,9 +97,7 @@ export default function MyPage() {
 
   return (
     <div className='min-h-screen'>
-      <header className='flex items-center justify-between w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 h-16'>
-        <BrandMark onClick={() => router.push('/')} />
-      </header>
+      <AppNav credits={credits} onHome={() => router.push('/')} />
 
       <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
         <div className='animate-fade-slide-up'>
