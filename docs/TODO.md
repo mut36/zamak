@@ -30,6 +30,38 @@
       (`app/config/packs.ts`에 lite/pro 구분 없음)
 - [ ] 완료 리포트의 CPS 조정 계측 (지금은 수치가 없어 항목이 빠져 있음)
 - [ ] 정식 오픈용 마케팅 랜딩 (베타 랜딩이 대체)
+- [ ] `app/legal/page.tsx`의 `SELLER_INFO` — 사업장 주소(`TODO`)와 통신판매업
+      신고번호("결제 미가동" 표기)를 실제 값으로 채울 것. 결제 오픈의 하드
+      블로커(`docs/decisions.md` §1-11에 이미 기록됨).
+
+### 최종 리뷰에서 남긴 사소한 항목들 (2026-07-30, 베타 리디자인 최종 리뷰 후속)
+
+머지를 막는 항목은 아니고, 다음에 약관·문구를 만질 때 같이 처리할 것들.
+
+- [ ] **시행일 갱신 여부 결정** — `app/legal/page.tsx`·`app/legal/privacy/page.tsx`가
+      여전히 시행일 2026-07-27로 돼 있는데, 그 뒤 결과물 30일 보관 등 내용이
+      실질적으로 바뀌었다. 약관 자체가 "불리한 변경은 30일 전 고지"를 요구한다
+      (`app/legal/page.tsx` 약관 변경 조항). 아직 비공개 베타·실사용자 없음이라
+      날짜만 새로 찍으면 될지, 정식 고지 절차를 밟을지는 사업 판단.
+- [ ] **`COPY.exhausted.body`("파일은 안전하게 보관됩니다") 문구 정정** —
+      크레딧 소진 화면 문구인데, 이 화면은 애초에 저장된 파일이 없는 상황이라
+      과장이다. `app/legal/*` 정정(커밋 `c124176`)과 같은 종류의 문제,
+      그 커밋 범위 밖이라 놓쳤음.
+- [ ] **약관 문구 정합성 자잘한 것들 4건**:
+  - `app/legal/privacy/page.tsx`의 "일회성 주소" → signed URL은 5분 유효기간이지
+    단일 사용이 아니다. "유효기간이 5분인 한시적 주소"로.
+  - `app/legal/page.tsx`와 `app/legal/privacy/page.tsx`의 "수집 항목" 목록이
+    서로 다르다 — 번역 모델·글로사리 옵션(`options` jsonb, `0007_job_results.sql`)이
+    한쪽에만 있음. 둘 중 하나로 맞출 것.
+  - `app/legal/privacy/page.tsx`의 "원본은 … 어디에도 기록되지 않습니다"가
+    파일명은 기록한다는 사실(수집 항목 표)과 살짝 긴장 관계 — "원본의 내용은"으로
+    좁히면 깔끔.
+  - `app/components/simple/UploadStep.tsx`의 "동의는 모달이 아니라 상시 고지로
+    남긴다"는 취지의 주석 — `CopyrightModal`(Task 16)이 실제로는 모달이라
+    사실과 다름(`docs/decisions.md` §5-7 참고). 주석만 정정.
+  - `docs/translation-pipeline.md` §2-B가 `movieInfo.notes`를 여전히 순수
+    AI 생성물로만 서술 — 지금은 `TranslateSettingsStep`에서 사용자가 보고
+    고칠 수 있는 입력란이다(커밋 `4a60042`). 한 줄 갱신.
 
 ## enrich
 
