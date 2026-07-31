@@ -2,14 +2,18 @@
 // Centralized configuration constants
 // ============================================
 
-import { resolveTargetLang, TARGET_LANGS } from './languages';
+import {
+  resolveSubtitleShape,
+  TARGET_LANGS,
+  type ContentProfileKey,
+} from './languages';
 
 /**
  * Build version, shown in the footer. Kept here rather than in page.tsx so the
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '0.26.4';
+export const APP_VERSION = '0.26.10';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
@@ -451,33 +455,41 @@ export const SUMMARY_SAMPLE_LINES = (() => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 50;
 })();
 
-/**
- * What the progress ring fills against, in milliseconds — one figure per
- * model, not a per-file derivation.
- *
- * The previous version computed this from block count, chunk size and wave
- * count off the measured generation rate (chunk-size-model.md §1). It tracked
- * wall clock well, but it quoted a different duration for every file while the
- * landing page promises one number ("30초"), so the ring and the pitch could
- * disagree on the same screen. These are the promise; the ring still eases
- * toward 99% and only a landed result reaches 100%, so a file that runs long
- * degrades into a crawl rather than a lie.
- *
- * Flash at 30s covers a full-length film today (~1,900 blocks measured at 23s,
- * experiment-log.md 2026-07-25). Pro is unmeasured — 3분 is a deliberately
- * loose placeholder, so re-measure before quoting it anywhere tighter.
- */
 export const TRANSLATION_ESTIMATE_MS: Record<AllowedModel, number> = {
-  [FLASH_MODEL]: 30_000,
-  [PRO_MODEL]: 180_000,
+  [FLASH_MODEL]: 20_000,
+  [PRO_MODEL]: 165_000,
 };
 
-/** Progress-ring duration for a translation model; unknown models get flash. */
+/**
+ * 모델별 벽시계 추정 — **블록 수를 모를 때의 폴백 전용**이다.
+ *
+ * 블록 수를 알면 `app/lib/progressEstimate.ts`의
+ * `estimateRunMsFromBlocks()` / `estimateRunMsFromChunks()`를 쓴다. 그쪽이
+ * `docs/tuning/chunk-size-model.md` §1의 실측 파라미터로 파일 크기를 반영한다.
+ *
+ * pro 165초는 2026-07-31 실측(1,124블록 B=250 HIGH, 총 161.4초 —
+ * `docs/tuning/experiment-log.md`)을 올림한 값이다. 이전 180초는
+ * `decisions.md` §2-7이 "미측정 자리표시자"라고 명시해 둔 값이었고, 그 주의사항은
+ * 이 측정으로 해소됐다. flash 20초는 실측 최악값 17.8초를 덮는 값 그대로다.
+ */
 export function estimateTranslationMs(model: string): number {
   return model === PRO_MODEL
     ? TRANSLATION_ESTIMATE_MS[PRO_MODEL]
     : TRANSLATION_ESTIMATE_MS[FLASH_MODEL];
 }
+
+/**
+ * 타임코드 검증 단계의 **최소 노출 시간**.
+ *
+ * 검증 자체(`enforceTextRules` → `adjustSubtitleTiming` → `buildDownloads`)는
+ * 수십 ms에 끝나서, 완료 화면으로 넘어가기 전에 한 프레임도 그려지지 않았다.
+ * 사용자에게는 "타임코드 검증을 건너뛴 것"으로 보인다. 고정 대기가 아니라
+ * **최소** 보장이다 — 회수 스윕이 더 걸리면 그만큼 더 보여준다.
+ */
+export const MIN_VERIFY_MS = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_MIN_VERIFY_MS,
+  2_000,
+);
 
 /**
  * Reading-speed post-processing thresholds (characters per second). After a
@@ -486,15 +498,20 @@ export function estimateTranslationMs(model: string): number {
  * CPS_TARGET, borrowing only from the silent gaps its neighbours leave free so
  * nothing can overlap.
  *
- * Three thresholds, one recommended band (8–10) under a hard ceiling (12):
- *  - CPS_HARD_MAX (12): the ceiling — only blocks reading faster than this are
- *    touched. 12 = Netflix's Korean adult reading-speed limit.
- *  - CPS_TARGET (10): where a fixed block should land — the fast edge of the
- *    8–10 band. Aiming at the top of the band spends the least gap to reach
- *    "comfortable"; when a block can't reach it, it still gets as close as room
- *    allows.
- *  - The band's lower edge (8) is not a constant: we never extend past
- *    CPS_TARGET, so nothing is ever pushed below it and no code has to know it.
+ * The live values come from the target language × content profile
+ * (languages.ts `shapes`, resolved by getReadingSpeed below) — Korean film is
+ * 12 target / 14 ceiling, documentary 10 / 12, and so on. The two constants
+ * here are the **global env override**: set either one and it applies to every
+ * language and every profile at once, which is what an escape hatch is for.
+ * Their defaults (12/10) are the pre-profile Korean band, kept so an
+ * unconfigured deployment behaves the way it always did.
+ *
+ * Whatever the source, the pair means the same thing:
+ *  - hard max: the ceiling — only blocks reading faster than this are touched.
+ *  - target: where a fixed block should land. When a block can't reach it, it
+ *    still gets as close as the free gaps allow.
+ *  - There is no lower edge constant: we never extend past target, so nothing
+ *    is ever pushed below it and no code has to know it.
  *
  * MIN_SUBTITLE_GAP_MS keeps a ~2-frame (24fps) silence between adjacent
  * subtitles so a widened line never visually touches the next.
@@ -523,22 +540,26 @@ export const MIN_SUBTITLE_DURATION_MS = readPositiveIntEnv(
 );
 
 /**
- * The band above is Korean; reading speed is script-dependent (a Latin line
- * carries far less meaning per character than a Hangul or Han one), so the
- * per-language numbers live in TargetLang.reading and this resolves them.
- * An explicitly set env var still wins — it stays the global escape hatch,
- * applying to every language at once.
+ * Reading speed depends on two things: the script (a Latin line carries far
+ * less meaning per character than a Hangul or Han one) and what is being
+ * watched (banter is skimmed, narration is read). Both live in
+ * `TargetLang.shapes`, and this resolves the pair. An explicitly set env var
+ * still wins — it stays the global escape hatch, applying to every language
+ * and profile at once.
  */
-export function getReadingSpeed(targetLang: string): {
+export function getReadingSpeed(
+  targetLang: string,
+  contentProfile?: ContentProfileKey | string,
+): {
   cpsHardMax: number;
   cpsTarget: number;
 } {
-  const { reading } = resolveTargetLang(targetLang);
+  const shape = resolveSubtitleShape(targetLang, contentProfile);
   return {
     cpsHardMax: process.env.NEXT_PUBLIC_CPS_HARD_MAX
       ? CPS_HARD_MAX
-      : reading.hardMax,
-    cpsTarget: process.env.NEXT_PUBLIC_CPS_TARGET ? CPS_TARGET : reading.target,
+      : shape.hardMax,
+    cpsTarget: process.env.NEXT_PUBLIC_CPS_TARGET ? CPS_TARGET : shape.target,
   };
 }
 

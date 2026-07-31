@@ -5,6 +5,7 @@ import {
   FREE_CHUNK_SIZE,
   FREE_CONCURRENCY,
   MAX_BLOCKS_PER_CREDIT,
+  MIN_VERIFY_MS,
   PRO_CHUNK_SIZE,
   PRO_MODEL,
   RESULT_RETENTION_DAYS,
@@ -152,12 +153,13 @@ describe('chunkSizeForModel', () => {
 });
 
 describe('estimateTranslationMs', () => {
-  it('quotes 30s for flash and 3 minutes for pro', () => {
-    // These are the numbers the landing copy promises (i18n/simpleCopy.ts).
-    // Changing either one here without changing the copy puts the ring and the
-    // pitch on different figures, which is the failure this pins.
-    expect(estimateTranslationMs(FLASH_MODEL)).toBe(30_000);
-    expect(estimateTranslationMs(PRO_MODEL)).toBe(180_000);
+  it('quotes 20s for flash and 3 minutes for pro', () => {
+    // Both are anchored to measured runs (experiment-log.md), and the landing
+    // copy quotes the same measurement (i18n/simpleCopy.ts). Moving either one
+    // here without re-checking the log and the copy puts the ring, the pitch
+    // and the measurement on different figures — the failure this pins.
+    expect(estimateTranslationMs(FLASH_MODEL)).toBe(20_000);
+    expect(estimateTranslationMs(PRO_MODEL)).toBe(165_000);
   });
 
   it('falls back to flash for an unrecognised model', () => {
@@ -178,5 +180,17 @@ describe('estimateTranslationMs', () => {
     expect(TRANSLATION_ESTIMATE_MS[FLASH_MODEL]).toBeLessThan(
       TRANSLATION_ESTIMATE_MS[PRO_MODEL],
     );
+  });
+});
+
+describe('MIN_VERIFY_MS', () => {
+  // 타임코드 검증은 수십 ms에 끝나 한 프레임도 안 보였다. 최소 노출이 없으면
+  // 사용자는 검증을 안 했다고 읽는다.
+  it('체크가 켜지는 걸 사람이 볼 수 있을 만큼 길다', () => {
+    expect(MIN_VERIFY_MS).toBeGreaterThanOrEqual(1_000);
+  });
+
+  it('기다림이 부담될 만큼 길지는 않다', () => {
+    expect(MIN_VERIFY_MS).toBeLessThanOrEqual(3_000);
   });
 });
