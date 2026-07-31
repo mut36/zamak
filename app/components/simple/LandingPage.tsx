@@ -10,73 +10,538 @@ interface Props {
   configured: boolean;
 }
 
-/** ms per character of the wordmark reveal — プロトタイプ値. */
-const TYPE_MS = 150;
+const L = COPY.landing;
+
+/** 히어로 데모 순환 주기 / 번역문이 뜨기 전 대기 시간 (핸드오프 명세값). */
+const HERO_CYCLE_MS = 3800;
+const HERO_WAIT_MS = 500;
+
+const TAG_CLASS: Record<string, string> = {
+  red: 'lp-tag-red',
+  orange: 'lp-tag-orange',
+  green: 'lp-tag-green',
+  neutral: 'lp-tag-neutral',
+};
+
+/** 워드마크 — 마지막 마침표만 옐로("문장을 완성한다"). */
+function Wordmark({ className }: { className?: string }) {
+  return (
+    <span className={className}>
+      {L.wordmark}
+      <span style={{ color: 'var(--accent)' }}>.</span>
+    </span>
+  );
+}
+
+/**
+ * CTA 4개(nav / 히어로 / 속도 / 최종)는 전부 같은 가입 진입점이다. 유입 위치는
+ * `data-cta`로만 구분해 둔다 — 애널리틱스가 붙으면 이 속성을 이벤트
+ * 파라미터로 쓰면 된다(핸드오프 "Interactions & Behavior").
+ */
+function Cta({
+  location,
+  className,
+  style,
+  onSignIn,
+  configured,
+}: {
+  location: string;
+  className: string;
+  style?: React.CSSProperties;
+  onSignIn: () => void;
+  configured: boolean;
+}) {
+  return (
+    <button
+      type='button'
+      data-cta={location}
+      disabled={!configured}
+      onClick={onSignIn}
+      className={className}
+      style={style}
+    >
+      {L.cta}
+    </button>
+  );
+}
+
+/** 세그먼트 컨트롤 — 비교 섹션과 CPS 섹션이 공유. 좌우 화살표로 이동한다. */
+function Segmented({
+  label,
+  options,
+  value,
+  onChange,
+  idPrefix,
+  onCanvas,
+  className = '',
+}: {
+  label: string;
+  options: readonly string[];
+  value: number;
+  onChange: (i: number) => void;
+  idPrefix: string;
+  onCanvas?: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      role='tablist'
+      aria-label={label}
+      className={`lp-seg${onCanvas ? ' lp-seg-canvas' : ''} ${className}`}
+      onKeyDown={(e) => {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        e.preventDefault();
+        const next =
+          e.key === 'ArrowRight'
+            ? (value + 1) % options.length
+            : (value - 1 + options.length) % options.length;
+        onChange(next);
+        document.getElementById(`${idPrefix}-tab-${next}`)?.focus();
+      }}
+    >
+      {options.map((opt, i) => (
+        <button
+          key={opt}
+          type='button'
+          role='tab'
+          id={`${idPrefix}-tab-${i}`}
+          aria-selected={value === i}
+          aria-controls={`${idPrefix}-panel`}
+          tabIndex={value === i ? 0 : -1}
+          onClick={() => onChange(i)}
+          className='lp-seg-btn'
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function LandingPage({ onSignIn, error, configured }: Props) {
-  const word = COPY.landing.wordmark;
-  const [typed, setTyped] = useState('');
+  // 히어로 데모: 4개 대사를 순환하며, 전환 시 옐로 커서로 500ms 대기했다가
+  // 번역문이 뜬다. prefers-reduced-motion이면 타이머를 아예 시작하지 않는다.
+  const [heroIdx, setHeroIdx] = useState(0);
+  const [heroWaiting, setHeroWaiting] = useState(false);
+  const [engine, setEngine] = useState(2); // 초기값 ZAMAK
+  const [profile, setProfile] = useState(0); // 초기값 영화 · 드라마
 
   useEffect(() => {
-    let i = 0;
-    const timer = setInterval(() => {
-      i += 1;
-      setTyped(word.slice(0, i));
-      if (i >= word.length) clearInterval(timer);
-    }, TYPE_MS);
-    return () => clearInterval(timer);
-  }, [word]);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    let waitTimer: ReturnType<typeof setTimeout> | undefined;
+    const cycle = setInterval(() => {
+      // 백그라운드 탭에서는 순환을 멈춘다 — 돌아왔을 때 몇 바퀴 앞선 상태로
+      // 점프하지 않게.
+      if (document.hidden) return;
+      setHeroIdx((i) => (i + 1) % L.hero.pairs.length);
+      setHeroWaiting(true);
+      waitTimer = setTimeout(() => setHeroWaiting(false), HERO_WAIT_MS);
+    }, HERO_CYCLE_MS);
+
+    return () => {
+      clearInterval(cycle);
+      clearTimeout(waitTimer);
+    };
+  }, []);
+
+  const pair = L.hero.pairs[heroIdx]!;
+  const eng = L.compare.engines[engine]!;
+  const cps = L.cps.profiles[profile]!;
 
   return (
-    <div className='min-h-screen flex flex-col items-center justify-center px-10 py-10'>
-      <h1 className='mono mb-[18px] inline-block bg-ink text-accent text-[42px] font-semibold tracking-[0.07em] leading-none px-7 py-4 rounded-[6px] text-center min-h-[42px]'>
-        {typed}
-        <span className='animate-zblink inline-block w-1 h-[34px] bg-accent ml-2 rounded-[2px] align-[-3px]' />
-      </h1>
-      <p className='mb-10 text-[19px] text-ink-3 text-center max-w-[460px] leading-[1.5]'>
-        {COPY.landing.tagline}
-        <br />
-        {COPY.landing.taglineSub}
-      </p>
-      {configured ? (
-        <button
-          type='button'
-          onClick={onSignIn}
-          className='flex items-center gap-2.5 bg-surface text-ink-body text-[15px] font-medium px-7 py-[13px] rounded-full border border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:bg-surface-2 active:scale-[0.98] transition'
+    <div className='w-full'>
+      {/* ── 1. Sticky nav ─────────────────────────────────────── */}
+      <nav className='lp-nav glass-nav'>
+        <span
+          className='zchip'
+          style={{
+            fontSize: 13,
+            letterSpacing: '0.1em',
+            padding: '6px 4px 6px 12px',
+          }}
         >
-          <span className='w-[18px] h-[18px] rounded-full bg-accent text-ink flex items-center justify-center text-[11px] font-bold'>
-            G
-          </span>
-          {COPY.landing.signIn}
-        </button>
-      ) : (
-        <p className='text-sm text-danger'>{COPY.landing.notConfigured}</p>
-      )}
+          <Wordmark />
+        </span>
 
-      {/* signup-wrap. 가입이라는 능동적 행위에 결합돼 있어 푸터 링크(browsewrap)
-          단독보다 효력이 안정적이다 — docs/decisions.md §1-11이 고른 3개 노출
-          지점 중 두 번째. 로그인 버튼이 없으면 "계속하면"이 가리킬 행위도 없다. */}
-      {configured && (
-        <p className='mt-4 max-w-[320px] text-center text-[12px] leading-[1.6] text-ink-5'>
-          {COPY.legal.consentPrefix}
-          <Link href={COPY.legal.termsHref} className='underline'>
-            {COPY.legal.terms}
-          </Link>
-          {COPY.legal.consentAnd}
-          <Link href={COPY.legal.privacyHref} className='underline'>
-            {COPY.legal.privacy}
-          </Link>
-          {COPY.legal.consentSuffix}
-        </p>
-      )}
+        <div className='flex items-center gap-1.5'>
+          {/* 640px 아래에서는 링크를 숨기고 로고+CTA만 남긴다 (핸드오프 "모바일
+              보완 필요"). Tailwind 유틸리티로 처리 — 컴포넌트 레이어의 미디어
+              쿼리는 같은 요소의 `flex` 유틸리티에 밀린다. */}
+          <div className='hidden sm:flex items-center gap-1.5'>
+            <a href='#compare' className='lp-navlink'>
+              {L.nav.compare}
+            </a>
+            <a href='#speed' className='lp-navlink'>
+              {L.nav.speed}
+            </a>
+            <a href='#cps' className='lp-navlink'>
+              {L.nav.cps}
+            </a>
+            <span className='lp-navsep' aria-hidden />
+          </div>
+          <Cta
+            location='nav'
+            onSignIn={onSignIn}
+            configured={configured}
+            className='lp-btn lp-btn-ink text-[13px] px-4 py-2 rounded-[10px]'
+          />
+        </div>
+      </nav>
 
-      {error && <p className='mt-4 text-sm text-danger'>{error}</p>}
+      <main>
+        {/* ── 2. Hero ───────────────────────────────────────────── */}
+        <header className='animate-zrise flex flex-col items-center text-center px-6 pt-[clamp(56px,9vh,88px)] pb-[90px]'>
+          <h1 className='lp-h1 mb-[18px] whitespace-pre-line'>
+            {L.hero.title}
+          </h1>
+          <p className='lp-hero-sub mb-[34px] max-w-[520px]'>{L.hero.sub}</p>
 
-      {/* §1-11의 세 번째 노출 지점. 로그인 전 화면은 이 푸터가 유일한 약관 경로다
-          — 로그인 후 셸의 푸터(app/page.tsx)에는 익명 방문자가 닿지 못한다. */}
-      <footer className='mt-14 flex flex-col items-center gap-1.5 text-[12px] text-ink-5'>
-        <p className='m-0'>{COPY.landing.badge}</p>
-        <div className='flex items-center gap-2.5'>
+          <div className='flex flex-wrap items-center justify-center gap-3'>
+            <Cta
+              location='hero'
+              onSignIn={onSignIn}
+              configured={configured}
+              className='lp-btn lp-btn-ink text-[16px] px-[30px] py-[14px]'
+            />
+            <a
+              href='#compare'
+              className='lp-btn-quiet text-[16px] px-[22px] py-[14px]'
+            >
+              {L.hero.secondaryCta}
+            </a>
+          </div>
+
+          {!configured && (
+            <p className='mt-4 text-[12.5px] text-quaternary'>
+              {L.notConfigured}
+            </p>
+          )}
+          {error && <p className='mt-4 text-sm text-danger'>{error}</p>}
+
+          {/* signup-wrap. 가입이라는 능동적 행위에 결합돼 있어 푸터 링크
+            (browsewrap) 단독보다 효력이 안정적이다 — docs/decisions.md §1-11이
+            고른 3개 노출 지점 중 두 번째. */}
+          {configured && (
+            <p className='mt-4 max-w-[320px] text-fineprint leading-[1.6] text-quaternary'>
+              {COPY.legal.consentPrefix}
+              <Link href={COPY.legal.termsHref} className='underline'>
+                {COPY.legal.terms}
+              </Link>
+              {COPY.legal.consentAnd}
+              <Link href={COPY.legal.privacyHref} className='underline'>
+                {COPY.legal.privacy}
+              </Link>
+              {COPY.legal.consentSuffix}
+            </p>
+          )}
+
+          {/* 자막 데모 카드 */}
+          <div
+            className='lp-hero-card mt-16'
+            role='img'
+            aria-label={L.hero.demoLabel}
+          >
+            <div className='lp-hero-head'>
+              <span className='lp-mono-tc'>{pair.tc}</span>
+              <span className='lp-mono-lang'>{pair.lang} → KO</span>
+            </div>
+            <div className='flex flex-col gap-5 px-10 pt-11 pb-10 min-h-[150px]'>
+              <div className='lp-hero-src'>{pair.src}</div>
+              <div className='flex flex-col gap-2'>
+                {heroWaiting ? (
+                  <span className='lp-hero-wait' aria-hidden>
+                    <span className='animate-zblink'>▋</span>
+                  </span>
+                ) : (
+                  <span key={`ko${heroIdx}`} className='lp-hero-ko'>
+                    {pair.ko}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className='lp-hero-track'>
+              <div
+                className='lp-hero-fill'
+                style={{ width: `${(heroIdx + 1) * 25}%` }}
+              />
+            </div>
+          </div>
+          <p className='mt-4 text-[12.5px] text-quaternary'>{L.hero.note}</p>
+        </header>
+
+        {/* ── 3. 번역 비교 ──────────────────────────────────────── */}
+        <section
+          id='compare'
+          className='lp-anchor bg-surface border-t border-border-subtle px-6 py-[90px]'
+        >
+          <div className='max-w-[880px] mx-auto'>
+            <h2 className='lp-h2 text-center mb-2.5'>{L.compare.title}</h2>
+            <p className='lp-section-sub text-center max-w-[480px] mx-auto mb-10'>
+              {L.compare.sub}
+            </p>
+
+            <div className='flex justify-center mb-7'>
+              <Segmented
+                label={L.compare.tablistLabel}
+                idPrefix='engine'
+                options={L.compare.engines.map((e) => e.name)}
+                value={engine}
+                onChange={setEngine}
+              />
+            </div>
+
+            <div className='grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-[18px] items-stretch'>
+              <div className='lp-card-source'>
+                <span className='lp-card-label'>{L.compare.sourceLabel}</span>
+                <p className='lp-line'>{L.compare.sourceLine}</p>
+                <span className='mono text-[11px] text-quaternary'>
+                  {L.compare.sourceMeta}
+                </span>
+              </div>
+
+              <div
+                id='engine-panel'
+                role='tabpanel'
+                aria-live='polite'
+                aria-labelledby={`engine-tab-${engine}`}
+                className={`lp-card-result${engine === 2 ? ' win' : ''}`}
+              >
+                <span className='lp-card-label'>
+                  {L.compare.resultLabel(eng.name)}
+                </span>
+                <p key={`e${engine}`} className='lp-line lp-subin'>
+                  {eng.out}
+                </p>
+                <div className='flex flex-wrap gap-2'>
+                  {eng.tags.map((tag) => (
+                    <span
+                      key={tag.label}
+                      className={`lp-tag ${TAG_CLASS[tag.tone]}`}
+                    >
+                      {tag.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <p className='mt-7 mx-auto max-w-[560px] text-center text-sm text-tertiary leading-[1.6]'>
+              {L.compare.outro}
+            </p>
+          </div>
+        </section>
+
+        {/* ── 4. 속도 ───────────────────────────────────────────── */}
+        <section
+          id='speed'
+          className='lp-anchor bg-ink-strong text-on-ink px-6 py-[100px]'
+        >
+          <div className='max-w-[880px] mx-auto grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-14 items-center'>
+            <div>
+              <h2 className='lp-h2-dark mb-4'>
+                {L.speed.titleTop}
+                <br />
+                <span style={{ color: 'var(--accent)' }}>
+                  {L.speed.titleAccent}
+                </span>
+              </h2>
+              <p
+                className='mb-7 text-[16px] leading-[1.6] max-w-[400px]'
+                style={{ color: 'rgba(250,249,245,0.6)' }}
+              >
+                {L.speed.body}
+              </p>
+              {/* 다크 섹션에서만 옐로 버튼을 쓴다. */}
+              <Cta
+                location='speed'
+                onSignIn={onSignIn}
+                configured={configured}
+                className='lp-btn lp-btn-accent text-[15px] px-[26px] py-3'
+              />
+            </div>
+
+            <ol className='flex flex-col list-none m-0 p-0'>
+              {L.speed.steps.map((step) => (
+                <li key={step.time} className='lp-step'>
+                  <span className='lp-step-time'>{step.time}</span>
+                  <div>
+                    <div className='lp-step-title'>{step.title}</div>
+                    <div className='lp-step-desc'>{step.desc}</div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* ── 5. CPS 자동 조정 ──────────────────────────────────── */}
+        <section id='cps' className='lp-anchor bg-bg px-6 py-24'>
+          <div className='max-w-[880px] mx-auto'>
+            <h2 className='lp-h2 mb-2.5'>{L.cps.title}</h2>
+            <p className='lp-section-sub max-w-[560px] mb-9 leading-[1.55]'>
+              {L.cps.sub}
+            </p>
+
+            <Segmented
+              label={L.cps.tablistLabel}
+              idPrefix='cps'
+              options={L.cps.profiles.map((p) => p.name)}
+              value={profile}
+              onChange={setProfile}
+              onCanvas
+              className='w-fit max-w-full flex-wrap mb-6'
+            />
+
+            <div
+              key={`c${profile}`}
+              id='cps-panel'
+              role='tabpanel'
+              aria-live='polite'
+              aria-labelledby={`cps-tab-${profile}`}
+              className='lp-cps-card'
+            >
+              <div className='flex flex-col gap-[18px]'>
+                <div>
+                  <div className='text-caption font-semibold text-tertiary mb-1.5'>
+                    {L.cps.speedLabel}
+                  </div>
+                  <div className='lp-cps-value'>
+                    {cps.value}
+                    <span className='lp-cps-unit'>{L.cps.unit}</span>
+                  </div>
+                </div>
+                <div className='flex flex-col gap-2.5'>
+                  <div className='lp-spec'>
+                    <span>{L.cps.lineLenLabel}</span>
+                    <b>{cps.lineLen}</b>
+                  </div>
+                  <div className='lp-spec'>
+                    <span>{L.cps.lineCountLabel}</span>
+                    <b>{L.cps.lineCountValue}</b>
+                  </div>
+                  <div className='lp-spec'>
+                    <span>{L.cps.actionLabel}</span>
+                    <b>{cps.action}</b>
+                  </div>
+                </div>
+              </div>
+
+              <div className='lp-preview'>
+                <div className='text-center flex flex-col gap-1'>
+                  {cps.lines.map((line) => (
+                    <span key={line} className='lp-preview-line'>
+                      {line}
+                    </span>
+                  ))}
+                </div>
+                <div className='lp-preview-meta'>
+                  <span>{cps.tc}</span>
+                  <span style={{ color: 'var(--accent)' }}>{cps.measured}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── 6. 기능 벤토 ──────────────────────────────────────── */}
+        <section className='bg-surface border-t border-border-subtle px-6 py-24'>
+          <div className='max-w-[880px] mx-auto'>
+            <h2 className='lp-h2 text-center max-w-[560px] mx-auto mb-11 whitespace-pre-line'>
+              {L.features.title}
+            </h2>
+
+            <div className='flex flex-col gap-[18px]'>
+              <div className='lp-bento-wide'>
+                <div>
+                  <div className='text-[19px] font-semibold tracking-[-0.012em] mb-2'>
+                    {L.features.rules.title}
+                  </div>
+                  <p className='m-0 text-[14.5px] text-secondary leading-[1.6]'>
+                    {L.features.rules.body}
+                  </p>
+                </div>
+                <div className='flex flex-col gap-2'>
+                  {L.features.rules.rows.map((row) => (
+                    <div key={row.before} className='lp-rule'>
+                      <span className='lp-rule-before'>{row.before}</span>
+                      <span className='lp-rule-arrow' aria-hidden>
+                        →
+                      </span>
+                      <span className='lp-rule-after'>{row.after}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className='grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-[18px]'>
+                <div className='lp-bento-card lp-bento-ink'>
+                  <div className='lp-bento-title'>
+                    {L.features.formats.title}
+                  </div>
+                  <p
+                    className='m-0 text-sm leading-[1.6] flex-1'
+                    style={{ color: 'rgba(250,249,245,0.55)' }}
+                  >
+                    {L.features.formats.body}
+                  </p>
+                  <div className='flex flex-wrap gap-2'>
+                    {L.features.formats.chips.map((chip) => (
+                      <span key={chip} className='lp-fmt'>
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className='lp-bento-card lp-bento-accent'>
+                  <div className='lp-bento-title'>
+                    {L.features.languages.title}
+                  </div>
+                  <p
+                    className='m-0 text-sm leading-[1.6] flex-1'
+                    style={{ color: 'rgba(22,22,20,0.65)' }}
+                  >
+                    {L.features.languages.body}
+                  </p>
+                  <div
+                    className='mono text-[12.5px] tracking-[0.03em]'
+                    style={{ color: 'rgba(22,22,20,0.6)' }}
+                  >
+                    {L.features.languages.codes}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── 7. 최종 CTA ───────────────────────────────────────── */}
+        <section className='text-center px-6 pt-[110px] pb-[90px]'>
+          <h2 className='lp-h2-final mb-3.5 whitespace-pre-line'>
+            {L.final.title}
+          </h2>
+          <p className='lp-section-sub mb-8'>{L.final.sub}</p>
+          <Cta
+            location='footer'
+            onSignIn={onSignIn}
+            configured={configured}
+            className='lp-btn lp-btn-ink text-[16px] px-8 py-[14px]'
+          />
+          <p className='mt-[52px] flex items-center justify-center gap-1.5 text-fineprint text-quaternary'>
+            <span className='zchip-dot w-[5px] h-[5px]' aria-hidden />
+            {L.final.badge}
+          </p>
+        </section>
+      </main>
+
+      {/* ── 8. Footer ─────────────────────────────────────────── */}
+      {/* §1-11의 세 번째 노출 지점. 로그인 전 화면은 이 푸터가 유일한 약관
+          경로다 — 로그인 후 셸의 푸터(app/page.tsx)에는 익명 방문자가 닿지
+          못한다. */}
+      <footer className='lp-footer'>
+        <Wordmark className='lp-wordmark' />
+        <div className='flex items-center gap-2.5 text-fineprint text-quaternary'>
           <Link href={COPY.legal.termsHref} className='underline'>
             {COPY.legal.terms}
           </Link>
@@ -84,6 +549,8 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           <Link href={COPY.legal.privacyHref} className='underline'>
             {COPY.legal.privacy}
           </Link>
+          <span className='dot-sep' />
+          <span>{L.footer.copyright}</span>
         </div>
       </footer>
     </div>

@@ -88,7 +88,7 @@ export function CastSheetCard({
     <div className='card mt-4 overflow-hidden'>
       <button
         type='button'
-        className='w-full flex items-center gap-3 p-[14px] text-left'
+        className='w-full flex items-center gap-3 p-[18px_24px] text-left'
         onClick={() => {
           if (!enabled) {
             onToggle(true);
@@ -98,27 +98,20 @@ export function CastSheetCard({
           }
         }}
       >
-        <span
-          className='inline-flex items-center justify-center w-4 h-4 rounded border shrink-0'
-          style={{
-            borderColor: enabled ? 'var(--ink)' : 'var(--border)',
-            background: enabled ? 'var(--ink)' : 'transparent',
-          }}
-          aria-hidden
-        >
-          {enabled && <span style={{ color: 'white', fontSize: 11 }}>✓</span>}
-        </span>
         <span className='flex-1 min-w-0'>
           <span className='flex items-center gap-2'>
-            <span className='text-[14px] font-medium'>{c.title}</span>
-            <span className='dbadge !text-[10px]'>{c.badge}</span>
+            <span className='text-title-sm font-semibold tracking-[-0.01em]'>{c.title}</span>
+            <span className='dbadge-pro'>{c.badge}</span>
             {hasResult && (
-              <span className='text-[12px] text-ink-3'>{c.count(itemCount)}</span>
+              <span className='text-fineprint text-secondary'>{c.count(itemCount)}</span>
             )}
           </span>
-          {!enabled && <span className='block text-[12px] text-ink-3 mt-0.5'>{c.hint}</span>}
+          <span className='block text-caption-sm text-tertiary mt-0.5'>{c.hint}</span>
         </span>
         {extracting && <SpinnerIcon className='w-4 h-4 text-accent shrink-0' />}
+        <span className={`ztoggle${enabled ? ' on' : ''}`} aria-hidden>
+          <span className='ztoggle-knob' />
+        </span>
         {hasResult && (
           <span
             role='button'
@@ -130,7 +123,7 @@ export function CastSheetCard({
             }}
           >
             <ChevronDownIcon
-              className='w-4 h-4 text-ink-3 transition-transform'
+              className='w-4 h-4 text-secondary transition-transform'
               style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
             />
           </span>
@@ -138,7 +131,7 @@ export function CastSheetCard({
       </button>
 
       {extracting && (
-        <p className='px-[14px] pb-[14px] text-[12px] text-ink-3'>{c.extracting}</p>
+        <p className='px-[14px] pb-[14px] text-fineprint text-secondary'>{c.extracting}</p>
       )}
 
       {hasResult && expanded && (
@@ -146,7 +139,7 @@ export function CastSheetCard({
           <div className='flex gap-1 mb-3'>
             <button
               type='button'
-              className={activeTab === 'terms' ? 'btn btn-ghost !py-1.5 !px-3 !text-[12px]' : 'btn btn-ghost !py-1.5 !px-3 !text-[12px] opacity-50'}
+              className={activeTab === 'terms' ? 'btn btn-ghost !py-1.5 !px-3 !text-fineprint' : 'btn btn-ghost !py-1.5 !px-3 !text-fineprint opacity-50'}
               onClick={() => setTab('terms')}
             >
               {c.tabTerms}
@@ -154,7 +147,7 @@ export function CastSheetCard({
             {axis && (
               <button
                 type='button'
-                className={activeTab === 'relations' ? 'btn btn-ghost !py-1.5 !px-3 !text-[12px]' : 'btn btn-ghost !py-1.5 !px-3 !text-[12px] opacity-50'}
+                className={activeTab === 'relations' ? 'btn btn-ghost !py-1.5 !px-3 !text-fineprint' : 'btn btn-ghost !py-1.5 !px-3 !text-fineprint opacity-50'}
                 onClick={() => setTab('relations')}
               >
                 {c.tabRelations}
@@ -162,7 +155,7 @@ export function CastSheetCard({
             )}
             <button
               type='button'
-              className='btn btn-ghost !py-1.5 !px-3 !text-[12px] ml-auto'
+              className='btn btn-ghost !py-1.5 !px-3 !text-fineprint ml-auto'
               onClick={onRefetch}
             >
               <RefreshIcon className='w-3.5 h-3.5' />
@@ -173,12 +166,12 @@ export function CastSheetCard({
           {activeTab === 'terms' ? (
             <div>
               {!axis && (
-                <p className='text-[12px] text-ink-3 mb-2'>
+                <p className='text-fineprint text-secondary mb-2'>
                   {c.noFormality(language.label)}
                 </p>
               )}
               {sheet.terms.length === 0 && (
-                <p className='text-[12px] text-ink-3 mb-2'>{c.emptyTerms}</p>
+                <p className='text-fineprint text-secondary mb-2'>{c.emptyTerms}</p>
               )}
               {sheet.terms.map((term, i) => (
                 <div key={i} className='flex items-center gap-2 mb-2'>
@@ -188,7 +181,7 @@ export function CastSheetCard({
                     value={term.source}
                     onChange={(e) => updateTerm(i, { source: e.target.value })}
                   />
-                  <span className='text-ink-3'>→</span>
+                  <span className='text-secondary'>→</span>
                   <input
                     className='input !py-1.5 flex-1'
                     placeholder={c.termTargetLabel(language.label)}
@@ -197,7 +190,7 @@ export function CastSheetCard({
                   />
                   <button
                     type='button'
-                    className='btn btn-ghost !py-1.5 !px-2 !text-[12px]'
+                    className='btn btn-ghost !py-1.5 !px-2 !text-fineprint'
                     aria-label={c.removeRow}
                     onClick={() => removeTerm(i)}
                   >
@@ -207,7 +200,7 @@ export function CastSheetCard({
               ))}
               <button
                 type='button'
-                className='btn btn-ghost !py-1.5 !px-3 !text-[12px] mt-1'
+                className='btn btn-ghost !py-1.5 !px-3 !text-fineprint mt-1'
                 onClick={addTerm}
               >
                 {c.addTerm}
@@ -216,7 +209,7 @@ export function CastSheetCard({
           ) : (
             <div>
               {sheet.relations.length === 0 && (
-                <p className='text-[12px] text-ink-3 mb-2'>{c.emptyRelations}</p>
+                <p className='text-fineprint text-secondary mb-2'>{c.emptyRelations}</p>
               )}
               {sheet.relations.map((rel, i) => (
                 <div key={i} className='flex items-center gap-2 mb-2 flex-wrap'>
@@ -231,7 +224,7 @@ export function CastSheetCard({
                       </option>
                     ))}
                   </select>
-                  <span className='text-ink-3'>→</span>
+                  <span className='text-secondary'>→</span>
                   <select
                     className='input !py-1.5 !w-auto'
                     value={rel.to}
@@ -248,10 +241,10 @@ export function CastSheetCard({
                       <button
                         key={option}
                         type='button'
-                        className='btn btn-ghost !py-1 !px-2 !text-[12px]'
+                        className='btn btn-ghost !py-1 !px-2 !text-fineprint'
                         style={
                           rel.speech === option
-                            ? { background: 'var(--ink)', color: 'white' }
+                            ? { background: 'var(--ink-strong)', color: 'white' }
                             : undefined
                         }
                         onClick={() => updateRelation(i, { speech: option })}
@@ -260,12 +253,12 @@ export function CastSheetCard({
                       </button>
                     ))}
                   </div>
-                  <span className='text-[11px] text-ink-3'>
+                  <span className='text-mono-step text-secondary'>
                     {c.relationRange(rel.fromBlock, rel.toBlock)}
                   </span>
                   <button
                     type='button'
-                    className='btn btn-ghost !py-1.5 !px-2 !text-[12px] ml-auto'
+                    className='btn btn-ghost !py-1.5 !px-2 !text-fineprint ml-auto'
                     aria-label={c.removeRow}
                     onClick={() => removeRelation(i)}
                   >

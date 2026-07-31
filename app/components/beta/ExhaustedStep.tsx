@@ -42,18 +42,18 @@ export function ExhaustedStep({
   };
 
   return (
-    <div className='animate-fade-slide-up'>
+    <div className='animate-zslide max-w-[520px] mx-auto'>
       <div className='text-center mb-2'>
-        <div className='bigcheck'>
+        <div className='bigcheck' style={{ background: 'var(--fill-hover)' }}>
           <span
-            className='text-[34px] font-bold leading-none'
-            style={{ color: 'var(--accent)' }}
+            className='mono text-h2 font-bold leading-none'
+            style={{ color: 'var(--ink)' }}
           >
             0
           </span>
         </div>
         <div className='head'>
-          <h1>{c.title(kindLabel)}</h1>
+          <h1 className='!text-h1-sm'>{c.title(kindLabel)}</h1>
           {c.body.split('\n').map((line) => (
             <p key={line}>{line}</p>
           ))}
@@ -62,10 +62,10 @@ export function ExhaustedStep({
 
       <div className='card p-5 mt-6 text-center'>
         {status === 'joined' ? (
-          <p className='text-[14px] text-ink-2'>{c.joined}</p>
+          <p className='text-body text-nav'>{c.joined}</p>
         ) : (
           <>
-            <div className='text-[14px] font-bold text-ink mb-3'>
+            <div className='text-body font-semibold text-ink-strong mb-3'>
               {c.waitlistLabel}
             </div>
             <input
@@ -77,7 +77,7 @@ export function ExhaustedStep({
             />
             {status === 'failed' && (
               <p
-                className='mt-2 text-[12px]'
+                className='mt-2 text-fineprint'
                 style={{ color: 'oklch(0.5 0.13 75)' }}
               >
                 {c.joinFailed}

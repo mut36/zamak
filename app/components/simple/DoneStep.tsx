@@ -71,9 +71,9 @@ export function DoneStep({
   };
 
   return (
-    <div className='animate-fade-slide-up'>
+    <div className='animate-zslide max-w-[680px] mx-auto'>
       <div className='text-center mb-2'>
-        <div className='bigcheck'>
+        <div className='bigcheck animate-zpop' style={{ background: 'var(--success)' }}>
           <CheckIcon />
         </div>
         <div className='head'>
@@ -89,7 +89,7 @@ export function DoneStep({
           it says nothing about the file being downloaded. */}
       {result.stopReason || result.fallbackBlocks ? (
         <div
-          className='card p-4 mt-6 text-[13px] leading-relaxed'
+          className='card p-4 mt-6 text-caption leading-relaxed'
           style={{
             color: 'oklch(0.5 0.13 75)',
             background: 'oklch(0.97 0.03 85)',
@@ -119,7 +119,7 @@ export function DoneStep({
         </button>
         {alternates.length > 0 && (
           <>
-            <p className='mt-2 text-[12px] text-ink-3'>
+            <p className='mt-2 text-fineprint text-secondary'>
               {c.downloadAsHint(primary.extension)}
             </p>
             {alternates.map((option) => (
@@ -143,6 +143,7 @@ export function DoneStep({
         <div className='pvm-h'>{c.reportTitle}</div>
         {reportItems.map((item) => (
           <div className='pvm-row' key={item.key}>
+            <span className='check'>✓</span>
             <div className='t'>{reportLine(item)}</div>
           </div>
         ))}
@@ -153,10 +154,10 @@ export function DoneStep({
       {jobId && (
         <div className='card p-5 mt-4 text-center'>
           {feedbackStatus === 'sent' ? (
-            <p className='text-[14px] text-ink-2'>{c.feedbackThanks}</p>
+            <p className='text-body text-nav'>{c.feedbackThanks}</p>
           ) : (
             <>
-              <div className='text-[14px] font-bold text-ink mb-3'>{c.feedbackTitle}</div>
+              <div className='text-body font-semibold text-ink-strong mb-3'>{c.feedbackTitle}</div>
               <div className='feedback-stars' role='radiogroup' aria-label={c.feedbackTitle}>
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button
@@ -179,13 +180,13 @@ export function DoneStep({
                 onChange={(e) => setComment(e.target.value)}
               />
               {feedbackStatus === 'failed' && (
-                <p className='mt-2 text-[12px]' style={{ color: 'oklch(0.5 0.13 75)' }}>
+                <p className='mt-2 text-fineprint' style={{ color: 'oklch(0.5 0.13 75)' }}>
                   {c.feedbackFailed}
                 </p>
               )}
               <button
                 type='button'
-                className='btn btn-primary btn-block mt-3'
+                className='btn btn-ghost btn-block mt-3'
                 disabled={rating === 0 || feedbackStatus === 'sending'}
                 onClick={handleSendFeedback}
               >

@@ -25,25 +25,28 @@ export function CopyrightModal({ onAgree, pending, error }: CopyrightModalProps)
   const canAgree = checked && !pending;
 
   return (
-    <div className='fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-5'>
-      <div className='w-full max-w-[420px] bg-surface rounded-card-lg shadow-[var(--shadow-modal)] p-7 animate-fade-slide-up'>
-        <h2 className='text-[19px] font-bold text-ink'>{c.title}</h2>
-        <p className='mt-3 text-[14px] leading-relaxed text-ink-2'>{c.body}</p>
+    <div className='animate-zscrim fixed inset-0 z-50 bg-scrim flex items-center justify-center px-6'>
+      <div className='glass-modal w-full max-w-[460px] rounded-modal p-8 shadow-modal animate-zpop'>
+        <h2 className='text-h2 text-ink-strong'>{c.title}</h2>
+        <p className='mt-[10px] text-body text-secondary'>{c.body}</p>
 
-        <label className='flex items-start gap-2.5 mt-5 cursor-pointer'>
-          <input
-            type='checkbox'
-            className='mt-[3px] w-4 h-4 accent-[var(--ink)]'
-            checked={checked}
-            onChange={(e) => setChecked(e.target.checked)}
-          />
-          <span className='text-[13.5px] text-ink-2'>{c.checkbox}</span>
-        </label>
+        <button
+          type='button'
+          onClick={() => setChecked((v) => !v)}
+          className='w-full flex items-center gap-2.5 mt-[18px] p-[12px_14px] rounded-drop text-left border border-border-chip bg-fill-hover/60 transition hover:bg-fill-hover'
+        >
+          <span
+            className={`zcheck w-[22px] h-[22px] rounded-[6px] text-fineprint font-bold shrink-0${
+              checked ? ' on' : ''
+            }`}
+          >
+            {checked && '✓'}
+          </span>
+          <span className='text-caption text-nav'>{c.checkbox}</span>
+        </button>
 
         {error && (
-          <p className='mt-3 text-[12px]' style={{ color: 'var(--danger)' }}>
-            {error}
-          </p>
+          <p className='mt-3 text-fineprint text-danger'>{error}</p>
         )}
 
         <button
@@ -51,10 +54,10 @@ export function CopyrightModal({ onAgree, pending, error }: CopyrightModalProps)
           disabled={!canAgree}
           onClick={onAgree}
           // Same disabled treatment as WorkPickStep's confirm button: a flat
-          // #c7c7cc fill (not .btn's opacity fade) so the locked state reads
-          // as "not yet", not "broken".
-          className='w-full mt-5 text-white text-[15px] font-bold py-[14px] rounded-[14px] transition active:scale-[0.98] disabled:cursor-default'
-          style={{ background: canAgree ? 'var(--ink)' : '#c7c7cc' }}
+          // ink-disabled fill (not .btn's opacity fade) so the locked state
+          // reads as "not yet", not "broken".
+          className='w-full mt-[18px] text-white text-title-sm py-[13px] rounded-btn text-center transition active:scale-[0.98] disabled:cursor-default'
+          style={{ background: canAgree ? 'var(--ink-strong)' : 'var(--ink-disabled)' }}
         >
           {c.agree}
         </button>

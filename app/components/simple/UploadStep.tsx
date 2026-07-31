@@ -2,7 +2,8 @@
 
 import { useRef, useState, type DragEvent } from 'react';
 import Link from 'next/link';
-import { FileIcon, FilmIcon, VideoIcon } from '../icons';
+import { UploadIcon } from '../icons';
+import { StepBreadcrumb } from '../StepBreadcrumb';
 import type { ContentType } from '../../types/translation';
 import { COPY } from '../../i18n/simpleCopy';
 
@@ -47,8 +48,9 @@ export function UploadStep({
   };
 
   return (
-    <div className='animate-fade-slide-up'>
-      <div className='head text-center mb-7'>
+    <div className='animate-zslide max-w-[760px] mx-auto'>
+      <StepBreadcrumb current='upload' className='mb-[24px]' />
+      <div className='head mb-[40px]'>
         <h1>{c.title}</h1>
         <p>{c.subtitle}</p>
       </div>
@@ -62,44 +64,32 @@ export function UploadStep({
         </div>
       )}
 
-      {/* Content type — chosen before the dropzone unlocks */}
-      <div className='card qcard mb-[14px]'>
-        <p className='qlabel'>{c.kindLabel}</p>
-        <div className='bg-[rgba(0,0,0,0.05)] rounded-xl p-[3px] flex'>
-          <button
-            type='button'
-            onClick={() => onContentType('movie')}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-[10px] py-3 px-3 text-sm font-semibold transition ${
-              contentType === 'movie'
-                ? 'bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.12)] text-ink'
-                : 'text-ink-3'
-            }`}
-          >
-            <FilmIcon className='w-[18px] h-[18px]' />
-            {c.kindMovie}
-          </button>
-          <button
-            type='button'
-            onClick={() => onContentType('other')}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-[10px] py-3 px-3 text-sm font-semibold transition ${
-              contentType === 'other'
-                ? 'bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.12)] text-ink'
-                : 'text-ink-3'
-            }`}
-          >
-            <VideoIcon className='w-[18px] h-[18px]' />
-            {c.kindOther}
-          </button>
-        </div>
+      {/* Content type — chosen before the dropzone unlocks. Square check
+          (brand radio motif), never a circle. */}
+      <div className='flex items-center gap-[10px] mb-[18px]'>
+        <p className='text-label text-secondary'>{c.kindLabel}</p>
+        <p className='text-fineprint text-tertiary font-medium'>둘 중 하나를 눌러 선택하세요</p>
+      </div>
+      <div className='grid grid-cols-2 gap-[14px] mb-[28px]'>
+        <ContentTypeCard
+          selected={contentType === 'movie'}
+          label={c.kindMovie}
+          subLabel={c.kindMovieSub}
+          onClick={() => onContentType('movie')}
+        />
+        <ContentTypeCard
+          selected={contentType === 'other'}
+          label={c.kindOther}
+          subLabel={c.kindOtherSub}
+          onClick={() => onContentType('other')}
+        />
       </div>
 
       {/* Dropzone — locked (dimmed, inert to clicks/drops) until a content
           type is picked above. Dimming alone isn't a lock: both the drop
           handler and the click handler bail out while `inert`. */}
       <div
-        className={`rounded-card-lg bg-surface shadow-[var(--shadow-hover)] p-[60px_40px] text-center transition${
-          locked ? ' opacity-50' : ''
-        }${over && !inert ? ' bg-accent-wash' : ''}${inert ? ' cursor-not-allowed' : ' cursor-pointer'}`}
+        className={`rounded-drop bg-surface shadow-drop hover:shadow-drop-hover p-[64px_40px] text-center transition ${locked ? '' : 'cursor-pointer'} ${over && !inert ? ' bg-accent-wash' : ''}`}
         onDragOver={(e) => {
           e.preventDefault();
           if (!inert) setOver(true);
@@ -118,34 +108,37 @@ export function UploadStep({
           if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click();
         }}
       >
-        <div className={`drop-ico${uploading ? ' animate-zbreathe' : ''}`}>
-          <FileIcon />
+        <div className={`drop-ico${uploading ? ' animate-zbreathe' : ''}`} style={{ color: locked ? 'var(--text-tertiary)' : 'var(--ink)' }}>
+          <UploadIcon strokeWidth={locked ? 1.2 : 1.6} />
         </div>
 
         {uploading ? (
           <>
-            <h3>{c.readingTitle(uploadingFileName)}</h3>
-            <p>{c.readingSub}</p>
+            <h3 className='text-lead font-semibold text-ink mb-2'>{c.readingTitle(uploadingFileName)}</h3>
+            <p className='text-body text-nav mb-0'>{c.readingSub}</p>
           </>
         ) : (
           <>
-            <h3>{c.dropTitle}</h3>
-            <p className='fmt'>{c.dropFormats}</p>
-            <button
-              type='button'
-              className='btn btn-primary btn-lg mt-3'
-              disabled={locked}
-              onClick={(e) => {
-                e.stopPropagation();
-                openPicker();
-              }}
-            >
-              {c.dropButton}
-            </button>
+            <h3 className={`text-lead font-semibold mb-2 ${locked ? 'text-tertiary' : 'text-ink'}`}>{c.dropTitle}</h3>
+            <p className={`text-caption mb-[22px] ${locked ? 'text-quaternary' : 'text-tertiary'}`}>{c.dropFormats}</p>
+            
+            {locked ? (
+              <p className='text-caption text-tertiary mt-[28px]'>{c.dropLocked}</p>
+            ) : (
+              <button
+                type='button'
+                className='btn btn-primary btn-lg mt-3'
+                disabled={locked}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openPicker();
+                }}
+              >
+                {c.dropButton}
+              </button>
+            )}
           </>
         )}
-
-        {locked && <p className='fmt mt-3'>{c.dropLocked}</p>}
 
         <input
           ref={inputRef}
@@ -161,16 +154,51 @@ export function UploadStep({
         />
       </div>
 
-      <p className='mt-4 text-center text-[13px] text-ink-3'>{c.noVideoNeeded}</p>
-
-      {/* Rights notice. Upload is where the copyright risk actually arises, so
-          the notice lives here permanently rather than behind a consent modal. */}
-      <p className='mt-3 text-center text-[12px] text-ink-3'>
-        {c.rightsNotice} {c.storageNotice}{' '}
-        <Link href={COPY.legal.termsHref} className='underline'>
-          {COPY.legal.detail}
-        </Link>
-      </p>
+      <div className='mt-[20px] flex flex-col gap-2'>
+        <p className='text-caption-sm text-quaternary font-medium'>{c.noVideoNeeded}</p>
+        <p className='text-fineprint text-quaternary'>
+          {c.rightsNotice} {c.storageNotice}{' '}
+          <Link href={COPY.legal.termsHref} className='underline'>
+            {COPY.legal.detail}
+          </Link>
+        </p>
+      </div>
     </div>
+  );
+}
+
+function ContentTypeCard({
+  selected,
+  label,
+  subLabel,
+  onClick,
+}: {
+  selected: boolean;
+  label: string;
+  subLabel: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      className='flex items-start gap-3 bg-surface rounded-card p-[18px_20px] text-left border-[1.5px] transition hover:shadow-[var(--shadow-hover)] active:scale-[0.985]'
+      style={{
+        borderColor: selected ? 'var(--ink-strong)' : 'var(--border-card)',
+        boxShadow: selected ? 'var(--shadow-hover)' : 'var(--shadow-card)',
+      }}
+    >
+      <span className={`zcheck shrink-0 w-5 h-5 mt-[2px]${selected ? ' on' : ''}`}>
+        {selected && (
+          <span className='text-mono-step font-bold leading-none'>✓</span>
+        )}
+      </span>
+      <div className='flex-1'>
+        <div className='flex items-center gap-[6px] mb-1'>
+          <span className='text-title-sm text-ink'>{label}</span>
+        </div>
+        <div className='text-caption text-tertiary'>{subLabel}</div>
+      </div>
+    </button>
   );
 }

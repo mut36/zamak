@@ -1,6 +1,7 @@
 'use client';
 
 import type { TranslationProgress } from '../../types/translation';
+import { StepBreadcrumb } from '../StepBreadcrumb';
 import { COPY } from '../../i18n/simpleCopy';
 import { DEFAULT_MODEL, estimateTranslationMs } from '../../config/constants';
 import { overallPercent, stageViews, type StageKey } from '../../lib/progressStages';
@@ -62,46 +63,52 @@ export function ProgressStep({
   const processedLines = Math.round((percent / 100) * totalLines);
 
   return (
-    <div className='animate-fade-slide-up flex flex-col items-center w-full'>
+    <div className='animate-zslide flex flex-col items-center w-full max-w-[520px] mx-auto'>
+      <StepBreadcrumb current='translate' className='mb-6' />
       <div className='head text-center'>
-        <h1>{title}</h1>
+        <h1 className='!text-h1-mini'>{title}</h1>
       </div>
 
-      <div className='mono text-[14px] text-ink-3 mt-1'>
+      <div className='mono text-fineprint text-tertiary mt-1'>
         {c.pct(percent, remainingSec)}
       </div>
 
-      <div className='w-full h-[6px] rounded-full bg-surface-2 overflow-hidden mt-4'>
+      <div className='w-full h-[6px] rounded-full bg-track overflow-hidden mt-4 mb-4'>
         <div
-          className='h-full rounded-full bg-accent'
-          style={{ width: `${percent}%`, transition: 'width 0.3s ease' }}
+          className='h-full rounded-full bg-ink-strong'
+          style={{ width: `${percent}%`, transition: 'width 0.15s linear' }}
         />
       </div>
 
-      <div className='flex flex-col gap-2 w-full mt-5'>
+      <div className='card flex flex-col gap-[14px] w-full p-[24px_28px]'>
         {views.map((view) => (
           <div
             key={view.key}
-            className={`card flex items-center gap-3 px-4 py-3${
-              view.state === 'skipped' ? ' opacity-40' : ''
+            className={`flex items-center gap-3${
+              view.state === 'skipped' || view.state === 'pending' ? ' opacity-40' : ''
             }`}
           >
             {view.state === 'done' ? (
-              <span className='flex items-center justify-center w-5 h-5 rounded-full bg-success text-white text-[11px] shrink-0'>
+              <span
+                className='flex items-center justify-center w-5 h-5 rounded-[5px] text-white text-mono-step font-bold shrink-0'
+                style={{ background: 'var(--success)' }}
+              >
                 ✓
               </span>
             ) : (
               <span
-                className={`w-2.5 h-2.5 rounded-full shrink-0${
-                  view.state === 'active'
-                    ? ' bg-accent animate-zbreathe'
-                    : ' bg-border'
+                className={`w-5 h-5 rounded-[5px] shrink-0${
+                  view.state === 'active' ? ' animate-zbreathe' : ''
                 }`}
+                style={{
+                  background: view.state === 'active' ? 'var(--ink-strong)' : 'transparent',
+                  border: view.state === 'active' ? 'none' : '1.5px solid var(--border-step)',
+                }}
               />
             )}
-            <span className='text-[14px] text-ink'>{c.stages[view.key]}</span>
+            <span className='text-body text-nav'>{c.stages[view.key]}</span>
             {view.state === 'skipped' && (
-              <span className='ml-auto text-[12px] text-ink-3'>
+              <span className='ml-auto text-fineprint text-secondary'>
                 {c.stageSkipped}
               </span>
             )}
@@ -124,7 +131,7 @@ export function ProgressStep({
         )
       )}
 
-      <p className='text-[13px] text-ink-2 text-center mt-6'>{c.reassure}</p>
+      <p className='text-caption text-nav text-center mt-6'>{c.reassure}</p>
 
       <button type='button' className='btn btn-ghost mt-5' onClick={onCancel}>
         {c.cancel}

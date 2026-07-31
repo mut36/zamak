@@ -168,29 +168,19 @@ export default function Home() {
   // Auth is the outermost gate: every route that spends the server key is
   // closed to anonymous callers, so there is nothing to show behind it.
   if (authLoading) {
-    return (
-      <div className='min-h-screen'>
-        <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
-          <p className='text-center text-sm text-ink-3 py-16'>
-            {COPY.auth.loading}
-          </p>
-        </main>
-      </div>
-    );
+    return <div className='min-h-screen' aria-busy='true' />;
   }
 
   if (!user) {
-    // Landing is full-bleed minimal screen for private beta. No nav.
+    // 비로그인 `/`는 마케팅 랜딩(design_handoff_zamak_landing)이다. 앱 셸의
+    // 폭 제한·nav·푸터를 쓰지 않고 랜딩이 자기 chrome(sticky nav, 풀블리드
+    // 섹션, 푸터)을 직접 갖는다.
     return (
-      <div className='min-h-screen'>
-        <main className='w-full'>
-          <LandingPage
-            onSignIn={signIn}
-            error={authError}
-            configured={isSupabaseConfigured}
-          />
-        </main>
-      </div>
+      <LandingPage
+        onSignIn={signIn}
+        error={authError}
+        configured={isSupabaseConfigured}
+      />
     );
   }
 
@@ -203,7 +193,7 @@ export default function Home() {
         onHome={resetAll}
       />
 
-      <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
+      <main className='w-full max-w-[840px] mx-auto px-5 sm:px-10 pt-4 sm:pt-16 pb-20'>
         {/* Mandatory first-translation gate: a fixed full-screen overlay with
             no close affordance, over whichever screen is showing (the wizard
             stays on 'settings' behind it). */}
@@ -271,6 +261,13 @@ export default function Home() {
                 setMovieInfo((prev) => ({ ...prev, ...patch }))
               }
               needsConfirm={needsConfirm}
+              // Same condition the picker uses — settings now owns the wait,
+              // since upload hands off before the TMDB search settles.
+              searching={
+                analysis.isAnalyzing ||
+                enrichStatus === 'searching' ||
+                enrichStatus === 'idle'
+              }
               onConfirmWork={confirmWork}
               onChangeWork={goWorkPick}
               model={model}
@@ -326,14 +323,14 @@ export default function Home() {
         )}
 
         {refusal && refusal.code === 'file_too_large' && (
-          <div className='animate-fade-slide-up'>
+          <div className='animate-zslide'>
             <div className='head text-center mb-7'>
               <h1>{COPY.credits.tooLargeTitle}</h1>
               <p>{COPY.credits.tooLargeBody(refusal.maxBlocks ?? 0, totalLines)}</p>
             </div>
 
             <div className='card p-[22px] flex flex-col items-center gap-3'>
-              <button type='button' className='btn w-full' onClick={resetAll}>
+              <button type='button' className='btn btn-primary w-full' onClick={resetAll}>
                 {COPY.credits.startOver}
               </button>
             </div>
@@ -346,14 +343,14 @@ export default function Home() {
         {refusal &&
           refusal.code !== 'insufficient_credits' &&
           refusal.code !== 'file_too_large' && (
-            <div className='animate-fade-slide-up'>
+            <div className='animate-zslide'>
               <div className='head text-center mb-7'>
                 <h1>{COPY.error.title}</h1>
                 <p>{COPY.error.body}</p>
               </div>
 
               <div className='card p-[22px] flex flex-col items-center gap-3'>
-                <button type='button' className='btn w-full' onClick={resetAll}>
+                <button type='button' className='btn btn-primary w-full' onClick={resetAll}>
                   {COPY.error.retry}
                 </button>
               </div>
@@ -361,10 +358,10 @@ export default function Home() {
           )}
       </main>
 
-      <footer className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pb-10 text-center text-ink-3'>
-        <p className='mono text-[12px]'>v{APP_VERSION} · Beta</p>
-        <p className='text-[12px] mt-1'>© 2026 ZAMAK. All rights reserved.</p>
-        <div className='flex items-center justify-center gap-2.5 mt-1 text-[12px]'>
+      <footer className='w-full max-w-[840px] mx-auto px-5 pb-10 text-center text-secondary'>
+        <p className='mono text-fineprint'>v{APP_VERSION} · Beta</p>
+        <p className='text-fineprint mt-1'>© 2026 ZAMAK. All rights reserved.</p>
+        <div className='flex items-center justify-center gap-2.5 mt-1 text-fineprint'>
           <a href={`mailto:${COPY.footer.feedbackEmail}`} className='underline'>
             {COPY.footer.feedback}
           </a>

@@ -13,11 +13,13 @@ const c = COPY.mypage;
 
 function CreditCard({ label, count }: { label: string; count: number }) {
   return (
-    <div className='card p-[18px]'>
-      <div className='text-[13px] font-medium text-ink-3'>{label}</div>
-      <div className='mt-1.5 flex items-baseline gap-1'>
-        <span className='mono text-[28px] font-bold leading-none'>{count}</span>
-        <span className='text-[13px] text-ink-3'>{c.unit}</span>
+    <div className='card p-[22px_24px]'>
+      <div className='text-caption text-tertiary'>{label}</div>
+      <div className='mt-1 flex items-baseline gap-1'>
+        <span className='text-h1-sm font-semibold tracking-[-0.01em] leading-none'>
+          {count}
+        </span>
+        <span className='text-title-sm font-normal text-tertiary'>{c.unit}</span>
       </div>
     </div>
   );
@@ -36,17 +38,17 @@ function HistoryRow({ item }: { item: HistoryItem }) {
   const downloadUrl = item.expired ? null : item.downloadUrl;
 
   return (
-    <div className='card p-[14px_18px] flex items-center gap-3'>
+    <div className='card p-[18px_24px] flex items-center gap-4'>
       <div className='min-w-0 flex-1'>
-        <div className='text-[14px] font-medium truncate'>{item.filename}</div>
-        <div className='text-[12.5px] text-ink-3 mt-0.5'>
+        <div className='mono text-caption truncate'>{item.filename}</div>
+        <div className='text-caption-sm text-tertiary mt-[3px]'>
           {c.meta(date, modelLabel, item.options?.glossary === true)}
         </div>
       </div>
       {downloadUrl ? (
         <a
           href={downloadUrl}
-          className='btn btn-ghost shrink-0 !px-3.5 !py-2 !text-[13px]'
+          className='btn btn-ghost shrink-0 !px-3.5 !py-2 !text-caption'
           download
         >
           {c.download}
@@ -54,7 +56,7 @@ function HistoryRow({ item }: { item: HistoryItem }) {
       ) : (
         <button
           type='button'
-          className='btn btn-ghost shrink-0 !px-3.5 !py-2 !text-[13px]'
+          className='btn btn-ghost shrink-0 !px-3.5 !py-2 !text-caption'
           disabled
         >
           {c.expired}
@@ -104,29 +106,30 @@ export default function MyPage() {
         onHome={() => router.push('/')}
       />
 
-      <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
-        <div className='animate-fade-slide-up'>
-          <div className='head text-center mb-7'>
+      <main className='w-full max-w-[840px] mx-auto px-5 sm:px-10 pt-4 sm:pt-16 pb-14'>
+        <div className='animate-zslide max-w-[720px] mx-auto'>
+          <div className='head mb-8'>
             <h1>{c.title}</h1>
           </div>
 
+          <p className='qlabel'>{c.creditsTitle}</p>
           <div className='grid grid-cols-2 gap-[14px]'>
             <CreditCard label={c.liteCredits} count={credits?.lite ?? 0} />
             <CreditCard label={c.proCredits} count={credits?.pro ?? 0} />
           </div>
 
-          <p className='text-[12.5px] text-ink-3 mt-3 mb-7'>
+          <p className='text-caption-sm text-secondary mt-3 mb-7'>
             {c.retention(RESULT_RETENTION_DAYS)}
           </p>
 
-          <h2 className='text-[15px] font-semibold mb-3'>{c.historyTitle}</h2>
+          <p className='qlabel'>{c.historyTitle}</p>
 
           {history === null ? (
-            <p className='text-[13px] text-ink-3 py-6 text-center'>
+            <p className='text-caption text-secondary py-6 text-center'>
               {COPY.auth.loading}
             </p>
           ) : history.length === 0 ? (
-            <p className='text-[13px] text-ink-3 py-6 text-center'>{c.empty}</p>
+            <p className='text-caption text-secondary py-6 text-center'>{c.empty}</p>
           ) : (
             <div className='flex flex-col gap-2.5'>
               {history.map((item) => (

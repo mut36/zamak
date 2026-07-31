@@ -84,8 +84,13 @@ npm run dev
 ### 검증
 
 ```bash
-npx tsc --noEmit && npx eslint app && npx vitest run
+npx tsc --noEmit && npx eslint app && npx vitest run && npm run check:tokens
 ```
+
+`check:tokens`는 디자인 토큰 가드입니다. CSS 커스텀 프로퍼티는 오타가 나도
+빌드가 통과하므로(`var(--typo)`는 에러 없이 선언만 버려짐) tsc·eslint·vitest 중
+무엇도 못 잡습니다. 이 스크립트가 `app/globals.css`의 정의 집합과 `app/` 전체의
+`var(--…)` 참조 집합을 대조해 미정의 참조와 죽은 토큰을 걸러냅니다.
 
 ## Configuration
 

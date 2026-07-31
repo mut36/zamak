@@ -86,9 +86,9 @@ export default function PrivacyPage() {
       <Contents items={CONTENTS} />
 
       <KeyPoint>
-        <b className='text-ink'>올리신 자막 원본은 저장하지 않습니다.</b> 원본은
+        <b className='text-ink-strong'>올리신 자막 원본은 저장하지 않습니다.</b> 원본은
         브라우저에서 열려 번역되는 동안에만 서버를 거쳐 가고, 어디에도 기록되지
-        않습니다. 다만 <b className='text-ink'>완성된 번역 결과물</b>은 나중에 다시
+        않습니다. 다만 <b className='text-ink-strong'>완성된 번역 결과물</b>은 나중에 다시
         받으실 수 있도록, 본인만 접근할 수 있는 비공개 저장소에 {RESULT_RETENTION_DAYS}
         일간 보관합니다.
       </KeyPoint>
@@ -97,10 +97,10 @@ export default function PrivacyPage() {
         <dl className='grid gap-4 m-0'>
           {COLLECTED.map((row) => (
             <div key={row.kind}>
-              <dt className='font-bold text-ink'>{row.kind}</dt>
+              <dt className='font-bold text-ink-strong'>{row.kind}</dt>
               <dd className='m-0 mt-0.5'>
                 {row.items}
-                <span className='block text-ink-3 text-[12.5px] mt-0.5'>
+                <span className='block text-secondary text-caption-sm mt-0.5'>
                   {row.how}
                 </span>
               </dd>
@@ -173,9 +173,9 @@ export default function PrivacyPage() {
         <dl className='grid gap-3 m-0 mt-4'>
           {PROCESSORS.map((p) => (
             <div key={p.name}>
-              <dt className='font-bold text-ink'>
+              <dt className='font-bold text-ink-strong'>
                 {p.name}
-                <span className='ml-2 font-normal text-ink-3 text-[12.5px]'>
+                <span className='ml-2 font-normal text-secondary text-caption-sm'>
                   {p.country}
                 </span>
               </dt>
@@ -232,7 +232,7 @@ export default function PrivacyPage() {
         <dl className='grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 m-0'>
           {OFFICER.map((row) => (
             <div key={row.label} className='contents'>
-              <dt className='text-ink-3'>{row.label}</dt>
+              <dt className='text-secondary'>{row.label}</dt>
               <dd className='m-0'>{row.value}</dd>
             </div>
           ))}

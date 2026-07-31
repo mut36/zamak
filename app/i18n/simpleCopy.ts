@@ -5,6 +5,15 @@ export const COPY = {
   brand: 'ZAMAK',
   langPill: '한국어',
 
+  // Mono breadcrumb shown above the H1 on every step screen (업로드 →
+  // 설정 → 번역). WorkPickStep (작품 인식) and TranslateSettingsStep share
+  // the '설정' step — see StepBreadcrumb.
+  steps: {
+    upload: '업로드',
+    settings: '설정',
+    translate: '번역',
+  },
+
   nav: {
     history: '내 번역',
     credits: (lite: number, pro: number) => `라이트 ${lite} · 프로 ${pro}`,
@@ -24,14 +33,202 @@ export const COPY = {
     creditsLeft: (n: number) => `번역권 ${n}편`,
   },
 
+  // 랜딩(비로그인 `/`) — design_handoff_zamak_landing 그대로. 마케팅 카피는
+  // 자주 바뀌므로 데모 데이터(히어로 4쌍, 엔진 3개, CPS 3개, 속도 4단계,
+  // 규칙 3행)까지 전부 여기에 둔다. 수치는 핸드오프의 "확인 필요 항목" —
+  // 실측으로 교체될 수 있다(docs/TODO.md).
   landing: {
-    /** Typed out one character at a time on mount. */
     wordmark: 'ZAMAK',
-    tagline: '자막 파일 하나로, 자연스러운 한국어 자막을.',
-    taglineSub: '타임코드는 그대로 지켜 드립니다.',
-    signIn: 'Google로 계속하기',
-    badge: '비공개 베타',
+    /** All four CTAs point at the same Google sign-in. */
+    cta: '무료로 시작하기',
     notConfigured: '로그인이 아직 설정되지 않았어요.',
+
+    nav: {
+      compare: '번역 비교',
+      speed: '속도',
+      cps: '자막 규칙',
+    },
+
+    hero: {
+      title: '번역기 티가 안 나는\n한국어 자막',
+      sub: '자막 파일을 올리면 한글 자막 표준 규칙에 맞춘 자연스러운 번역이 10초 안에 내려옵니다.',
+      secondaryCta: '번역 품질 비교하기',
+      note: '실제 번역 결과 예시. 타임코드는 원본 그대로 유지됩니다.',
+      demoLabel: '번역 결과 예시',
+      pairs: [
+        {
+          lang: 'EN',
+          tc: '00:41:07,220',
+          src: '"You’re telling me she just walked out? In the middle of the ceremony?"',
+          ko: '식 도중에 그냥 나가 버렸다고?',
+        },
+        {
+          lang: 'JA',
+          tc: '00:12:44,050',
+          src: '「そんなつもりじゃなかったんだ。信じてくれ。」',
+          ko: '그럴 생각은 없었어. 믿어 줘',
+        },
+        {
+          lang: 'EN',
+          tc: '01:03:18,900',
+          src: '"Don’t you dare walk away from me right now."',
+          ko: '지금 나한테서 등 돌릴 생각 하지 마',
+        },
+        {
+          lang: 'FR',
+          tc: '00:27:55,410',
+          src: '« On ne voit bien qu’avec le cœur. »',
+          ko: '마음으로 봐야 제대로 보이는 법이야',
+        },
+      ],
+    },
+
+    compare: {
+      title: '같은 대사, 다른 번역.',
+      sub: '직접 비교해 보세요. 자막은 읽는 글이 아니라 듣는 말입니다.',
+      tablistLabel: '번역 엔진 선택',
+      sourceLabel: '원문 대사',
+      sourceLine:
+        '"You’re telling me she just walked out? In the middle of the ceremony?"',
+      sourceMeta: '00:41:07,220 → 00:41:09,850 · 2.6초 노출',
+      resultLabel: (engine: string) => `${engine}의 번역`,
+      outro:
+        'ZAMAK은 문장을 옮기지 않고 장면을 옮깁니다. 화면에 떠 있는 시간 안에 읽히도록, 말투와 관계까지 그대로.',
+      engines: [
+        {
+          name: '일반 번역기',
+          out: '"당신은 그녀가 그냥 걸어 나갔다고 나에게 말하고 있는 건가요? 의식 한가운데에서?"',
+          tags: [
+            { label: 'CPS 17.3 초과', tone: 'red' },
+            { label: '어색한 직역', tone: 'red' },
+            { label: '말투 불일치', tone: 'red' },
+          ],
+        },
+        {
+          name: '범용 AI 모델',
+          out: '"그녀가 식 중간에 그냥 나가버렸다고 말하는 거야?"',
+          tags: [
+            { label: '문장은 자연스러움', tone: 'neutral' },
+            { label: 'CPS 9.6 아슬아슬', tone: 'orange' },
+            { label: '자막 규칙 미적용', tone: 'orange' },
+          ],
+        },
+        {
+          name: 'ZAMAK',
+          out: '"식 도중에 그냥 나가 버렸다고?"',
+          tags: [
+            { label: 'CPS 6.2 충족', tone: 'green' },
+            { label: '표준 규칙 적용', tone: 'green' },
+            { label: '반문 뉘앙스 유지', tone: 'green' },
+          ],
+        },
+      ],
+    },
+
+    speed: {
+      titleTop: '업로드에서 다운로드까지,',
+      titleAccent: '최고 속도 10초.',
+      body: '영상 파일은 필요 없습니다. 자막 파일 하나만 올리면 언어 인식부터 규칙 적용, 최종 파일 생성까지 한 번에 끝납니다.',
+      steps: [
+        {
+          time: '0:00',
+          title: '자막 파일 업로드',
+          desc: '.srt .vtt .ass .smi, 무엇이든. 조잡한 자동 자막도 괜찮습니다.',
+        },
+        {
+          time: '0:01',
+          title: '언어 · 작품 자동 인식',
+          desc: '원본 언어를 감지하고 영상 종류에 맞는 번역 프로필을 고릅니다.',
+        },
+        {
+          time: '0:03',
+          title: '번역 + 규칙 적용',
+          desc: '자연스러운 한국어로 옮기며 CPS와 표준 자막 규칙을 동시에 맞춥니다.',
+        },
+        {
+          time: '0:10',
+          title: '완성 파일 다운로드',
+          desc: '타임코드와 스타일은 원본 그대로. 바로 영상에 얹으면 됩니다.',
+        },
+      ],
+    },
+
+    cps: {
+      title: '영상마다 읽는 속도가 다릅니다.',
+      sub: 'ZAMAK은 CPS(초당 글자 수)를 계산해 영상 종류에 맞는 자막 길이를 자동으로 맞춥니다. 화면에 뜬 시간 안에 다 읽히도록.',
+      tablistLabel: '영상 종류 선택',
+      speedLabel: '권장 읽기 속도',
+      unit: 'CPS',
+      lineLenLabel: '한 줄 최대',
+      lineCountLabel: '줄 수',
+      lineCountValue: '최대 2줄',
+      actionLabel: 'ZAMAK이 하는 일',
+      profiles: [
+        {
+          name: '영화 · 드라마',
+          value: '12',
+          lineLen: '18자',
+          action: '긴 대사는 두 줄로 분할, 조사 단위로 줄바꿈',
+          lines: ['식 도중에 그냥', '나가 버렸다고?'],
+          tc: '00:41:07 → 00:41:09',
+          measured: 'CPS 6.2 ✓',
+        },
+        {
+          name: '예능 · 유튜브',
+          value: '14',
+          lineLen: '20자',
+          action: '빠른 티키타카에 맞춰 짧고 리듬감 있게 압축',
+          lines: ['아니 진짜 중간에 나갔다고?'],
+          tc: '00:03:12 → 00:03:13',
+          measured: 'CPS 13.0 ✓',
+        },
+        {
+          name: '다큐 · 강연',
+          value: '10',
+          lineLen: '16자',
+          action: '정보 밀도가 높은 문장은 노출 시간에 맞춰 요약',
+          lines: ['그녀는 예식 도중', '자리를 떠났습니다'],
+          tc: '00:18:40 → 00:18:44',
+          measured: 'CPS 4.3 ✓',
+        },
+      ],
+    },
+
+    features: {
+      title: '전문 자막가의 규칙을\n그대로 배웠습니다.',
+      rules: {
+        title: '한글 자막 표준 규칙 적용',
+        body: '방송·OTT에서 쓰는 표기 규칙을 그대로 따릅니다. 문장부호, 숫자 표기, 말줄임, 두 줄 분할까지 감수 없이 바로 쓸 수 있는 상태로.',
+        rows: [
+          { before: '3천만 달러라구요?!', after: '3,000만 달러라고요?' },
+          { before: '오 마이 갓...!!', after: '세상에…' },
+          {
+            before: '한 줄에 스물여덟 글자가 넘어가는 긴 자막',
+            after: '두 줄로 자연스럽게 분할',
+          },
+        ],
+      },
+      formats: {
+        title: '모든 자막 포맷 지원',
+        body: '스타일과 타임코드는 손대지 않고 대사만 바꿉니다. 올린 포맷 그대로 내려받으세요.',
+        chips: ['.srt', '.vtt', '.ass', '.smi'],
+      },
+      languages: {
+        title: '모든 언어 → 한국어',
+        body: '원본 언어는 자동으로 인식합니다. 영어, 일본어, 중국어부터 스페인어, 프랑스어까지, 어떤 언어든 한국어로.',
+        codes: 'EN JA ZH ES FR DE + 90개 언어',
+      },
+    },
+
+    final: {
+      title: '자막 하나 올려 보면\n바로 알게 됩니다.',
+      sub: '가입 후 첫 파일은 무료입니다. 신용카드도 필요 없어요.',
+      badge: '비공개 베타 운영 중',
+    },
+
+    footer: {
+      copyright: '© 2026 ZAMAK. 자연스러운 한국어 자막.',
+    },
   },
 
   credits: {
@@ -93,14 +290,17 @@ export const COPY = {
     subtitle: '타임코드는 그대로, 대사만 자연스러운 한국어로 옮겨 드립니다.',
     kindLabel: '콘텐츠 유형',
     kindMovie: '영화 · 드라마',
+    kindMovieSub: '작품을 찾아 시대·말투까지 맞춰요',
     kindOther: '유튜브 · 일반 영상',
+    kindOtherSub: '원하는 톤앤매너를 직접 지정해요',
     dropTitle: '자막 파일을 여기에 놓으세요',
-    dropFormats: '.srt .vtt .ass .smi · 원본 언어 자동 인식',
+    dropFormats: '.srt .vtt .ass .smi - 원본 언어 자동 인식',
     dropButton: '파일 선택',
     dropLocked: '먼저 콘텐츠 유형을 선택하세요',
     readingTitle: (name: string) => `${name} 읽는 중…`,
     readingSub: '타임코드를 확인하고 작품을 찾고 있어요',
-    noVideoNeeded: '영상 파일은 필요하지 않아요. 조잡한 자동 자막도 괜찮습니다.',
+    noVideoNeeded:
+      '영상 파일은 필요하지 않아요. 조잡한 자동 자막도 괜찮습니다.',
     // LanguageSelect.tsx는 이 화면에서 더 이상 호출되지 않지만 컴포넌트 자체는
     // 확장 대비로 남아 있고, 그 컴포넌트가 이 두 키를 여전히 읽는다.
     langLabel: '어떤 언어로 바꿔드릴까요?',
@@ -149,7 +349,8 @@ export const COPY = {
     enrichFailed: '작품 정보 검색에 실패했어요.',
     // AI-derived keyword fields fed into the translation prompt. Editable so
     // a wrong AI guess can be corrected before translating.
-    aiInfoHint: 'AI가 자동으로 채운 정보예요. 번역 톤을 잡는 데 쓰이니, 틀리면 고쳐주세요.',
+    aiInfoHint:
+      'AI가 자동으로 채운 정보예요. 번역 톤을 잡는 데 쓰이니, 틀리면 고쳐주세요.',
     genreLabel: '장르',
     eraLabel: '배경/시대',
     toneLabel: '톤앤매너',
@@ -161,7 +362,8 @@ export const COPY = {
     summarizing: '내용을 요약하고 있어요…',
     summaryBadge: 'AI가 앞부분을 읽고 정리했어요',
     otherNotesLabel: '참고할 내용 · 선택',
-    otherNotesHint: '말투(존댓말/반말), 전문 용어 표기 등 참고할 내용을 적어주세요.',
+    otherNotesHint:
+      '말투(존댓말/반말), 전문 용어 표기 등 참고할 내용을 적어주세요.',
     // shared
     back: '이전',
     translatePro: '고급번역',
@@ -196,6 +398,7 @@ export const COPY = {
   settings: {
     title: '번역 설정',
     subtitleAuto: '원본 언어 자동 인식 → 한국어',
+    confirmBadge: '확인 필요',
     confirmQuestion: (work: string) => `'${work}'(으)로 인식했어요. 맞나요?`,
     confirmHint: '아니라면 다시 골라 주세요',
     confirmYes: '맞아요',
@@ -207,11 +410,19 @@ export const COPY = {
     tonePlaceholder: '예: 고전적이고 절제된 어투, 심리극',
     contextEditable: '(수정 가능)',
     contextHint: '번역에 그대로 반영돼요. 비워 두면 자막만 보고 판단해요.',
+    // Section labels above each group of settings (design_handoff_zamak_brand).
+    sectionWork: '작품 정보',
+    sectionQuality: '번역 품질',
+    sectionAdvanced: '세부 조정 (선택)',
     liteName: '라이트',
     liteDesc: '빠르고 정확한 기본 번역.',
+    // Second line of the lite card — the speed promise the handoff leads with.
+    liteDescSpeed: '10초면 다운로드까지 끝나요.',
     proName: '프로',
     proDesc: '작품 맥락 분석과 인물명 일관성. 후편집 시간을 줄이는 초벌 번역.',
-    creditsLeft: (n: number) => `${n}회 남음`,
+    // "무료" is load-bearing for the beta: the credits are a gift, not a
+    // purchase. Revisit this wording when paid credits ship.
+    creditsLeft: (n: number) => `무료 ${n}회 남음`,
     glossaryTitle: '용어집 · 말투 설정',
     glossaryBadge: '고급',
     glossaryDesc:
@@ -298,9 +509,12 @@ export const COPY = {
         fallback === 0
           ? `타임코드 ${lines.toLocaleString()}개를 검증했어요. 원문 그대로 남은 구간은 0줄입니다`
           : `타임코드 ${lines.toLocaleString()}개를 검증했어요. 원문 그대로 남은 구간은 ${fallback}줄입니다`,
-      context: (context: string) => `작품 맥락(${context})에 맞춰 어휘와 문체를 골랐어요`,
-      glossary: (terms: number) => `용어집 ${terms}개 표기를 자막 전체에 일관되게 적용했어요`,
-      relations: (pairs: number) => `설정한 존대·반말 관계 ${pairs}쌍을 대화 전체에 반영했어요`,
+      context: (context: string) =>
+        `작품 맥락(${context})에 맞춰 어휘와 문체를 골랐어요`,
+      glossary: (terms: number) =>
+        `용어집 ${terms}개 표기를 자막 전체에 일관되게 적용했어요`,
+      relations: (pairs: number) =>
+        `설정한 존대·반말 관계 ${pairs}쌍을 대화 전체에 반영했어요`,
     },
     feedbackTitle: '이번 번역, 어땠나요?',
     feedbackPlaceholder: '자유롭게 남겨주세요 (선택)',
@@ -316,14 +530,14 @@ export const COPY = {
     stopReason: {
       quota:
         'API 사용 한도를 초과해 번역을 도중에 멈췄어요. 여기까지는 저장됐고, 나머지는 원문 그대로예요.',
-      auth:
-        '인증에 문제가 생겨 번역을 도중에 멈췄어요. 여기까지는 저장됐고, 나머지는 원문 그대로예요. 다시 로그인한 뒤 새로 시도해주세요.',
+      auth: '인증에 문제가 생겨 번역을 도중에 멈췄어요. 여기까지는 저장됐고, 나머지는 원문 그대로예요. 다시 로그인한 뒤 새로 시도해주세요.',
     },
   },
 
   // 내 번역(/mypage) — 번역권 잔여 + 지난 번역 기록.
   mypage: {
     title: '내 번역',
+    creditsTitle: '남은 번역권',
     liteCredits: '라이트 번역권',
     proCredits: '프로 번역권',
     unit: '회',

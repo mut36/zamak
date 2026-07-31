@@ -7,6 +7,9 @@ export interface MovieInfo {
   notes: string;
   /** TMDB poster URL for the detected work (movie branch), when available. */
   posterUrl?: string;
+  /** Director name, from TMDB credits (movie branch). UI-facing only — never
+   * fed into the translation prompt, unlike genre/era/tone below. */
+  director?: string;
   /** Legacy metadata fields — still consumed by the translation prompt when
    * present, but no longer surfaced in the Simple UI. Optional. */
   genre?: string;

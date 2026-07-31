@@ -58,9 +58,9 @@ export default function LegalPage() {
       <Contents items={CONTENTS} />
 
       <KeyPoint>
-        <b className='text-ink'>올리신 자막 원본은 저장하지 않습니다.</b> 원본은
+        <b className='text-ink-strong'>올리신 자막 원본은 저장하지 않습니다.</b> 원본은
         브라우저에서 열리고, 번역되는 동안에만 서버를 거쳐 갑니다.{' '}
-        <b className='text-ink'>완성된 번역 결과물</b>은 다시 받으실 수 있도록
+        <b className='text-ink-strong'>완성된 번역 결과물</b>은 다시 받으실 수 있도록
         본인만 접근할 수 있는 비공개 저장소에 {RESULT_RETENTION_DAYS}일간
         보관합니다.
       </KeyPoint>
@@ -202,7 +202,7 @@ export default function LegalPage() {
         <dl className='grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 m-0'>
           {SELLER_INFO.map((row) => (
             <div key={row.label} className='contents'>
-              <dt className='text-ink-3'>{row.label}</dt>
+              <dt className='text-secondary'>{row.label}</dt>
               <dd className='m-0'>{row.value}</dd>
             </div>
           ))}

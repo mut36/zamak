@@ -32,21 +32,24 @@ export function AppNav({ user, signOut, credits, onHome }: AppNavProps) {
   ).toUpperCase();
 
   return (
-    <nav className='sticky top-0 z-40 h-14 border-b border-border bg-[var(--nav-bg)] backdrop-blur-[20px] backdrop-saturate-[180%]'>
+    <nav className='sticky top-0 z-40 h-[52px] border-b border-border-subtle glass-nav'>
       <div className='flex h-full w-full max-w-[600px] lg:max-w-[840px] mx-auto items-center justify-between px-5'>
         <button
           type='button'
           onClick={onHome}
           aria-label='ZAMAK home'
-          className='mono inline-flex items-center rounded-[4px] bg-ink px-2.5 py-1.5 text-[13px] font-semibold tracking-[0.07em] leading-none text-accent'
+          className='bg-transparent border-0 p-0 cursor-pointer'
         >
-          {COPY.brand}
+          <span className='zchip text-caption py-[4px] px-[9px]'>
+            {COPY.brand}
+            <span className='zchip-dot w-[3px] h-[3px] ml-[3px]' aria-hidden />
+          </span>
         </button>
 
-        <div className='flex items-center gap-3'>
+        <div className='flex items-center gap-4'>
           <Link
             href='/mypage'
-            className='text-[13px] font-medium text-ink-2 hover:text-ink'
+            className='text-caption text-nav hover:bg-[var(--fill-hover)] rounded-[var(--r-btn)] px-3 py-1.5 transition'
           >
             {COPY.nav.history}
           </Link>
@@ -54,7 +57,7 @@ export function AppNav({ user, signOut, credits, onHome }: AppNavProps) {
           {credits && (
             <Link
               href='/mypage'
-              className='inline-flex items-center rounded-full bg-accent-soft px-3 py-1.5 text-[12px] font-semibold text-ink'
+              className='inline-flex items-center rounded-[var(--r-btn)] bg-[var(--fill-hover)] px-[13px] py-1.5 text-fineprint font-medium text-ink hover:bg-[var(--fill-hover-strong)] transition'
             >
               {COPY.nav.credits(credits.lite, credits.pro)}
             </Link>
@@ -65,7 +68,7 @@ export function AppNav({ user, signOut, credits, onHome }: AppNavProps) {
             onClick={signOut}
             aria-label={COPY.nav.signOut}
             title={COPY.nav.signOut}
-            className='flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-border'
+            className='flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#c8c8cd] to-[#a9a9af]'
           >
             {avatarUrl ? (
               // Google OAuth avatar — remote host varies; next/image needs a
@@ -78,7 +81,7 @@ export function AppNav({ user, signOut, credits, onHome }: AppNavProps) {
                 referrerPolicy='no-referrer'
               />
             ) : (
-              <span className='text-[12px] font-semibold text-ink-2'>
+              <span className='text-fineprint font-semibold text-white'>
                 {initial}
               </span>
             )}

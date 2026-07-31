@@ -32,7 +32,7 @@
 ## 명령
 
 - 개발 서버: `npm run dev` (프리뷰는 Browser 도구로 — Bash로 서버 띄우지 말 것)
-- 검증: `npx tsc --noEmit && npx eslint app && npx vitest run`
+- 검증: `npx tsc --noEmit && npx eslint app && npx vitest run && npm run check:tokens`
 
 ## 깨면 안 되는 불변식
 

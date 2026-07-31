@@ -1,6 +1,6 @@
 {
   "name": "srt-translator-web",
-  "version": "0.19.0",
+  "version": "0.23.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "check:tokens": "node scripts/check-tokens.mjs",
     "harness": "node --import ./scripts/harness/loader.mjs --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/prompt-ab.mts",
     "glossary": "node --import ./scripts/harness/loader.mjs --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/glossary-ab.mts"
   },

@@ -188,7 +188,6 @@ export function useWizard(
 
   const {
     status: enrichStatus,
-    director,
     error: enrichError,
     candidates: enrichCandidates,
     enrich,
@@ -228,6 +227,7 @@ export function useWizard(
       posterUrl: data?.posterUrl ?? undefined,
       title: data?.found && data.title ? data.title : prev.title,
       year: data?.found && data.year ? data.year : prev.year,
+      director: data?.found ? (data.director ?? undefined) : undefined,
       genre: data?.found ? data.genre : '',
       era: data?.found ? data.era : '',
       tone: data?.found ? data.tone : '',
@@ -256,6 +256,7 @@ export function useWizard(
         posterUrl: data?.posterUrl ?? undefined,
         title: data?.found && data.title ? data.title : prev.title,
         year: data?.found && data.year ? data.year : prev.year,
+        director: data?.found ? (data.director ?? undefined) : undefined,
         genre: data?.found ? data.genre : '',
         era: data?.found ? data.era : '',
         tone: data?.found ? data.tone : '',
@@ -351,13 +352,16 @@ export function useWizard(
 
     setMovieInfo(EMPTY_MOVIE_INFO);
     resetAnalysis();
-    // Screen goes to 'workPick' immediately — the movie branch's TMDB search
-    // and the other branch's summarize both run while it's showing, so the
-    // user sees a live "searching"/analyzing state on the work-pick screen
-    // itself rather than looking stuck on upload.
+    // Screen goes to 'settings' immediately, not to the picker: the handoff
+    // confirms an auto-matched work inline on the settings screen, and showing
+    // a candidate list first would ask the user a question we usually don't
+    // need to ask. The TMDB search and the other branch's summarize both run
+    // while settings is showing (it renders its own searching state), and
+    // runEnrich redirects to 'workPick' only when the match comes back
+    // ambiguous or empty — see nextScreenAfterUpload.
     processFile(selected, doc);
     setUploading(false);
-    setScreen('workPick');
+    setScreen('settings');
   };
 
   // The actual translate work, entered only once consent is settled — either
@@ -539,7 +543,6 @@ export function useWizard(
     totalLines,
     // Passed through from useEnrich.
     enrichStatus,
-    director,
     enrichError,
     enrichCandidates,
     runEnrich,

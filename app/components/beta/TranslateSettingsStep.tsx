@@ -1,6 +1,7 @@
 'use client';
 
-import { PencilIcon } from '../icons';
+import { PencilIcon, SpinnerIcon } from '../icons';
+import { StepBreadcrumb } from '../StepBreadcrumb';
 import { CastSheetCard } from '../simple/CastSheetCard';
 import type { CastSheetStatus } from '../../hooks/useCastSheet';
 import type { CastSheet } from '../../types/glossary';
@@ -24,6 +25,11 @@ interface TranslateSettingsStepProps {
   onMovieInfo: (patch: Partial<MovieInfo>) => void;
   /** autoMatched && !workConfirmed, computed by the caller (useWizard). */
   needsConfirm: boolean;
+  /** True while the TMDB search is still in flight. The upload step hands off
+   *  to this screen before the search settles (see useWizard.handleFile), so
+   *  the work card has to be able to say "still looking" rather than render an
+   *  empty title. */
+  searching: boolean;
   onConfirmWork: () => void;
   onChangeWork: () => void;
   model: AllowedModel;
@@ -44,8 +50,8 @@ interface TranslateSettingsStepProps {
 }
 
 const CARDS = [
-  { model: FLASH_MODEL, name: c.liteName, desc: c.liteDesc },
-  { model: PRO_MODEL, name: c.proName, desc: c.proDesc },
+  { model: FLASH_MODEL, name: c.liteName, desc: [c.liteDesc, c.liteDescSpeed] },
+  { model: PRO_MODEL, name: c.proName, desc: [c.proDesc] },
 ] as const;
 
 export function TranslateSettingsStep({
@@ -53,6 +59,7 @@ export function TranslateSettingsStep({
   movieInfo,
   onMovieInfo,
   needsConfirm,
+  searching,
   onConfirmWork,
   onChangeWork,
   model,
@@ -74,20 +81,37 @@ export function TranslateSettingsStep({
   } as const;
 
   return (
-    <div className='animate-fade-slide-up pb-28'>
-      <div className='head text-center mb-7'>
+    <div className='animate-zslide pb-28 max-w-[760px] mx-auto'>
+      <StepBreadcrumb current='settings' className='mb-6' />
+      <div className='head mb-8'>
         <h1>{c.title}</h1>
         <p>{c.subtitleAuto}</p>
       </div>
 
-      {contentType === 'movie' && needsConfirm && (
+      <p className='qlabel'>{c.sectionWork}</p>
+
+      {contentType === 'movie' && searching && (
+        <div className='card p-[18px_20px] mb-[14px] flex items-center gap-3'>
+          <SpinnerIcon className='w-5 h-5 text-accent' />
+          <span className='text-caption text-nav'>{COPY.info.searching}</span>
+        </div>
+      )}
+
+      {contentType === 'movie' && !searching && needsConfirm && (
         <div
-          className='rounded-card border-[1.5px] p-[18px] mb-[14px] bg-accent-wash border-accent-line'
+          className='rounded-card border-[1.5px] p-[18px_24px] mb-[14px] bg-surface border-accent'
+          style={{ boxShadow: 'var(--shadow-accent)' }}
         >
-          <p className='text-[14px] font-medium'>
+          <div className='flex items-center gap-[6px] mb-[5px]'>
+            <span className='zchip-dot animate-zbreathe w-[6px] h-[6px]' />
+            <span className='mono text-micro tracking-[0.06em] text-secondary'>
+              {c.confirmBadge}
+            </span>
+          </div>
+          <p className='text-title-sm font-semibold tracking-[-0.01em]'>
             {c.confirmQuestion(movieInfo.title || '—')}
           </p>
-          <p className='text-[12.5px] text-ink-3 mt-1'>{c.confirmHint}</p>
+          <p className='text-caption-sm text-secondary mt-1'>{c.confirmHint}</p>
           <div className='flex gap-2 mt-3'>
             <button
               type='button'
@@ -107,7 +131,7 @@ export function TranslateSettingsStep({
         </div>
       )}
 
-      {contentType === 'movie' && !needsConfirm && (
+      {contentType === 'movie' && !searching && !needsConfirm && (
         <div className='card detected mb-[14px]'>
           <div className='poster'>
             {movieInfo.posterUrl ? (
@@ -123,7 +147,11 @@ export function TranslateSettingsStep({
           </div>
           <div className='min-w-0'>
             <div className='dtitle truncate'>{movieInfo.title || '—'}</div>
-            <div className='dmeta'>{movieInfo.year || '—'}</div>
+            <div className='dmeta'>
+              {movieInfo.year || '—'}
+              {movieInfo.director &&
+                ` · ${COPY.info.labelDirector} ${movieInfo.director}`}
+            </div>
             <div className='dbadge'>
               <b />
               {COPY.info.detectedBadge}
@@ -131,7 +159,7 @@ export function TranslateSettingsStep({
           </div>
           <button
             type='button'
-            className='btn btn-ghost ml-auto self-start !px-3 !py-2 !text-[13px]'
+            className='btn btn-ghost ml-auto self-start !px-3 !py-2 !text-caption'
             onClick={onChangeWork}
           >
             <PencilIcon />
@@ -187,38 +215,54 @@ export function TranslateSettingsStep({
             onChange={(e) => onMovieInfo({ tone: e.target.value })}
           />
         </div>
-        <p className='text-[12px] text-ink-3 mt-3'>{c.contextHint}</p>
+        <p className='text-fineprint text-secondary mt-3'>{c.contextHint}</p>
       </div>
+
+      <p className='qlabel'>{c.sectionQuality}</p>
 
       <div className='grid grid-cols-2 gap-[14px] mb-[14px]'>
         {CARDS.map((card) => {
           const left = cardCredits[card.model];
+          const selected = model === card.model;
           return (
             <button
               key={card.model}
               type='button'
               onClick={() => onModel(card.model)}
-              className='bg-surface rounded-card border-[1.5px] p-[22px_24px] text-left transition hover:shadow-[var(--shadow-hover)]'
-              style={{ borderColor: model === card.model ? 'var(--ink)' : 'transparent' }}
+              className='rounded-card border-[1.5px] p-[18px_20px] text-left transition hover:shadow-[var(--shadow-hover)] active:scale-[0.99]'
+              style={{
+                background: selected ? 'var(--accent-wash)' : 'var(--surface)',
+                borderColor: selected ? 'var(--ink-strong)' : 'transparent',
+              }}
             >
               <div className='flex justify-between items-baseline'>
-                <span className='text-[17px] font-semibold tracking-[-0.01em]'>
+                <span className='flex items-center gap-[9px] text-body-lg font-semibold tracking-[-0.01em]'>
+                  <span className={`zcheck w-[18px] h-[18px] text-micro${selected ? ' on' : ''}`}>
+                    {selected && '✓'}
+                  </span>
                   {card.name}
                 </span>
                 <span
-                  className='text-[12px] font-medium'
+                  className='text-fineprint font-medium whitespace-nowrap'
                   style={{ color: left > 0 ? 'var(--success)' : 'var(--danger)' }}
                 >
                   {c.creditsLeft(left)}
                 </span>
               </div>
-              <p className='mt-2 text-[13.5px] text-ink-3 leading-[1.5]'>
-                {card.desc}
-              </p>
+              {card.desc.map((line) => (
+                <p
+                  key={line}
+                  className='mt-2 text-caption text-secondary leading-[1.5]'
+                >
+                  {line}
+                </p>
+              ))}
             </button>
           );
         })}
       </div>
+
+      <p className='qlabel'>{c.sectionAdvanced}</p>
 
       {castSheetEnabled ? (
         <div className='animate-zslide mb-[14px]'>
@@ -235,34 +279,34 @@ export function TranslateSettingsStep({
       ) : (
         <button
           type='button'
-          className='card w-full flex items-center gap-3 p-[14px] text-left mb-[14px]'
+          className='card w-full flex items-center justify-between gap-3 p-[18px_24px] text-left mb-[14px]'
           onClick={() => onCastSheetToggle(true)}
         >
-          <span
-            className='inline-flex items-center justify-center w-4 h-4 rounded border shrink-0'
-            style={{ borderColor: 'var(--border)' }}
-            aria-hidden
-          />
           <span className='flex-1 min-w-0'>
             <span className='flex items-center gap-2'>
-              <span className='text-[14px] font-medium'>{c.glossaryTitle}</span>
-              <span className='dbadge !text-[10px]'>{c.glossaryBadge}</span>
+              <span className='text-title-sm font-semibold tracking-[-0.01em]'>
+                {c.glossaryTitle}
+              </span>
+              <span className='dbadge-pro'>{c.glossaryBadge}</span>
             </span>
-            <span className='block text-[12px] text-ink-3 mt-0.5'>
+            <span className='block text-caption-sm text-tertiary mt-0.5'>
               {c.glossaryDesc}
             </span>
+          </span>
+          <span className='ztoggle' aria-hidden>
+            <span className='ztoggle-knob' />
           </span>
         </button>
       )}
 
-      <div className='fixed bottom-0 left-0 right-0 bg-[var(--nav-bg)] backdrop-blur-[20px] backdrop-saturate-[180%] border-t border-border'>
-        <div className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 py-4 flex items-center justify-between gap-4'>
-          <span className='text-[13px] text-ink-3'>{c.eta(etaSeconds)}</span>
+      <div className='fixed bottom-0 left-0 right-0 glass-nav border-t border-border-subtle'>
+        <div className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 py-4 flex items-center justify-center gap-4'>
+          <span className='text-caption text-tertiary'>{c.eta(etaSeconds)}</span>
           <button
             type='button'
             onClick={onStart}
-            className='text-white text-[15px] font-medium px-11 py-[13px] rounded-full transition active:scale-[0.98]'
-            style={{ background: 'var(--ink)' }}
+            className='text-white text-card-title font-medium px-11 py-[13px] rounded-[var(--r-btn)] transition active:scale-[0.97]'
+            style={{ background: 'var(--ink-strong)' }}
           >
             {c.start}
           </button>
