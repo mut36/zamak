@@ -4,15 +4,23 @@
 
 ## 베타
 
-### 정식 오픈 시: 가입 크레딧 3편 → 1편으로 복귀 (2026-07-27)
+### 정식 오픈 시: 가입 크레딧 복귀 — SQL 작성 완료, **실행만 남음** (2026-07-31 갱신)
 
-베타 30명에게 결제 없이 체험시키려고 한시적으로 3편을 준 것(`docs/decisions.md` §1-10).
-결제(토스)가 정식으로 열리는 시점에 아래를 되돌릴 것:
+베타 30명에게 결제 없이 체험시키려고 한시적으로 올린 것(`docs/decisions.md` §1-10).
+복귀 후 지급량은 **라이트 1 + 프로 0**으로 확정(2026-07-31 대표 결정) — 결제가
+열리면 프로는 미끼가 아니라 판매 대상이 되므로 지급에서 뺀다.
 
-- [ ] `supabase/migrations/0003_beta_signup_credit.sql` 하단의 "베타 종료 후
-      되돌리기" 블록 실행 (`grant_signup_credit()`을 1편 지급으로 되돌림)
-- [ ] `app/i18n/simpleCopy.ts` 3곳을 1편으로: `landing.hero.ctaHint`,
-      `landing.closing.title`/`body`, `credits.emptyBody`
+- [ ] **`supabase/migrations/0010_signup_credit_revert.sql`을 Supabase SQL 에디터에서
+      실행** ← 결제 오픈 시점에 이것 하나만 하면 된다.
+      ⛔ **0003 하단의 되돌리기 블록은 실행하지 말 것** — 0004(티어제) 이전에
+      쓰인 것이라 지금은 신규 가입자에게 크레딧 **0편**을 준다(`balance`는
+      deprecated이고 `begin_translation_job`은 `lite_balance`/`pro_balance`만
+      차감한다). 0003 파일에도 같은 경고를 달아뒀다.
+- [x] ~~`app/i18n/simpleCopy.ts` 3곳을 1편으로~~ — **불필요해짐.** 베타 리디자인
+      (852dea9)에서 `landing.hero.ctaHint`·`landing.closing.title/body`·
+      `credits.emptyBody` 키가 전부 사라졌다. 지금 편수를 언급하는 문구는
+      `landing`의 "가입 후 첫 파일은 무료입니다"뿐이고 이미 1편과 일치한다
+      (`creditsLeft`는 잔액을 인자로 받는 동적 문구라 무관).
 - [ ] 베타 기간에 지급된 3편 중 미사용분을 회수할지 결정 (지금은 회수 안 함)
 
 ### 결과물 보관 만료 정리 cron (2026-07-29, `0007_job_results.sql` 후속)
