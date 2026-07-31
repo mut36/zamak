@@ -100,11 +100,44 @@ export function runPipeline(o: PipelineOptions): Promise<PipelineResult>;
   `{prompt: prompt_tokens, cached: prompt_tokens_details.cached_tokens,
   thoughts: completion_tokens_details.reasoning_tokens, output: completion_tokens
   - reasoning_tokens}`로 정규화. `reasoning` 옵션은 `reasoning_effort`로.
-- `anthropic` — `@anthropic-ai/sdk`. `usage`를
-  `{prompt: input_tokens, cached: cache_read_input_tokens, thoughts: 0,
-  output: output_tokens}`로 정규화. `reasoning`은 thinking budget으로.
-  Claude는 thinking 토큰을 output에 합산 보고하므로 `thoughts`는 0으로 두고
-  리포트 각주에 명시한다 — **모델 간 `thoughts` 열은 직접 비교하지 말 것.**
+- `anthropic` — `@anthropic-ai/sdk`. `{prompt: input_tokens,
+  cached: cache_read_input_tokens, output: output_tokens}`. `reasoning`은
+  thinking budget으로. **`thoughts`는 §3-2-1로 역산한다.**
+
+#### 3-2-1. Anthropic의 thinking 토큰 역산
+
+thinking은 출력 단가로 과금되고 청크 크기 결정의 지배항이므로
+(`docs/tuning/chunk-size-model.md` §5-2-1) 비워둘 수 없다. Anthropic은
+thinking을 `output_tokens`에 합산 보고하고 별도 필드를 주지 않으므로
+**여집합으로 빼서** 구한다.
+
+```
+thoughts_est = output_tokens − countTokens(응답의 text 블록 전체)
+output_est   = countTokens(응답의 text 블록 전체)
+```
+
+`countTokens`는 Anthropic의 토큰 계수 엔드포인트(무과금)를 쓴다. 응답당 1회
+추가 호출이므로 `calls.json` 기록 시점에 한 번만 부른다.
+
+**thinking 블록을 직접 세지 않는 이유**: Claude 4 이후는 thinking을 요약해
+반환하지만 과금은 요약 전 전체 분량으로 한다. 돌려받은 thinking 텍스트를 세면
+실제보다 크게 적게 나온다. 반면 `text` 블록(번역문)은 요약되지 않으므로,
+여집합을 쓰면 요약 정책과 무관하게 성립한다. `redacted_thinking`(암호화된
+thinking)이 섞여도 마찬가지로 영향받지 않는다.
+
+**오차**: 종료 토큰 등 구조적 오버헤드 수십 토큰이 `thoughts_est` 쪽으로
+쏠린다. 수천 단위 비교에는 지장이 없다. **비용은 추정값이 아니다** —
+`output_tokens` 총합으로 계산하므로 정확하고, 추정인 것은 thinking/번역문
+내역 분해뿐이다.
+
+각 프로바이더가 어느 방식인지는 usage에 실어 나른다:
+
+```ts
+type ThoughtsSource = 'reported' | 'derived';
+```
+
+`gemini`(`thoughtsTokenCount`)와 `openai`(`reasoning_tokens`)는 `reported`,
+`anthropic`은 `derived`. 리포트는 `derived` 값에 `~`와 `(추정)`을 붙인다.
 
 키는 각 SDK의 표준 환경변수(`GEMINI_API_KEY`/`OPENAI_API_KEY`/
 `ANTHROPIC_API_KEY`)를 `.env.local`에서 읽는다. 키가 없는 프로바이더의 모델을
@@ -260,8 +293,11 @@ enrich의 후보 자동 선택은 CLI에 사람이 없어서 내리는 타협이
 
 지표 해석은 `prompt-ab`의 각주를 승계한다: **정렬실패** 기준선 0.5~0.65%,
 **최장호출**이 300초 타임아웃에 걸리는 값, **P_fixed·t_in**은 프롬프트를
-바꾸면 움직이는 최소제곱 적합. 여기에 모델 축 각주를 더한다 —
-**`thoughts` 열은 프로바이더 간 보고 방식이 달라 비교 불가**(§3-2).
+바꾸면 움직이는 최소제곱 적합, thinking은 출력 단가로 과금.
+
+모델 축 각주를 더한다 — **`~1234 (추정)`으로 표시된 thinking 값은 §3-2-1로
+역산한 것**이다. 오차는 수십 토큰 수준이라 모델 간 비교에 쓸 수 있고,
+**비용 열은 추정이 아니라 정확하다**(총 output 토큰으로 계산).
 
 ## 7. 리스크
 
@@ -289,6 +325,10 @@ enrich의 후보 자동 선택은 CLI에 사람이 없어서 내리는 타협이
    — SRT가 나오고 블록 수가 원본과 같은지.
 5. **다중 프로바이더**: 키가 있는 프로바이더 2개 이상으로 `limit=1` 실행,
    `calls.json`에 usage가 0이 아닌 값으로 찍히는지.
+6. **thinking 역산 검증**(§3-2-1): Claude를 thinking 끈 상태와 켠 상태로
+   각각 `limit=1` 실행. 끈 쪽은 `thoughts_est`가 0 근처(수십 토큰 이내)여야
+   하고, 켠 쪽은 유의미한 양수여야 한다. 끈 쪽이 크게 나오면 역산식이 아니라
+   `countTokens` 대상 범위가 틀린 것이다.
 
 ## 9. 문서 갱신
 
