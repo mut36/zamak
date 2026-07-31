@@ -19,21 +19,22 @@ export const metadata = {
  * readable before purchase, and card acquirers check for this page during the
  * Toss Payments merchant review.
  *
- * 사업장 주소는 아직 TODO — 대표가 직접 채울 것. 통신판매업 신고번호는 결제가
- * 붙지 않은 지금은 "결제 미가동" 표기로 대신한다: 그 신고 자체가 통신판매업 신고
- * 면제 대상(직전년도 거래 50회 미만 등)인지 대표가 사업자 유형(간이과세자 여부)을
- * 확인해 판단할 사안이라, 결제를 열 때 신고번호 또는 면제 근거로 교체해야 한다.
+ * 값 자체는 `COPY.seller`에 있다 — 전 페이지 푸터(`SiteFooter`)가 같은 항목을
+ * 표시하므로, 여기 하드코딩하면 한쪽만 고쳐져 갈라진다. 이 배열은 그 값에
+ * 이 페이지용 라벨만 붙인다. 호스팅·결제대행은 법정 표시 항목이 아니라
+ * 신뢰 신호라 푸터에는 없고 이 표에만 있다.
  */
 const SELLER_INFO: { label: string; value: string }[] = [
-  { label: '상호', value: '뭍36 (MUT36)' },
-  { label: '대표자', value: '이지안' },
-  { label: '사업자등록번호', value: '224-23-65160' },
-  { label: '통신판매업 신고번호', value: '신고 면제 (직전 연도 통신판매 거래 횟수 50회 미만)' },
-  { label: '사업장 주소', value: '서울특별시 여의대방로22길 24' },
+  { label: '상호', value: COPY.seller.name },
+  { label: '대표자', value: COPY.seller.ceo },
+  { label: '사업자등록번호', value: COPY.seller.bizNo },
+  { label: '통신판매업 신고번호', value: COPY.seller.mailOrder },
+  { label: '사업장 주소', value: COPY.seller.address },
+  { label: '전화번호', value: COPY.seller.tel },
   { label: '홈페이지', value: SITE.url },
   { label: '고객문의', value: COPY.footer.feedbackEmail },
-  { label: '호스팅 제공', value: 'Vercel Inc.' },
-  { label: '결제대행', value: '토스페이먼츠(주)' },
+  { label: '호스팅 제공', value: COPY.seller.hosting },
+  { label: '결제대행', value: COPY.seller.pg },
 ];
 
 const CONTENTS = [

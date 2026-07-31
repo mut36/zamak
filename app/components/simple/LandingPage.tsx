@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { COPY } from '../../i18n/simpleCopy';
+import { SiteFooter } from '../SiteFooter';
+import { Wordmark } from '../Wordmark';
 
 interface Props {
   onSignIn: () => void;
@@ -22,16 +24,6 @@ const TAG_CLASS: Record<string, string> = {
   green: 'lp-tag-green',
   neutral: 'lp-tag-neutral',
 };
-
-/** 워드마크 — 마지막 마침표만 옐로("문장을 완성한다"). */
-function Wordmark({ className }: { className?: string }) {
-  return (
-    <span className={className}>
-      {L.wordmark}
-      <span style={{ color: 'var(--accent)' }}>.</span>
-    </span>
-  );
-}
 
 /**
  * CTA 4개(nav / 히어로 / 속도 / 최종)는 전부 같은 가입 진입점이다. 유입 위치는
@@ -537,22 +529,8 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
 
       {/* ── 8. Footer ─────────────────────────────────────────── */}
       {/* §1-11의 세 번째 노출 지점. 로그인 전 화면은 이 푸터가 유일한 약관
-          경로다 — 로그인 후 셸의 푸터(app/page.tsx)에는 익명 방문자가 닿지
-          못한다. */}
-      <footer className='lp-footer'>
-        <Wordmark className='lp-wordmark' />
-        <div className='flex items-center gap-2.5 text-fineprint text-quaternary'>
-          <Link href={COPY.legal.termsHref} className='underline'>
-            {COPY.legal.terms}
-          </Link>
-          <span className='dot-sep' />
-          <Link href={COPY.legal.privacyHref} className='underline'>
-            {COPY.legal.privacy}
-          </Link>
-          <span className='dot-sep' />
-          <span>{L.footer.copyright}</span>
-        </div>
-      </footer>
+          경로다 — 로그인 후 셸에는 익명 방문자가 닿지 못한다. */}
+      <SiteFooter />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { BrandMark } from '../components/BrandMark';
+import { SiteFooter } from '../components/SiteFooter';
 import { COPY } from '../i18n/simpleCopy';
 
 /**
@@ -95,6 +96,8 @@ export function LegalShell({
           </Link>
         </p>
       </main>
+
+      <SiteFooter />
     </div>
   );
 }

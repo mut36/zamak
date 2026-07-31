@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { UploadStep } from './components/simple/UploadStep';
 import { WorkPickStep } from './components/beta/WorkPickStep';
@@ -12,10 +11,11 @@ import { LandingPage } from './components/simple/LandingPage';
 import { ExhaustedStep } from './components/beta/ExhaustedStep';
 import { CopyrightModal } from './components/beta/CopyrightModal';
 import { AppNav } from './components/beta/AppNav';
+import { SiteFooter } from './components/SiteFooter';
 import { useWizard } from './hooks/useWizard';
 import { useAuth } from './hooks/useAuth';
 import { isSupabaseConfigured } from './lib/supabase/env';
-import { APP_VERSION, estimateTranslationMs, GLOSSARY_WAIT_MS } from './config/constants';
+import { estimateTranslationMs, GLOSSARY_WAIT_MS } from './config/constants';
 import { COPY } from './i18n/simpleCopy';
 
 // Work identification (enrich for the movie branch, otherType/toneText for
@@ -358,23 +358,7 @@ export default function Home() {
           )}
       </main>
 
-      <footer className='w-full max-w-[840px] mx-auto px-5 pb-10 text-center text-secondary'>
-        <p className='mono text-fineprint'>v{APP_VERSION} · Beta</p>
-        <p className='text-fineprint mt-1'>© 2026 ZAMAK. All rights reserved.</p>
-        <div className='flex items-center justify-center gap-2.5 mt-1 text-fineprint'>
-          <a href={`mailto:${COPY.footer.feedbackEmail}`} className='underline'>
-            {COPY.footer.feedback}
-          </a>
-          <span className='dot-sep' />
-          <Link href={COPY.legal.termsHref} className='underline'>
-            {COPY.legal.terms}
-          </Link>
-          <span className='dot-sep' />
-          <Link href={COPY.legal.privacyHref} className='underline'>
-            {COPY.legal.privacy}
-          </Link>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppNav } from '../components/beta/AppNav';
+import { SiteFooter } from '../components/SiteFooter';
 import { useAuth } from '../hooks/useAuth';
 import { fetchHistory } from '../lib/client/history';
 import type { HistoryItem } from '../lib/jobHistory';
@@ -147,6 +148,8 @@ export default function MyPage() {
           </button>
         </div>
       </main>
+
+      <SiteFooter />
     </div>
   );
 }

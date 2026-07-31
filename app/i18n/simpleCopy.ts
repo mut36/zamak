@@ -225,10 +225,6 @@ export const COPY = {
       sub: '가입 후 첫 파일은 무료입니다. 신용카드도 필요 없어요.',
       badge: '비공개 베타 운영 중',
     },
-
-    footer: {
-      copyright: '© 2026 ZAMAK. 자연스러운 한국어 자막.',
-    },
   },
 
   credits: {
@@ -555,6 +551,32 @@ export const COPY = {
   footer: {
     feedback: '피드백 보내기',
     feedbackEmail: 'hello@mut36.com',
+    tagline: '타임코드가 밀리지 않는 자막 번역기.',
+    serviceGroup: '서비스',
+    policyGroup: '정책',
+    home: '홈',
+    mypage: '마이페이지',
+    copyright: '© 2026 ZAMAK. All rights reserved.',
+  },
+
+  /**
+   * 전자상거래법 제10조가 요구하는 판매자 표시. 푸터(모든 페이지)와 `/legal`의
+   * 사업자 정보 표가 **같은 이 객체**를 읽는다 — 두 곳에 따로 적으면 한쪽만
+   * 고쳐져 갈라진다. 홈페이지는 `SITE.url`, 고객문의는 `footer.feedbackEmail`을
+   * 그대로 쓰므로 여기 중복해 두지 않는다.
+   */
+  seller: {
+    name: '뭍36 (MUT36)',
+    ceo: '이지안',
+    bizNo: '224-23-65160',
+    address: '서울특별시 여의대방로22길 24',
+    tel: '010-7927-9836',
+    // 면제는 조건부다 — 직전 연도 거래가 50회를 넘으면 신고 후 이 두 문구를
+    // 실제 신고번호로 바꿔야 한다(`docs/TODO.md` 결제 오픈 항목).
+    mailOrder: '신고 면제 (직전 연도 통신판매 거래 횟수 50회 미만)',
+    mailOrderShort: '통신판매업 신고 면제',
+    hosting: 'Vercel Inc.',
+    pg: '토스페이먼츠(주)',
   },
 
   // 첫 번역 전에 한 번 받는 저작권 동의 모달. 닫기 없이 동의만 가능한

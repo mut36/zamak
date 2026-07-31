@@ -1655,14 +1655,70 @@ button:disabled {
     border-radius: var(--r-chip);
   }
 
-  .lp-footer {
+  /* 전 페이지 공용 푸터(app/components/SiteFooter.tsx). 3단: 브랜드+링크 /
+     판매자 표시 / 저작권+버전. */
+  .site-footer {
     border-top: 1px solid var(--border-chip);
-    padding: 28px clamp(20px, 5vw, 48px);
+    padding: 40px clamp(20px, 5vw, 48px) 32px;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .site-footer-top {
+    display: flex;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 28px;
+  }
+  .site-footer-tagline {
+    margin-top: 8px;
+    font-size: var(--fs-fineprint);
+    color: var(--text-tertiary);
+  }
+  .site-footer-links {
+    display: flex;
+    gap: clamp(32px, 8vw, 72px);
+  }
+  .site-footer-links div {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .site-footer-links a {
+    font-size: var(--fs-fineprint);
+    color: var(--text-tertiary);
+  }
+  .site-footer-links a:hover {
+    color: var(--text-secondary);
+    text-decoration: underline;
+  }
+  .site-footer-group {
+    font-size: var(--fs-fineprint);
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  /* 판매자 표시는 <address> — 기본 이탤릭을 되돌리고, `·` 구분자가 좁은
+     화면에서 줄바꿈을 타도록 inline flex wrap으로 흘린다. */
+  .site-footer-seller {
+    font-style: normal;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px 9px;
+    font-size: var(--fs-fineprint);
+    line-height: 1.6;
+    color: var(--text-quaternary);
+  }
+  .site-footer-seller a:hover {
+    text-decoration: underline;
+  }
+  .site-footer-bottom {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: var(--fs-fineprint);
+    color: var(--text-quaternary);
   }
   /* Footer wordmark: no chip, grey text, yellow point (handoff §로고). */
   .lp-wordmark {
