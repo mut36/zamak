@@ -7,6 +7,9 @@ export interface MovieInfo {
   notes: string;
   /** TMDB poster URL for the detected work (movie branch), when available. */
   posterUrl?: string;
+  /** Director name, from TMDB credits (movie branch). UI-facing only — never
+   * fed into the translation prompt, unlike genre/era/tone below. */
+  director?: string;
   /** Legacy metadata fields — still consumed by the translation prompt when
    * present, but no longer surfaced in the Simple UI. Optional. */
   genre?: string;
@@ -99,6 +102,10 @@ export interface ChunkTranslationRequest extends TranslationRequestBase {
   chunk: string;
   chunkIndex: number;
   totalChunks: number;
+  /** Which pass this call belongs to. Measurement only — the server treats
+   *  both identically. Sweep rounds are all sent as 1/1, so without this the
+   *  usage rows could not tell a sweep round from a single-chunk file. */
+  phase?: 'main' | 'sweep';
 }
 
 export interface TranslationEvent {

@@ -8,6 +8,7 @@ import {
   generateModelText,
   getModelProvider,
   type ProviderApiKeys,
+  type TokenUsage,
 } from '../providers';
 import type {
   MovieInfo,
@@ -27,6 +28,23 @@ export interface TranslationOutcome {
    * re-collect and re-send exactly them. See ChunkReassembly.unmatchedIndices
    * for why this can be shorter than `unmatchedBlocks`. */
   unmatchedIndices: number[];
+  /** What the model call consumed. Never sent to the browser — the route
+   * records it server-side. Strict mode makes several calls and reports their
+   * sum, so this is "what this chunk cost", not "what one request cost". */
+  usage: TokenUsage;
+  /** Thinking level the provider actually applied, for the same row. */
+  thinkingLevel: string | null;
+}
+
+const ZERO_USAGE: TokenUsage = { prompt: 0, cached: 0, thoughts: 0, output: 0 };
+
+function addUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
+  return {
+    prompt: a.prompt + b.prompt,
+    cached: a.cached + b.cached,
+    thoughts: a.thoughts + b.thoughts,
+    output: a.output + b.output,
+  };
 }
 
 interface TranslateOptions {
@@ -273,11 +291,16 @@ export async function translateSubtitle({
   async function translateOnce(content: string): Promise<TranslationOutcome> {
     const { system, user } = await composePrompt(content);
     let modelOutput: string;
+    let usage: TokenUsage = ZERO_USAGE;
+    let thinkingLevel: string | null = null;
     try {
-      modelOutput = await generateModelText(
+      const generated = await generateModelText(
         { model, prompt: user, systemInstruction: system, translationMode },
         apiKeys,
       );
+      modelOutput = generated.text;
+      usage = generated.usage;
+      thinkingLevel = generated.thinkingLevel;
     } catch (error) {
       console.error(`[translation] ${provider.name} call failed`, error);
       throw toTranslationError(error);
@@ -310,8 +333,20 @@ export async function translateSubtitle({
       );
     }
 
-    return { content: rebuilt, unmatchedBlocks: unmatched, unmatchedIndices };
+    return {
+      content: rebuilt,
+      unmatchedBlocks: unmatched,
+      unmatchedIndices,
+      usage,
+      thinkingLevel,
+    };
   }
+
+  // Strict mode can make many calls for one chunk (retries, then a per-block
+  // split), and the caller stores one row per chunk. Summing them here is what
+  // keeps that row honest about what the chunk actually cost.
+  let strictUsage = ZERO_USAGE;
+  let strictThinking: string | null = null;
 
   // Strict path (opt-in via TRANSLATION_STRICT_MODE): validate the output,
   // retry with backoff, and re-translate block-by-block on a count mismatch.
@@ -322,11 +357,13 @@ export async function translateSubtitle({
     let lastError: unknown;
     for (let attempt = 1; attempt <= RETRY.MAX_ATTEMPTS; attempt++) {
       try {
-        const translatedContent = await generateModelText(
+        const generated = await generateModelText(
           { model, prompt: user, systemInstruction: system, translationMode },
           apiKeys,
         );
-        return validateTranslatedSrt(content, translatedContent);
+        strictUsage = addUsage(strictUsage, generated.usage);
+        strictThinking = generated.thinkingLevel;
+        return validateTranslatedSrt(content, generated.text);
       } catch (error) {
         lastError = error;
         console.error(
@@ -375,7 +412,13 @@ export async function translateSubtitle({
     const content = await translateContentStrict(subtitleContent);
     // Strict mode validates every block matches or throws, so there is never
     // a partial fallback to report.
-    return { content, unmatchedBlocks: 0, unmatchedIndices: [] };
+    return {
+      content,
+      unmatchedBlocks: 0,
+      unmatchedIndices: [],
+      usage: strictUsage,
+      thinkingLevel: strictThinking,
+    };
   }
   return translateOnce(subtitleContent);
 }

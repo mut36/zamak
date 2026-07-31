@@ -5,6 +5,47 @@
 import { resolveTargetLang, TARGET_LANGS } from './languages';
 
 /**
+ * Build version, shown in the footer. Kept here rather than in page.tsx so the
+ * one hardcoded copy sits next to every other constant — a test pins it to
+ * package.json.
+ */
+export const APP_VERSION = '0.25.0';
+
+/**
+ * How long a finished translation stays downloadable. The beta ships without
+ * automatic cleanup, so this is what the UI promises and what the history
+ * screen enforces by disabling the button — not what a cron job deletes.
+ */
+export const RESULT_RETENTION_DAYS = 30;
+
+/**
+ * Version of the copyright notice the user agrees to before their first
+ * translation. Bump this when the wording changes materially and everyone is
+ * asked again — an agreement to old wording is not an agreement to new wording.
+ */
+export const COPYRIGHT_NOTICE_VERSION = '2026-07-29';
+
+/**
+ * Funnel steps worth their own beta_events row (0009_beta_metrics.sql) —
+ * only what translation_jobs cannot already answer. Anything derivable from
+ * a finished job (format, model, block count) is deliberately not here; a
+ * second, weaker copy of a fact we already have is how counts start
+ * disagreeing with each other.
+ */
+export const BETA_EVENTS = [
+  /** Upload rejected before it ever became a job — detail: { reason, format }. */
+  'upload_rejected',
+  /** "번역 시작" pressed on the settings screen — detail: { contentType, model, glossaryEnabled, targetLang }. */
+  'settings_confirmed',
+  /** A download button clicked on the done screen — detail: { extension }. */
+  'download_clicked',
+  /** The credit-exhausted screen was shown — detail: { kind }. */
+  'credits_exhausted_shown',
+] as const;
+
+export type BetaEvent = (typeof BETA_EVENTS)[number];
+
+/**
  * SRT chunking & concurrency — the two knobs for parallel translation, split
  * per tier. Set a very large chunk size to force a single request (no
  * chunking). All four overridable via env for quick tuning.

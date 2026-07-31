@@ -54,25 +54,21 @@ interface EnrichApiResponse {
  */
 export function useEnrich() {
   const [status, setStatus] = useState<EnrichStatus>('idle');
-  const [director, setDirector] = useState('');
   const [error, setError] = useState('');
   const [candidates, setCandidates] = useState<EnrichCandidate[]>([]);
 
   const applyResponse = useCallback(
     (data: EnrichApiResponse): EnrichResult | null => {
       if (data.status === 'found' && data.enrichment) {
-        setDirector(data.enrichment.director ?? '');
         setCandidates([]);
         setStatus('found');
         return data.enrichment;
       }
       if (data.status === 'ambiguous') {
-        setDirector('');
         setCandidates(data.candidates ?? []);
         setStatus('ambiguous');
         return null;
       }
-      setDirector('');
       setCandidates([]);
       setStatus('notFound');
       return null;
@@ -102,7 +98,6 @@ export function useEnrich() {
         const data = (await res.json()) as EnrichApiResponse;
         return applyResponse(data);
       } catch (err) {
-        setDirector('');
         setCandidates([]);
         setError(err instanceof Error ? err.message : 'Enrichment failed');
         setStatus('notFound');
@@ -117,7 +112,6 @@ export function useEnrich() {
       setError('');
       setCandidates([]);
       if (!title.trim()) {
-        setDirector('');
         setStatus('notFound');
         return null;
       }
@@ -134,10 +128,9 @@ export function useEnrich() {
 
   const reset = useCallback(() => {
     setStatus('idle');
-    setDirector('');
     setError('');
     setCandidates([]);
   }, []);
 
-  return { status, director, error, candidates, enrich, selectCandidate, reset };
+  return { status, error, candidates, enrich, selectCandidate, reset };
 }

@@ -67,8 +67,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#FAF8F4' },
-    { media: '(prefers-color-scheme: dark)', color: '#FAF8F4' },
+    { media: '(prefers-color-scheme: light)', color: '#f5f5f7' },
+    { media: '(prefers-color-scheme: dark)', color: '#f5f5f7' },
   ],
   colorScheme: 'light',
 };
@@ -79,7 +79,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang='ko'>
+    // The font variable must land on <html>, not <body>: `--mono` is declared
+    // in `:root` and references it, and a custom property that references an
+    // undefined one computes to guaranteed-invalid *there* — descendants then
+    // inherit that emptiness, so every mono surface silently fell back to the
+    // body sans.
+    <html lang='ko' className={jetbrainsMono.variable}>
       <head>
         {/* Pretendard (dynamic-subset) — body/UI typeface */}
         <link
@@ -87,7 +92,7 @@ export default function RootLayout({
           href='https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css'
         />
       </head>
-      <body className={`${jetbrainsMono.variable} antialiased`}>
+      <body className='antialiased'>
         <ErrorBoundary>{children}</ErrorBoundary>
       </body>
     </html>

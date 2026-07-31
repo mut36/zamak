@@ -3,7 +3,7 @@ import 'server-only';
 import { GoogleGenAI, FinishReason, ThinkingLevel } from '@google/genai';
 import { thinkingLevelForModel } from '../../config/constants';
 import { TranslationError } from '../translationErrors';
-import type { ModelProvider } from './types';
+import type { ModelProvider, TokenUsage } from './types';
 
 const defaultClient = process.env.GOOGLE_GENAI_API_KEY
   ? new GoogleGenAI({ apiKey: process.env.GOOGLE_GENAI_API_KEY })
@@ -38,11 +38,18 @@ export const geminiProvider: ModelProvider = {
     });
 
     // thoughts are billed at the output rate and spent once per request, so
-    // they drive the per-chunk cost that decides chunk size. Log them.
-    const usage = response.usageMetadata;
-    const cached = usage?.cachedContentTokenCount ?? 0;
+    // they drive the per-chunk cost that decides chunk size. Logged here and
+    // returned to the caller, which stores it per call — the tuning docs used
+    // to be built by reading these lines out of a terminal by hand.
+    const raw = response.usageMetadata;
+    const usage: TokenUsage = {
+      prompt: raw?.promptTokenCount ?? 0,
+      cached: raw?.cachedContentTokenCount ?? 0,
+      thoughts: raw?.thoughtsTokenCount ?? 0,
+      output: raw?.candidatesTokenCount ?? 0,
+    };
     console.log(
-      `[gemini] model=${model} thinking=${thinking} prompt=${usage?.promptTokenCount} cached=${cached} thoughts=${usage?.thoughtsTokenCount ?? 0} output=${usage?.candidatesTokenCount}`,
+      `[gemini] model=${model} thinking=${thinking} prompt=${usage.prompt} cached=${usage.cached} thoughts=${usage.thoughts} output=${usage.output}`,
     );
 
     const candidate = response.candidates?.[0];
@@ -61,6 +68,6 @@ export const geminiProvider: ModelProvider = {
       );
     }
 
-    return response.text ?? '';
+    return { text: response.text ?? '', usage, thinkingLevel: thinking };
   },
 };

@@ -2,57 +2,169 @@
 
 /* ============================================================
    ZAMAK Design Tokens
-   Source of truth: design_handoff_zamak_redesign
-   Default theme = "Simple" (warm green). The "Pro" workspace
-   theme (cool blue) swaps only the accent + ink hue via
-   [data-theme='pro'] so both share one primitive layer.
+   Source of truth: design_handoff_zamak_brand
+   Black + yellow-point brand (square chip logo, square checks). No blue.
    ============================================================ */
 :root {
-  --bg: oklch(0.987 0.006 84);
+  /* ── Surfaces ───────────────────────────────────────────── */
+  --bg: #f5f5f7;
   --surface: #ffffff;
-  --surface-2: oklch(0.975 0.008 84);
-  --border: oklch(0.925 0.008 80);
-  --border-strong: oklch(0.87 0.012 78);
-  --ink: oklch(0.26 0.013 68);
-  --ink-2: oklch(0.49 0.013 68);
-  --ink-3: oklch(0.64 0.011 70);
-  --accent: oklch(0.57 0.115 162);
-  --accent-press: oklch(0.5 0.115 162);
-  --accent-soft: oklch(0.955 0.035 162);
-  --accent-line: oklch(0.86 0.06 162);
-  /* raw accent lightness/chroma/hue for shadow composition */
-  --accent-rgbish: 0.57 0.115 162;
+  --surface-hover: #fbfbfd;
 
-  --radius: 18px;
-  --radius-sm: 12px;
+  /* ── Text ───────────────────────────────────────────────────
+     `--ink` is body text; `--ink-strong` is the brand black used for the
+     logo chip, primary buttons, the progress bar and links. They are close
+     but not interchangeable — do not collapse them. */
+  --ink: #1d1d1f;
+  --ink-strong: #161614;
+  --ink-strong-hover: #2e2e2b;
+  --text-nav: #424245;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #86868b;
+  --text-quaternary: #a1a1a6;
+  /* Not in the handoff: the "locked, not broken" fill for disabled primary
+     buttons (see CopyrightModal / WorkPickStep). */
+  --ink-disabled: #c7c7cc;
+  --on-ink: #faf9f5;
+  /* Landing only: the subtitle preview "screen". Reads as video, so it sits
+     one step darker than the brand black (design_handoff_zamak_landing). */
+  --ink-deep: #101012;
 
-  --shadow:
-    0 1px 2px oklch(0.4 0.02 80 / 0.04), 0 12px 32px oklch(0.45 0.03 80 / 0.06);
-  --shadow-lg:
-    0 2px 4px oklch(0.4 0.02 80 / 0.04), 0 18px 48px oklch(0.45 0.03 80 / 0.09);
+  /* ── Accent ─────────────────────────────────────────────────
+     `--accent` is the handoff's brand yellow. The -soft/-line/-wash/-badge
+     derivatives are ours: alpha steps needed for focus rings, hover borders,
+     tinted bands and the "고급" badge. */
+  --accent: #ffd400;
+  --accent-soft: rgba(255, 212, 0, 0.45);
+  --accent-line: rgba(214, 176, 20, 0.6);
+  --accent-wash: rgba(255, 212, 0, 0.08);
+  --accent-badge: rgba(255, 212, 0, 0.55);
+  /* Landing's "ZAMAK 선택" result card — a hair lighter than --accent-wash and
+     paired with a near-solid border. The landing handoff specifies both. */
+  --accent-tint: rgba(255, 212, 0, 0.07);
+  --accent-border: rgba(255, 212, 0, 0.8);
+
+  /* ── Status ─────────────────────────────────────────────── */
+  --success: #34c759;
+  --danger: #ff3b30;
+  --star: #f5a623;
+
+  /* Landing verdict tags (비교 섹션). Tinted fill + darkened text so 12px
+     labels stay legible — the raw --success/--danger hexes do not pass at
+     that size on a white card. */
+  --tag-red-bg: rgba(255, 59, 48, 0.1);
+  --tag-red-fg: #c0362c;
+  --tag-orange-bg: rgba(255, 149, 0, 0.12);
+  --tag-orange-fg: #9a6200;
+  --tag-green-bg: rgba(52, 199, 89, 0.13);
+  --tag-green-fg: #1d7a3a;
+  --tag-neutral-bg: rgba(0, 0, 0, 0.06);
+  --tag-neutral-fg: #424245;
+
+  /* ── Lines & fills ──────────────────────────────────────────
+     Four distinct border weights, one per role. Picking by role (not by
+     "looks about right") is what keeps dividers from reading as chrome. */
+  --border-subtle: rgba(0, 0, 0, 0.05); /* dividers, nav underline */
+  --border-chip: rgba(0, 0, 0, 0.07); /* cards, chips, badges */
+  --border-card: rgba(0, 0, 0, 0.1); /* selection cards, resting state */
+  --border-input: rgba(0, 0, 0, 0.12); /* input, textarea */
+  --border-step: rgba(0, 0, 0, 0.14); /* stepper rules, checks, toggles */
+  --fill-hover: rgba(0, 0, 0, 0.05);
+  --fill-hover-strong: rgba(0, 0, 0, 0.09);
+  --track: rgba(0, 0, 0, 0.06);
+  /* Dividers *inside* dark areas (landing hero card, speed timeline). */
+  --border-on-dark: rgba(255, 255, 255, 0.08);
+  --border-on-dark-strong: rgba(255, 255, 255, 0.09);
+  /* Segment-control track. Two values because the control sits on both
+     surfaces: white (비교) and canvas (CPS) — one grey cannot serve both. */
+  --segment-track: var(--bg);
+  --segment-track-on-canvas: #e9e9ec;
+  --scrim: rgba(0, 0, 0, 0.4);
+  --placeholder-stripe: repeating-linear-gradient(
+    45deg,
+    #e8e8ed,
+    #e8e8ed 6px,
+    #f2f2f5 6px,
+    #f2f2f5 12px
+  );
+
+  /* ── Radius ─────────────────────────────────────────────────
+     `--r-chip: 1px` is deliberate: the brand chip is square-ish, not rounded.
+     Circles are reserved for toggles, avatars, dots and the progress bar. */
+  --r-chip: 1px;
+  --r-check: 5px;
+  --r-poster: 8px;
+  --r-btn: 10px;
+  --r-input: 12px;
+  --r-card: 18px;
+  --r-modal: 22px;
+  --r-drop: 24px;
+  --r-pill: 999px;
+
+  /* ── Elevation ──────────────────────────────────────────── */
+  --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.03), 0 4px 16px rgba(0, 0, 0, 0.04);
+  --shadow-drop: 0 1px 1px rgba(0, 0, 0, 0.03), 0 8px 30px rgba(0, 0, 0, 0.05);
+  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-drop-hover: 0 1px 1px rgba(0, 0, 0, 0.03),
+    0 14px 44px rgba(0, 0, 0, 0.09);
+  --shadow-accent: 0 8px 28px rgba(255, 212, 0, 0.25);
+  --shadow-knob: 0 3px 8px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.16);
+  --shadow-modal: 0 24px 80px rgba(0, 0, 0, 0.25);
+  /* Landing: the hero demo lifts off the page (marketing hero), the CPS card
+     barely does, and the active segment button is a 1px lift only. */
+  --shadow-hero: 0 2px 2px rgba(0, 0, 0, 0.06), 0 24px 70px rgba(0, 0, 0, 0.18);
+  --shadow-cps: 0 1px 1px rgba(0, 0, 0, 0.03), 0 10px 36px rgba(0, 0, 0, 0.06);
+  --shadow-segment: 0 1px 4px rgba(0, 0, 0, 0.12);
+  /* Subtitle text burned over the dark preview, as on a real video. */
+  --shadow-subtitle: 0 1px 3px rgba(0, 0, 0, 0.6);
+  /* Paired with border-color: var(--ink-strong) on the focused field. */
+  --focus-ring: 0 0 0 3.5px rgba(255, 212, 0, 0.45);
+
+  /* ── Materials ──────────────────────────────────────────────
+     Glass is a pair: a translucent tint plus a blur/saturate filter. Both
+     are tokens so `prefers-reduced-transparency` can swap them together. */
+  --glass-nav: rgba(245, 245, 247, 0.72);
+  --glass-nav-filter: blur(20px) saturate(180%);
+  --glass-modal: rgba(255, 255, 255, 0.92);
+  --glass-modal-filter: blur(30px) saturate(180%);
+
+  /* ── Motion ─────────────────────────────────────────────── */
+  --ease-apple: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ── Type ───────────────────────────────────────────────────
+     The scale's sizes live here so the component layer below can reach them
+     as plain `var(--fs-*)`. `@theme` re-exports each step as a Tailwind
+     utility (`text-h1`) that also carries the step's weight, tracking and
+     leading — use the utility in TSX, the var in hand-written CSS whose
+     weight/tracking intentionally departs from the step (e.g. `.head h2`).
+     `micro` is ours, not the handoff's: the mono captions in the poster
+     placeholder and the SRT terminal sit below the scale's 11px floor. */
+  --fs-display: 48px;
+  --fs-h1: 40px;
+  --fs-h1-sm: 34px;
+  --fs-h1-mini: 28px;
+  --fs-h2: 22px;
+  --fs-stat: 34px;
+  --fs-lead: 19px;
+  --fs-body-lg: 17px;
+  /* The handoff gives card titles a 16–17px range; 16 is the value the
+     prototype actually renders, and it doubles as the primary-button size
+     (16px/500) — picking 17 inflated every button by a pixel. */
+  --fs-card-title: 16px;
+  --fs-title-sm: 15px;
+  --fs-body: 14.5px;
+  --fs-caption: 13px;
+  --fs-caption-sm: 12.5px;
+  --fs-label: 12px;
+  --fs-fineprint: 12px;
+  --fs-mono-step: 11px;
+  --fs-mono-file: 12.5px;
+  --fs-micro: 10px;
 
   --mono: var(--font-jetbrains-mono), ui-monospace, 'SFMono-Regular', monospace;
   --sans:
-    'Pretendard Variable', 'Pretendard', var(--font-jetbrains-mono), system-ui,
-    sans-serif;
-}
-
-/* Pro workspace theme — cool blue. Applied via <html data-theme="pro">. */
-[data-theme='pro'] {
-  --bg: oklch(0.984 0.003 255);
-  --surface-2: oklch(0.975 0.004 255);
-  --border: oklch(0.918 0.006 255);
-  --border-strong: oklch(0.86 0.01 255);
-  --ink: oklch(0.24 0.02 258);
-  --ink-2: oklch(0.46 0.02 258);
-  --ink-3: oklch(0.62 0.015 258);
-  --accent: oklch(0.55 0.17 256);
-  --accent-press: oklch(0.48 0.17 256);
-  --accent-soft: oklch(0.955 0.03 256);
-  --accent-line: oklch(0.84 0.07 256);
-  --accent-rgbish: 0.55 0.17 256;
-  --radius: 12px;
-  --radius-sm: 8px;
+    'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont,
+    system-ui, sans-serif;
 }
 
 /* Expose tokens to Tailwind utilities (bg-surface, text-ink, border-border …).
@@ -60,22 +172,141 @@
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-border: var(--border);
-  --color-border-strong: var(--border-strong);
+  --color-surface-hover: var(--surface-hover);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-chip: var(--border-chip);
+  --color-border-card: var(--border-card);
+  --color-border-input: var(--border-input);
+  --color-border-step: var(--border-step);
   --color-ink: var(--ink);
-  --color-ink-2: var(--ink-2);
-  --color-ink-3: var(--ink-3);
+  --color-ink-strong: var(--ink-strong);
+  --color-ink-disabled: var(--ink-disabled);
+  --color-on-ink: var(--on-ink);
+  /* `text-secondary` / `text-tertiary` read naturally as text utilities; they
+     are greys, so avoid them as `bg-*` even though Tailwind will emit those. */
+  --color-nav: var(--text-nav);
+  --color-secondary: var(--text-secondary);
+  --color-tertiary: var(--text-tertiary);
+  --color-quaternary: var(--text-quaternary);
   --color-accent: var(--accent);
-  --color-accent-press: var(--accent-press);
   --color-accent-soft: var(--accent-soft);
   --color-accent-line: var(--accent-line);
+  --color-accent-wash: var(--accent-wash);
+  --color-accent-badge: var(--accent-badge);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-track: var(--track);
+  --color-scrim: var(--scrim);
+  --color-fill-hover: var(--fill-hover);
+  --color-fill-hover-strong: var(--fill-hover-strong);
 
   --font-sans: var(--sans);
   --font-mono: var(--mono);
 
-  --radius-card: var(--radius);
-  --radius-sm: var(--radius-sm);
+  --radius-chip: var(--r-chip);
+  --radius-check: var(--r-check);
+  --radius-poster: var(--r-poster);
+  --radius-btn: var(--r-btn);
+  --radius-input: var(--r-input);
+  --radius-card: var(--r-card);
+  --radius-modal: var(--r-modal);
+  --radius-drop: var(--r-drop);
+  --radius-pill: var(--r-pill);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-drop: var(--shadow-drop);
+  --shadow-hover: var(--shadow-hover);
+  --shadow-drop-hover: var(--shadow-drop-hover);
+  --shadow-accent: var(--shadow-accent);
+  --shadow-modal: var(--shadow-modal);
+
+  --ease-apple: var(--ease-apple);
+
+  /* ── Type scale ─────────────────────────────────────────────
+     One utility per step, carrying size + tracking + leading, so a heading is
+     `text-h1` rather than three hand-tuned arbitrary values.
+
+     Weight is carried ONLY where the step is not 400. A utility that sets
+     font-weight outranks the component layer, so baking the default in would
+     silently strip weight from anything it lands on: `text-caption` on `.btn`
+     dropped it from 500 to 400, and `text-mono-step`/`text-caption` on
+     `.zchip` cost the brand chip its 600. Since 400 is the initial value, the
+     token bought nothing and broke that. The mono/micro steps carry no weight
+     at all — the handoff specifies none for them.
+     `micro` is ours, not the handoff's: the mono captions inside the poster
+     placeholder and the SRT terminal sit below the scale's 11px floor. */
+  --text-display: var(--fs-display);
+  --text-display--font-weight: 700;
+  --text-display--letter-spacing: -0.015em;
+  --text-display--line-height: 1.12;
+
+  --text-h1: var(--fs-h1);
+  --text-h1--font-weight: 700;
+  --text-h1--letter-spacing: -0.015em;
+  --text-h1--line-height: 1.08;
+
+  --text-h1-sm: var(--fs-h1-sm);
+  --text-h1-sm--font-weight: 700;
+  --text-h1-sm--letter-spacing: -0.015em;
+  --text-h1-sm--line-height: 1.12;
+
+  --text-h1-mini: var(--fs-h1-mini);
+  --text-h1-mini--font-weight: 700;
+  --text-h1-mini--letter-spacing: -0.015em;
+  --text-h1-mini--line-height: 1.15;
+
+  --text-h2: var(--fs-h2);
+  --text-h2--font-weight: 700;
+  --text-h2--letter-spacing: -0.015em;
+  --text-h2--line-height: 1.25;
+
+  --text-stat: var(--fs-stat);
+  --text-stat--font-weight: 600;
+  --text-stat--letter-spacing: -0.01em;
+  --text-stat--line-height: 1.1;
+
+  --text-lead: var(--fs-lead);
+  --text-lead--line-height: 1.5;
+
+  --text-body-lg: var(--fs-body-lg);
+  --text-body-lg--line-height: 1.47;
+
+  --text-card-title: var(--fs-card-title);
+  --text-card-title--font-weight: 600;
+  --text-card-title--letter-spacing: -0.01em;
+  --text-card-title--line-height: 1.35;
+
+  --text-title-sm: var(--fs-title-sm);
+  --text-title-sm--font-weight: 600;
+  --text-title-sm--letter-spacing: -0.01em;
+  --text-title-sm--line-height: 1.4;
+
+  --text-body: var(--fs-body);
+  --text-body--line-height: 1.5;
+
+  --text-caption: var(--fs-caption);
+  --text-caption--line-height: 1.45;
+
+  --text-caption-sm: var(--fs-caption-sm);
+  --text-caption-sm--line-height: 1.4;
+
+  --text-label: var(--fs-label);
+  --text-label--font-weight: 600;
+  --text-label--letter-spacing: 0.05em;
+  --text-label--line-height: 1.3;
+
+  --text-fineprint: var(--fs-fineprint);
+  --text-fineprint--line-height: 1.5;
+
+  --text-mono-step: var(--fs-mono-step);
+  --text-mono-step--letter-spacing: 0.06em;
+  --text-mono-step--line-height: 1.2;
+
+  --text-mono-file: var(--fs-mono-file);
+  --text-mono-file--line-height: 1.4;
+
+  --text-micro: var(--fs-micro);
+  --text-micro--line-height: 1.3;
 }
 
 /* ============================================================
@@ -84,7 +315,7 @@
 body {
   font-family: var(--sans);
   background: var(--bg);
-  color: var(--ink);
+  color: var(--ink-strong);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   /* Arrow cursor over static text everywhere; editable fields opt back in below */
@@ -114,30 +345,119 @@ button:disabled {
    Tailwind utilities compose on top for layout/spacing.
    ============================================================ */
 @layer components {
-  /* Brand mark — two overlapping rounded diamonds ("alloy" motif) */
-  .mark {
-    position: relative;
-    width: 30px;
-    height: 30px;
+  /* Brand chip — black square-ish chip + wordmark + yellow point.
+     Shared by BrandMark, AppNav and the step breadcrumb's active chip. */
+  .zchip {
+    display: inline-flex;
+    align-items: center;
+    background: var(--ink-strong);
+    color: var(--on-ink);
+    font-family: var(--mono);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    border-radius: var(--r-chip);
+    white-space: nowrap;
+  }
+  .zchip-dot {
+    display: inline-block;
+    border-radius: var(--r-pill);
+    background: var(--accent);
     flex: none;
   }
-  .mark i {
-    position: absolute;
-    inset: 0;
-    border-radius: 5px;
+
+  /* Glass surfaces — nav/action bars and the modal. Kept as classes rather
+     than Tailwind utility stacks so `prefers-reduced-transparency` (bottom of
+     file) can swap tint and filter together in one place. */
+  .glass-nav {
+    background: var(--glass-nav);
+    backdrop-filter: var(--glass-nav-filter);
+    -webkit-backdrop-filter: var(--glass-nav-filter);
+  }
+  .glass-modal {
+    background: var(--glass-modal);
+    backdrop-filter: var(--glass-modal-filter);
+    -webkit-backdrop-filter: var(--glass-modal-filter);
+  }
+
+  /* Square check/radio mark — brand's radio/checkbox motif (5–6px round
+     square, never a circle). Filled state: yellow + dark check glyph. */
+  .zcheck {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    box-sizing: border-box;
+    border-radius: var(--r-check);
+    /* Heavier than any of the border tokens on purpose — the prototype gives
+       the check mark its own 0.22 outline so an unchecked box still reads as
+       an affordance rather than a hairline. */
+    border: 1.5px solid rgba(0, 0, 0, 0.22);
+    background: var(--surface);
+    color: var(--ink-strong);
+    transition:
+      background 0.2s,
+      border-color 0.2s;
+  }
+  .zcheck.on {
+    border-color: var(--accent);
     background: var(--accent);
-    transform: rotate(45deg) scale(0.64);
   }
-  .mark i:last-child {
-    background: var(--ink);
-    opacity: 0.88;
-    transform: rotate(45deg) scale(0.64) translate(4px, 4px);
-    mix-blend-mode: multiply;
+
+  /* iOS-style toggle — the one circular exception besides avatars, the
+     progress bar and decorative dots (see design_handoff_zamak_brand). */
+  .ztoggle {
+    position: relative;
+    width: 51px;
+    height: 31px;
+    flex: none;
+    border-radius: var(--r-pill);
+    background: var(--border-step);
+    cursor: pointer;
+    transition: background 0.3s;
   }
-  .wordmark {
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: var(--ink);
+  .ztoggle.on {
+    background: var(--ink-strong);
+  }
+  .ztoggle-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 27px;
+    height: 27px;
+    border-radius: var(--r-pill);
+    background: #fff;
+    box-shadow: var(--shadow-knob);
+    transition: left 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+  }
+  .ztoggle.on .ztoggle-knob {
+    left: 22px;
+  }
+
+  /* Step breadcrumb — mono label row above every step screen's H1. */
+  .zsteps {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: var(--fs-mono-step);
+    letter-spacing: 0.06em;
+  }
+  .zstep-done {
+    color: var(--text-secondary);
+  }
+  .zstep-done b {
+    color: var(--success);
+    font-weight: 700;
+  }
+  .zstep-future {
+    color: var(--text-quaternary);
+  }
+  .zstep-sep {
+    width: 18px;
+    height: 1px;
+    background: var(--border-step);
+    flex: none;
   }
 
   /* Language pill (top bar) */
@@ -145,13 +465,13 @@ button:disabled {
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-chip);
     background: var(--surface);
-    border-radius: 999px;
+    border-radius: var(--r-pill);
     padding: 7px 14px;
-    font-size: 13px;
+    font-size: var(--fs-caption);
     font-weight: 600;
-    color: var(--ink-2);
+    color: var(--text-nav);
     cursor: default;
   }
 
@@ -166,13 +486,13 @@ button:disabled {
     width: 30px;
     height: 30px;
     border-radius: 50%;
-    border: 2px solid var(--border-strong);
+    border: 2px solid var(--border-step);
     background: var(--surface);
     display: grid;
     place-items: center;
-    font-size: 13px;
+    font-size: var(--fs-caption);
     font-weight: 700;
-    color: var(--ink-3);
+    color: var(--text-secondary);
     transition: 0.2s;
   }
   .step.active .dot {
@@ -182,25 +502,28 @@ button:disabled {
     color: #fff;
     box-shadow: 0 0 0 5px var(--accent-soft);
   }
-  /* Repeating light ripple radiating out from the active dot */
+  /* Repeating light ripple radiating out from the active dot.
+     --accent-soft is already the accent hex at 0.45 alpha (rgba(255,216,77,0.45))
+     so it doubles as the ripple's start color; the fade-out target reuses the
+     same hue at 0 alpha rather than a deleted --accent-rgbish component var. */
   .step.active .dot::after {
     content: '';
     position: absolute;
     inset: -2px;
     border-radius: 50%;
-    box-shadow: 0 0 0 0 oklch(var(--accent-rgbish) / 0.45);
+    box-shadow: 0 0 0 0 var(--accent-soft);
     animation: dot-ripple 2s ease-out infinite;
     pointer-events: none;
   }
   @keyframes dot-ripple {
     0% {
-      box-shadow: 0 0 0 0 oklch(var(--accent-rgbish) / 0.45);
+      box-shadow: 0 0 0 0 var(--accent-soft);
     }
     70% {
-      box-shadow: 0 0 0 14px oklch(var(--accent-rgbish) / 0);
+      box-shadow: 0 0 0 14px rgba(255, 216, 77, 0);
     }
     100% {
-      box-shadow: 0 0 0 0 oklch(var(--accent-rgbish) / 0);
+      box-shadow: 0 0 0 0 rgba(255, 216, 77, 0);
     }
   }
   .step.done .dot {
@@ -209,20 +532,20 @@ button:disabled {
     color: #fff;
   }
   .step .lbl {
-    font-size: 13px;
+    font-size: var(--fs-caption);
     font-weight: 600;
-    color: var(--ink-3);
+    color: var(--text-secondary);
   }
   .step.active .lbl {
-    color: var(--ink);
+    color: var(--ink-strong);
   }
   .step.done .lbl {
-    color: var(--ink-2);
+    color: var(--text-nav);
   }
   .step-line {
     flex: 1;
     height: 2px;
-    background: var(--border);
+    background: var(--border-chip);
     margin: 0 12px;
     border-radius: 2px;
   }
@@ -232,102 +555,111 @@ button:disabled {
 
   /* Headline */
   .head h1 {
-    font-size: 27px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
+    font-size: var(--fs-h1);
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.08;
     margin: 0 0 8px;
-    color: var(--ink);
+    color: var(--ink-strong);
   }
   /* Section sub-headings on the landing page */
   .head h2 {
-    font-size: 22px;
+    font-size: var(--fs-h2);
     font-weight: 800;
     letter-spacing: -0.025em;
     margin: 0 0 8px;
-    color: var(--ink);
+    color: var(--ink-strong);
   }
   .head p {
-    font-size: 15px;
-    color: var(--ink-2);
+    font-size: var(--fs-body-lg);
+    color: var(--text-secondary);
     margin: 0;
-    line-height: 1.55;
+    line-height: 1.47;
   }
 
   /* Card */
   .card {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
+    border: 1px solid var(--border-chip);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-card);
   }
 
   /* Dropzone */
   .drop {
-    border: 2px dashed var(--border-strong);
-    border-radius: var(--radius);
+    border: 2px dashed var(--border-step);
+    border-radius: var(--r-drop);
     background: var(--surface);
+    box-shadow: var(--shadow-drop);
     padding: 48px 28px;
     text-align: center;
-    transition: 0.18s;
+    transition:
+      border-color 0.2s,
+      background 0.2s,
+      box-shadow 0.25s;
     cursor: default;
   }
   .drop:hover {
     border-color: var(--accent-line);
     background: var(--accent-soft);
+    box-shadow: var(--shadow-drop-hover);
   }
   .drop.over {
     border-color: var(--accent);
     background: var(--accent-soft);
   }
   .drop-ico {
-    width: 64px;
-    height: 64px;
-    border-radius: 18px;
-    background: var(--accent-soft);
+    width: 56px;
+    height: 56px;
     display: grid;
     place-items: center;
-    margin: 0 auto 20px;
+    margin: 0 auto 15px;
   }
   .drop-ico svg {
-    width: 30px;
-    height: 30px;
-    color: var(--accent);
+    width: 44px;
+    height: 44px;
+    color: inherit;
   }
   .drop h3 {
-    font-size: 19px;
+    font-size: var(--fs-lead);
     font-weight: 700;
-    color: var(--ink);
+    color: var(--ink-strong);
     margin: 0 0 8px;
   }
   .drop p:not(.fmt) {
-    font-size: 14px;
-    color: var(--ink-2);
+    font-size: var(--fs-body);
+    color: var(--text-nav);
     margin: 0 0 22px;
   }
   .drop .btn-lg {
     margin-bottom: 12px;
   }
   .drop p.fmt {
-    font-size: 12.5px;
-    color: var(--ink-3);
+    font-size: var(--fs-caption-sm);
+    color: var(--text-secondary);
     margin: 0;
     padding-top: 2px;
   }
 
-  /* Buttons */
+  /* Buttons — 10px round-rect per brand (never pill). */
   .btn {
     border: 1px solid transparent;
-    border-radius: 13px;
-    font-weight: 700;
-    font-size: 15px;
+    border-radius: var(--r-btn);
+    font-weight: 500;
+    font-size: var(--fs-title-sm);
     padding: 13px 22px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 9px;
-    transition: 0.14s;
+    transition:
+      background 0.2s,
+      transform 0.15s ease-out;
     white-space: nowrap;
     flex-shrink: 0;
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.96);
   }
   .btn svg {
     width: 18px;
@@ -339,30 +671,28 @@ button:disabled {
     cursor: not-allowed;
   }
   .btn-primary {
-    background: var(--accent);
+    background: var(--ink-strong);
     color: #fff;
-    box-shadow: 0 2px 8px oklch(var(--accent-rgbish) / 0.28);
   }
   .btn-primary:not(:disabled):hover {
-    background: var(--accent-press);
+    background: var(--ink-strong-hover);
   }
   .btn-ghost {
-    background: var(--surface);
-    color: var(--ink);
-    border-color: var(--border-strong);
+    background: var(--fill-hover);
+    color: var(--ink-strong);
+    border-color: transparent;
   }
   .btn-ghost:not(:disabled):hover {
-    background: var(--surface-2);
+    background: var(--fill-hover-strong);
   }
   .btn-block {
     width: 100%;
     padding: 16px;
-    font-size: 16px;
-    border-radius: 14px;
+    font-size: var(--fs-card-title);
   }
   .btn-lg {
     padding: 15px 26px;
-    font-size: 16px;
+    font-size: var(--fs-card-title);
   }
 
   /* Target-language picker */
@@ -370,11 +700,13 @@ button:disabled {
     padding: 22px;
   }
   .qlabel {
-    font-size: 14px;
-    font-weight: 700;
-    margin: 0 0 14px;
-    text-align: center;
-    color: var(--ink);
+    font-size: var(--fs-label);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    /* 28px above / 10px below — the handoff's section-label rhythm. */
+    margin: 28px 0 10px;
+    text-align: left;
+    color: var(--text-secondary);
   }
 
   /* Target-language row — chromeless "detected → target" flow, no card.
@@ -390,8 +722,8 @@ button:disabled {
   }
   .langflow-src {
     justify-self: end;
-    color: var(--ink-3);
-    font-size: 13.5px;
+    color: var(--text-secondary);
+    font-size: var(--fs-caption);
     font-weight: 600;
   }
   .langflow > .lselect {
@@ -400,7 +732,7 @@ button:disabled {
   .langflow-arrow {
     width: 16px;
     height: 16px;
-    color: var(--ink-3);
+    color: var(--text-secondary);
     flex: none;
   }
 
@@ -414,13 +746,13 @@ button:disabled {
     display: inline-flex;
     align-items: center;
     gap: 9px;
-    border: 1.5px solid var(--border-strong);
+    border: 1.5px solid var(--border-step);
     background: var(--surface);
-    border-radius: 999px;
+    border-radius: var(--r-pill);
     padding: 9px 14px 9px 11px;
-    font-size: 14.5px;
+    font-size: var(--fs-body);
     font-weight: 600;
-    color: var(--ink);
+    color: var(--ink-strong);
     cursor: pointer;
     transition: 0.13s;
   }
@@ -436,10 +768,10 @@ button:disabled {
   }
   .lselect-mono {
     font-family: var(--mono);
-    font-size: 11px;
+    font-size: var(--fs-mono-step);
     font-weight: 700;
-    color: var(--ink-3);
-    background: var(--surface-2);
+    color: var(--text-secondary);
+    background: var(--surface-hover);
     border-radius: 6px;
     padding: 3px 6px;
     letter-spacing: 0.02em;
@@ -448,7 +780,7 @@ button:disabled {
   .lselect-chev {
     width: 16px;
     height: 16px;
-    color: var(--ink-3);
+    color: var(--text-secondary);
     flex: none;
     transition: transform 0.16s ease;
   }
@@ -464,9 +796,9 @@ button:disabled {
     z-index: 20;
     min-width: 240px;
     background: var(--surface);
-    border: 1.5px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    box-shadow: var(--shadow-lg);
+    border: 1.5px solid var(--border-step);
+    border-radius: var(--r-input);
+    box-shadow: var(--shadow-hover);
     padding: 6px;
     max-height: 280px;
     overflow-y: auto;
@@ -479,14 +811,14 @@ button:disabled {
     gap: 10px;
     padding: 10px 10px;
     border-radius: 9px;
-    font-size: 14px;
+    font-size: var(--fs-body);
     font-weight: 600;
-    color: var(--ink-2);
+    color: var(--text-nav);
     transition: 0.1s;
     text-align: left;
   }
   .lselect-opt:not(:disabled):hover {
-    background: var(--surface-2);
+    background: var(--surface-hover);
   }
   .lselect-opt.on {
     background: var(--accent-soft);
@@ -508,10 +840,10 @@ button:disabled {
     margin-left: auto;
   }
   .lselect-soon {
-    font-size: 11px;
+    font-size: var(--fs-mono-step);
     font-weight: 700;
-    color: var(--ink-3);
-    background: var(--surface-2);
+    color: var(--text-secondary);
+    background: var(--surface-hover);
     border-radius: 6px;
     padding: 3px 7px;
     margin-left: auto;
@@ -524,8 +856,8 @@ button:disabled {
     justify-content: center;
     flex-wrap: wrap;
     gap: 8px;
-    font-size: 13.5px;
-    color: var(--ink-2);
+    font-size: var(--fs-caption);
+    color: var(--text-nav);
     margin-top: 20px;
     font-weight: 500;
   }
@@ -537,7 +869,8 @@ button:disabled {
     width: 3px;
     height: 3px;
     border-radius: 50%;
-    background: var(--border-strong);
+    background: var(--text-quaternary);
+    flex: none;
   }
 
   /* Content-type segmented control (movie vs other) */
@@ -547,13 +880,13 @@ button:disabled {
     gap: 9px;
   }
   .segbtn {
-    border: 1.5px solid var(--border-strong);
+    border: 1.5px solid var(--border-step);
     background: var(--surface);
     border-radius: 12px;
     padding: 14px 12px;
-    font-size: 14px;
+    font-size: var(--fs-body);
     font-weight: 600;
-    color: var(--ink-2);
+    color: var(--text-nav);
     transition: 0.12s;
     display: flex;
     align-items: center;
@@ -584,26 +917,20 @@ button:disabled {
     margin-bottom: 16px;
   }
   .poster {
-    width: 62px;
-    height: 88px;
-    border-radius: 10px;
+    width: 56px;
+    height: 80px;
+    border-radius: var(--r-poster);
     flex: none;
-    background: repeating-linear-gradient(
-      135deg,
-      var(--surface-2),
-      var(--surface-2) 7px,
-      oklch(0.94 0.01 80) 7px,
-      oklch(0.94 0.01 80) 14px
-    );
-    border: 1px solid var(--border);
+    background: var(--placeholder-stripe);
+    border: 1px solid var(--border-chip);
     display: grid;
     place-items: center;
     overflow: hidden;
   }
   .poster span {
     font-family: var(--mono);
-    font-size: 8.5px;
-    color: var(--ink-3);
+    font-size: var(--fs-micro);
+    color: var(--text-secondary);
     text-align: center;
     line-height: 1.3;
     padding: 4px;
@@ -614,26 +941,25 @@ button:disabled {
     object-fit: cover;
   }
   .dtitle {
-    font-size: 18px;
+    font-size: var(--fs-card-title);
     font-weight: 700;
     letter-spacing: -0.01em;
-    color: var(--ink);
+    color: var(--ink-strong);
   }
   .dmeta {
-    font-size: 13px;
-    color: var(--ink-2);
+    font-size: var(--fs-caption);
+    color: var(--text-nav);
     margin-top: 4px;
   }
+  /* Dot + mono-ish label, no pill chrome — echoes the brand's "확인 필요"
+     indicator (breathing yellow dot + muted caption), not a solid badge. */
   .dbadge {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    font-size: 11.5px;
+    gap: 6px;
+    font-size: var(--fs-fineprint);
     font-weight: 600;
-    color: var(--accent);
-    background: var(--accent-soft);
-    padding: 4px 10px;
-    border-radius: 999px;
+    color: var(--text-secondary);
     margin-top: 9px;
   }
   .dbadge-inline {
@@ -644,6 +970,18 @@ button:disabled {
     height: 5px;
     border-radius: 50%;
     background: var(--accent);
+    flex: none;
+  }
+  /* "고급" badge — solid yellow pill, dark text (design_handoff_zamak_brand). */
+  .dbadge-pro {
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--fs-fineprint);
+    font-weight: 600;
+    color: var(--ink-strong);
+    background: var(--accent-badge);
+    padding: 2px 8px;
+    border-radius: var(--r-btn);
   }
 
   /* Fields */
@@ -652,25 +990,27 @@ button:disabled {
   }
   .field label {
     display: block;
-    font-size: 13px;
+    font-size: var(--fs-caption);
     font-weight: 600;
-    color: var(--ink-2);
+    color: var(--text-nav);
     margin-bottom: 7px;
   }
   .input {
     width: 100%;
-    border: 1.5px solid var(--border-strong);
-    background: var(--surface);
-    border-radius: 12px;
+    border: 1px solid var(--border-input);
+    background: var(--surface-hover);
+    border-radius: var(--r-input);
     padding: 12px 14px;
-    font-size: 14.5px;
-    color: var(--ink);
-    transition: 0.13s;
+    font-size: var(--fs-body);
+    color: var(--text-nav);
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
   }
   .input:focus {
     outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 4px var(--accent-soft);
+    border-color: var(--ink-strong);
+    box-shadow: var(--focus-ring);
   }
   .input:disabled {
     opacity: 0.55;
@@ -689,8 +1029,8 @@ button:disabled {
 
   /* Advanced accordion (e.g. BYOK key field) */
   .adv {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-chip);
+    border-radius: var(--r-input);
     overflow: hidden;
     background: var(--surface);
   }
@@ -700,14 +1040,14 @@ button:disabled {
     justify-content: space-between;
     padding: 15px 18px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: var(--fs-body);
     font-weight: 600;
-    color: var(--ink);
+    color: var(--ink-strong);
   }
   .adv-h .chev {
     width: 16px;
     height: 16px;
-    color: var(--ink-3);
+    color: var(--text-secondary);
     transition: 0.2s;
     flex: none;
   }
@@ -716,102 +1056,58 @@ button:disabled {
   }
   .adv-body {
     padding: 4px 18px 20px;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--border-subtle);
   }
 
-  /* Progress ring */
-  .ring-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 18px 0 6px;
-  }
-  /* .pring (not .ring — avoids Tailwind's `ring` box-shadow utility) */
-  .pring {
-    position: relative;
-    width: 172px;
-    height: 172px;
-  }
-  .pring svg {
-    transform: rotate(-90deg);
-  }
-  .pring .pcttext {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-  }
-  .pring .pn {
-    font-size: 42px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    line-height: 1;
-    color: var(--ink);
-  }
-  .pring .pl {
-    font-size: 12px;
-    color: var(--ink-3);
-    margin-top: 3px;
-    font-weight: 600;
-  }
-  .pstatus {
-    font-size: 17px;
-    font-weight: 700;
-    margin-top: 24px;
-    text-align: center;
-    letter-spacing: -0.01em;
-    color: var(--ink);
-  }
+  /* Progress screen sub-line (recovery-sweep readout) */
   .psub {
-    font-size: 13.5px;
-    color: var(--ink-2);
+    font-size: var(--fs-caption);
+    color: var(--text-nav);
     margin-top: 7px;
     text-align: center;
   }
   .pline {
     margin-top: 24px;
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-chip);
     border-radius: 14px;
     padding: 16px 18px;
     width: 100%;
   }
   .pline .pl-k {
-    font-size: 11.5px;
+    font-size: var(--fs-fineprint);
     font-weight: 700;
-    color: var(--ink-3);
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     margin-bottom: 6px;
   }
   .pline .pl-o {
-    font-size: 13.5px;
-    color: var(--ink-3);
+    font-size: var(--fs-caption);
+    color: var(--text-secondary);
   }
   .pline .pl-t {
-    font-size: 15px;
-    color: var(--ink);
+    font-size: var(--fs-title-sm);
+    color: var(--ink-strong);
     font-weight: 600;
     margin-top: 4px;
     min-height: 22px;
   }
 
-  /* Done step */
+  /* Done / exhausted hero icon — 56px round-square (brand), background and
+     glyph color set per-screen via inline style (green check vs. neutral "0"). */
   .bigcheck {
-    width: 72px;
-    height: 72px;
-    border-radius: 50%;
-    background: var(--accent-soft);
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
     display: grid;
     place-items: center;
-    margin: 0 auto 20px;
+    margin: 0 auto 16px;
   }
   .bigcheck svg {
-    width: 34px;
-    height: 34px;
-    color: var(--accent);
+    width: 26px;
+    height: 26px;
+    color: #fff;
   }
   .dl-card {
     padding: 22px;
@@ -822,8 +1118,8 @@ button:disabled {
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
+    background: var(--surface-hover);
+    border: 1px solid var(--border-chip);
     border-radius: 12px;
     padding: 11px 16px;
     margin-bottom: 18px;
@@ -832,334 +1128,650 @@ button:disabled {
   .dl-file svg {
     width: 18px;
     height: 18px;
-    color: var(--accent);
+    color: var(--text-secondary);
     flex: none;
   }
   .dl-file .nm {
     font-family: var(--mono);
-    font-size: 12.5px;
+    font-size: var(--fs-caption-sm);
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .sumrow {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 16px;
-  }
-  .sum {
-    flex: 1;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 15px;
-    text-align: center;
-  }
-  .sum .v {
-    font-size: 21px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: var(--ink);
-  }
-  .sum .k {
-    font-size: 12px;
-    color: var(--ink-3);
-    margin-top: 4px;
   }
   .pvm {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    overflow: hidden;
-    margin-bottom: 18px;
+    border: 1px solid var(--border-chip);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-card);
+    padding: 24px 28px;
+    margin-bottom: 14px;
   }
   .pvm-h {
-    padding: 12px 18px;
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--ink-2);
-    border-bottom: 1px solid var(--border);
+    font-size: var(--fs-title-sm);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ink-strong);
+    margin-bottom: 16px;
   }
   .pvm-row {
-    padding: 12px 18px;
-    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+    margin-top: 14px;
   }
-  .pvm-row:last-child {
-    border-bottom: none;
+  .pvm-row:first-of-type {
+    margin-top: 0;
   }
-  .pvm-row .o {
-    font-size: 12.5px;
-    color: var(--ink-3);
+  .pvm-row .check {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    background: var(--success);
+    color: #fff;
+    font-size: var(--fs-micro);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    margin-top: 1px;
   }
   .pvm-row .t {
-    font-size: 14.5px;
-    color: var(--ink);
-    font-weight: 500;
-    margin-top: 3px;
+    font-size: var(--fs-body);
+    color: var(--text-nav);
+    font-weight: 400;
+    line-height: 1.5;
   }
 
-  /* ── Landing (Toss-like full-bleed chapters) ─────────────────
-     Anonymous `/` only. Wide rhythm, large type, one idea per band.
-     Signed-in wizard keeps the tighter .card / .head primitives. */
-  .landing {
-    width: 100%;
+  /* Feedback card (Done step) */
+  .feedback-stars {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 14px;
   }
-  .landing-inner {
-    width: 100%;
-    max-width: 980px;
-    margin-inline: auto;
-    padding-inline: 24px;
+  .star-btn {
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    font-size: var(--fs-h2);
+    line-height: 1;
+    color: var(--border-step);
+    transition:
+      transform 0.15s ease-out,
+      color 0.15s;
   }
-  .landing-inner-narrow {
-    max-width: 720px;
+  .star-btn:hover {
+    transform: scale(1.15);
   }
-  .landing-hero {
+  .star-btn:active {
+    transform: scale(0.92);
+  }
+  .star-btn .on {
+    color: var(--star);
+  }
+
+  /* ── Landing (design_handoff_zamak_landing) ──────────────────
+     Anonymous `/` only — a marketing page, not the wizard. Ported 1:1 from
+     the prototype's inline styles: sizes here are literal handoff values, not
+     the wizard's type scale, because the landing runs on its own clamp()-based
+     scale (H1 58px vs. the app's 40px). Layout/spacing composes on top in TSX.
+
+     Naming: `lp-` = landing page, to keep it from colliding with the wizard's
+     primitives (.card, .btn, .head) which stay untouched. */
+  .lp-nav {
+    position: sticky;
+    top: 0;
+    z-index: 40;
     display: flex;
     align-items: center;
-    justify-content: center;
-    min-height: min(88vh, 820px);
-    padding: 72px 0 88px;
+    justify-content: space-between;
+    height: 56px;
+    padding: 0 clamp(20px, 5vw, 48px);
+    border-bottom: 1px solid var(--track);
   }
-  .landing-hero-title {
-    margin: 0;
-    font-size: clamp(2.25rem, 5.2vw, 3.75rem);
-    font-weight: 800;
-    letter-spacing: -0.045em;
-    line-height: 1.18;
-    color: var(--ink);
-    white-space: pre-line;
-    text-wrap: balance;
+  .lp-navlink {
+    font-size: 13px;
+    color: var(--text-nav);
+    padding: 7px 13px;
+    border-radius: var(--r-btn);
+    transition: background 0.2s;
   }
-  .landing-hero-sub {
-    margin: 22px auto 0;
-    max-width: 34rem;
-    font-size: clamp(1.05rem, 1.6vw, 1.25rem);
-    line-height: 1.6;
-    color: var(--ink-2);
-    text-wrap: pretty;
+  .lp-navlink:hover {
+    background: var(--fill-hover);
+    opacity: 1;
   }
-  .landing-reassure {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px 8px;
-    list-style: none;
-    margin: 36px 0 0;
-    padding: 0;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--ink-3);
-  }
-  .landing-reassure li:not(:last-child)::after {
-    content: '·';
-    margin-left: 8px;
-    color: var(--ink-3);
-  }
-  .landing-band {
-    padding: 96px 0;
-  }
-  .landing-band-soft {
-    background: var(--surface-2);
-  }
-  .landing-band-accent {
-    background: var(--accent-soft);
-  }
-  .landing-chapter-head {
-    margin-bottom: 20px;
-  }
-  .landing-eyebrow {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin: 0 0 14px;
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    color: var(--accent);
-  }
-  .landing-title {
-    margin: 0;
-    font-size: clamp(1.85rem, 4vw, 2.75rem);
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    line-height: 1.22;
-    color: var(--ink);
-    white-space: pre-line;
-    text-wrap: balance;
-  }
-  .landing-title-center {
-    text-align: center;
-  }
-  .landing-body {
-    margin: 0;
-    max-width: 36rem;
-    font-size: clamp(1rem, 1.4vw, 1.125rem);
-    line-height: 1.7;
-    color: var(--ink-2);
-    text-wrap: pretty;
-  }
-  .landing-body-center {
-    margin-inline: auto;
-    text-align: center;
-    margin-top: 18px;
-  }
-  .landing-note {
-    margin: 20px 0 0;
-    font-size: 14px;
-    line-height: 1.6;
-    color: var(--ink-3);
-    max-width: 40rem;
-  }
-  .landing-proof-grid {
-    display: grid;
-    gap: 16px;
-    margin-top: 40px;
-  }
-  .landing-steps {
-    list-style: none;
-    margin: 48px 0 0;
-    padding: 0;
-    display: grid;
-    gap: 28px;
-  }
-  .landing-step {
-    display: flex;
-    gap: 18px;
-    align-items: flex-start;
-  }
-  .landing-step-num {
+  .lp-navsep {
+    width: 1px;
+    height: 16px;
+    background: var(--border-card);
+    margin: 0 6px;
     flex: none;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: #fff;
-    font-size: 16px;
-    font-weight: 800;
-    display: grid;
-    place-items: center;
   }
-  .landing-step-title {
-    font-size: 20px;
-    font-weight: 800;
+  /* Buttons. Geometry (size/padding) is set per instance in TSX — the four
+     CTAs differ — so only fill and press behaviour live here. */
+  .lp-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-input);
+    font-weight: 500;
+    white-space: nowrap;
+    transition:
+      transform 0.15s,
+      opacity 0.2s;
+  }
+  .lp-btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .lp-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .lp-btn-ink {
+    background: var(--ink-strong);
+    color: #fff;
+  }
+  .lp-btn-accent {
+    background: var(--accent);
+    color: var(--ink-strong);
+    font-weight: 600;
+  }
+  .lp-btn-ink:not(:disabled):hover,
+  .lp-btn-accent:not(:disabled):hover {
+    opacity: 0.85;
+  }
+  /* Text-link CTA (hero secondary): tint on hover, no fill at rest. */
+  .lp-btn-quiet {
+    color: var(--ink-strong);
+    border-radius: var(--r-input);
+    transition: background 0.2s;
+  }
+  .lp-btn-quiet:hover {
+    background: var(--fill-hover);
+    opacity: 1;
+  }
+
+  /* Headlines — the landing's own scale. */
+  .lp-h1 {
+    margin: 0;
+    font-size: clamp(38px, 5.4vw, 58px);
+    font-weight: 700;
     letter-spacing: -0.02em;
+    line-height: 1.1;
     color: var(--ink);
   }
-  .landing-step-body {
-    margin: 6px 0 0;
-    font-size: 16px;
-    line-height: 1.6;
-    color: var(--ink-2);
-  }
-  .landing-specs {
-    margin: 40px 0 0;
-    padding: 0;
-    display: grid;
-    gap: 0;
-    border-top: 1px solid var(--border);
-  }
-  .landing-spec {
-    display: grid;
-    grid-template-columns: 7.5rem 1fr;
-    gap: 16px;
-    padding: 22px 0;
-    border-bottom: 1px solid var(--border);
-    align-items: baseline;
-  }
-  .landing-spec dt {
+  .lp-h2 {
     margin: 0;
-    font-size: 14px;
+    font-size: clamp(28px, 3.6vw, 40px);
     font-weight: 700;
-    color: var(--ink-3);
+    letter-spacing: -0.018em;
+    line-height: 1.15;
+    color: var(--ink);
   }
-  .landing-spec dd {
+  .lp-h2-dark {
+    margin: 0;
+    font-size: clamp(30px, 3.8vw, 42px);
+    font-weight: 700;
+    letter-spacing: -0.018em;
+    line-height: 1.12;
+  }
+  .lp-h2-final {
+    margin: 0;
+    font-size: clamp(30px, 4vw, 44px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.12;
+    color: var(--ink);
+  }
+  .lp-hero-sub {
+    margin: 0;
+    font-size: clamp(16px, 2vw, 19px);
+    color: var(--text-secondary);
+    line-height: 1.55;
+  }
+  .lp-section-sub {
     margin: 0;
     font-size: 17px;
-    font-weight: 600;
-    letter-spacing: -0.015em;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  /* Anchored sections must clear the 56px sticky nav. */
+  .lp-anchor {
+    scroll-margin-top: 56px;
+  }
+
+  /* Segment control — shared by 비교 and CPS. */
+  .lp-seg {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: var(--r-input);
+    background: var(--segment-track);
+  }
+  .lp-seg-canvas {
+    background: var(--segment-track-on-canvas);
+  }
+  .lp-seg-btn {
+    font-size: 13.5px;
+    font-weight: 500;
+    padding: 8px 18px;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--text-secondary);
+    box-shadow: none;
+    transition: all 0.2s;
+  }
+  .lp-seg-btn:hover {
+    color: var(--text-nav);
+  }
+  .lp-seg-btn[aria-selected='true'] {
+    background: var(--surface);
     color: var(--ink);
-    line-height: 1.45;
+    box-shadow: var(--shadow-segment);
   }
-  .landing-footer {
-    padding: 56px 0 72px;
-    border-top: 1px solid var(--border);
+
+  /* Hero demo card — a subtitle burned onto a dark "screen". */
+  .lp-screen {
+    background: var(--ink-deep);
   }
-  @media (min-width: 768px) {
-    .landing-band {
-      padding: 128px 0;
-    }
-    .landing-proof-grid {
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-    .landing-steps {
-      grid-template-columns: repeat(3, 1fr);
-      gap: 32px;
-    }
-    .landing-step {
-      flex-direction: column;
-      gap: 16px;
-    }
-    .landing-spec {
-      grid-template-columns: 9rem 1fr;
-      gap: 24px;
-      padding: 26px 0;
-    }
-  }
-  @media (min-width: 1024px) {
-    .landing-inner {
-      padding-inline: 32px;
-    }
-    .landing-band {
-      padding: 152px 0;
-    }
-    .landing-hero {
-      padding: 96px 0 120px;
-    }
-  }
-  /* Dark terminal SRT comparison panel — hardcoded near-black warm
-     neutrals (file-viewer look, not a full dark theme). WCAG AA ≈ 12:1. */
-  .srt-terminal {
-    background: oklch(0.17 0.012 80);
-    border: 1px solid oklch(0.27 0.012 80);
-    border-radius: var(--radius-sm);
-    padding: 18px 20px;
+  .lp-hero-card {
+    width: min(780px, 100%);
+    border-radius: var(--r-drop);
     overflow: hidden;
+    background: var(--ink-deep);
+    box-shadow: var(--shadow-hero);
+    text-align: left;
   }
-  .srt-terminal-label {
+  .lp-hero-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-on-dark);
+  }
+  .lp-mono-tc {
+    font-family: var(--mono);
     font-size: 11px;
-    font-weight: 700;
+    color: rgba(255, 255, 255, 0.45);
     letter-spacing: 0.06em;
-    text-transform: uppercase;
-    margin-bottom: 14px;
-    color: var(--ink-3);
   }
-  .srt-terminal-label.accent {
+  .lp-mono-lang {
+    font-family: var(--mono);
+    font-size: 11px;
     color: var(--accent);
+    letter-spacing: 0.08em;
   }
-  .srt-terminal-no {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: oklch(0.68 0.01 80);
-    line-height: 1.2;
+  .lp-hero-src {
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.4);
+    line-height: 1.5;
   }
-  /* Timecode stays on one line; truncate rather than wrap to preserve layout */
-  .srt-terminal-tc {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: oklch(0.72 0.1 162);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .lp-hero-ko {
+    color: #fff;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    line-height: 1.4;
+    animation: zsubin 0.45s var(--ease-apple);
+  }
+  .lp-hero-wait {
+    color: var(--accent);
+    font-size: 24px;
+    font-weight: 600;
     line-height: 1.4;
   }
-  .srt-terminal-text {
-    font-size: 13.5px;
-    color: oklch(0.87 0.008 70);
+  .lp-hero-track {
+    height: 3px;
+    background: var(--border-on-dark);
+  }
+  .lp-hero-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.4s linear;
+  }
+
+  /* 비교 섹션 카드 */
+  .lp-card-source {
+    background: var(--bg);
+    border-radius: 20px;
+    padding: 28px 28px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .lp-card-result {
+    background: var(--surface);
+    border: 1.5px solid var(--border-chip);
+    border-radius: 20px;
+    padding: 28px 28px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    transition: all 0.3s;
+  }
+  .lp-card-result.win {
+    background: var(--accent-tint);
+    border-color: var(--accent-border);
+  }
+  .lp-card-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    letter-spacing: 0.04em;
+  }
+  .lp-card-result.win .lp-card-label {
+    color: var(--ink-strong);
+  }
+  .lp-line {
+    margin: 0;
+    font-size: 19px;
     line-height: 1.5;
-    margin-top: 3px;
+    color: var(--ink);
+    flex: 1;
+  }
+  /* Re-run on tab change: the result line and CPS card are keyed in TSX so
+     React remounts them and this replays. */
+  .lp-subin {
+    animation: zsubin 0.35s var(--ease-apple);
+  }
+  .lp-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 11px;
+    border-radius: var(--r-pill);
+  }
+  .lp-tag-red {
+    background: var(--tag-red-bg);
+    color: var(--tag-red-fg);
+  }
+  .lp-tag-orange {
+    background: var(--tag-orange-bg);
+    color: var(--tag-orange-fg);
+  }
+  .lp-tag-green {
+    background: var(--tag-green-bg);
+    color: var(--tag-green-fg);
+  }
+  .lp-tag-neutral {
+    background: var(--tag-neutral-bg);
+    color: var(--tag-neutral-fg);
+  }
+
+  /* 속도 타임라인 (다크 섹션) */
+  .lp-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--border-on-dark-strong);
+  }
+  .lp-step-time {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    min-width: 52px;
+    padding-top: 2px;
+  }
+  .lp-step-title {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .lp-step-desc {
+    font-size: 13.5px;
+    color: rgba(250, 249, 245, 0.5);
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  /* CPS 카드 */
+  .lp-cps-card {
+    background: var(--surface);
+    border-radius: var(--r-drop);
+    padding: 36px 40px;
+    box-shadow: var(--shadow-cps);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 36px;
+    animation: zsubin 0.35s var(--ease-apple);
+  }
+  .lp-cps-value {
+    font-size: 44px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .lp-cps-unit {
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    margin-left: 8px;
+  }
+  .lp-spec {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13.5px;
+    color: var(--text-secondary);
+  }
+  .lp-spec b {
+    font-weight: 600;
+    color: var(--ink);
+    text-align: right;
+    max-width: 60%;
+  }
+  .lp-preview {
+    background: var(--ink-deep);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 28px;
+    min-height: 200px;
+  }
+  .lp-preview-line {
+    color: #fff;
+    font-size: 17px;
+    line-height: 1.45;
+    text-shadow: var(--shadow-subtitle);
+  }
+  .lp-preview-meta {
+    margin-top: 20px;
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: rgba(255, 255, 255, 0.35);
+  }
+
+  /* 기능 벤토 */
+  .lp-bento-wide {
+    background: var(--bg);
+    border-radius: 22px;
+    padding: 32px 36px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 28px;
+    align-items: center;
+  }
+  .lp-bento-card {
+    border-radius: 22px;
+    padding: 30px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .lp-bento-ink {
+    background: var(--ink-strong);
+    color: var(--on-ink);
+  }
+  .lp-bento-accent {
+    background: var(--accent);
+    color: var(--ink-strong);
+  }
+  .lp-bento-title {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+  }
+  .lp-rule {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+    border-radius: var(--r-input);
+    padding: 11px 16px;
+    font-size: 13.5px;
+  }
+  .lp-rule-before {
+    color: var(--text-quaternary);
+    text-decoration: line-through;
+    flex: 1;
+  }
+  .lp-rule-arrow {
+    color: var(--accent);
+    font-weight: 700;
+    flex: none;
+  }
+  .lp-rule-after {
+    color: var(--ink);
+    font-weight: 500;
+    flex: 1;
+    text-align: right;
+  }
+  /* Format chips keep the square subtitle-box motif (radius 1px) — the one
+     shape rule the landing shares with the brand chip. Do not round these. */
+  .lp-fmt {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 6px 12px;
+    border-radius: var(--r-chip);
+  }
+
+  /* 전 페이지 공용 푸터(app/components/SiteFooter.tsx). 3단: 브랜드+링크 /
+     판매자 표시 / 저작권+버전. */
+  .site-footer {
+    border-top: 1px solid var(--border-chip);
+    padding: 40px clamp(20px, 5vw, 48px) 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .site-footer-top {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 28px;
+  }
+  .site-footer-tagline {
+    margin-top: 8px;
+    font-size: var(--fs-fineprint);
+    color: var(--text-tertiary);
+  }
+  .site-footer-links {
+    display: flex;
+    gap: clamp(32px, 8vw, 72px);
+  }
+  .site-footer-links div {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .site-footer-links a {
+    font-size: var(--fs-fineprint);
+    color: var(--text-tertiary);
+  }
+  .site-footer-links a:hover {
+    color: var(--text-secondary);
+    text-decoration: underline;
+  }
+  .site-footer-group {
+    font-size: var(--fs-fineprint);
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  /* 판매자 표시 아코디언 */
+  .site-footer-seller-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .site-footer-seller-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px 9px;
+    font-size: var(--fs-fineprint);
+    color: var(--text-quaternary);
+    line-height: 1.6;
+  }
+  .seller-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-quaternary);
+    font-size: var(--fs-fineprint);
+    font-weight: 400;
+    transition: color 0.2s;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  .seller-toggle-btn:hover {
+    color: var(--text-secondary);
+    text-decoration: underline;
+  }
+  .seller-toggle-btn svg {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.2s;
+  }
+  .seller-toggle-btn[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+  }
+  /* 판매자 표시는 <address> — 기본 이탤릭을 되돌리고, `·` 구분자가 좁은
+     화면에서 줄바꿈을 타도록 inline flex wrap으로 흘린다. */
+  .site-footer-seller {
+    font-style: normal;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px 9px;
+    font-size: var(--fs-fineprint);
+    line-height: 1.6;
+    color: var(--text-quaternary);
+  }
+  .site-footer-seller a:hover {
+    text-decoration: underline;
+  }
+  .site-footer-bottom {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .site-footer-copyright {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: var(--fs-fineprint);
+    color: var(--text-quaternary);
+  }
+  /* Footer wordmark: no chip, grey text, yellow point (handoff §로고). */
+  .lp-wordmark {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--text-tertiary);
   }
 }
 
@@ -1232,6 +1844,19 @@ button:disabled {
   outline: none;
 }
 
+/* Respect the user's transparency preference: glass becomes solid. The blur
+   is dropped too — a backdrop-filter with an opaque backdrop costs a
+   compositor layer for nothing. Overrides the token, so every `.glass-*`
+   surface (and anything else reading it) turns solid at once. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-nav: var(--bg);
+    --glass-nav-filter: none;
+    --glass-modal: var(--surface);
+    --glass-modal-filter: none;
+  }
+}
+
 /* Respect the user's motion preference: disable spatial animations and
    shorten transitions to an imperceptible duration. */
 @media (prefers-reduced-motion: reduce) {
@@ -1242,7 +1867,16 @@ button:disabled {
     transition-duration: 0.01ms !important;
   }
   .animate-fade-slide-up,
-  .animate-fade-in {
+  .animate-fade-in,
+  .animate-zslide,
+  .animate-zbreathe,
+  .animate-zblink,
+  .animate-zpop,
+  .animate-zscrim,
+  .animate-zrise,
+  .lp-hero-ko,
+  .lp-subin,
+  .lp-cps-card {
     animation: none;
   }
   .step.active .dot::after {
@@ -1254,4 +1888,51 @@ button:disabled {
     transition: none;
     will-change: auto;
   }
+}
+
+/* ── 프로토타입 모션 (design_handoff_zamak_brand) ── */
+@keyframes zslide {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes zbreathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+@keyframes zblink {
+  0%, 49%   { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+/* Landing (design_handoff_zamak_landing) — "자막이 화면에 뜨는" 등장과
+   히어로 진입. zsubin은 번역 결과·CPS 카드 교체에도 재사용된다. */
+@keyframes zsubin {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes zrise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* Modal / success-icon materialize — scale + blur settling to normal. */
+@keyframes zpop {
+  from { opacity: 0; transform: scale(1.04); filter: blur(10px); }
+  to   { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+@keyframes zscrim {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-zslide { animation: zslide 0.5s var(--ease-apple); }
+.animate-zbreathe { animation: zbreathe 1.2s ease-in-out infinite; }
+.animate-zblink { animation: zblink 1.06s step-end infinite; }
+.animate-zpop { animation: zpop 0.45s var(--ease-apple); }
+.animate-zscrim { animation: zscrim 0.3s ease; }
+.animate-zrise { animation: zrise 0.6s var(--ease-apple); }
+
+/* Anchor scrolling for the landing's three in-page links. Paired with
+   `.lp-anchor`'s scroll-margin-top so the sticky nav never covers a heading;
+   the reduced-motion block below forces this back to `auto`. */
+html {
+  scroll-behavior: smooth;
 }

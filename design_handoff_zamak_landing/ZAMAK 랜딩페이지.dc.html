@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,Pretendard,system-ui,sans-serif;color:#1d1d1f;-webkit-font-smoothing:antialiased}
+a{color:#161614;text-decoration:none}a:hover{opacity:0.7}
+@keyframes zsubin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes zrise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes zbar{from{width:0%}to{width:100%}}
+@keyframes zblink{0%,49%{opacity:1}50%,100%{opacity:0}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important}}
+@media (prefers-reduced-transparency: reduce){[data-material]{background:#f5f5f7 !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important}}
+</style>
+</helmet>
+
+<div data-material="" style="position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;height:56px;padding:0 clamp(20px,5vw,48px);background:rgba(245,245,247,0.72);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(0,0,0,0.06)">
+  <div style="display:flex;align-items:center;gap:9px"><span style="background:#161614;color:#FAF9F5;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;letter-spacing:0.1em;padding:6px 4px 6px 12px;border-radius:1px">ZAMAK<span style="color:#FFD400">.</span></span></div>
+  <div style="display:flex;align-items:center;gap:6px">
+    <a href="#compare" style="font-size:13px;color:#424245;padding:7px 13px;border-radius:10px;transition:background 0.2s" style-hover="background:rgba(0,0,0,0.05);opacity:1">번역 비교</a>
+    <a href="#speed" style="font-size:13px;color:#424245;padding:7px 13px;border-radius:10px;transition:background 0.2s" style-hover="background:rgba(0,0,0,0.05);opacity:1">속도</a>
+    <a href="#cps" style="font-size:13px;color:#424245;padding:7px 13px;border-radius:10px;transition:background 0.2s" style-hover="background:rgba(0,0,0,0.05);opacity:1">자막 규칙</a>
+    <span style="width:1px;height:16px;background:rgba(0,0,0,0.1);margin:0 6px"></span>
+    <span style="font-size:13px;font-weight:500;background:#161614;color:#fff;padding:8px 16px;border-radius:10px;cursor:pointer;transition:transform 0.15s" style-hover="opacity:0.85" style-active="transform:scale(0.97)">무료로 시작하기</span>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;align-items:center;padding:clamp(56px,9vh,88px) 24px 90px;text-align:center;animation:zrise 0.6s cubic-bezier(0.32,0.72,0,1)">
+  <h1 style="margin:0 0 18px;font-size:clamp(38px,5.4vw,58px);font-weight:700;letter-spacing:-0.02em;line-height:1.1;color:#1d1d1f">번역기 티가 안 나는<br>한국어 자막</h1>
+  <p style="margin:0 0 34px;font-size:clamp(16px,2vw,19px);color:#6e6e73;max-width:520px;line-height:1.55">자막 파일을 올리면 한글 자막 표준 규칙에 맞춘 자연스러운 번역이 10초 안에 내려옵니다.</p>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center">
+    <span style="background:#161614;color:#fff;font-size:16px;font-weight:500;padding:14px 30px;border-radius:12px;cursor:pointer;transition:transform 0.15s,opacity 0.2s" style-hover="opacity:0.85" style-active="transform:scale(0.97)">무료로 시작하기</span>
+    <a href="#compare" style="font-size:16px;color:#161614;padding:14px 22px;border-radius:12px;transition:background 0.2s" style-hover="background:rgba(0,0,0,0.05);opacity:1">번역 품질 비교하기</a>
+  </div>
+
+  <div style="margin-top:64px;width:min(780px,100%);border-radius:24px;overflow:hidden;background:#101012;box-shadow:0 2px 2px rgba(0,0,0,0.06),0 24px 70px rgba(0,0,0,0.18);text-align:left">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.08)">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,0.45);letter-spacing:0.06em">{{ heroTimecode }}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#FFD400;letter-spacing:0.08em">{{ heroLang }} → KO</span>
+    </div>
+    <div style="padding:44px 40px 40px;display:flex;flex-direction:column;gap:20px;min-height:150px;box-sizing:border-box">
+      <div style="font-size:15px;color:rgba(255,255,255,0.4);line-height:1.5">{{ heroSource }}</div>
+      <div style="display:flex;flex-direction:column;gap:8px">{{ heroTranslated }}</div>
+    </div>
+    <div style="height:3px;background:rgba(255,255,255,0.08)"><div style="height:100%;background:#FFD400;width:{{ heroProgress }};transition:width 0.4s linear"></div></div>
+  </div>
+  <p style="margin:16px 0 0;font-size:12.5px;color:#a1a1a6">실제 번역 결과 예시. 타임코드는 원본 그대로 유지됩니다.</p>
+</div>
+
+<div id="compare" style="padding:90px 24px;background:#fff;border-top:1px solid rgba(0,0,0,0.05)">
+  <div style="max-width:880px;margin:0 auto">
+    <h2 style="margin:0 0 10px;font-size:clamp(28px,3.6vw,40px);font-weight:700;letter-spacing:-0.018em;line-height:1.15;text-align:center">같은 대사, 다른 번역.</h2>
+    <p style="margin:0 auto 40px;font-size:17px;color:#6e6e73;max-width:480px;line-height:1.5;text-align:center">직접 비교해 보세요. 자막은 읽는 글이 아니라 듣는 말입니다.</p>
+    <div style="display:flex;justify-content:center;margin-bottom:28px">
+      <div style="display:flex;gap:4px;background:#f5f5f7;padding:4px;border-radius:12px">
+        <span onClick="{{ pickEngine0 }}" style="font-size:13.5px;font-weight:500;padding:8px 18px;border-radius:9px;cursor:pointer;transition:all 0.2s;background:{{ eng0Bg }};color:{{ eng0Color }};box-shadow:{{ eng0Shadow }}">일반 번역기</span>
+        <span onClick="{{ pickEngine1 }}" style="font-size:13.5px;font-weight:500;padding:8px 18px;border-radius:9px;cursor:pointer;transition:all 0.2s;background:{{ eng1Bg }};color:{{ eng1Color }};box-shadow:{{ eng1Shadow }}">범용 AI 모델</span>
+        <span onClick="{{ pickEngine2 }}" style="font-size:13.5px;font-weight:500;padding:8px 18px;border-radius:9px;cursor:pointer;transition:all 0.2s;background:{{ eng2Bg }};color:{{ eng2Color }};box-shadow:{{ eng2Shadow }}">ZAMAK</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:stretch">
+      <div style="background:#f5f5f7;border-radius:20px;padding:28px 28px 24px;display:flex;flex-direction:column;gap:14px">
+        <span style="font-size:12px;font-weight:600;color:#86868b;letter-spacing:0.04em">원문 대사</span>
+        <p style="margin:0;font-size:19px;line-height:1.5;color:#1d1d1f;flex:1">"You're telling me she just walked out? In the middle of the ceremony?"</p>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#a1a1a6">00:41:07,220 → 00:41:09,850 · 2.6초 노출</span>
+      </div>
+      <div style="background:{{ resultCardBg }};border:1.5px solid {{ resultCardBorder }};border-radius:20px;padding:28px 28px 24px;display:flex;flex-direction:column;gap:14px;transition:all 0.3s">
+        <span style="font-size:12px;font-weight:600;color:{{ resultLabelColor }};letter-spacing:0.04em">{{ engineName }}의 번역</span>
+        <p key="{{ engineKey }}" style="margin:0;font-size:19px;line-height:1.5;color:#1d1d1f;flex:1;animation:zsubin 0.35s cubic-bezier(0.32,0.72,0,1)">{{ engineOutput }}</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <sc-for list="{{ engineTags }}" as="tag" hint-placeholder-count="3">
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:5px 11px;border-radius:999px;background:{{ tag.bg }};color:{{ tag.color }}">{{ tag.label }}</span>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    <p style="margin:28px auto 0;font-size:14px;color:#86868b;max-width:560px;line-height:1.6;text-align:center">ZAMAK은 문장을 옮기지 않고 장면을 옮깁니다. 화면에 떠 있는 시간 안에 읽히도록, 말투와 관계까지 그대로.</p>
+  </div>
+</div>
+
+<div id="speed" style="background:#161614;color:#FAF9F5;padding:100px 24px">
+  <div style="max-width:880px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:56px;align-items:center">
+    <div>
+      <h2 style="margin:0 0 16px;font-size:clamp(30px,3.8vw,42px);font-weight:700;letter-spacing:-0.018em;line-height:1.12">업로드에서 다운로드까지,<br><span style="color:#FFD400">최고 속도 10초.</span></h2>
+      <p style="margin:0 0 28px;font-size:16px;color:rgba(250,249,245,0.6);line-height:1.6;max-width:400px">영상 파일은 필요 없습니다. 자막 파일 하나만 올리면 언어 인식부터 규칙 적용, 최종 파일 생성까지 한 번에 끝납니다.</p>
+      <span style="display:inline-block;background:#FFD400;color:#161614;font-size:15px;font-weight:600;padding:12px 26px;border-radius:12px;cursor:pointer;transition:transform 0.15s,opacity 0.2s" style-hover="opacity:0.85" style-active="transform:scale(0.97)">무료로 시작하기</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:0">
+      <sc-for list="{{ speedSteps }}" as="step" hint-placeholder-count="4">
+        <div style="display:flex;align-items:flex-start;gap:18px;padding:18px 0;border-bottom:1px solid rgba(255,255,255,0.09)">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#FFD400;min-width:52px;padding-top:2px">{{ step.time }}</span>
+          <div>
+            <div style="font-size:16px;font-weight:600;letter-spacing:-0.01em">{{ step.title }}</div>
+            <div style="font-size:13.5px;color:rgba(250,249,245,0.5);margin-top:4px;line-height:1.5">{{ step.desc }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+
+<div id="cps" style="padding:96px 24px;background:#f5f5f7">
+  <div style="max-width:880px;margin:0 auto">
+    <h2 style="margin:0 0 10px;font-size:clamp(28px,3.6vw,40px);font-weight:700;letter-spacing:-0.018em;line-height:1.15">영상마다 읽는 속도가 다릅니다.</h2>
+    <p style="margin:0 0 36px;font-size:17px;color:#6e6e73;max-width:560px;line-height:1.55">ZAMAK은 CPS(초당 글자 수)를 계산해 영상 종류에 맞는 자막 길이를 자동으로 맞춥니다. 화면에 뜬 시간 안에 다 읽히도록.</p>
+    <div style="display:flex;gap:4px;background:#e9e9ec;padding:4px;border-radius:12px;width:fit-content;max-width:100%;flex-wrap:wrap;margin-bottom:24px">
+      <span onClick="{{ pickCps0 }}" style="font-size:13.5px;font-weight:500;padding:8px 18px;border-radius:9px;cursor:pointer;transition:all 0.2s;background:{{ cps0Bg }};color:{{ cps0Color }};box-shadow:{{ cps0Shadow }}">영화 · 드라마</span>
+      <span onClick="{{ pickCps1 }}" style="font-size:13.5px;font-weight:500;padding:8px 18px;border-radius:9px;cursor:pointer;transition:all 0.2s;background:{{ cps1Bg }};color:{{ cps1Color }};box-shadow:{{ cps1Shadow }}">예능 · 유튜브</span>
+      <span onClick="{{ pickCps2 }}" style="font-size:13.5px;font-weight:500;padding:8px 18px;border-radius:9px;cursor:pointer;transition:all 0.2s;background:{{ cps2Bg }};color:{{ cps2Color }};box-shadow:{{ cps2Shadow }}">다큐 · 강연</span>
+    </div>
+    <div key="{{ cpsKey }}" style="background:#fff;border-radius:24px;padding:36px 40px;box-shadow:0 1px 1px rgba(0,0,0,0.03),0 10px 36px rgba(0,0,0,0.06);display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:36px;animation:zsubin 0.35s cubic-bezier(0.32,0.72,0,1)">
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#86868b;margin-bottom:6px">권장 읽기 속도</div>
+          <div style="font-size:44px;font-weight:700;letter-spacing:-0.02em;line-height:1">{{ cpsValue }}<span style="font-size:17px;font-weight:500;color:#86868b;margin-left:8px">CPS</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;font-size:13.5px;color:#6e6e73"><span>한 줄 최대</span><span style="font-weight:600;color:#1d1d1f">{{ cpsLineLen }}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13.5px;color:#6e6e73"><span>줄 수</span><span style="font-weight:600;color:#1d1d1f">최대 2줄</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13.5px;color:#6e6e73"><span>ZAMAK이 하는 일</span><span style="font-weight:600;color:#1d1d1f;text-align:right;max-width:60%">{{ cpsAction }}</span></div>
+        </div>
+      </div>
+      <div style="background:#101012;border-radius:16px;display:flex;flex-direction:column;justify-content:flex-end;padding:28px;min-height:200px;box-sizing:border-box">
+        <div style="text-align:center;display:flex;flex-direction:column;gap:4px">
+          <sc-for list="{{ cpsLines }}" as="line" hint-placeholder-count="2">
+            <span style="color:#fff;font-size:17px;line-height:1.45;text-shadow:0 1px 3px rgba(0,0,0,0.6)">{{ line }}</span>
+          </sc-for>
+        </div>
+        <div style="margin-top:20px;display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:rgba(255,255,255,0.35)"><span>{{ cpsTimecode }}</span><span style="color:#FFD400">{{ cpsMeasured }}</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="padding:96px 24px;background:#fff;border-top:1px solid rgba(0,0,0,0.05)">
+  <div style="max-width:880px;margin:0 auto">
+    <h2 style="margin:0 auto 44px;font-size:clamp(28px,3.6vw,40px);font-weight:700;letter-spacing:-0.018em;line-height:1.15;text-align:center;max-width:560px">전문 자막가의 규칙을<br>그대로 배웠습니다.</h2>
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="background:#f5f5f7;border-radius:22px;padding:32px 36px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:28px;align-items:center">
+        <div>
+          <div style="font-size:19px;font-weight:600;letter-spacing:-0.012em;margin-bottom:8px">한글 자막 표준 규칙 적용</div>
+          <p style="margin:0;font-size:14.5px;color:#6e6e73;line-height:1.6">방송·OTT에서 쓰는 표기 규칙을 그대로 따릅니다. 문장부호, 숫자 표기, 말줄임, 두 줄 분할까지 감수 없이 바로 쓸 수 있는 상태로.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ ruleRows }}" as="rule" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:12px;background:#fff;border-radius:12px;padding:11px 16px;font-size:13.5px">
+              <span style="color:#a1a1a6;text-decoration:line-through;flex:1">{{ rule.before }}</span>
+              <span style="color:#FFD400;font-weight:700">→</span>
+              <span style="color:#1d1d1f;font-weight:500;flex:1;text-align:right">{{ rule.after }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px">
+      <div style="background:#161614;color:#FAF9F5;border-radius:22px;padding:30px 32px;display:flex;flex-direction:column;gap:14px">
+        <div style="font-size:18px;font-weight:600;letter-spacing:-0.012em">모든 자막 포맷 지원</div>
+        <p style="margin:0;font-size:14px;color:rgba(250,249,245,0.55);line-height:1.6;flex:1">스타일과 타임코드는 손대지 않고 대사만 바꿉니다. 올린 포맷 그대로 내려받으세요.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12.5px;background:rgba(255,255,255,0.1);padding:6px 12px;border-radius:1px">.srt</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12.5px;background:rgba(255,255,255,0.1);padding:6px 12px;border-radius:1px">.vtt</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12.5px;background:rgba(255,255,255,0.1);padding:6px 12px;border-radius:1px">.ass</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12.5px;background:rgba(255,255,255,0.1);padding:6px 12px;border-radius:1px">.smi</span>
+        </div>
+      </div>
+      <div style="background:#FFD400;color:#161614;border-radius:22px;padding:30px 32px;display:flex;flex-direction:column;gap:14px">
+        <div style="font-size:18px;font-weight:600;letter-spacing:-0.012em">모든 언어 → 한국어</div>
+        <p style="margin:0;font-size:14px;color:rgba(22,22,20,0.65);line-height:1.6;flex:1">원본 언어는 자동으로 인식합니다. 영어, 일본어, 중국어부터 스페인어, 프랑스어까지, 어떤 언어든 한국어로.</p>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:rgba(22,22,20,0.6);letter-spacing:0.03em">EN JA ZH ES FR DE + 90개 언어</div>
+      </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="padding:110px 24px 90px;text-align:center">
+  <h2 style="margin:0 0 14px;font-size:clamp(30px,4vw,44px);font-weight:700;letter-spacing:-0.02em;line-height:1.12">자막 하나 올려 보면<br>바로 알게 됩니다.</h2>
+  <p style="margin:0 0 32px;font-size:17px;color:#6e6e73;line-height:1.5">가입 후 첫 파일은 무료입니다. 신용카드도 필요 없어요.</p>
+  <span style="display:inline-block;background:#161614;color:#fff;font-size:16px;font-weight:500;padding:14px 32px;border-radius:12px;cursor:pointer;transition:transform 0.15s,opacity 0.2s" style-hover="opacity:0.85" style-active="transform:scale(0.97)">무료로 시작하기</span>
+  <p style="margin:52px 0 0;font-size:12px;color:#a1a1a6;display:flex;align-items:center;gap:6px;justify-content:center"><span style="width:5px;height:5px;border-radius:999px;background:#FFD400;flex:none"></span>비공개 베타 운영 중</p>
+</div>
+
+<div style="border-top:1px solid rgba(0,0,0,0.07);padding:28px clamp(20px,5vw,48px);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+  <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;letter-spacing:0.1em;color:#86868b">ZAMAK<span style="color:#FFD400">.</span></span>
+  <span style="font-size:12px;color:#a1a1a6">© 2026 ZAMAK. 자연스러운 한국어 자막.</span>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;heroAutoplay&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;데모&quot;},&quot;defaultEngine&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  state = { heroIdx: 0, heroPhase: 1, engine: 2, cps: 0 };
+
+  componentDidMount() {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || (this.props.heroAutoplay === false)) return;
+    this._t = setInterval(() => {
+      this.setState(s => ({ heroIdx: (s.heroIdx + 1) % 4, heroPhase: 0 }));
+      setTimeout(() => this.setState({ heroPhase: 1 }), 500);
+    }, 3800);
+  }
+  componentWillUnmount() { clearInterval(this._t); }
+
+  renderVals() {
+    const heroPairs = [
+      { lang: 'EN', tc: '00:41:07,220', src: '"You\u2019re telling me she just walked out? In the middle of the ceremony?"', ko: '식 도중에 그냥 나가 버렸다고?' },
+      { lang: 'JA', tc: '00:12:44,050', src: '「そんなつもりじゃなかったんだ。信じてくれ。」', ko: '그럴 생각은 없었어. 믿어 줘' },
+      { lang: 'EN', tc: '01:03:18,900', src: '"Don\u2019t you dare walk away from me right now."', ko: '지금 나한테서 등 돌릴 생각 하지 마' },
+      { lang: 'FR', tc: '00:27:55,410', src: '\u00AB On ne voit bien qu\u2019avec le c\u0153ur. \u00BB', ko: '마음으로 봐야 제대로 보이는 법이야' },
+    ];
+    const hp = heroPairs[this.state.heroIdx];
+    const translated = this.state.heroPhase === 1
+      ? React.createElement('span', { key: 'ko' + this.state.heroIdx, style: { color: '#fff', fontSize: '24px', fontWeight: 600, letterSpacing: '-0.012em', lineHeight: 1.4, animation: 'zsubin 0.45s cubic-bezier(0.32,0.72,0,1)' } }, hp.ko)
+      : React.createElement('span', { key: 'wait' + this.state.heroIdx, style: { color: 'rgba(255,255,255,0.55)', fontSize: '24px', fontWeight: 600 } },
+          React.createElement('span', { style: { animation: 'zblink 1s step-end infinite', color: '#FFD400' } }, '\u258B'));
+
+    const engines = [
+      { name: '일반 번역기', out: '"당신은 그녀가 그냥 걸어 나갔다고 나에게 말하고 있는 건가요? 의식 한가운데에서?"',
+        tags: [ { label: 'CPS 17.3 초과', bg: 'rgba(255,59,48,0.1)', color: '#c0362c' }, { label: '어색한 직역', bg: 'rgba(255,59,48,0.1)', color: '#c0362c' }, { label: '말투 불일치', bg: 'rgba(255,59,48,0.1)', color: '#c0362c' } ] },
+      { name: '범용 AI 모델', out: '"그녀가 식 중간에 그냥 나가버렸다고 말하는 거야?"',
+        tags: [ { label: '문장은 자연스러움', bg: 'rgba(0,0,0,0.06)', color: '#424245' }, { label: 'CPS 9.6 아슬아슬', bg: 'rgba(255,149,0,0.12)', color: '#9a6200' }, { label: '자막 규칙 미적용', bg: 'rgba(255,149,0,0.12)', color: '#9a6200' } ] },
+      { name: 'ZAMAK', out: '"식 도중에 그냥 나가 버렸다고?"',
+        tags: [ { label: 'CPS 6.2 충족', bg: 'rgba(52,199,89,0.13)', color: '#1d7a3a' }, { label: '표준 규칙 적용', bg: 'rgba(52,199,89,0.13)', color: '#1d7a3a' }, { label: '반문 뉘앙스 유지', bg: 'rgba(52,199,89,0.13)', color: '#1d7a3a' } ] },
+    ];
+    const e = this.state.engine;
+    const eng = engines[e];
+    const segBtn = (active) => active
+      ? { bg: '#fff', color: '#1d1d1f', shadow: '0 1px 4px rgba(0,0,0,0.12)' }
+      : { bg: 'transparent', color: '#6e6e73', shadow: 'none' };
+    const s0 = segBtn(e === 0), s1 = segBtn(e === 1), s2 = segBtn(e === 2);
+
+    const cpsData = [
+      { value: '12', lineLen: '18자', action: '긴 대사는 두 줄로 분할, 조사 단위로 줄바꿈',
+        lines: ['식 도중에 그냥', '나가 버렸다고?'], tc: '00:41:07 → 00:41:09', measured: 'CPS 6.2 ✓' },
+      { value: '14', lineLen: '20자', action: '빠른 티키타카에 맞춰 짧고 리듬감 있게 압축',
+        lines: ['아니 진짜 중간에 나갔다고?'], tc: '00:03:12 → 00:03:13', measured: 'CPS 13.0 ✓' },
+      { value: '10', lineLen: '16자', action: '정보 밀도가 높은 문장은 노출 시간에 맞춰 요약',
+        lines: ['그녀는 예식 도중', '자리를 떠났습니다'], tc: '00:18:40 → 00:18:44', measured: 'CPS 4.3 ✓' },
+    ];
+    const c = this.state.cps;
+    const cd = cpsData[c];
+    const c0 = segBtn(c === 0), c1 = segBtn(c === 1), c2 = segBtn(c === 2);
+
+    return {
+      heroTimecode: hp.tc, heroLang: hp.lang, heroSource: hp.src, heroTranslated: translated,
+      heroProgress: ((this.state.heroIdx + 1) * 25) + '%',
+      pickEngine0: () => this.setState({ engine: 0 }), pickEngine1: () => this.setState({ engine: 1 }), pickEngine2: () => this.setState({ engine: 2 }),
+      eng0Bg: s0.bg, eng0Color: s0.color, eng0Shadow: s0.shadow,
+      eng1Bg: s1.bg, eng1Color: s1.color, eng1Shadow: s1.shadow,
+      eng2Bg: s2.bg, eng2Color: s2.color, eng2Shadow: s2.shadow,
+      engineName: eng.name, engineOutput: eng.out, engineTags: eng.tags, engineKey: 'e' + e,
+      resultCardBg: e === 2 ? 'rgba(255,212,0,0.07)' : '#fff',
+      resultCardBorder: e === 2 ? 'rgba(255,212,0,0.8)' : 'rgba(0,0,0,0.08)',
+      resultLabelColor: e === 2 ? '#161614' : '#86868b',
+      speedSteps: [
+        { time: '0:00', title: '자막 파일 업로드', desc: '.srt .vtt .ass .smi, 무엇이든. 조잡한 자동 자막도 괜찮습니다.' },
+        { time: '0:01', title: '언어 · 작품 자동 인식', desc: '원본 언어를 감지하고 영상 종류에 맞는 번역 프로필을 고릅니다.' },
+        { time: '0:03', title: '번역 + 규칙 적용', desc: '자연스러운 한국어로 옮기며 CPS와 표준 자막 규칙을 동시에 맞춥니다.' },
+        { time: '0:10', title: '완성 파일 다운로드', desc: '타임코드와 스타일은 원본 그대로. 바로 영상에 얹으면 됩니다.' },
+      ],
+      pickCps0: () => this.setState({ cps: 0 }), pickCps1: () => this.setState({ cps: 1 }), pickCps2: () => this.setState({ cps: 2 }),
+      cps0Bg: c0.bg, cps0Color: c0.color, cps0Shadow: c0.shadow,
+      cps1Bg: c1.bg, cps1Color: c1.color, cps1Shadow: c1.shadow,
+      cps2Bg: c2.bg, cps2Color: c2.color, cps2Shadow: c2.shadow,
+      cpsKey: 'c' + c, cpsValue: cd.value, cpsLineLen: cd.lineLen, cpsAction: cd.action,
+      cpsLines: cd.lines, cpsTimecode: cd.tc, cpsMeasured: cd.measured,
+      ruleRows: [
+        { before: '3천만 달러라구요?!', after: '3,000만 달러라고요?' },
+        { before: '오 마이 갓...!!', after: '세상에\u2026' },
+        { before: '한 줄에 스물여덟 글자가 넘어가는 긴 자막', after: '두 줄로 자연스럽게 분할' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

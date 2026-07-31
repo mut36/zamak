@@ -105,7 +105,7 @@ function MovieInfo({
           {enrichStatus === 'notFound' && !editing && (
             <div
               className='dbadge mb-3'
-              style={{ color: 'var(--ink-3)', background: 'var(--surface-2)' }}
+              style={{ color: 'var(--text-secondary)', background: 'var(--surface-hover)' }}
             >
               {c.notFoundBadge}
             </div>
@@ -113,11 +113,11 @@ function MovieInfo({
           {/* Why it failed, when it failed. Manual input below still works, so
               this informs rather than blocks. */}
           {enrichError && !editing && (
-            <p className='text-[13px] mb-3' style={{ color: 'oklch(0.55 0.2 25)' }}>
+            <p className='text-caption mb-3' style={{ color: 'oklch(0.55 0.2 25)' }}>
               {`${c.enrichFailed} (${enrichError})`}
             </p>
           )}
-          <p className='text-[13px] text-ink-3 mb-3'>{c.notFoundHint}</p>
+          <p className='text-caption text-secondary mb-3'>{c.notFoundHint}</p>
           <div className='frow'>
             <div className='field !mb-0'>
               <label>{c.labelTitle}</label>
@@ -186,7 +186,7 @@ function MovieInfo({
           </div>
           <button
             type='button'
-            className='btn btn-ghost ml-auto self-start !px-3 !py-2 !text-[13px]'
+            className='btn btn-ghost ml-auto self-start !px-3 !py-2 !text-caption'
             onClick={() => setEditing(true)}
           >
             <PencilIcon />
@@ -197,7 +197,7 @@ function MovieInfo({
 
       {!busy && !awaitingSelection && (
         <div className='mt-6'>
-          <p className='text-[12px] text-ink-3 mb-2'>{c.aiInfoHint}</p>
+          <p className='text-fineprint text-secondary mb-2'>{c.aiInfoHint}</p>
           <div className='frow'>
             <div className='field !mb-0'>
               <label>{c.genreLabel}</label>
@@ -236,7 +236,7 @@ function MovieInfo({
       {!busy && !awaitingSelection && (
         <div className='field mt-4'>
           <label>{c.notesLabel}</label>
-          <p className='text-[12px] text-ink-3 mb-2'>{c.notesHint}</p>
+          <p className='text-fineprint text-secondary mb-2'>{c.notesHint}</p>
           <textarea
             className='input'
             rows={8}
@@ -340,13 +340,13 @@ function CandidatePicker({
 }) {
   return (
     <div className='card p-[18px] mb-4'>
-      <p className='text-[13px] text-ink-3 mb-3'>{c.ambiguousHint}</p>
+      <p className='text-caption text-secondary mb-3'>{c.ambiguousHint}</p>
       <div className='flex flex-col gap-1'>
         {candidates.map((candidate) => (
           <button
             key={`${candidate.mediaType}-${candidate.tmdbId}`}
             type='button'
-            className='flex gap-3 text-left items-start p-2 rounded-lg transition-colors hover:bg-[var(--surface-2)]'
+            className='flex gap-3 text-left items-start p-2 rounded-lg transition-colors hover:bg-[var(--surface-hover)]'
             onClick={() => onSelect(candidate)}
           >
             <div className='poster !w-[46px] !h-[64px]'>
@@ -362,8 +362,8 @@ function CandidatePicker({
               )}
             </div>
             <div className='min-w-0'>
-              <div className='dtitle truncate !text-[14px]'>{candidate.title}</div>
-              <div className='dmeta !text-[12px]'>
+              <div className='dtitle truncate !text-body'>{candidate.title}</div>
+              <div className='dmeta !text-fineprint'>
                 {[
                   candidate.year,
                   candidate.mediaType === 'movie'
@@ -374,7 +374,7 @@ function CandidatePicker({
                   .join(' · ')}
               </div>
               {candidate.overview && (
-                <p className='text-[12px] text-ink-3 mt-1 line-clamp-2'>
+                <p className='text-fineprint text-secondary mt-1 line-clamp-2'>
                   {candidate.overview}
                 </p>
               )}
@@ -392,7 +392,7 @@ function Loading({ text }: { text: string }) {
   return (
     <div className='card p-6 flex items-center gap-3 mb-4'>
       <SpinnerIcon className='w-5 h-5 text-accent' />
-      <span className='text-sm text-ink-2'>{text}</span>
+      <span className='text-sm text-nav'>{text}</span>
     </div>
   );
 }

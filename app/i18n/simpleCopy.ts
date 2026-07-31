@@ -5,7 +5,20 @@ export const COPY = {
   brand: 'ZAMAK',
   langPill: '한국어',
 
-  steps: ['파일', '정보', '번역', '완료'],
+  // Mono breadcrumb shown above the H1 on every step screen (업로드 →
+  // 설정 → 번역). WorkPickStep (작품 인식) and TranslateSettingsStep share
+  // the '설정' step — see StepBreadcrumb.
+  steps: {
+    upload: '업로드',
+    settings: '설정',
+    translate: '번역',
+  },
+
+  nav: {
+    history: '내 번역',
+    credits: (lite: number, pro: number) => `라이트 ${lite} · 프로 ${pro}`,
+    signOut: '로그아웃',
+  },
 
   auth: {
     signIn: 'Google로 계속하기',
@@ -20,122 +33,221 @@ export const COPY = {
     creditsLeft: (n: number) => `번역권 ${n}편`,
   },
 
-  // Anonymous landing. Static content only — proving product value in front
-  // of the sign-in wall costs zero API calls. Primary claim: structural
-  // timecode integrity (the code, not the AI, owns every timestamp).
-  // Secondary: work-context enrichment and opt-in cast-sheet consistency.
+  // 랜딩(비로그인 `/`) — design_handoff_zamak_landing 그대로. 마케팅 카피는
+  // 자주 바뀌므로 데모 데이터(히어로 4쌍, 엔진 3개, CPS 3개, 속도 4단계,
+  // 규칙 3행)까지 전부 여기에 둔다. 수치는 핸드오프의 "확인 필요 항목" —
+  // 실측으로 교체될 수 있다(docs/TODO.md).
   landing: {
+    wordmark: 'ZAMAK',
+    /** All four CTAs point at the same Google sign-in. */
+    cta: '무료로 시작하기',
+    notConfigured: '로그인이 아직 설정되지 않았어요.',
+
+    nav: {
+      compare: '번역 비교',
+      speed: '속도',
+      cps: '자막 규칙',
+    },
+
     hero: {
-      title: '번역해도,\n뒤 자막이 밀리지 않도록.',
-      subtitle: 'AI는 대사만 번역하고, 코드가 타임코드를 복원합니다.',
-      cta: 'Google로 무료 시작하기',
-      // 베타 한시적: 3편. 정식 오픈 시 1편으로 되돌릴 것 (docs/decisions.md 2026-07-27).
-      ctaHint: '가입 즉시 번역권 3편 무료 · 카드 등록 없음',
-    },
-    // Landing-specific reassurance row — separate from upload.reassure so
-    // the two pages can evolve independently.
-    reassure: ['SRT·VTT·SMI·ASS', '설치 없이 바로', '로그인만으로 시작'] as readonly string[],
-    proof: {
-      eyebrow: '결과물',
-      title: '타임코드는 그대로,\n대사는 자연스럽게.',
-      subtitle:
-        '형사물 예문이에요. 선배와 신입의 말투, 그리고 번호·타임코드가 어떻게 유지되는지 눈으로 확인하세요.',
-      srcLabel: '원본',
-      dstLabel: 'ZAMAK',
-      blocks: [
+      title: '번역기 티가 안 나는\n한국어 자막',
+      sub: '자막 파일을 올리면 한글 자막 표준 규칙에 맞춘 자연스러운 번역이 10초 안에 내려옵니다.',
+      secondaryCta: '번역 품질 비교하기',
+      note: '실제 번역 결과 예시. 타임코드는 원본 그대로 유지됩니다.',
+      demoLabel: '번역 결과 예시',
+      pairs: [
         {
-          no: '24',
-          tc: '00:12:07,332 --> 00:12:09,150',
-          src: 'You called it in yet?',
-          dst: '보고는 올렸어?',
+          lang: 'EN',
+          tc: '00:41:07,220',
+          src: '"You’re telling me she just walked out? In the middle of the ceremony?"',
+          ko: '식 도중에 그냥 나가 버렸다고?',
         },
         {
-          no: '25',
-          tc: '00:12:09,433 --> 00:12:11,900',
-          src: 'Not yet. I thought you should see it first.',
-          dst: '아직입니다. 선배가 먼저 보셔야 할 것 같아서요.',
+          lang: 'JA',
+          tc: '00:12:44,050',
+          src: '「そんなつもりじゃなかったんだ。信じてくれ。」',
+          ko: '그럴 생각은 없었어. 믿어 줘',
         },
         {
-          no: '26',
-          tc: '00:12:12,410 --> 00:12:15,224',
-          src: 'Good call. This stays between us for now.',
-          dst: '잘 판단했어. 당분간 우리끼리만 알고 있자.',
-        },
-      ],
-      note: '타임코드는 코드가 원본에서 복원합니다. AI가 줄을 합치거나 빠뜨려도 이후 자막이 밀리는 건 구조적으로 막혀 있어요.',
-    },
-    // Each item is its own full-bleed chapter (Toss-style), not a card grid.
-    features: {
-      items: [
-        {
-          eyebrow: '타임코드',
-          title: 'AI가 줄을 합쳐도,\n뒤 자막은 밀리지 않아요.',
-          body: 'AI에는 대사만 보내고, 타임코드는 코드가 원본과 재결합합니다. 그래서 번역 뒤에도 싱크가 연쇄로 흐트러지지 않아요.',
+          lang: 'EN',
+          tc: '01:03:18,900',
+          src: '"Don’t you dare walk away from me right now."',
+          ko: '지금 나한테서 등 돌릴 생각 하지 마',
         },
         {
-          eyebrow: '작품 맥락',
-          title: '장르와 톤까지\n읽어서 번역해요.',
-          body: 'TMDB와 Google 검색으로 장르·배경·톤을 보강해요. 같은 문장이라도 작품 분위기에 맞게 나와요.',
-        },
-        {
-          eyebrow: '말투 · 용어',
-          title: '인물 말투와 고유명사,\n필요할 때만 켜요.',
-          badge: 'opt-in',
-          body: '켜면 파일 전체를 스캔해 존댓말/반말 관계와 고유명사 표기를 청크마다 통일합니다. 기본은 꺼져 있어요.',
-        },
-        {
-          eyebrow: '안정성',
-          title: '빠진 줄은 다시 번역하고,\n안 되면 원문을 남기요.',
-          body: '어긋난 줄만 모아 한 번 더 요청합니다. 끝내 안 되는 줄은 원문 그대로 두어, 항상 재생 가능한 완전한 자막 파일을 돌려줍니다.',
+          lang: 'FR',
+          tc: '00:27:55,410',
+          src: '« On ne voit bien qu’avec le cœur. »',
+          ko: '마음으로 봐야 제대로 보이는 법이야',
         },
       ],
     },
-    specs: {
-      eyebrow: '한눈에',
-      title: '필요한 것만\n깔끔하게.',
-      items: [
-        { label: '지원 형식', value: 'SRT · VTT · SMI · ASS' },
-        { label: '출력', value: '올린 형식 또는 SRT' },
-        { label: '번역 모델', value: 'Flash · Pro' },
+
+    compare: {
+      title: '같은 대사, 다른 번역.',
+      sub: '직접 비교해 보세요. 자막은 읽는 글이 아니라 듣는 말입니다.',
+      tablistLabel: '번역 엔진 선택',
+      sourceLabel: '원문 대사',
+      sourceLine:
+        '"You’re telling me she just walked out? In the middle of the ceremony?"',
+      sourceMeta: '00:41:07,220 → 00:41:09,850 · 2.6초 노출',
+      resultLabel: (engine: string) => `${engine}의 번역`,
+      outro:
+        'ZAMAK은 문장을 옮기지 않고 장면을 옮깁니다. 화면에 떠 있는 시간 안에 읽히도록, 말투와 관계까지 그대로.',
+      engines: [
         {
-          label: '도착어',
-          value: '한국어 · 영어 · 일본어 · 스페인어 · 프랑스어 · 중국어 · 독일어',
+          name: '일반 번역기',
+          out: '"당신은 그녀가 그냥 걸어 나갔다고 나에게 말하고 있는 건가요? 의식 한가운데에서?"',
+          tags: [
+            { label: 'CPS 17.3 초과', tone: 'red' },
+            { label: '어색한 직역', tone: 'red' },
+            { label: '말투 불일치', tone: 'red' },
+          ],
+        },
+        {
+          name: '범용 AI 모델',
+          out: '"그녀가 식 중간에 그냥 나가버렸다고 말하는 거야?"',
+          tags: [
+            { label: '문장은 자연스러움', tone: 'neutral' },
+            { label: 'CPS 9.6 아슬아슬', tone: 'orange' },
+            { label: '자막 규칙 미적용', tone: 'orange' },
+          ],
+        },
+        {
+          name: 'ZAMAK',
+          out: '"식 도중에 그냥 나가 버렸다고?"',
+          tags: [
+            { label: 'CPS 6.2 충족', tone: 'green' },
+            { label: '표준 규칙 적용', tone: 'green' },
+            { label: '반문 뉘앙스 유지', tone: 'green' },
+          ],
         },
       ],
     },
-    how: {
-      eyebrow: '이용 방법',
-      title: '올리면,\n확인하고,\n받아요.',
+
+    speed: {
+      titleTop: '업로드에서 다운로드까지,',
+      titleAccent: '최고 속도 10초.',
+      body: '영상 파일은 필요 없습니다. 자막 파일 하나만 올리면 언어 인식부터 규칙 적용, 최종 파일 생성까지 한 번에 끝납니다.',
       steps: [
-        { title: '업로드', body: '.srt · .vtt · .smi · .ass 파일을 올려요.' },
         {
-          title: '확인',
-          body: '작품 정보를 확인하고 번역을 시작해요.',
+          time: '0:00',
+          title: '자막 파일 업로드',
+          desc: '.srt .vtt .ass .smi, 무엇이든. 조잡한 자동 자막도 괜찮습니다.',
         },
         {
-          title: '다운로드',
-          body: '번역된 자막 파일을 받아요.',
+          time: '0:01',
+          title: '언어 · 작품 자동 인식',
+          desc: '원본 언어를 감지하고 영상 종류에 맞는 번역 프로필을 고릅니다.',
+        },
+        {
+          time: '0:03',
+          title: '번역 + 규칙 적용',
+          desc: '자연스러운 한국어로 옮기며 CPS와 표준 자막 규칙을 동시에 맞춥니다.',
+        },
+        {
+          time: '0:10',
+          title: '완성 파일 다운로드',
+          desc: '타임코드와 스타일은 원본 그대로. 바로 영상에 얹으면 됩니다.',
         },
       ],
     },
-    closing: {
-      // 베타 한시적: 3편. 정식 오픈 시 1편으로 되돌릴 것 (docs/decisions.md 2026-07-27).
-      title: '첫 3편은\n무료예요.',
-      body: '로그인하면 번역권 3편을 바로 드려요. 사람에게 맡기면 편당 15만 원. 먼저 결과물로 판단하세요.',
+
+    cps: {
+      title: '영상마다 읽는 속도가 다릅니다.',
+      sub: 'ZAMAK은 CPS(초당 글자 수)를 계산해 영상 종류에 맞는 자막 길이를 자동으로 맞춥니다. 화면에 뜬 시간 안에 다 읽히도록.',
+      tablistLabel: '영상 종류 선택',
+      speedLabel: '권장 읽기 속도',
+      unit: 'CPS',
+      lineLenLabel: '한 줄 최대',
+      lineCountLabel: '줄 수',
+      lineCountValue: '최대 2줄',
+      actionLabel: 'ZAMAK이 하는 일',
+      profiles: [
+        {
+          name: '영화 · 드라마',
+          value: '12',
+          lineLen: '18자',
+          action: '긴 대사는 두 줄로 분할, 조사 단위로 줄바꿈',
+          lines: ['식 도중에 그냥', '나가 버렸다고?'],
+          tc: '00:41:07 → 00:41:09',
+          measured: 'CPS 6.2 ✓',
+        },
+        {
+          name: '예능 · 유튜브',
+          value: '14',
+          lineLen: '20자',
+          action: '빠른 티키타카에 맞춰 짧고 리듬감 있게 압축',
+          lines: ['아니 진짜 중간에 나갔다고?'],
+          tc: '00:03:12 → 00:03:13',
+          measured: 'CPS 13.0 ✓',
+        },
+        {
+          name: '다큐 · 강연',
+          value: '10',
+          lineLen: '16자',
+          action: '정보 밀도가 높은 문장은 노출 시간에 맞춰 요약',
+          lines: ['그녀는 예식 도중', '자리를 떠났습니다'],
+          tc: '00:18:40 → 00:18:44',
+          measured: 'CPS 4.3 ✓',
+        },
+      ],
     },
-    footerNote: '자막 번역 도구',
+
+    features: {
+      title: '전문 자막가의 규칙을\n그대로 배웠습니다.',
+      rules: {
+        title: '한글 자막 표준 규칙 적용',
+        body: '방송·OTT에서 쓰는 표기 규칙을 그대로 따릅니다. 문장부호, 숫자 표기, 말줄임, 두 줄 분할까지 감수 없이 바로 쓸 수 있는 상태로.',
+        rows: [
+          { before: '3천만 달러라구요?!', after: '3,000만 달러라고요?' },
+          { before: '오 마이 갓...!!', after: '세상에…' },
+          {
+            before: '한 줄에 스물여덟 글자가 넘어가는 긴 자막',
+            after: '두 줄로 자연스럽게 분할',
+          },
+        ],
+      },
+      formats: {
+        title: '모든 자막 포맷 지원',
+        body: '스타일과 타임코드는 손대지 않고 대사만 바꿉니다. 올린 포맷 그대로 내려받으세요.',
+        chips: ['.srt', '.vtt', '.ass', '.smi'],
+      },
+      languages: {
+        title: '모든 언어 → 한국어',
+        body: '원본 언어는 자동으로 인식합니다. 영어, 일본어, 중국어부터 스페인어, 프랑스어까지, 어떤 언어든 한국어로.',
+        codes: 'EN JA ZH ES FR DE + 90개 언어',
+      },
+    },
+
+    final: {
+      title: '자막 하나 올려 보면\n바로 알게 됩니다.',
+      sub: '가입 후 첫 파일은 무료입니다. 신용카드도 필요 없어요.',
+      badge: '비공개 베타 운영 중',
+    },
   },
 
   credits: {
-    emptyTitle: '번역권을 모두 사용했어요',
-    // 베타 한시적: 3편. 정식 오픈 시 1편으로 되돌릴 것 (docs/decisions.md 2026-07-27).
-    emptyBody:
-      '무료로 드린 3편을 다 쓰셨어요. 번역권을 충전하면 이어서 번역할 수 있어요.',
-    emptyCta: '번역권 충전하기',
     tooLargeTitle: '파일이 너무 커요',
     tooLargeBody: (max: number, actual: number) =>
       `번역권 1편은 자막 ${max.toLocaleString()}줄까지 커버해요. 이 파일은 ${actual.toLocaleString()}줄이에요.`,
     startOver: '다른 파일 올리기',
+  },
+
+  // 번역권 소진 화면 (insufficient_credits). 베타에는 결제창이 없으니 막다른
+  // 골목 대신 결제 오픈 대기자 등록을 둔다.
+  exhausted: {
+    title: (kind: string) => `${kind} 번역권을 모두 썼어요`,
+    kindLite: '라이트',
+    kindPro: '프로',
+    body: '결제 기능을 준비하고 있어요.\n준비되면 가장 먼저 알려드릴게요. 파일은 안전하게 보관됩니다.',
+    waitlistLabel: '결제 오픈 대기자 등록',
+    emailPlaceholder: '이메일 주소',
+    join: '등록',
+    joined: '대기자로 등록됐어요. 오픈하면 바로 메일을 드릴게요.',
+    joinFailed: '등록하지 못했어요. 이메일을 확인해 주세요.',
+    goHistory: '지난 번역 다시 받기',
+    back: '설정으로 돌아가기',
   },
 
   // Prepaid credit packs. The anchor is deliberately the human-translator price
@@ -152,10 +264,9 @@ export const COPY = {
     close: '돌아가기',
     balance: (n: number) => `현재 번역권 ${n}편`,
     notice: [
-      '카드·간편결제로 결제돼요. 결제는 토스페이먼츠가 처리해요.',
-      '번역권은 유효기간이 없고, 사용하지 않은 번역권은 환불할 수 있어요.',
+      '번역권은 유효기간이 없어요.',
     ],
-    terms: '환불 · 이용 안내',
+    terms: '이용 안내',
     done: (n: number) => `번역권 ${n}편이 충전됐어요!`,
     // Toss error codes are opaque to buyers; only the cause that they can act
     // on is worth naming, and everything else gets one honest sentence.
@@ -170,20 +281,25 @@ export const COPY = {
   },
 
   upload: {
-    title: '자막을 올려주세요',
-    subtitle: '한 번의 업로드로 끝. 작품 맥락을 반영한 번역 자막을 받아요.',
-    dropTitle: '파일을 여기에 끌어다 놓으세요',
-    dropOr: '또는',
-    browse: '파일 선택',
-    formats: 'SRT · VTT · SMI · ASS 지원',
+    title: '파일 업로드',
+    subtitle: '타임코드는 그대로, 대사만 자연스러운 한국어로 옮겨 드립니다.',
+    kindLabel: '콘텐츠 유형',
+    kindMovie: '영화 · 드라마',
+    kindMovieSub: '작품을 찾아 시대·말투까지 맞춰요',
+    kindOther: '유튜브 · 일반 영상',
+    kindOtherSub: '원하는 톤앤매너를 직접 지정해요',
+    dropTitle: '자막 파일을 여기에 놓으세요',
+    dropFormats: '.srt .vtt .ass .smi - 원본 언어 자동 인식',
+    dropButton: '파일 선택',
+    dropLocked: '먼저 콘텐츠 유형을 선택하세요',
+    readingTitle: (name: string) => `${name} 읽는 중…`,
+    readingSub: '타임코드를 확인하고 작품을 찾고 있어요',
+    noVideoNeeded:
+      '영상 파일은 필요하지 않아요. 조잡한 자동 자막도 괜찮습니다.',
+    // LanguageSelect.tsx는 이 화면에서 더 이상 호출되지 않지만 컴포넌트 자체는
+    // 확장 대비로 남아 있고, 그 컴포넌트가 이 두 키를 여전히 읽는다.
     langLabel: '어떤 언어로 바꿔드릴까요?',
-    langDetect: '언어 감지',
     comingSoon: '곧 지원',
-    typeLabel: '무엇을 번역하나요?',
-    typeMovie: '영화 · 드라마',
-    typeOther: '기타 영상',
-    typeOtherHint: '유튜브 · 인터뷰 · 강연 등',
-    reassure: ['빠른 번역 · 고급 번역', '후속 자막 밀림 방지', '설치 없이 바로'],
     invalidFile: 'SRT, VTT, SMI, ASS 파일만 올릴 수 있어요.',
     unreadableFile:
       '자막을 읽지 못했어요. 파일이 손상되지 않았는지 확인하고 다시 올려주세요.',
@@ -191,10 +307,13 @@ export const COPY = {
     // 섞인 결과를 내놓느니 여기서 돌려보낸다. 트랙 선택 UI는 docs/TODO.md.
     bilingualSmi:
       '두 개 언어가 함께 담긴 SMI 파일이에요. 아직 지원하지 않아요 — 한 언어만 담긴 파일로 올려주세요.',
-    // 업로드가 저작권 리스크가 실제로 발생하는 시점이라, 동의 모달 대신 여기에
-    // 상시 노출한다. 모달은 "30초면 번역돼요"라는 제품 약속과 정면으로 충돌한다.
+    // 업로드가 저작권 리스크가 실제로 발생하는 시점이라 여기에 상시 노출한다
+    // (decisions.md §1-11의 세 지점 중 첫 번째). 첫 번역 앞의 동의 모달(§5-7)은
+    // 이 문구를 대체하지 않고 위에 얹힌다.
     rightsNotice: '권리가 있는 자막만 올려주세요.',
-    storageNotice: '파일은 서버에 저장하지 않아요.',
+    // 반드시 '원본'으로 한정할 것 — 완성된 결과물은 30일간 보관한다
+    // (mypage.retention). 여기서 "파일"이라고 뭉뚱그리면 그 안내와 충돌한다.
+    storageNotice: '올리신 원본은 서버에 저장하지 않아요.',
   },
 
   info: {
@@ -225,7 +344,8 @@ export const COPY = {
     enrichFailed: '작품 정보 검색에 실패했어요.',
     // AI-derived keyword fields fed into the translation prompt. Editable so
     // a wrong AI guess can be corrected before translating.
-    aiInfoHint: 'AI가 자동으로 채운 정보예요. 번역 톤을 잡는 데 쓰이니, 틀리면 고쳐주세요.',
+    aiInfoHint:
+      'AI가 자동으로 채운 정보예요. 번역 톤을 잡는 데 쓰이니, 틀리면 고쳐주세요.',
     genreLabel: '장르',
     eraLabel: '배경/시대',
     toneLabel: '톤앤매너',
@@ -237,7 +357,8 @@ export const COPY = {
     summarizing: '내용을 요약하고 있어요…',
     summaryBadge: 'AI가 앞부분을 읽고 정리했어요',
     otherNotesLabel: '참고할 내용 · 선택',
-    otherNotesHint: '말투(존댓말/반말), 전문 용어 표기 등 참고할 내용을 적어주세요.',
+    otherNotesHint:
+      '말투(존댓말/반말), 전문 용어 표기 등 참고할 내용을 적어주세요.',
     // shared
     back: '이전',
     translatePro: '고급번역',
@@ -269,6 +390,61 @@ export const COPY = {
     },
   },
 
+  settings: {
+    title: '번역 설정',
+    subtitleAuto: '원본 언어 자동 인식 → 한국어',
+    confirmBadge: '확인 필요',
+    confirmQuestion: (work: string) => `'${work}'(으)로 인식했어요. 맞나요?`,
+    confirmHint: '아니라면 다시 골라 주세요',
+    confirmYes: '맞아요',
+    confirmNo: '아니에요',
+    changeWork: '작품 변경',
+    eraLabel: '시대 · 배경',
+    eraPlaceholder: '예: 1920년대 아일랜드 해안, 고립된 등대',
+    toneLabel: '톤앤매너',
+    tonePlaceholder: '예: 고전적이고 절제된 어투, 심리극',
+    contextEditable: '(수정 가능)',
+    contextHint: '번역에 그대로 반영돼요. 비워 두면 자막만 보고 판단해요.',
+    // Section labels above each group of settings (design_handoff_zamak_brand).
+    sectionWork: '작품 정보',
+    sectionQuality: '번역 품질',
+    sectionAdvanced: '세부 조정 (선택)',
+    liteName: '라이트',
+    liteDesc: '빠르고 정확한 기본 번역.',
+    // Second line of the lite card — the speed promise the handoff leads with.
+    liteDescSpeed: '10초면 다운로드까지 끝나요.',
+    proName: '프로',
+    proDesc: '작품 맥락 분석과 인물명 일관성. 후편집 시간을 줄이는 초벌 번역.',
+    // "무료" is load-bearing for the beta: the credits are a gift, not a
+    // purchase. Revisit this wording when paid credits ship.
+    creditsLeft: (n: number) => `무료 ${n}회 남음`,
+    glossaryTitle: '용어집 · 말투 설정',
+    glossaryBadge: '고급',
+    glossaryDesc:
+      '인물명 표기를 고정하고 인물 간 존대·반말을 지정해요. 약 20초 더 걸려요.',
+    eta: (sec: number) => `예상 소요 약 ${sec}초`,
+    start: '번역 시작',
+  },
+
+  workPick: {
+    sourceLangBadge: '원본 언어: 자동 인식',
+    title: '어떤 작품인가요?',
+    subtitle: '작품을 골라 주시면 시대배경과 말투까지 조율해 번역해요.',
+    posterEmpty: 'poster',
+    kindMovie: '영화',
+    kindTv: '드라마',
+    searchOpen: '찾는 작품이 없어요',
+    searchClose: '검색 닫기',
+    searchPlaceholder: '작품 제목을 검색하세요',
+    // enrich()는 제목+연도만 받는다. 감독으로 찾아준다고 쓰면 못 지키는 약속이 된다.
+    searchHint: '제목으로 다시 찾아 드려요. 못 찾아도 번역은 계속할 수 있어요.',
+    confirm: '이 작품으로 계속',
+    otherTypeLabel: '콘텐츠 유형',
+    otherTypes: ['유튜브', '강연·인터뷰', '브이로그', '기타'],
+    toneLabel: '원하는 톤앤매너',
+    tonePlaceholder: '예: 친근한 반말, 유튜브 예능 자막처럼 리듬감 있게',
+  },
+
   progress: {
     label: '번역 중',
     analyzing: '파일을 분석하고 있어요',
@@ -285,6 +461,16 @@ export const COPY = {
     reassure: '번역이 끝날 때까지 이 창을 열어두세요.',
     cancel: '취소',
     cancelConfirm: '번역을 취소할까요?',
+    stages: {
+      context: '자막 맥락을 분석하는 중',
+      glossary: '인물과 용어를 정리하는 중',
+      translate: '자막을 번역하는 중',
+      verify: '타임코드를 검증하는 중',
+    },
+    stageSkipped: '건너뜀',
+    pct: (pct: number, sec: number) =>
+      `${String(Math.floor(pct)).padStart(2, '0')}% · 약 ${sec}초 남음`,
+    keepOpen: '창을 닫아도 번역은 계속돼요',
   },
 
   // Failure strings for the translation run. useTranslation takes these as a
@@ -307,12 +493,29 @@ export const COPY = {
     downloadAs: (extension: string) => `.${extension}로 다운로드`,
     downloadAsHint: (extension: string) =>
       `올린 형식 그대로 받아요. 자막 스타일·설정은 원본을 유지하고 대사만 바뀌어요. (.${extension})`,
-    summaryLines: '번역된 줄',
-    summaryTime: '걸린 시간',
-    summaryTimecodeValue: '번호 매칭',
-    summaryTimecode: '타임코드 처리',
-    previewTitle: '번역 미리보기',
     startOver: '새 파일 번역하기',
+    goHistory: '내 번역 보기',
+    // 실제로 무엇을 했는지 적는 리포트 카드. buildReport()가 실측한 항목만
+    // 골라내고, 여기 함수들이 그 값을 문장으로 만든다 — 계측하지 않은
+    // "CPS 조정 23곳" 같은 줄은 buildReport 쪽에서부터 아예 나오지 않는다.
+    reportTitle: '이 번역에 실제로 적용된 것',
+    report: {
+      timecode: (lines: number, fallback: number) =>
+        fallback === 0
+          ? `타임코드 ${lines.toLocaleString()}개를 검증했어요. 원문 그대로 남은 구간은 0줄입니다`
+          : `타임코드 ${lines.toLocaleString()}개를 검증했어요. 원문 그대로 남은 구간은 ${fallback}줄입니다`,
+      context: (context: string) =>
+        `작품 맥락(${context})에 맞춰 어휘와 문체를 골랐어요`,
+      glossary: (terms: number) =>
+        `용어집 ${terms}개 표기를 자막 전체에 일관되게 적용했어요`,
+      relations: (pairs: number) =>
+        `설정한 존대·반말 관계 ${pairs}쌍을 대화 전체에 반영했어요`,
+    },
+    feedbackTitle: '이번 번역, 어땠나요?',
+    feedbackPlaceholder: '자유롭게 남겨주세요 (선택)',
+    feedbackSend: '보내기',
+    feedbackThanks: '의견 감사해요. 베타를 다듬는 데 큰 힘이 됩니다.',
+    feedbackFailed: '의견을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.',
     // Lines still holding their original text in the downloaded file, after
     // the recovery sweep has already retried them. Counted per line, not per
     // chunk: the sweep works block by block, so "구간 2개 실패" would describe
@@ -322,14 +525,106 @@ export const COPY = {
     stopReason: {
       quota:
         'API 사용 한도를 초과해 번역을 도중에 멈췄어요. 여기까지는 저장됐고, 나머지는 원문 그대로예요.',
-      auth:
-        '인증에 문제가 생겨 번역을 도중에 멈췄어요. 여기까지는 저장됐고, 나머지는 원문 그대로예요. 다시 로그인한 뒤 새로 시도해주세요.',
+      auth: '인증에 문제가 생겨 번역을 도중에 멈췄어요. 여기까지는 저장됐고, 나머지는 원문 그대로예요. 다시 로그인한 뒤 새로 시도해주세요.',
     },
+  },
+
+  // 재방문 후속 모달 — "실제로 쓰셨나요"는 완료 화면에서 답할 수 없는
+  // 질문이라(그 시점엔 파일을 열어보지도 않았다) 나중 방문에 따로 묻는다.
+  // 대상·시점은 서버(pending_feedback_job)가 정한다.
+  feedbackFollowup: {
+    title: '지난 번역, 어땠나요?',
+    subtitle: (filename: string) => `${filename}을(를) 실제로 써보셨나요?`,
+    usability: {
+      'as-is': '그대로 썼어요',
+      'minor-edits': '조금 고쳐서 썼어요',
+      'major-edits': '많이 고쳐서 썼어요',
+      unusable: '쓸 수 없었어요',
+    },
+    issuesTitle: '어떤 부분이 문제였나요? (복수 선택 가능)',
+    issues: {
+      mistranslation: '오역',
+      'speech-level': '존댓말·반말',
+      naming: '이름·용어 표기',
+      'too-long': '자막이 너무 길어요',
+      unnatural: '어색한 문장',
+      timing: '타이밍',
+    },
+    linesTitle: '문제가 된 줄이 있다면 골라주세요 (선택)',
+    linesHint: (max: number) => `최대 ${max}줄까지 고를 수 있어요.`,
+    linesSearchPlaceholder: '대사로 검색',
+    linesEmpty: '검색 결과가 없어요.',
+    linesLoadFailed: '결과물을 불러오지 못해 이 단계는 건너뛸게요.',
+    linesSkip: '건너뛰기',
+    commentTitle: '한 줄로 남겨주신다면',
+    commentPlaceholder: '자유롭게 남겨주세요 (선택)',
+    next: '다음',
+    submit: '보내기',
+    later: '나중에',
+    thanks: '의견 감사해요. 베타를 다듬는 데 큰 힘이 됩니다.',
+    close: '닫기',
+    failed: '저장하지 못했어요. 잠시 후 다시 시도해 주세요.',
+  },
+
+  // 내 번역(/mypage) — 번역권 잔여 + 지난 번역 기록.
+  mypage: {
+    title: '내 번역',
+    creditsTitle: '남은 번역권',
+    liteCredits: '라이트 번역권',
+    proCredits: '프로 번역권',
+    unit: '회',
+    historyTitle: '번역 기록',
+    retention: (days: number) => `완성된 자막은 ${days}일간 보관해요.`,
+    download: '다시 받기',
+    expired: '보관 기간 지남',
+    empty: '아직 번역한 파일이 없어요.',
+    again: '새 파일 번역하기',
+    // 용어집은 적용됐을 때만 붙는다 — 켰지만 추출이 실패한 런에는 붙지 않는다.
+    meta: (date: string, model: string, glossary: boolean) =>
+      `${date} · ${model}${glossary ? ' · 용어집' : ''}`,
   },
 
   footer: {
     feedback: '피드백 보내기',
     feedbackEmail: 'hello@mut36.com',
+    sellerInfo: '사업자 정보 확인',
+    tagline: '타임코드가 밀리지 않는 자막 번역기.',
+    serviceGroup: '서비스',
+    policyGroup: '정책',
+    home: '홈',
+    mypage: '마이페이지',
+    copyright: '© 2026 ZAMAK. All rights reserved.',
+  },
+
+  /**
+   * 전자상거래법 제10조가 요구하는 판매자 표시. 푸터(모든 페이지)와 `/legal`의
+   * 사업자 정보 표가 **같은 이 객체**를 읽는다 — 두 곳에 따로 적으면 한쪽만
+   * 고쳐져 갈라진다. 홈페이지는 `SITE.url`, 고객문의는 `footer.feedbackEmail`을
+   * 그대로 쓰므로 여기 중복해 두지 않는다.
+   */
+  seller: {
+    name: '뭍36 (MUT36)',
+    ceo: '이지안',
+    bizNo: '224-23-65160',
+    address: '서울특별시 여의대방로22길 24',
+    tel: '010-7927-9836',
+    // 면제는 조건부다 — 직전 연도 거래가 50회를 넘으면 신고 후 이 두 문구를
+    // 실제 신고번호로 바꿔야 한다(`docs/TODO.md` 결제 오픈 항목).
+    mailOrder: '신고 면제 (직전 연도 통신판매 거래 횟수 50회 미만)',
+    mailOrderShort: '통신판매업 신고 면제',
+    hosting: 'Vercel Inc.',
+  },
+
+  // 첫 번역 전에 한 번 받는 저작권 동의 모달. 닫기 없이 동의만 가능한
+  // 필수 게이트라 취소 문구가 없다.
+  copyright: {
+    title: '시작하기 전에',
+    body:
+      'ZAMAK은 이용자가 적법하게 보유한 자막 파일의 번역만 지원해요. ' +
+      '업로드하는 파일에 대한 권리와 책임은 이용자에게 있습니다.',
+    checkbox: '저작권 안내를 확인했고, 이에 동의합니다',
+    agree: '동의하고 시작하기',
+    failed: '동의를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.',
   },
 
   // 약관·처리방침 링크와 그 주변 마이크로카피. 본문 장문은 app/legal/*에

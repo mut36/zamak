@@ -4,6 +4,7 @@ import { ALLOWED_MODELS, type AllowedModel } from '../../config/constants';
 import { geminiProvider } from './gemini';
 import type {
   GenerateTextRequest,
+  GenerateTextResult,
   ModelProvider,
   ProviderApiKeys,
 } from './types';
@@ -32,7 +33,7 @@ export function isModelProviderConfigured(
 export async function generateModelText(
   request: Omit<GenerateTextRequest, 'apiKey'>,
   apiKeys: ProviderApiKeys = {},
-): Promise<string> {
+): Promise<GenerateTextResult> {
   assertAllowed(request.model);
   return geminiProvider.generateText({ ...request, apiKey: apiKeys.gemini });
 }

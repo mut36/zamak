@@ -1,66 +1,138 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
-import { BrandMark } from './components/BrandMark';
-import { StepTracker } from './components/simple/StepTracker';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { UploadStep } from './components/simple/UploadStep';
-import { InfoStep } from './components/simple/InfoStep';
+import { WorkPickStep } from './components/beta/WorkPickStep';
+import { TranslateSettingsStep } from './components/beta/TranslateSettingsStep';
 import { ProgressStep } from './components/simple/ProgressStep';
 import { DoneStep } from './components/simple/DoneStep';
 import { LandingPage } from './components/simple/LandingPage';
-import { CreditWall } from './components/simple/CreditWall';
-import { PurchaseStep } from './components/simple/PurchaseStep';
-import { useTranslation } from './hooks/useTranslation';
-import { useEnrich, type EnrichCandidate } from './hooks/useEnrich';
-import { useCastSheet } from './hooks/useCastSheet';
+import { ExhaustedStep } from './components/beta/ExhaustedStep';
+import { CopyrightModal } from './components/beta/CopyrightModal';
+import { FeedbackFollowup } from './components/beta/FeedbackFollowup';
+import { AppNav } from './components/beta/AppNav';
+import { SiteFooter } from './components/SiteFooter';
+import { useWizard } from './hooks/useWizard';
 import { useAuth } from './hooks/useAuth';
-import { parseSrtBlocks } from './lib/srt';
-import {
-  BilingualSmiError,
-  isSupportedSubtitleFilename,
-  loadSubtitleFile,
-} from './lib/subtitles';
+import { useFeedbackFollowup } from './hooks/useFeedbackFollowup';
 import { isSupabaseConfigured } from './lib/supabase/env';
-import { DEFAULT_TARGET_LANG } from './config/languages';
-import type { AllowedModel } from './config/constants';
-import type { ContentType, MovieInfo } from './types/translation';
+import { recordEvent } from './lib/client/events';
+import { estimateTranslationMs, GLOSSARY_WAIT_MS } from './config/constants';
 import { COPY } from './i18n/simpleCopy';
 
-const EMPTY_MOVIE_INFO: MovieInfo = { title: '', year: '', notes: '' };
-// Keep in sync with package.json version.
-const APP_VERSION = '0.15.0';
-
-/**
- * A bilingual SAMI is the one failure with a fix the user can act on (upload a
- * single-language file), so it gets its own message. Everything else — an
- * unrecognized body, no cues, a decode failure — reads the same from here.
- */
-function uploadErrorMessage(err: unknown): string {
-  return err instanceof BilingualSmiError
-    ? COPY.upload.bilingualSmi
-    : COPY.upload.unreadableFile;
-}
+// Work identification (enrich for the movie branch, otherType/toneText for
+// the "other" branch) is always resolved by the time handleTranslate can
+// even be called — it only fires from the settings screen, which is reached
+// through confirmWorkPick or the settings screen's own confirm banner, both
+// of which settle movieInfo first. overallPercent's `enrichDone: false`
+// branch exists for that function's own general behavior (its test suite
+// covers it directly); it is not a state this wizard's wiring ever reaches,
+// so ProgressStep always gets `true` here.
+const ENRICH_ALWAYS_DONE = true;
 
 export default function Home() {
-  const [step, setStep] = useState(0);
-  const [contentType, setContentType] = useState<ContentType>('movie');
-  const [targetLang, setTargetLang] = useState<string>(DEFAULT_TARGET_LANG);
-  const [movieInfo, setMovieInfo] = useState<MovieInfo>(EMPTY_MOVIE_INFO);
-  const [uploadError, setUploadError] = useState('');
-  const [summarizing, setSummarizing] = useState(false);
   const [authError, setAuthError] = useState('');
-  const [purchasing, setPurchasing] = useState(false);
   const [purchaseNotice, setPurchaseNotice] = useState('');
+
+  const router = useRouter();
 
   const {
     user,
-    balance,
+    credits,
+    email,
     loading: authLoading,
     signIn,
     signOut,
     refreshBalance,
   } = useAuth();
+
+  const {
+    screen,
+    contentType,
+    setContentType,
+    targetLang,
+    movieInfo,
+    setMovieInfo,
+    uploadError,
+    uploading,
+    uploadingFileName,
+    handleFile,
+    handleTranslate,
+    handleCancel,
+    resetAll: resetWizard,
+    error,
+    analysis,
+    translationProgress,
+    result,
+    refusal,
+    clearRefusal,
+    jobId,
+    totalLines,
+    enrichStatus,
+    enrichCandidates,
+    castSheet,
+    fileContentRef,
+    movieInfoRef,
+    selectedIndex,
+    setSelectedIndex,
+    otherType,
+    setOtherType,
+    toneText,
+    setToneText,
+    searchWork,
+    confirmWorkPick,
+    workConfirmed,
+    autoMatched,
+    confirmWork,
+    goWorkPick,
+    model,
+    setModel,
+    showConsentModal,
+    consentPending,
+    consentError,
+    handleAgreeConsent,
+  } = useWizard(
+    {
+      translate: COPY.translateErrors,
+      upload: {
+        bilingualSmi: COPY.upload.bilingualSmi,
+        unreadableFile: COPY.upload.unreadableFile,
+        invalidFile: COPY.upload.invalidFile,
+      },
+      cancelConfirm: COPY.progress.cancelConfirm,
+      copyright: { failed: COPY.copyright.failed },
+    },
+    refreshBalance,
+    !!user,
+  );
+
+  // Re-visit follow-up: "did you actually use it" can't be answered on the
+  // completion screen, so it's asked once on app entry instead — see
+  // useFeedbackFollowup and app/api/feedback/pending.
+  const { item: pendingFeedback, clear: clearPendingFeedback } =
+    useFeedbackFollowup(!!user);
+
+  // Settings screen's confirm banner vs. settled card — a single confident
+  // TMDB match needs a yes/no before it's trusted, a manual pick or an
+  // already-confirmed one doesn't.
+  const needsConfirm = autoMatched && !workConfirmed;
+
+  // ETA promise for the settings screen's bottom bar — reuses the same
+  // per-model estimate the progress ring fills against (TRANSLATION_ESTIMATE_MS
+  // via estimateTranslationMs), plus the cast-sheet grace period when that
+  // toggle is on. No separate formula invented here.
+  const etaSeconds = Math.round(
+    (estimateTranslationMs(model) + (castSheet.enabled ? GLOSSARY_WAIT_MS : 0)) /
+      1000,
+  );
+
+  // page.tsx owns purchaseNotice (payment return chrome, not wizard state), so
+  // "start over" clears both the wizard and this screen's leftover banner.
+  const resetAll = () => {
+    resetWizard();
+    setPurchaseNotice('');
+  };
 
   // Both round-trips that leave the app — OAuth and the Toss payment window —
   // report back through query params. Read them once, then clean the URL so a
@@ -71,6 +143,10 @@ export default function Home() {
     let handled = false;
 
     if (params.get('auth_error')) {
+      // This effect only runs to sync a one-time redirect query param into
+      // state on mount (an external system, per the rule's own carve-out) —
+      // there is no render-time equivalent for "the URL said auth failed".
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAuthError(COPY.auth.failed);
       handled = true;
     }
@@ -98,324 +174,90 @@ export default function Home() {
     }
   }, [refreshBalance]);
 
-  const onMetaUpdate = useCallback(
-    (meta: { inferredTitle?: string; inferredYear?: string }) => {
-      setMovieInfo((prev) => ({
-        ...prev,
-        title: meta.inferredTitle || prev.title,
-        year: meta.inferredYear || prev.year,
-      }));
-    },
-    [],
-  );
-
-  const {
-    fileContent,
-    error,
-    analysis,
-    translationProgress,
-    result,
-    refusal,
-    processFile,
-    translate,
-    cancelTranslation,
-    clearFile,
-  } = useTranslation(COPY.translateErrors, onMetaUpdate);
-
-  const {
-    status: enrichStatus,
-    director,
-    error: enrichError,
-    candidates: enrichCandidates,
-    enrich,
-    selectCandidate,
-    reset: resetEnrich,
-  } = useEnrich();
-
-  const castSheet = useCastSheet();
-
-  const totalLines = useMemo(
-    () => (fileContent ? parseSrtBlocks(fileContent).length : 0),
-    [fileContent],
-  );
-
-  // Latest values for async callbacks, so the enrich/summarize lifecycle can
-  // live in the orchestrator (surviving step changes) without stale closures.
-  const movieInfoRef = useRef(movieInfo);
-  const fileContentRef = useRef(fileContent);
-  useEffect(() => {
-    movieInfoRef.current = movieInfo;
-    fileContentRef.current = fileContent;
-  }, [movieInfo, fileContent]);
-
-  const enrichStartedRef = useRef(false);
-  const summarizeStartedRef = useRef(false);
-
-  // Movie branch: one unified lookup (TMDB first, grounded search fallback —
-  // see enrichMovie() server-side). title/year/director/poster are UI-facing
-  // and overwrite the filename-guessed values with the authoritative ones;
-  // genre/era/tone are AI-facing keyword fields, never rendered. `notes`
-  // stays untouched here — it is the user's own free-text field.
-  const runEnrich = useCallback(async () => {
-    const { title, year } = movieInfoRef.current;
-    const data = await enrich(title, year);
-    setMovieInfo((prev) => ({
-      ...prev,
-      posterUrl: data?.posterUrl ?? undefined,
-      title: data?.found && data.title ? data.title : prev.title,
-      year: data?.found && data.year ? data.year : prev.year,
-      genre: data?.found ? data.genre : '',
-      era: data?.found ? data.era : '',
-      tone: data?.found ? data.tone : '',
-    }));
-  }, [enrich]);
-
-  // User picked one of several TMDB matches from the ambiguous-search
-  // candidate list (InfoStep) — resolve that specific work the same way
-  // runEnrich merges an auto-resolved one.
-  const runSelectCandidate = useCallback(
-    async (candidate: EnrichCandidate) => {
-      const { title, year } = movieInfoRef.current;
-      const data = await selectCandidate(candidate, title, year);
-      setMovieInfo((prev) => ({
-        ...prev,
-        posterUrl: data?.posterUrl ?? undefined,
-        title: data?.found && data.title ? data.title : prev.title,
-        year: data?.found && data.year ? data.year : prev.year,
-        genre: data?.found ? data.genre : '',
-        era: data?.found ? data.era : '',
-        tone: data?.found ? data.tone : '',
-      }));
-    },
-    [selectCandidate],
-  );
-
-  // Auto-analyze once per file: movie → web-search enrich + TMDB poster,
-  // other → summarize. Guarded by refs so returning never re-triggers.
-  useEffect(() => {
-    if (step !== 1) return;
-    if (contentType === 'movie') {
-      if (analysis.completed && !enrichStartedRef.current) {
-        enrichStartedRef.current = true;
-        runEnrich();
-      }
-    } else if (fileContent && !summarizeStartedRef.current) {
-      summarizeStartedRef.current = true;
-      (async () => {
-        setSummarizing(true);
-        try {
-          const res = await fetch('/api/summarize', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: fileContentRef.current }),
-          });
-          const data = res.ok ? await res.json() : { summary: '' };
-          if (data.summary) {
-            setMovieInfo((prev) => ({ ...prev, notes: prev.notes || data.summary }));
-          }
-        } catch {
-          /* leave notes empty on failure */
-        } finally {
-          setSummarizing(false);
-        }
-      })();
-    }
-  }, [step, contentType, analysis.completed, fileContent, runEnrich]);
-
-  // Cast-sheet prepass: independent opt-in toggle (see docs/decisions.md).
-  // request() no-ops while already in flight/done for this file (internal
-  // ref guard), so firing this effect on every fileContent/enabled change is
-  // safe — it only actually dispatches once per file, and only when enabled.
-  const castSheetEnabled = castSheet.enabled;
-  const requestCastSheet = castSheet.request;
-  useEffect(() => {
-    if (step !== 1) return;
-    if (!castSheetEnabled) return;
-    if (!fileContent) return;
-    requestCastSheet(fileContentRef.current, movieInfoRef.current, targetLang);
-  }, [step, castSheetEnabled, fileContent, requestCastSheet, targetLang]);
-
-  const resetAnalysis = () => {
-    enrichStartedRef.current = false;
-    summarizeStartedRef.current = false;
-    resetEnrich();
-    castSheet.reset();
-    setSummarizing(false);
-  };
-
-  const handleFile = async (selected: File) => {
-    if (!isSupportedSubtitleFilename(selected.name)) {
-      setUploadError(COPY.upload.invalidFile);
-      return;
-    }
-    setUploadError('');
-
-    // Parsing is awaited here rather than inside the hook so a file we can't
-    // use never leaves this screen: the error belongs next to the dropzone,
-    // not on the info step behind a spinner.
-    let doc;
-    try {
-      doc = await loadSubtitleFile(selected);
-    } catch (err) {
-      setUploadError(uploadErrorMessage(err));
-      return;
-    }
-
-    setMovieInfo(EMPTY_MOVIE_INFO);
-    resetAnalysis();
-    // Step 1 goes up immediately so the "분석 중" spinner covers the wait.
-    processFile(selected, doc);
-    setStep(1);
-  };
-
-  const handleTranslate = async (model: AllowedModel) => {
-    setStep(2);
-    // Give a still-running extraction a bounded grace period rather than
-    // blocking indefinitely or always shipping without it — see
-    // GLOSSARY_WAIT_MS. Never called (resolves immediately) when the toggle
-    // is off, since no extraction was ever kicked off.
-    const resolvedCastSheet = castSheet.enabled
-      ? await castSheet.awaitReady()
-      : undefined;
-    // translate() resolves true on success, false on error/abort/refusal.
-    const ok = await translate(
-      movieInfo,
-      model,
-      targetLang,
-      'meaning',
-      undefined,
-      resolvedCastSheet,
-    );
-    // The balance moved either way: a success spent the credit, and a refusal
-    // means our cached number was stale.
-    refreshBalance();
-    setStep(ok ? 3 : 1);
-  };
-
-  const handleCancel = () => {
-    if (confirm(COPY.progress.cancelConfirm)) {
-      cancelTranslation();
-      setStep(1);
-    }
-  };
-
-  const resetAll = () => {
-    cancelTranslation();
-    clearFile();
-    resetAnalysis();
-    setMovieInfo(EMPTY_MOVIE_INFO);
-    setUploadError('');
-    setContentType('movie');
-    setPurchasing(false);
-    setPurchaseNotice('');
-    setStep(0);
-  };
-
-  const header = (
-    <header className='flex items-center justify-between w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 h-16'>
-      <BrandMark onClick={resetAll} />
-      <div className='flex items-center gap-2.5'>
-        {user && balance !== null && (
-          // The balance doubles as the way in to topping it up — there is no
-          // other entry point except running out mid-flow.
-          <button
-            type='button'
-            className='lang-pill'
-            onClick={() => setPurchasing(true)}
-          >
-            {COPY.auth.creditsLeft(balance)}
-          </button>
-        )}
-        {user ? (
-          <button
-            type='button'
-            className='text-[12px] text-ink-3 underline'
-            onClick={signOut}
-          >
-            {COPY.auth.signOut}
-          </button>
-        ) : (
-          <span className='lang-pill'>{COPY.langPill}</span>
-        )}
-      </div>
-    </header>
-  );
-
   // Auth is the outermost gate: every route that spends the server key is
   // closed to anonymous callers, so there is nothing to show behind it.
   if (authLoading) {
-    return (
-      <div className='min-h-screen'>
-        {header}
-        <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
-          <p className='text-center text-sm text-ink-3 py-16'>
-            {COPY.auth.loading}
-          </p>
-        </main>
-      </div>
-    );
+    return <div className='min-h-screen' aria-busy='true' />;
   }
 
   if (!user) {
-    // Landing is full-bleed (Toss-like chapters). The signed-in wizard keeps
-    // the tighter 600/840 content column below.
+    // 비로그인 `/`는 마케팅 랜딩(design_handoff_zamak_landing)이다. 앱 셸의
+    // 폭 제한·nav·푸터를 쓰지 않고 랜딩이 자기 chrome(sticky nav, 풀블리드
+    // 섹션, 푸터)을 직접 갖는다.
     return (
-      <div className='min-h-screen'>
-        <header className='flex items-center justify-between w-full max-w-[1100px] mx-auto px-6 h-16'>
-          <BrandMark onClick={resetAll} />
-          <span className='lang-pill'>{COPY.langPill}</span>
-        </header>
-        <main className='w-full'>
-          <LandingPage
-            onSignIn={signIn}
-            error={authError}
-            configured={isSupabaseConfigured}
-          />
-        </main>
-      </div>
+      <LandingPage
+        onSignIn={signIn}
+        error={authError}
+        configured={isSupabaseConfigured}
+      />
     );
   }
 
   return (
     <div className='min-h-screen'>
-      {header}
+      <AppNav
+        user={user}
+        signOut={signOut}
+        credits={credits}
+        onHome={resetAll}
+      />
 
-      <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
+      <main className='w-full max-w-[840px] mx-auto px-5 sm:px-10 pt-4 sm:pt-16 pb-20'>
+        {/* Mandatory first-translation gate: a fixed full-screen overlay with
+            no close affordance, over whichever screen is showing (the wizard
+            stays on 'settings' behind it). */}
+        {showConsentModal && (
+          <CopyrightModal
+            onAgree={handleAgreeConsent}
+            pending={consentPending}
+            error={consentError}
+          />
+        )}
+
         {purchaseNotice && (
           <div className='card p-4 mb-[14px] text-sm'>{purchaseNotice}</div>
         )}
 
-        {/* Buying credits suspends the wizard rather than replacing it: the
-            file and its analysis survive, so a top-up mid-flow returns to the
-            same step. */}
-        {purchasing ? (
-          <PurchaseStep balance={balance} onClose={() => setPurchasing(false)} />
-        ) : (
-        <>
-        {!refusal && <StepTracker current={step} />}
-
-        {refusal && (
-          <CreditWall
-            code={refusal.code}
-            maxBlocks={refusal.maxBlocks}
-            totalBlocks={totalLines}
-            onStartOver={resetAll}
-            onPurchase={() => setPurchasing(true)}
-          />
+        {!refusal && screen === 'upload' && pendingFeedback && (
+          <FeedbackFollowup item={pendingFeedback} onDone={clearPendingFeedback} />
         )}
 
-        {!refusal && step === 0 && (
+        {!refusal && screen === 'upload' && (
           <UploadStep
-            targetLang={targetLang}
-            onTargetLang={setTargetLang}
             contentType={contentType}
             onContentType={setContentType}
+            uploading={uploading}
+            uploadingFileName={uploadingFileName}
             error={uploadError}
             onFile={handleFile}
           />
         )}
 
-        {!refusal && step === 1 && (
+        {!refusal && screen === 'workPick' && (
+          <WorkPickStep
+            contentType={contentType ?? 'movie'}
+            fileName={uploadingFileName}
+            candidates={enrichCandidates}
+            selectedIndex={selectedIndex}
+            onSelect={setSelectedIndex}
+            onSearch={searchWork}
+            // Covers both the file-analysis phase and the TMDB search itself
+            // (mirrors InfoStep's old `busy` computation) so the movie branch
+            // never flashes an empty candidate list before either kicks in.
+            searching={
+              analysis.isAnalyzing ||
+              enrichStatus === 'searching' ||
+              enrichStatus === 'idle'
+            }
+            otherType={otherType}
+            onOtherType={setOtherType}
+            toneText={toneText}
+            onToneText={setToneText}
+            onConfirm={confirmWorkPick}
+          />
+        )}
+
+        {!refusal && screen === 'settings' && (
           <>
             {error && (
               <div
@@ -425,18 +267,25 @@ export default function Home() {
                 {error}
               </div>
             )}
-            <InfoStep
-              contentType={contentType}
+            <TranslateSettingsStep
+              contentType={contentType ?? 'movie'}
               movieInfo={movieInfo}
-              setMovieInfo={setMovieInfo}
-              enrichStatus={enrichStatus}
-              enrichError={enrichError}
-              director={director}
-              candidates={enrichCandidates}
-              onSelectCandidate={runSelectCandidate}
-              analysisAnalyzing={analysis.isAnalyzing}
-              onReEnrich={runEnrich}
-              summarizing={summarizing}
+              onMovieInfo={(patch) =>
+                setMovieInfo((prev) => ({ ...prev, ...patch }))
+              }
+              needsConfirm={needsConfirm}
+              // Same condition the picker uses — settings now owns the wait,
+              // since upload hands off before the TMDB search settles.
+              searching={
+                analysis.isAnalyzing ||
+                enrichStatus === 'searching' ||
+                enrichStatus === 'idle'
+              }
+              onConfirmWork={confirmWork}
+              onChangeWork={goWorkPick}
+              model={model}
+              onModel={setModel}
+              credits={credits}
               targetLang={targetLang}
               castSheetEnabled={castSheet.enabled}
               onCastSheetToggle={castSheet.setEnabled}
@@ -450,48 +299,87 @@ export default function Home() {
                   targetLang,
                 )
               }
-              onBack={resetAll}
-              onTranslate={handleTranslate}
+              etaSeconds={etaSeconds}
+              onStart={() => {
+                void recordEvent('settings_confirmed', {
+                  contentType: contentType ?? 'movie',
+                  model,
+                  glossaryEnabled: castSheet.enabled,
+                  targetLang,
+                });
+                handleTranslate(model);
+              }}
             />
           </>
         )}
 
-        {!refusal && step === 2 && (
+        {!refusal && screen === 'progress' && (
           <ProgressStep
             progress={translationProgress}
             totalLines={totalLines}
             onCancel={handleCancel}
+            enrichDone={ENRICH_ALWAYS_DONE}
+            glossaryEnabled={castSheet.enabled}
+            glossaryDone={castSheet.status !== 'extracting'}
           />
         )}
 
-        {!refusal && step === 3 && result && (
+        {!refusal && screen === 'done' && result && (
           <DoneStep
             result={result}
-            originalContent={fileContent}
+            movieInfo={movieInfo}
+            castSheet={castSheet.enabled ? castSheet.sheet : undefined}
+            jobId={jobId}
             onStartOver={resetAll}
           />
         )}
-        </>
+
+        {refusal && refusal.code === 'insufficient_credits' && (
+          <ExhaustedStep
+            kind={refusal.kind ?? 'lite'}
+            defaultEmail={email ?? ''}
+            onGoHistory={() => router.push('/mypage')}
+            onBack={clearRefusal}
+          />
         )}
+
+        {refusal && refusal.code === 'file_too_large' && (
+          <div className='animate-zslide'>
+            <div className='head text-center mb-7'>
+              <h1>{COPY.credits.tooLargeTitle}</h1>
+              <p>{COPY.credits.tooLargeBody(refusal.maxBlocks ?? 0, totalLines)}</p>
+            </div>
+
+            <div className='card p-[22px] flex flex-col items-center gap-3'>
+              <button type='button' className='btn btn-primary w-full' onClick={resetAll}>
+                {COPY.credits.startOver}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* unauthorized / unknown: neither documented screen applies (not a
+            credits or file-size problem), so this falls back to the app's
+            generic error copy rather than misusing the file-too-large text. */}
+        {refusal &&
+          refusal.code !== 'insufficient_credits' &&
+          refusal.code !== 'file_too_large' && (
+            <div className='animate-zslide'>
+              <div className='head text-center mb-7'>
+                <h1>{COPY.error.title}</h1>
+                <p>{COPY.error.body}</p>
+              </div>
+
+              <div className='card p-[22px] flex flex-col items-center gap-3'>
+                <button type='button' className='btn btn-primary w-full' onClick={resetAll}>
+                  {COPY.error.retry}
+                </button>
+              </div>
+            </div>
+          )}
       </main>
 
-      <footer className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pb-10 text-center text-ink-3'>
-        <p className='mono text-[12px]'>v{APP_VERSION} · Beta</p>
-        <p className='text-[12px] mt-1'>© 2026 ZAMAK. All rights reserved.</p>
-        <div className='flex items-center justify-center gap-2.5 mt-1 text-[12px]'>
-          <a href={`mailto:${COPY.footer.feedbackEmail}`} className='underline'>
-            {COPY.footer.feedback}
-          </a>
-          <span className='dot-sep' />
-          <Link href={COPY.legal.termsHref} className='underline'>
-            {COPY.legal.terms}
-          </Link>
-          <span className='dot-sep' />
-          <Link href={COPY.legal.privacyHref} className='underline'>
-            {COPY.legal.privacy}
-          </Link>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

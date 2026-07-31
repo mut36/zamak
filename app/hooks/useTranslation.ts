@@ -8,6 +8,8 @@ import {
   beginTranslationJob,
   JobRefusedError,
 } from '../lib/client/translationJob';
+import { saveResult } from '../lib/client/history';
+import { sendRunMetrics } from '../lib/client/metrics';
 import {
   adjustSubtitleTiming,
   buildOutputFilename,
@@ -45,6 +47,7 @@ import {
   MIN_SUBTITLE_DURATION_MS,
   MIN_SUBTITLE_GAP_MS,
   resolveTier,
+  type AllowedModel,
 } from '../config/constants';
 import { resolveTargetLang } from '../config/languages';
 
@@ -183,6 +186,9 @@ export function useTranslation(
   const [result, setResult] = useState<TranslationResult | null>(null);
   /** Set when the server declined to open a job (out of credits, file too big). */
   const [refusal, setRefusal] = useState<JobRefusedError | null>(null);
+  /** The currently (or most recently) opened job's id, exposed so the
+   *  completion screen and history can both refer to the same run. */
+  const [jobId, setJobId] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   /** Parsed source document, kept for round-trip output at download time. */
   const docRef = useRef<SubtitleDoc | null>(null);
@@ -264,7 +270,8 @@ export function useTranslation(
       // Spend the credit before any chunk goes out. Doing it here — once per
       // file rather than once per chunk — is what makes a credit worth one
       // title, and it means a refusal costs nothing.
-      const jobId = await beginTranslationJob(blocks.length);
+      const newJobId = await beginTranslationJob(blocks.length, model as AllowedModel);
+      setJobId(newJobId);
 
       // Concurrency comes from the tier, which is the one place the
       // billing/session gate will hook into. Chunk size is model-specific
@@ -330,7 +337,7 @@ export function useTranslation(
                     model,
                     targetLang,
                     translationStyle,
-                    jobId,
+                    jobId: newJobId,
                     castSheet,
                   },
                   signal,
@@ -381,6 +388,7 @@ export function useTranslation(
       // only fail the same way — the sweep is skipped and the stop reason
       // stands. See app/lib/client/recoverySweep.ts for the cost bounds.
       let sweptContent = mainPassContent;
+      let sweepCalls = 0;
       // Same accounting on both paths: only leftovers that actually hold
       // translatable text are the user's problem.
       let remainingBlocks = countTranslatableLeftovers(content, leftover);
@@ -417,17 +425,22 @@ export function useTranslation(
                 chunk: chunkContent,
                 chunkIndex: 1,
                 totalChunks: 1,
+                // Measurement label only — every sweep round is 1/1 on the
+                // wire, so this is what keeps them apart from a single-chunk
+                // file's one and only call.
+                phase: 'sweep',
                 movieInfo,
                 model,
                 targetLang,
                 translationStyle,
-                jobId,
+                jobId: newJobId,
                 castSheet,
               },
               signal,
             ),
         });
         sweptContent = sweep.content;
+        sweepCalls = sweep.calls;
         recoveredBlocks = sweep.recovered;
         // Blocks with nothing to translate (♪, numbers) aren't the user's
         // problem, so they don't go in the warning count.
@@ -507,6 +520,37 @@ export function useTranslation(
         stopReason: retryState.fatalCode ?? undefined,
       });
 
+      // Fire-and-forget: the user already has the file, and a failed upload
+      // costs them the re-download, not the translation. Errors are swallowed
+      // inside saveResult. `glossary` records what was actually applied, not
+      // whether the toggle was on — castSheet is undefined when the toggle
+      // was off or extraction never resolved.
+      void saveResult(newJobId, file.name, translated, {
+        glossary: Boolean(castSheet),
+      });
+
+      // Same fire-and-forget contract as saveResult, and for the same reason.
+      // This is the beta's only record of what a run actually cost in time and
+      // leftovers — the token side is written server-side, per model call.
+      void sendRunMetrics(newJobId, {
+        sourceFormat: docRef.current?.format ?? null,
+        targetLang,
+        totalChunks,
+        chunkSize,
+        concurrency,
+        durationMs: Date.now() - startedAt,
+        failedChunks,
+        fallbackBlocks: remainingBlocks,
+        recoveredBlocks,
+        sweepCalls,
+        stopReason: retryState.fatalCode ?? null,
+        // What was actually applied, not what the toggle said — castSheet is
+        // undefined when extraction never resolved (same rule as `glossary`).
+        glossaryTerms: castSheet?.terms?.length ?? 0,
+        relationPairs: castSheet?.relations?.length ?? 0,
+        textRules: textRuleReport,
+      });
+
       setTranslationProgress({
         stage: 'done',
         currentChunk: totalChunks,
@@ -550,6 +594,13 @@ export function useTranslation(
     abortControllerRef.current?.abort();
   }, []);
 
+  /** Dismisses the refusal wall without discarding the file / work-in-progress
+   *  — unlike clearFile, which resets everything back to the upload screen.
+   *  Used by the "설정으로 돌아가기" exit on the exhausted-credits screen. */
+  const clearRefusal = useCallback(() => {
+    setRefusal(null);
+  }, []);
+
   const clearFile = () => {
     cancelScheduledReset();
     processFileIdRef.current++;
@@ -561,6 +612,7 @@ export function useTranslation(
     setTranslationProgress(IDLE_PROGRESS);
     setResult(null);
     setRefusal(null);
+    setJobId(null);
   };
 
   return {
@@ -571,12 +623,14 @@ export function useTranslation(
     translationProgress,
     result,
     refusal,
+    jobId,
     // Reading and parsing belong to the caller — it owns the upload screen and
     // the error slot that names the problem, and a file that fails to parse
     // should never leave that screen. This takes the parsed document and
     // starts analyzing it.
     processFile,
     clearFile,
+    clearRefusal,
     translate,
     cancelTranslation,
   };

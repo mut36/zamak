@@ -1,41 +1,38 @@
 import Link from 'next/link';
-import { CREDIT_PACKS } from '../config/packs';
-import { MAX_BLOCKS_PER_CREDIT } from '../config/constants';
+import {
+  RESULT_RETENTION_DAYS,
+} from '../config/constants';
 import { COPY } from '../i18n/simpleCopy';
 import { SITE } from '../lib/brand';
 import { Contents, KeyPoint, LegalShell, Section } from './parts';
 
 export const metadata = {
-  title: '이용약관 · 환불 안내 | ZAMAK',
-  description: 'ZAMAK 이용약관, 자막 저작권과 이용자 책임, 번역권 구매·환불 안내',
+  title: '이용약관 | ZAMAK',
+  description: 'ZAMAK 이용약관, 자막 저작권과 이용자 책임',
 };
 
 /**
  * Required alongside payments, not optional polish: Korean e-commerce law
- * (전자상거래법) requires the seller's identity and the refund terms to be
- * readable before purchase, and card acquirers check for this page during the
- * Toss Payments merchant review.
+ * (전자상거래법) requires the seller's identity to be readable before purchase.
  *
- * 사업장 주소는 아직 TODO — 대표가 직접 채울 것. 통신판매업 신고번호는 결제가
- * 붙지 않은 지금은 "결제 미가동" 표기로 대신한다: 그 신고 자체가 통신판매업 신고
- * 면제 대상(직전년도 거래 50회 미만 등)인지 대표가 사업자 유형(간이과세자 여부)을
- * 확인해 판단할 사안이라, 결제를 열 때 신고번호 또는 면제 근거로 교체해야 한다.
+ * 값 자체는 `COPY.seller`에 있다 — 전 페이지 푸터(`SiteFooter`)가 같은 항목을
+ * 표시하므로, 여기 하드코딩하면 한쪽만 고쳐져 갈라진다. 이 배열은 그 값에
+ * 이 페이지용 라벨만 붙인다. 호스팅은 법정 표시 항목이 아니라
+ * 신뢰 신호라 푸터에는 없고 이 표에만 있다.
  */
 const SELLER_INFO: { label: string; value: string }[] = [
-  { label: '상호', value: '뭍36 (MUT36)' },
-  { label: '대표자', value: '이지안' },
-  { label: '사업자등록번호', value: '224-23-65160' },
-  { label: '통신판매업 신고번호', value: '결제 미가동 — 결제 오픈 시 신고 또는 면제 근거로 표기' },
-  { label: '사업장 주소', value: 'TODO' },
+  { label: '상호', value: COPY.seller.name },
+  { label: '대표자', value: COPY.seller.ceo },
+  { label: '사업자등록번호', value: COPY.seller.bizNo },
+  { label: '통신판매업 신고번호', value: COPY.seller.mailOrder },
+  { label: '사업장 주소', value: COPY.seller.address },
+  { label: '전화번호', value: COPY.seller.tel },
   { label: '홈페이지', value: SITE.url },
   { label: '고객문의', value: COPY.footer.feedbackEmail },
-  { label: '호스팅 제공', value: 'Vercel Inc.' },
-  { label: '결제대행', value: '토스페이먼츠(주)' },
+  { label: '호스팅 제공', value: COPY.seller.hosting },
 ];
 
 const CONTENTS = [
-  { id: 'product', label: '판매하는 것' },
-  { id: 'refund', label: '환불' },
   { id: 'copyright', label: '자막 저작권과 이용자 책임' },
   { id: 'data', label: '파일과 데이터 처리' },
   { id: 'liability', label: '책임의 한계' },
@@ -47,56 +44,20 @@ const CONTENTS = [
 export default function LegalPage() {
   return (
     <LegalShell
-      title='이용약관 · 환불 안내'
-      subtitle='번역권을 구매하거나 자막을 올리기 전에 확인해주세요.'
-      effectiveDate='2026년 7월 27일'
+      title='이용약관'
+      subtitle='자막을 올리기 전에 확인해주세요.'
+      effectiveDate='2026년 8월 1일'
       otherDoc={{ href: COPY.legal.privacyHref, label: COPY.legal.privacy }}
     >
       <Contents items={CONTENTS} />
 
       <KeyPoint>
-        <b className='text-ink'>
-          올리신 자막 파일은 서버에 저장하지 않습니다.
-        </b>{' '}
-        파일은 브라우저에서 열리고, 번역되는 동안에만 서버를 거쳐 갑니다. ZAMAK이
-        기록하는 것은 번역한 자막의 줄 수와 시각뿐이며 자막 내용은 포함되지
-        않습니다.
+        <b className='text-ink-strong'>올리신 자막 원본은 저장하지 않습니다.</b> 원본은
+        브라우저에서 열리고, 번역되는 동안에만 서버를 거쳐 갑니다.{' '}
+        <b className='text-ink-strong'>완성된 번역 결과물</b>은 다시 받으실 수 있도록
+        본인만 접근할 수 있는 비공개 저장소에 {RESULT_RETENTION_DAYS}일간
+        보관합니다.
       </KeyPoint>
-
-      <Section title='판매하는 것' id='product'>
-        <p className='m-0'>
-          ZAMAK은 SRT 자막 파일을 번역해주는 서비스이고, 판매하는 상품은 선불
-          번역권입니다. 번역권 1편으로 자막{' '}
-          {MAX_BLOCKS_PER_CREDIT.toLocaleString()}줄까지의 파일 하나를 번역할 수
-          있습니다.
-        </p>
-        <ul className='mt-3 pl-4'>
-          {CREDIT_PACKS.map((pack) => (
-            <li key={pack.id}>
-              번역권 {pack.credits}편 — {pack.amount.toLocaleString()}원 (부가세
-              포함)
-            </li>
-          ))}
-        </ul>
-        <p>번역권에는 유효기간이 없습니다.</p>
-      </Section>
-
-      <Section title='환불' id='refund'>
-        <p className='m-0'>
-          <b>사용하지 않은 번역권은 전액 환불됩니다.</b> 이미 사용한 번역권은
-          결과물(번역된 자막 파일)이 즉시 제공되므로 환불되지 않습니다. 예를 들어
-          10편을 구매하고 2편을 사용했다면 8편분이 환불 대상입니다.
-        </p>
-        <p>
-          환불은 아래 고객문의로 요청해주세요. 결제하신 수단으로 영업일 기준 3일
-          이내에 처리됩니다. 카드 결제의 경우 카드사 사정에 따라 취소 반영까지
-          며칠이 더 걸릴 수 있습니다.
-        </p>
-        <p>
-          번역이 서비스 오류로 실패했는데 번역권이 차감된 경우에도 같은 경로로
-          알려주세요. 사용 여부와 무관하게 복구해 드립니다.
-        </p>
-      </Section>
 
       <Section title='자막 저작권과 이용자 책임' id='copyright'>
         <p className='m-0'>
@@ -128,9 +89,15 @@ export default function LegalPage() {
 
       <Section title='파일과 데이터 처리' id='data'>
         <p className='m-0'>
-          올리신 자막 파일은 서버에 저장하지 않습니다. 파일은 브라우저에서 열려
+          올리신 자막 원본은 서버에 저장하지 않습니다. 원본은 브라우저에서 열려
           번역할 단위로 나뉘고, 번역이 진행되는 동안에만 서버를 거쳐 갑니다.
-          번역이 끝나면 결과물은 이용자의 브라우저에만 남습니다.
+        </p>
+        <p>
+          번역이 끝나면 <b>결과물</b>은 이용자가 다시 받을 수 있도록{' '}
+          {RESULT_RETENTION_DAYS}일간 보관합니다. 이용자별로 분리된 비공개
+          저장소에 두며, 검색 엔진에 노출되지 않고 본인 외에는 열람하지 않습니다.{' '}
+          {RESULT_RETENTION_DAYS}일이 지나면 다시 받으실 수 없습니다. 그 전에
+          삭제를 원하시면 아래 고객문의로 요청해주세요.
         </p>
         <p>
           번역에는 Google의 Gemini API를 사용하므로, 자막의 대사는 번역되는 동안
@@ -138,8 +105,8 @@ export default function LegalPage() {
           학습에 사용하지 않습니다.
         </p>
         <p>
-          ZAMAK이 기록하는 것은 번역한 자막의 줄 수와 시각뿐이며, 자막 내용은
-          포함되지 않습니다. 계정·결제 정보를 포함한 자세한 내용은{' '}
+          그 밖에 ZAMAK이 기록하는 것은 번역한 자막의 줄 수와 시각, 올린 파일의
+          이름, 사용한 번역 모델과 설정(글로사리 등)뿐입니다. 계정·결제 정보를 포함한 자세한 내용은{' '}
           <Link href={COPY.legal.privacyHref} className='underline'>
             {COPY.legal.privacy}
           </Link>
@@ -154,8 +121,7 @@ export default function LegalPage() {
         </p>
         <p>
           서비스 점검이나 외부 API 장애 등으로 번역이 중단되거나 실패할 수
-          있습니다. 이 경우 차감된 번역권은 위 &lsquo;환불&rsquo; 항목에 따라
-          복구해 드립니다. 그 밖에 서비스 이용으로 발생한 손해에 대해서는 ZAMAK의
+          있습니다. 그 밖에 서비스 이용으로 발생한 손해에 대해서는 ZAMAK의
           고의 또는 과실이 있는 범위에서 책임집니다.
         </p>
         <p>
@@ -177,10 +143,16 @@ export default function LegalPage() {
           </li>
         </ul>
         <p className='mt-3'>
-          다만 ZAMAK은 자막 파일이나 번역 결과물을 보관하지 않으므로, 특정 파일을
-          내리거나 접근을 차단하는 조치는 할 수 없습니다. 신고 내용을 검토해
-          반복적이거나 명백한 침해가 확인되면 해당 계정의 서비스 이용을 제한할 수
-          있습니다.
+          ZAMAK은 자막 원본을 보관하지 않으므로 원본에 대해서는 내릴 것이
+          없습니다. 다만 번역 <b>결과물</b>은 {RESULT_RETENTION_DAYS}일간
+          보관하므로, 보관 기간 안이라면 신고된 저작물에 해당하는 결과물을 계정과
+          작업 단위로 특정해 삭제하고 접근을 차단할 수 있습니다. 결과물은 처음부터
+          공개되지 않으며 올린 이용자 본인만 받을 수 있으므로, 이 조치는 공중에
+          대한 유통을 막는 것이 아니라 ZAMAK이 들고 있던 사본을 없애는 것입니다.
+        </p>
+        <p>
+          신고 내용을 검토해 반복적이거나 명백한 침해가 확인되면 해당 계정의
+          서비스 이용을 제한할 수 있습니다.
         </p>
       </Section>
 
@@ -188,7 +160,7 @@ export default function LegalPage() {
         <dl className='grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 m-0'>
           {SELLER_INFO.map((row) => (
             <div key={row.label} className='contents'>
-              <dt className='text-ink-3'>{row.label}</dt>
+              <dt className='text-secondary'>{row.label}</dt>
               <dd className='m-0'>{row.value}</dd>
             </div>
           ))}

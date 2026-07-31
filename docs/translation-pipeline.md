@@ -9,7 +9,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 [`standards/netflix-korean-gap-review.md`](standards/netflix-korean-gap-review.md).
 
 > 파일 경로 + 함수/심볼 이름으로만 가리킨다(줄 번호는 금방 어긋나서 안 적음).
-> 기준 시점: 2026-07-28. 구조가 바뀌면 이 문서도 같이 고칠 것.
+> 기준 시점: 2026-07-31. 구조가 바뀌면 이 문서도 같이 고칠 것.
 
 메인 경로는 **영화·드라마 분기**다. "기타 영상" 분기는 3단계에서 갈린다.
 
@@ -25,7 +25,8 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   → [영화] /api/enrich    TMDB + 그라운딩 → 제목/연도/감독/포스터 + 장르/배경/톤
     [기타] /api/summarize 자막 앞부분 요약 → notes
   → (opt-in, 토글 ON시) /api/glossary  전체 자막 1회 스캔 → 글로사리+말투관계
-  → InfoStep             사람이 검토·수정 (+ 글로사리 카드, 켰다면)
+  → WorkPickStep          후보 선택(영화) / 유형·톤 입력(기타)
+  → TranslateSettingsStep 사람이 검토·수정 (+ 글로사리 카드, 켰다면)
   → /api/translation/begin  크레딧 1 차감 → jobId
   → 청킹 (장면 갭 기준)
   → 청크별 병렬 /api/translate
@@ -76,16 +77,17 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   바로 상세조회까지 진행하지만, **2개 이상이면(제목이 흔하거나 리메이크가 있을 때)
   era/tone 추출 없이 후보 목록만 반환**한다(`{status:'ambiguous', candidates}`, 최대
   `MAX_ENRICH_CANDIDATES`개 — `constants.ts`). 인기도만으로 자동 선택하면 재검색해도
-  계속 다른 작품이 나오는 문제가 있어, 그 대신 `InfoStep.tsx`가 포스터·제목·연도·
-  영화/드라마 구분으로 후보 카드를 보여주고 사용자가 클릭해서 고르면(`onSelectCandidate`)
-  그때 `/api/enrich`를 선택 모드로 다시 호출해 `enrichMovieById`가 마무리한다.
+  계속 다른 작품이 나오는 문제가 있어, 그 대신 `WorkPickStep.tsx`가 포스터·제목·연도·
+  영화/드라마 구분으로 후보 카드(`CandidateCard`)를 보여주고 사용자가 클릭해서
+  고르면(`onSelect` → `confirmWorkPick`, `useWizard.ts`) 그때 `/api/enrich`를 선택
+  모드로 다시 호출해 `enrichMovieById`가 마무리한다.
 - **품질 레버**:
   - 제목/연도/감독/포스터 틀림 → TMDB 검색·정렬 로직 `tmdb.ts` (`searchCandidates`의
     연도매칭→인기도 정렬), 상세조회 `tmdb.ts` (`lookupById`), 또는 미스 시 그라운딩
     프롬프트 `enrichMovie.ts` (`buildGroundedPrompt`)
   - 후보가 계속 엉뚱한 작품으로 자동 선택됨(재검색 정확도) → `tmdb.ts`
     (`searchCandidates`의 정렬 기준), 후보 노출 상한 `constants.ts`
-    `MAX_ENRICH_CANDIDATES`, 후보 카드 UI `InfoStep.tsx` (`CandidatePicker`)
+    `MAX_ENRICH_CANDIDATES`, 후보 카드 UI `WorkPickStep.tsx` (`CandidateCard`)
   - 장르/배경·시대/톤앤매너 품질 → **`enrichMovie.ts`의 `buildKeywordPrompt`
     (TMDB 매치용) / `buildGroundedPrompt` (미스용)**. **배경/시대는 "시대, 지역"
     짧은 구절 하나로 못박혀 있다**(2026-07-28) — 전엔 "사회/문화적 특이사항"까지
@@ -98,7 +100,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 
 ### 2-B. 작품 정보 수집 — 기타 영상 (summarize)
 - **코드**: `app/api/summarize/route.ts` (AUX 모델, 앞 `SUMMARY_SAMPLE_LINES`줄 샘플)
-- **하는 일**: 내용 1~2문장 요약 → `movieInfo.notes`.
+- **하는 일**: 내용 1~2문장 요약 → `movieInfo.notes` (`TranslateSettingsStep`에서 사용자가 보고 고칠 수 있는 입력란).
 - **품질 레버**: 요약 프롬프트는 `summarize/route.ts` 안에 인라인. 샘플 줄 수는
   `constants.ts` `SUMMARY_SAMPLE_LINES`.
 
@@ -110,7 +112,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   `app/lib/prompts/glossaryContent.ts` (`renderGlossaryTags`), 프롬프트
   `prompts/common/cast_sheet_extraction.txt`, 토글 훅 `app/hooks/useCastSheet.ts`,
   카드 `app/components/simple/CastSheetCard.tsx`.
-- **하는 일**: InfoStep의 "등장인물·용어 일관성" 토글(기본 **OFF**, `localStorage`에
+- **하는 일**: TranslateSettingsStep의 "등장인물·용어 일관성" 토글(기본 **OFF**, `localStorage`에
   기억)을 켜면 전체 자막을 한 번 스캔해 ①인물·지명·용어의 확정 **도착어 표기**(글로사리,
   `GlossaryTerm.target`)와 ②인물 간 말투(방향성 있음, 자막 블록 범위가 붙음)를 뽑는다.
   말투 값은 언어 중립(`formal`/`informal`/`mixed`)으로 저장하고, 프롬프트·UI에는
@@ -120,7 +122,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   않고 `<speech_relations>` 태그도 나가지 않는다**(§7). 파일당 1회이고
   청크별 병렬 번역 호출과 별개 — 결과가 모든 청크 프롬프트에 주입된다(§7). **OFF가
   기본값이라 이 라우트는 사용자가 켜기 전엔 절대 호출되지 않는다.**
-- **왜 opt-in인가**: 추출에 20~40초 걸린다. 토글을 켜면 InfoStep 진입과 동시에
+- **왜 opt-in인가**: 추출에 20~40초 걸린다. 토글을 켜면 TranslateSettingsStep 진입과 동시에
   백그라운드로 돌아 지연이 대부분 숨지만(사람이 작품 정보를 검토하는 동안 끝남), 처음
   켜는 순간만은 그 지연이 노출된다. 번역 모델(고급/빠른) 선택과는 **무관한 독립
   토글**이다 — 결정 배경은 `decisions.md` §2-9.
@@ -139,8 +141,8 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   - 후반 청크가 초반 관계를 물려받음(또는 그 반대) → 있으면 안 되는 일 — `composer.ts`가
     `getBlockIndexRange`로 청크의 실제 블록 범위를 구해 겹치는 관계만 넣는다
     (`glossaryContent.ts` `renderGlossaryTags`)
-  - 사람이 잘못된 항목을 고치고 싶음 → InfoStep 카드에서 직접 편집(표기/삭제/추가,
-    말투 드롭다운) 가능, `CastSheetCard.tsx`
+  - 사람이 잘못된 항목을 고치고 싶음 → `CastSheetCard.tsx`에서 직접 편집(표기/삭제/추가,
+    말투 드롭다운) 가능
   - **모델·프로바이더** → `GLOSSARY_PROVIDER`(기본 `openai`) + `GLOSSARY_MODEL`(기본
     `gpt-5.6-luna`). 실패·키 없음은 빈 시트 + warn 로그 — 번역을 막지 않음(§2-9).
     `GLOSSARY_THINKING_LEVEL`은 Gemini 경로에서만 의미 있음. 비용 관측은
@@ -159,14 +161,22 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   관계 추론 역량 차이(flash-lite는 명백한 증거가 있는 관계도 놓침). Gemini로
   롤백하려면 `GLOSSARY_PROVIDER=gemini` + Gemini `GLOSSARY_MODEL`.
 
-### 3. 사용자 검토·수정 (InfoStep)
-- **코드**: `app/components/simple/InfoStep.tsx`, 문구 `app/i18n/simpleCopy.ts`
-  (`COPY.info`), 글로사리 카드는 `CastSheetCard.tsx`(§2-C)
-- **하는 일**: 제목·연도·장르·배경/시대·톤앤매너·notes를 **사람이 편집 가능**. 자동
-  수집이 틀려도 여기서 최종 교정된 값이 번역에 들어간다. 글로사리 토글을 켰다면 표기·
-  존대관계도 같은 화면에서 편집 가능(§2-C).
-- **품질 레버**: 어떤 필드를 보여줄지/편집 가능하게 할지 → `InfoStep.tsx`. 필드 라벨/힌트
-  문구 → `simpleCopy.ts`. **자동화가 애매하면 이 사람-교정 단계를 강화하는 게 가장 안전.**
+### 3. 사용자 검토·수정 (WorkPickStep → TranslateSettingsStep)
+- **코드**: 작품 후보 확정·기타 유형/톤 입력은 `app/components/beta/WorkPickStep.tsx`,
+  이후 배경/시대·톤앤매너 편집·모델 선택은 `app/components/beta/TranslateSettingsStep.tsx`
+  (문구 `app/i18n/simpleCopy.ts` `COPY.workPick`/`COPY.settings`), 글로사리 카드는
+  `app/components/simple/CastSheetCard.tsx`(§2-C). 옛 단일 화면
+  `app/components/simple/InfoStep.tsx`는 이 두 화면으로 대체돼 더 이상 임포트되지
+  않는 죽은 코드다(의도적으로 삭제 안 함).
+- **하는 일**: (영화) `WorkPickStep`에서 후보를 확정하고, `TranslateSettingsStep`에서
+  배경/시대·톤앤매너를 **사람이 편집 가능** — 자동 수집이 틀려도 여기서 최종 교정된
+  값이 번역에 들어간다. (기타 유형) `WorkPickStep`에서 콘텐츠 유형·톤을 사람이 직접
+  입력하면 각각 `movieInfo.genre`/`movieInfo.tone`으로 들어간다(`confirmWorkPick`,
+  `useWizard.ts`). 글로사리 토글을 켰다면 표기·존대관계도 설정 화면에서 편집
+  가능(§2-C).
+- **품질 레버**: 후보 카드 표시/선택 로직 → `WorkPickStep.tsx`. 편집 가능한 필드
+  구성 → `TranslateSettingsStep.tsx`. 필드 라벨/힌트 문구 → `simpleCopy.ts`.
+  **자동화가 애매하면 이 사람-교정 단계를 강화하는 게 가장 안전.**
 
 ### 4. 번역 시작 & 크레딧 & 스타일 선택
 - **코드**: `app/page.tsx` (`handleTranslate`) → `useTranslation.translate(...)`,
@@ -175,7 +185,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 - **품질 레버**:
   - **번역 스타일** `meaning`(의미보존) / `cinematic`(영화적) — 현재 `handleTranslate`에서
     **`'meaning'` 하드코딩**. cinematic 철학 파일은 존재하나 UI에 안 붙어 있음. 스타일을
-    노출/전환하려면 여기 + `InfoStep`.
+    노출/전환하려면 여기 + `TranslateSettingsStep`.
   - 도착어 → **`app/config/languages.ts` (`TARGET_LANGS`)** — 한 행이 곧 한 언어다:
     picker 표시(label/mono/enabled), 프롬프트(promptLabel/lineMaxChars/formality),
     후처리(trailingPunctuation/reading). 현재 활성: 한국어·영어·일본어·스페인어·
@@ -444,6 +454,31 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   확장자를 정하고, 입력과 같은 형식이면 원본 대소문자를 유지한다.
   완료 화면 실패 개수 표시 → `DoneStep.tsx`.
 
+### 11. 계측 (베타)
+- **코드**: 모델 호출 1회당 — provider의 `generateModelText`(`app/lib/providers/gemini.ts`)가
+  `{ text, usage, thinkingLevel }`를 반환(타입 `app/lib/providers/types.ts`) →
+  `/api/translate`가 `app/lib/server/chunkUsage.ts`(`recordChunkUsage`)로
+  `translation_chunk_usage`에 1행 기록(재시도·§9.65 sweep 라운드도 각각 1행 —
+  sweep은 `phase='sweep'`으로 구분). 런 1회당 — `useTranslation.ts` 완료 시
+  `app/lib/client/metrics.ts`(`sendRunMetrics`) → `/api/translation/metrics` →
+  RPC `record_job_metrics` → `translation_jobs`의 실측 컬럼(청크 수·소요·잔여
+  블록 등). 피드백 — 완료 화면 별점은 그 자리에서(`DoneStep.tsx`,
+  `sendFeedback`), "실제로 썼는지·뭐가 문제였는지"는 재방문 때
+  (`app/hooks/useFeedbackFollowup.ts`, `app/components/beta/FeedbackFollowup.tsx`)
+  `/api/feedback/pending`으로 대상을 받아 `/api/feedback`에 usability·
+  issueKinds·reportedBlocks를 기록(둘 다 `app/lib/client/feedback.ts`). 퍼널
+  이벤트 — `translation_jobs`로 이미 알 수 있는 건 제외한 4개만
+  `app/lib/client/events.ts`(`recordEvent`) → `/api/events` → `beta_events`
+  (업로드 거절 · 설정 확정 · 다운로드 클릭 · 크레딧 소진 화면 노출, 목록은
+  `constants.ts` `BETA_EVENTS`).
+- **스키마**: `supabase/migrations/0009_beta_metrics.sql`(적용 상태는
+  README의 스키마 절 참고).
+- **불변식**: 자막 텍스트는 계측 어디에도 저장하지 않는다 —
+  `feedback.reported_blocks`는 정수(SRT 시퀀스 번호) 배열이고, 그 줄의
+  텍스트는 보관된 결과물(0007)에서 읽는다. 계측 실패가 번역·화면을 깨면 안
+  되므로 모든 경로가 fire-and-forget이고 실패를 삼킨다. 미측정은 `null`로
+  남는다 — "실패 0건"과 "측정 못 함"은 반대되는 사실이라 `0`으로 뭉개지 않는다.
+
 ---
 
 ## 증상 → 고칠 곳 (빠른 인덱스)
@@ -457,7 +492,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 번역문에 원문 언어가 섞여 있다(SMI) | `resolveTrack` (`smi.ts`) — 트랙 2개 이상이면 업로드에서 거절되어야 한다 — §0 |
 | 제목/연도가 파일명에서 잘못 뽑힘 | `content_analysis.txt`, `metadataInference.ts` |
 | 감독/포스터 안 뜸·틀림 | `tmdb.ts` (`searchCandidates`/`lookupById`), `enrichMovie.ts` (`buildGroundedPrompt`) |
-| 재검색해도 계속 다른(엉뚱한) 작품이 나옴 | `tmdb.ts` (`searchCandidates` 정렬), `enrichMovie.ts` (`searchMovie`의 후보 임계값), `InfoStep.tsx` (`CandidatePicker`) — §2-A "후보가 여러 개일 때" |
+| 재검색해도 계속 다른(엉뚱한) 작품이 나옴 | `tmdb.ts` (`searchCandidates` 정렬), `enrichMovie.ts` (`searchMovie`의 후보 임계값), `WorkPickStep.tsx` (`CandidateCard`) — §2-A "후보가 여러 개일 때" |
 | 장르/배경·시대/톤앤매너가 이상함 | `enrichMovie.ts` (`buildKeywordPrompt` / `buildGroundedPrompt`) |
 | 배경/시대가 개봉연도로 나옴 | `enrichMovie.ts` 프롬프트 (그라운딩·"개봉연도≠극중배경" 지침) |
 | 번역이 직역투/어색함 | 해당 도착어의 `translation_rules_<code>.txt` |
@@ -465,8 +500,8 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 영어/중국어인데 존댓말 관계표가 안 보임 | 정상 — 그 언어엔 문법적 말투 축이 없어 relations를 안 만든다(§2-C, `languages.ts`의 `formality: null`) |
 | 영어 자막인데 문장 끝 마침표가 사라짐 | `languages.ts`의 `trailingPunctuation`이 비어 있어야 정상 — 값이 있으면 §9.7이 지운다 |
 | 일본어/중국어 자막이 너무 빨리 지나감 | `languages.ts`의 `reading`(언어별 CPS) — §9.5 |
-| 존댓말/반말·인물 말투가 안 맞음(말투 축이 있는 언어) | 먼저 InfoStep의 "등장인물·용어 일관성" 토글을 켜봤는지 확인(§2-C, 기본 OFF) — 켰다면 `cast_sheet_extraction.txt` 또는 카드에서 직접 관계 수정. 안 켰거나 그래도 안 맞으면 `translation_rules_ko.txt`, (cinematic) `cinematic_translation_philosophy_ko.txt`, `InfoStep`에서 사람이 톤 입력 |
-| 같은 이름이 청크마다 다르게 번역됨(표기 흔들림) | InfoStep 토글을 켜지 않았으면 그게 원인(§2-C, 기본 OFF). 켰는데도 흔들리면 `extractCastSheet.ts` `sanitizeCastSheet`(환각 필터로 그 이름이 버려졌을 수 있음) 또는 카드에서 직접 추가 |
+| 존댓말/반말·인물 말투가 안 맞음(말투 축이 있는 언어) | 먼저 TranslateSettingsStep의 "등장인물·용어 일관성" 토글을 켜봤는지 확인(§2-C, 기본 OFF) — 켰다면 `cast_sheet_extraction.txt` 또는 `CastSheetCard`에서 직접 관계 수정. 안 켰거나 그래도 안 맞으면 `translation_rules_ko.txt`, (cinematic) `cinematic_translation_philosophy_ko.txt`, `TranslateSettingsStep`에서 사람이 톤 입력 |
+| 같은 이름이 청크마다 다르게 번역됨(표기 흔들림) | TranslateSettingsStep 토글을 켜지 않았으면 그게 원인(§2-C, 기본 OFF). 켰는데도 흔들리면 `extractCastSheet.ts` `sanitizeCastSheet`(환각 필터로 그 이름이 버려졌을 수 있음) 또는 `CastSheetCard`에서 직접 추가 |
 | 감정/뉘앙스가 밋밋함 | `cinematic_translation_philosophy_ko.txt` (+ 스타일을 cinematic로) |
 | 줄이 25자 넘는데 안 나뉨(의미 단위 줄바꿈) | `translation_rules_ko.txt` 규칙 2 — AI가 `|`로 끊을 지점만 지정, 실제 줄바꿈은 코드. 끊을 위치 판단은 프롬프트로만 유도(§9.7 스코프 밖) |
 | 마침표·쉼표가 줄 끝에 남아 있음 / 3줄 이상 나옴 / `...`가 `…`로 안 바뀜 | `srt.ts` (`enforceTextRules`) — 이 셋은 코드가 강제하므로 재발하면 버그. `decisions.md` §2-8 — §9.7 |
@@ -488,6 +523,8 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 에러 종류에 따라 재시도/중단 동작을 바꾸고 싶음 | `translationErrors.ts` 분류(`classifyError`)·성격 함수(`isFatalCode`/`isRetryableCode`) — §9.6 |
 | 진행 링이 너무 빨리 차서 99%에서 오래 기다림(또는 그 반대) | `constants.ts` `TRANSLATION_ESTIMATE_MS`(모델별), 이징 곡선은 `ProgressStep.tsx` — §6 |
 | 화면 문구가 이상함 | `app/i18n/simpleCopy.ts` (하드코딩 금지) |
+| 베타 계측(토큰·이벤트)이 안 남는다 | 서버는 `chunkUsage.ts`/`api/translate/route.ts` 로그부터, 클라는 `metrics.ts`/`events.ts`의 fire-and-forget이 실패를 삼켰을 수 있음 — 네트워크 탭에서 `/api/translation/metrics`·`/api/events` 확인 — §11 |
+| 재방문 피드백 모달이 안 뜬다 | `pending_feedback_job()` 조건(완료 6시간~30일, 미응답, 미해제) 미충족이 정상 — Supabase에서 `translation_jobs`/`feedback` 직접 조회 — §11 |
 
 ---
 

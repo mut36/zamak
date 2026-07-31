@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
+  APP_VERSION,
   FLASH_MODEL,
   FREE_CHUNK_SIZE,
   FREE_CONCURRENCY,
   MAX_BLOCKS_PER_CREDIT,
   PRO_CHUNK_SIZE,
   PRO_MODEL,
+  RESULT_RETENTION_DAYS,
   SERVER_CHUNK_SIZE,
   SERVER_CONCURRENCY,
   TRANSLATION_ESTIMATE_MS,
@@ -14,6 +16,29 @@ import {
   getTierLimits,
   resolveTier,
 } from './constants';
+
+describe('APP_VERSION', () => {
+  it('matches package.json so the footer never lies about the build', async () => {
+    const pkg = await import('../../package.json');
+    expect(APP_VERSION).toBe(pkg.default.version);
+  });
+});
+
+describe('RESULT_RETENTION_DAYS', () => {
+  it('is 30 — the retention promised on screen', () => {
+    expect(RESULT_RETENTION_DAYS).toBe(30);
+  });
+});
+
+describe('PRO_MODEL', () => {
+  it('stays the exact literal the credit-tier migration hardcodes', () => {
+    // supabase/migrations/0004_credit_tiers.sql picks the balance to debit with
+    // a bare `p_model = 'gemini-3.1-pro-preview'` comparison, and that migration
+    // is already applied in production. If PRO_MODEL drifts without the DB
+    // following, every 프로 translation silently debits lite_balance instead.
+    expect(PRO_MODEL).toBe('gemini-3.1-pro-preview');
+  });
+});
 
 describe('resolveTier', () => {
   it('puts every request on the server tier', () => {

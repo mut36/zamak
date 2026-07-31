@@ -13,8 +13,13 @@ import { requireUser } from '../../lib/server/auth';
 import { isJobUsable } from '../../lib/server/translationJob';
 import { createClient } from '../../lib/supabase/server';
 import { classifyError } from '../../lib/translationErrors';
+import { recordChunkUsage } from '../../lib/server/chunkUsage';
+import { parseSrtBlocks } from '../../lib/srt';
+import type { TokenUsage } from '../../lib/providers';
 
 export const maxDuration = 300;
+
+const ZERO_USAGE: TokenUsage = { prompt: 0, cached: 0, thoughts: 0, output: 0 };
 
 export async function POST(request: NextRequest) {
   const auth = await requireUser();
@@ -37,22 +42,58 @@ export async function POST(request: NextRequest) {
     // Runs on the server key; throws if GOOGLE_GENAI_API_KEY is unset.
     assertProviderConfigured(body.model, apiKeys);
 
-    return createTranslationStream(() =>
-      translateSubtitle({
+    // Measured around the model call, then written after the outcome is
+    // known. Recording here rather than inside translateSubtitle keeps the
+    // service free of the request's identity (job, user) and means a
+    // measurement failure can never reach the stream.
+    const blocks = parseSrtBlocks(body.chunk).length;
+    const startedAt = Date.now();
+    const measure = (
+      ok: boolean,
+      usage: TokenUsage,
+      thinkingLevel: string | null,
+      errorCode?: string,
+    ) =>
+      void recordChunkUsage(supabase, {
+        jobId: body.jobId,
+        userId: auth.user.id,
+        chunkIndex: body.chunkIndex,
+        totalChunks: body.totalChunks,
+        phase: body.phase ?? 'main',
+        blocks,
         model: body.model,
-        movieInfo: body.movieInfo,
-        targetLanguage: body.targetLang,
-        translationMode: 'chunk',
-        translationStyle: body.translationStyle,
-        subtitleContent: body.chunk,
-        apiKeys,
-        chunkPosition: {
-          index: body.chunkIndex,
-          total: body.totalChunks,
-        },
-        castSheet: body.castSheet,
-      }),
-    );
+        thinkingLevel,
+        usage,
+        latencyMs: Date.now() - startedAt,
+        ok,
+        errorCode,
+      });
+
+    return createTranslationStream(async () => {
+      try {
+        const outcome = await translateSubtitle({
+          model: body.model,
+          movieInfo: body.movieInfo,
+          targetLanguage: body.targetLang,
+          translationMode: 'chunk',
+          translationStyle: body.translationStyle,
+          subtitleContent: body.chunk,
+          apiKeys,
+          chunkPosition: {
+            index: body.chunkIndex,
+            total: body.totalChunks,
+          },
+          castSheet: body.castSheet,
+        });
+        measure(true, outcome.usage, outcome.thinkingLevel);
+        return outcome;
+      } catch (error) {
+        // A failed call still spent latency and still happened. Dropping it
+        // would make the row count disagree with the retry logs.
+        measure(false, ZERO_USAGE, null, classifyError(error));
+        throw error;
+      }
+    });
   } catch (error) {
     const status =
       error instanceof RequestValidationError || error instanceof SyntaxError

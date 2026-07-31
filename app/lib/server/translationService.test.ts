@@ -11,8 +11,16 @@ vi.mock('../prompts/composer', () => ({
   composeTranslationPrompt: mocks.composeTranslationPrompt,
 }));
 
+// The mock stands for the model's TEXT; the usage envelope around it is the
+// provider's business and nothing in this file asserts on it. Wrapping here
+// rather than at every mockResolvedValue keeps these tests about alignment and
+// error classification, which is what they exist to pin down.
 vi.mock('../providers', () => ({
-  generateModelText: mocks.generateModelText,
+  generateModelText: async (...args: unknown[]) => ({
+    text: await mocks.generateModelText(...args),
+    usage: { prompt: 0, cached: 0, thoughts: 0, output: 0 },
+    thinkingLevel: null,
+  }),
   getModelProvider: () => ({ name: 'gemini' }),
 }));
 

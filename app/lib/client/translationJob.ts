@@ -1,13 +1,19 @@
+import type { AllowedModel } from '../../config/constants';
+import type { CreditKind } from '../creditKind';
+
 /** Raised when the server refuses to open a job, with a code the UI can branch on. */
 export class JobRefusedError extends Error {
-  constructor(
-    /** 'insufficient_credits' | 'file_too_large' | 'unauthorized' | 'unknown' */
-    readonly code: string,
-    message: string,
-    readonly maxBlocks?: number,
-  ) {
+  readonly code: string;
+  readonly maxBlocks?: number;
+  /** Which balance ran out. Set only for `insufficient_credits`. */
+  readonly kind?: CreditKind;
+
+  constructor(code: string, message: string, maxBlocks?: number, kind?: CreditKind) {
     super(message);
     this.name = 'JobRefusedError';
+    this.code = code;
+    this.maxBlocks = maxBlocks;
+    this.kind = kind;
   }
 }
 
@@ -19,17 +25,19 @@ export class JobRefusedError extends Error {
  */
 export async function beginTranslationJob(
   totalBlocks: number,
+  model: AllowedModel,
 ): Promise<string> {
   const res = await fetch('/api/translation/begin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ totalBlocks }),
+    body: JSON.stringify({ totalBlocks, model }),
   });
 
   const body = (await res.json().catch(() => null)) as {
     jobId?: string;
     error?: string;
     maxBlocks?: number;
+    kind?: CreditKind;
   } | null;
 
   if (!res.ok) {
@@ -43,6 +51,7 @@ export async function beginTranslationJob(
       code,
       body?.error ?? `Server error (${res.status})`,
       body?.maxBlocks,
+      body?.kind,
     );
   }
 

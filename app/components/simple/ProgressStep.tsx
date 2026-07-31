@@ -1,147 +1,137 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import type { TranslationProgress } from '../../types/translation';
+import { StepBreadcrumb } from '../StepBreadcrumb';
 import { COPY } from '../../i18n/simpleCopy';
 import { DEFAULT_MODEL, estimateTranslationMs } from '../../config/constants';
+import { overallPercent, stageViews, type StageKey } from '../../lib/progressStages';
 
 interface ProgressStepProps {
   progress: TranslationProgress;
   /** Total subtitle blocks in the source (for the "N / total줄" readout). */
   totalLines: number;
   onCancel: () => void;
+  /** Work identification (enrich / manual entry) is always settled before
+   *  handleTranslate can even be called — see ProgressStep's own usage site
+   *  for why this is passed as a constant rather than tracked state. */
+  enrichDone: boolean;
+  /** Whether the cast-sheet (glossary) toggle is on for this run. */
+  glossaryEnabled: boolean;
+  /** False only while the cast-sheet extraction is still in flight. */
+  glossaryDone: boolean;
 }
 
-const R = 78;
-const CIRC = 2 * Math.PI * R;
 const c = COPY.progress;
 
-/** Where the linear phase hands off to the saturating one. */
-const KNEE = 75;
-/** The ceiling the estimate crawls toward; only a real result reaches 100. */
-const CEIL = 99;
+/** Fallback title while every band is past its end (percent === 100) — the
+ *  screen swaps to 'done' right after, so this is only ever visible for a
+ *  frame. */
+const FALLBACK_STAGE: StageKey = 'verify';
 
 /**
- * Maps elapsed-time-as-percent onto what the ring shows.
- *
- * Linear while the estimate is holding, then saturating so an underestimate
- * degrades into a slow crawl instead of parking at 100% before the file
- * exists. The tail is scaled by exactly (CEIL - KNEE) so its slope at the
- * handoff is 1 — the previous curve divided by a constant instead, which
- * dropped the slope 4.4x in a single frame and read as a stall.
+ * Flat progress bar + 4-stage checklist (context → glossary → translate →
+ * verify), driven entirely by `percent` — a single real number computed from
+ * chunk-completion ratios (overallPercent), never from a client-side timer.
+ * A bar that moves while nothing happens is a lie the user eventually
+ * catches, so translation's 25–90% band is the only part that advances on
+ * its own — everything else is a fast, real pass-through.
  */
-function ease(raw: number): number {
-  if (raw < KNEE) return raw;
-  const span = CEIL - KNEE;
-  return KNEE + span * (1 - Math.exp(-(raw - KNEE) / span));
-}
+export function ProgressStep({
+  progress,
+  totalLines,
+  onCancel,
+  enrichDone,
+  glossaryEnabled,
+  glossaryDone,
+}: ProgressStepProps) {
+  const percent = overallPercent(progress, {
+    enrichDone,
+    glossaryEnabled,
+    glossaryDone,
+  });
+  const views = stageViews(percent, glossaryEnabled);
+  const activeKey =
+    views.find((v) => v.state === 'active')?.key ?? FALLBACK_STAGE;
+  const title = c.stages[activeKey];
 
-/**
- * Elapsed-time estimate ring. The backend sends one final result rather than a
- * per-line stream, so the ring animates against the time estimate from
- * estimateTranslationMs() and eases toward — but never claims — 100% until the
- * result actually lands.
- *
- * The time animation runs even when there are several chunks, and the ring
- * shows whichever of the two is further along. Chunk completions alone move in
- * visible steps — one request per file means a single step from 0 to 100 — so
- * the estimate fills the gaps while chunk counts keep it honest.
- */
-export function ProgressStep({ progress, totalLines, onCancel }: ProgressStepProps) {
-  const [pct, setPct] = useState(0);
-  const startRef = useRef(0);
   const estimate =
     progress.totalEstimateMs || estimateTranslationMs(DEFAULT_MODEL);
-  const done = progress.stage === 'finalizing' || progress.stage === 'done';
-
-  useEffect(() => {
-    if (done) return;
-    if (startRef.current === 0) startRef.current = Date.now();
-    const tick = () => {
-      const elapsed = Date.now() - startRef.current;
-      setPct(Math.min(CEIL, ease((elapsed / estimate) * 100)));
-    };
-    tick();
-    const id = window.setInterval(tick, 100);
-    return () => window.clearInterval(id);
-  }, [done, estimate]);
-
-  const realPct =
-    progress.totalChunks > 0
-      ? (progress.currentChunk / progress.totalChunks) * 100
-      : 0;
-  // Never let the ring go backwards: a chunk landing early should pull it
-  // forward, but a slow chunk must not undo what the estimate already showed.
-  const displayPct = done ? 100 : Math.min(CEIL, Math.max(realPct, pct));
-  // The sweep runs after every chunk has landed, so the ring is already
-  // pinned at its ceiling — only the label can tell the user that the extra
-  // wait is a second attempt at the lines that came back untranslated.
-  const status =
-    progress.stage === 'recovering'
-      ? c.recovering
-      : displayPct < 25
-        ? c.analyzing
-        : displayPct < 92
-          ? c.translating
-          : c.finalizing;
-  const processed = Math.round((displayPct / 100) * totalLines);
-  // Derive the countdown from whatever the ring is actually showing, so the
-  // two never disagree — the chunk-based estimatedRemainingMs used to drive
-  // this independently and could read 40s while the ring sat at 95%.
-  const remainingSec = done
-    ? 0
-    : Math.max(1, Math.round((estimate * (1 - displayPct / 100)) / 1000));
+  const remainingSec =
+    percent >= 100
+      ? 0
+      : Math.max(1, Math.round((estimate * (1 - percent / 100)) / 1000));
+  const processedLines = Math.round((percent / 100) * totalLines);
 
   return (
-    <div className='animate-fade-slide-up flex flex-col items-center'>
-      <div className='ring-wrap'>
-        <div className='pring'>
-          <svg width='172' height='172'>
-            <circle
-              cx='86'
-              cy='86'
-              r={R}
-              fill='none'
-              stroke='var(--surface-2)'
-              strokeWidth='11'
-            />
-            <circle
-              cx='86'
-              cy='86'
-              r={R}
-              fill='none'
-              stroke='var(--accent)'
-              strokeWidth='11'
-              strokeLinecap='round'
-              strokeDasharray={CIRC}
-              strokeDashoffset={CIRC * (1 - displayPct / 100)}
-              style={{ transition: 'stroke-dashoffset 0.3s ease' }}
-            />
-          </svg>
-          <div className='pcttext'>
-            <span className='pn mono'>{Math.round(displayPct)}%</span>
-            <span className='pl'>{c.label}</span>
-          </div>
-        </div>
+    <div className='animate-zslide flex flex-col items-center w-full max-w-[520px] mx-auto'>
+      <StepBreadcrumb current='translate' className='mb-6' />
+      <div className='head text-center'>
+        <h1 className='!text-h1-mini'>{title}</h1>
       </div>
 
-      <div className='pstatus'>{status}</div>
-      {/* While the sweep runs, the ring and the countdown are both frozen at
-          their ceiling — swap the readout for the one pair of numbers that is
-          still moving, so the extra wait doesn't look like a hang. */}
+      <div className='mono text-fineprint text-tertiary mt-1'>
+        {c.pct(percent, remainingSec)}
+      </div>
+
+      <div className='w-full h-[6px] rounded-full bg-track overflow-hidden mt-4 mb-4'>
+        <div
+          className='h-full rounded-full bg-ink-strong'
+          style={{ width: `${percent}%`, transition: 'width 0.15s linear' }}
+        />
+      </div>
+
+      <div className='card flex flex-col gap-[14px] w-full p-[24px_28px]'>
+        {views.map((view) => (
+          <div
+            key={view.key}
+            className={`flex items-center gap-3${
+              view.state === 'skipped' || view.state === 'pending' ? ' opacity-40' : ''
+            }`}
+          >
+            {view.state === 'done' ? (
+              <span
+                className='flex items-center justify-center w-5 h-5 rounded-[5px] text-white text-mono-step font-bold shrink-0'
+                style={{ background: 'var(--success)' }}
+              >
+                ✓
+              </span>
+            ) : (
+              <span
+                className={`w-5 h-5 rounded-[5px] shrink-0${
+                  view.state === 'active' ? ' animate-zbreathe' : ''
+                }`}
+                style={{
+                  background: view.state === 'active' ? 'var(--ink-strong)' : 'transparent',
+                  border: view.state === 'active' ? 'none' : '1.5px solid var(--border-step)',
+                }}
+              />
+            )}
+            <span className='text-body text-nav'>{c.stages[view.key]}</span>
+            {view.state === 'skipped' && (
+              <span className='ml-auto text-fineprint text-secondary'>
+                {c.stageSkipped}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* While the sweep runs, the checklist is already pinned on "verify" —
+          swap the readout for the one pair of numbers that is still moving,
+          so the extra wait doesn't look like a hang. */}
       {progress.stage === 'recovering' ? (
-        <div className='psub mono'>
+        <div className='psub mono mt-4'>
           {c.recoveringDetail(progress.sweepRecovered, progress.sweepRemaining)}
         </div>
       ) : (
         totalLines > 0 && (
-          <div className='psub mono'>
-            {c.remaining(processed, totalLines, remainingSec)}
+          <div className='psub mono mt-4'>
+            {c.remaining(processedLines, totalLines, remainingSec)}
           </div>
         )
       )}
 
-      <p className='text-[13px] text-ink-2 text-center mt-6'>{c.reassure}</p>
+      <p className='text-caption text-nav text-center mt-6'>{c.reassure}</p>
 
       <button type='button' className='btn btn-ghost mt-5' onClick={onCancel}>
         {c.cancel}

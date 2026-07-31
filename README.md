@@ -84,8 +84,13 @@ npm run dev
 ### 검증
 
 ```bash
-npx tsc --noEmit && npx eslint app && npx vitest run
+npx tsc --noEmit && npx eslint app && npx vitest run && npm run check:tokens
 ```
+
+`check:tokens`는 디자인 토큰 가드입니다. CSS 커스텀 프로퍼티는 오타가 나도
+빌드가 통과하므로(`var(--typo)`는 에러 없이 선언만 버려짐) tsc·eslint·vitest 중
+무엇도 못 잡습니다. 이 스크립트가 `app/globals.css`의 정의 집합과 `app/` 전체의
+`var(--…)` 참조 집합을 대조해 미정의 참조와 죽은 토큰을 걸러냅니다.
 
 ## Configuration
 
@@ -104,6 +109,36 @@ npx tsc --noEmit && npx eslint app && npx vitest run
    - Redirect URLs: `http://localhost:3000/auth/callback`(개발),
      `https://zamak.app/auth/callback`, `https://www.zamak.app/auth/callback`
 5. **스키마 적용**: `supabase/migrations/0001_credits.sql`을 SQL Editor에 붙여넣고 실행
+
+### 베타 리디자인 마이그레이션
+
+`0001`~`0003` 이후, 베타 리디자인이 추가한 스키마를 **순서대로** SQL Editor에서 실행합니다:
+
+1. `supabase/migrations/0004_credit_tiers.sql` — 크레딧을 라이트/프로 2종 잔액으로 분리
+2. `supabase/migrations/0005_feedback.sql` — 완료 화면 별점·의견 피드백
+3. `supabase/migrations/0006_waitlist.sql` — 번역권 소진 시 결제 오픈 대기자 등록
+4. `supabase/migrations/0007_job_results.sql` — 번역 결과물 보관(30일) + `translation_jobs` 컬럼 추가
+5. `supabase/migrations/0008_copyright_consents.sql` — 첫 번역 전 저작권 동의 기록
+6. `supabase/migrations/0009_beta_metrics.sql` — 베타 계측: 청크별 토큰 실측
+   (`translation_chunk_usage`), 런별 실측 컬럼(`translation_jobs` +
+   `record_job_metrics`), 퍼널 이벤트(`beta_events`), 재방문 피드백 확장
+   (`feedback.usability`/`issue_kinds`/`reported_blocks` +
+   `pending_feedback_job()`). **2026-07-31 기준 아직 미실행** — 실행 전에는
+   계측 관련 API(`/api/translation/metrics`, `/api/events`,
+   `/api/feedback/pending`)가 전부 조용히 실패한다(계측 실패가 번역을 깨면
+   안 된다는 원칙대로 fire-and-forget이라 사용자에게는 안 보이지만, 계측
+   자체는 안 쌓인다).
+
+**마이그레이션과 배포는 붙여서 합니다.** `0004`는 기존 `begin_translation_job(integer)`과
+5인자 `settle_order`를 **drop하고** 새 시그니처로 다시 만듭니다. 이 앱은 Next.js 한 벌이
+Supabase 한 개를 보는 구조라 블루/그린도, 버전 핀도 없습니다 — 그래서 순서가 어느 쪽이든
+그 사이에는 살아 있는 코드가 없는 함수를 호출하는 구간이 생깁니다(마이그레이션 먼저면
+구코드가 옛 시그니처를 못 찾고, 배포 먼저면 신코드가 새 시그니처를 못 찾습니다).
+1인 운영이므로 **트래픽이 적은 시간에 마이그레이션 실행 → 곧바로 배포**로 몇 분짜리
+다운타임을 감수하는 것이 가장 단순하고 정직한 방법입니다. 그 사이 진행 중이던 번역은
+실패하며, 차감된 번역권은 `/legal`의 환불 조항대로 복구해 주면 됩니다.
+
+`0007` 실행 후, Supabase 대시보드 **Storage → New bucket**에서 이름 `results`, **Public bucket OFF**(비공개)로 버킷을 생성합니다. **이 버킷을 만들지 않으면 번역 자체는 정상 동작하지만, 결과물이 저장되지 않아 `/mypage`의 번역 기록이 비어 보입니다.**
 
 ### 크레딧
 
