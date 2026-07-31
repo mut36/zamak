@@ -9,7 +9,7 @@ import { resolveTargetLang, TARGET_LANGS } from './languages';
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '0.26.2';
+export const APP_VERSION = '0.26.3';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
@@ -376,6 +376,17 @@ export const GLOSSARY_THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
  * are sent whole; larger files are evenly excerpted (names/relations are
  * scattered through a whole file, unlike summarize's leading-sample approach)
  * — see extractCastSheet.ts.
+ *
+ * ⚠️ 3000 HAS NO DERIVATION — it arrived with the feature's first commit
+ * (779ad6c) and nothing has tested it. It is also currently DEAD: it sits
+ * above MAX_BLOCKS_PER_CREDIT (2000), so every file we actually translate is
+ * sent whole and excerptBlocks() never runs. The only files it can affect are
+ * ones /api/translation/begin will refuse anyway — and glossary runs BEFORE
+ * that check (the settings screen fires it), so those files cost us a real
+ * extraction before being rejected. See docs/TODO.md.
+ *
+ * Anything reasoning about glossary cost should therefore treat it as
+ * proportional to file size up to the credit cap, not capped here.
  */
 export const GLOSSARY_MAX_BLOCKS = readPositiveIntEnv(
   process.env.GLOSSARY_MAX_BLOCKS,
