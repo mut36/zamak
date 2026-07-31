@@ -13,7 +13,11 @@ import {
 import { fetchConsent, recordConsent } from '../lib/client/consent';
 import { recordEvent } from '../lib/client/events';
 import { DEFAULT_TARGET_LANG } from '../config/languages';
-import { DEFAULT_MODEL, type AllowedModel } from '../config/constants';
+import {
+  DEFAULT_MODEL,
+  MAX_BLOCKS_PER_CREDIT,
+  type AllowedModel,
+} from '../config/constants';
 import type { ContentType, MovieInfo } from '../types/translation';
 
 const EMPTY_MOVIE_INFO: MovieInfo = { title: '', year: '', notes: '' };
@@ -23,6 +27,31 @@ const EMPTY_MOVIE_INFO: MovieInfo = { title: '', year: '', notes: '' };
 function fileExtension(filename: string): string | null {
   const match = filename.toLowerCase().match(/\.([a-z0-9]+)$/);
   return match?.[1] ?? null;
+}
+
+/**
+ * Blocks in a parsed document, counted exactly the way the server counts them.
+ *
+ * `useTranslation` sends `parseSrtBlocks(doc.srt).length` to
+ * /api/translation/begin, which compares it against MAX_BLOCKS_PER_CREDIT. The
+ * upload guard has to agree with that number or it would refuse files the
+ * server would accept (or worse, pass files it will reject), so both go
+ * through this one parse rather than counting cues or lines independently.
+ */
+export function countBlocks(srt: string): number {
+  return parseSrtBlocks(srt).length;
+}
+
+/**
+ * Whether a file is too big to translate on one credit.
+ *
+ * Strictly greater-than, matching /api/translation/begin — a file of exactly
+ * MAX_BLOCKS_PER_CREDIT blocks is allowed. Exported for the test that pins
+ * that boundary; the two checks drifting by one block would either leak spend
+ * or reject a legal file.
+ */
+export function exceedsCreditCap(blockCount: number): boolean {
+  return blockCount > MAX_BLOCKS_PER_CREDIT;
 }
 
 /**
@@ -48,6 +77,8 @@ export interface WizardMessages {
     bilingualSmi: string;
     unreadableFile: string;
     invalidFile: string;
+    /** (상한, 실제) — 크레딧 상한을 넘는 파일을 드롭존에서 돌려보낼 때. */
+    tooLarge: (max: number, actual: number) => string;
   };
   cancelConfirm: string;
   copyright: {
@@ -361,6 +392,23 @@ export function useWizard(
       setUploading(false);
       void recordEvent('upload_rejected', {
         reason: err instanceof BilingualSmiError ? 'bilingualSmi' : 'unreadable',
+        format: fileExtension(selected.name),
+      });
+      return;
+    }
+
+    // Size check belongs HERE, not at translate time. /api/translation/begin
+    // enforces MAX_BLOCKS_PER_CREDIT too (that check is the billing defense and
+    // stays), but by then the settings screen has already fired enrich,
+    // summarize and — if the toggle is on — a full glossary extraction. Those
+    // are real API spend on a file we are about to refuse. Same parse the
+    // server check uses, so the two can never disagree about the count.
+    const blockCount = countBlocks(doc.srt);
+    if (exceedsCreditCap(blockCount)) {
+      setUploadError(messages.upload.tooLarge(MAX_BLOCKS_PER_CREDIT, blockCount));
+      setUploading(false);
+      void recordEvent('upload_rejected', {
+        reason: 'tooLarge',
         format: fileExtension(selected.name),
       });
       return;

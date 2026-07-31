@@ -98,6 +98,10 @@ export default function Home() {
         bilingualSmi: COPY.upload.bilingualSmi,
         unreadableFile: COPY.upload.unreadableFile,
         invalidFile: COPY.upload.invalidFile,
+        // Same sentence the server-refusal screen uses — it already says
+        // exactly this ("N줄까지 커버해요, 이 파일은 M줄"), and one wording for
+        // one fact keeps the two paths from drifting apart.
+        tooLarge: COPY.credits.tooLargeBody,
       },
       cancelConfirm: COPY.progress.cancelConfirm,
       copyright: { failed: COPY.copyright.failed },

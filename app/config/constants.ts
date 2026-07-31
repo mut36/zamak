@@ -9,7 +9,7 @@ import { resolveTargetLang, TARGET_LANGS } from './languages';
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '0.26.3';
+export const APP_VERSION = '0.26.4';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
@@ -380,10 +380,11 @@ export const GLOSSARY_THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
  * ⚠️ 3000 HAS NO DERIVATION — it arrived with the feature's first commit
  * (779ad6c) and nothing has tested it. It is also currently DEAD: it sits
  * above MAX_BLOCKS_PER_CREDIT (2000), so every file we actually translate is
- * sent whole and excerptBlocks() never runs. The only files it can affect are
- * ones /api/translation/begin will refuse anyway — and glossary runs BEFORE
- * that check (the settings screen fires it), so those files cost us a real
- * extraction before being rejected. See docs/TODO.md.
+ * sent whole and excerptBlocks() never runs. Since 2026-07-31 the upload
+ * screen refuses over-cap files outright (useWizard's handleFile), so nothing
+ * oversized reaches the glossary at all — the excerpt path is now unreachable
+ * by construction, not just by coincidence. Harmless either way; see
+ * docs/TODO.md for the delete-or-lower decision.
  *
  * Anything reasoning about glossary cost should therefore treat it as
  * proportional to file size up to the credit cap, not capped here.

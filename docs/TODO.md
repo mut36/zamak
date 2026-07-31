@@ -66,22 +66,23 @@ git worktree add /Users/jian/projects/zamak-worktrees/payments feature/payments
 - [ ] **enrich(TMDB + 그라운딩) 호출 원가 실측** — 위 두 마진 계산에서 빠져
       있는 유일한 항목이다. 파일당 1회라 작겠지만 값이 없어서 못 넣었다.
 
-### 글로사리가 크기 검사보다 먼저 돈다 — 거절할 파일에 돈을 쓴다 (2026-07-31 발견)
+### ~~글로사리가 크기 검사보다 먼저 돈다~~ — 해결 (2026-07-31)
 
-호출 순서가 거꾸로다:
+발견 당시 호출 순서가 거꾸로였다:
 
 ```
-업로드 → 설정 화면에서 글로사리 실행(과금) → 번역 시작 → 2,000블록 초과? → 거절
+업로드 → 설정 화면에서 enrich·summarize·글로사리 실행(과금) → 번역 시작 → 거절
 ```
 
-`useWizard.ts`의 cast-sheet effect는 `screen === 'settings'`에서 발동하는데,
-`MAX_BLOCKS_PER_CREDIT` 검사는 그 다음 단계인 `/api/translation/begin`에만 있다
-(`app/api/translation/begin/route.ts`). 그래서 상한을 넘는 파일을 올리면
-**글로사리 추출 비용을 다 치른 뒤에** "파일이 너무 커요"를 본다.
+`MAX_BLOCKS_PER_CREDIT` 검사가 `/api/translation/begin`에만 있어서, 상한을
+넘는 파일은 **AI 호출 비용을 다 치른 뒤에** "파일이 너무 커요"를 봤다.
 
-- [ ] 크기 검사를 업로드/설정 진입 시점으로 앞당기거나, 글로사리 effect에
-      블록 수 가드를 넣을 것. 서버 측 `MAX_BLOCKS_PER_CREDIT` 검사는 그대로
-      두고(클라이언트 가드는 UX용, 과금 방어는 서버가 한다).
+- [x] ~~크기 검사를 앞당길 것~~ — `useWizard.ts` `handleFile`이 파싱 직후
+      드롭존에서 돌려보낸다. 글로사리만 막지 않고 **enrich·summarize까지**
+      함께 아끼며, 사용자도 설정 화면을 거치지 않고 즉시 안다.
+      서버 검사는 그대로 뒀다 — 클라이언트는 UX·낭비 방지용이고 과금 방어는
+      서버가 한다. `countBlocks`/`exceedsCreditCap`을 순수 함수로 빼서
+      경계(정확히 2,000블록은 통과)를 테스트로 고정했다.
 - [ ] **`GLOSSARY_MAX_BLOCKS=3000`은 코드 정리 항목이지 비용 항목이 아니다.**
       ⚠️ 2026-07-31 최초 기록 때 "비용 모델에 영향"이라고 잘못 적었던 걸
       정정한다 — 번역 자체가 `MAX_BLOCKS_PER_CREDIT`(2,000)에서 이미 막히므로
