@@ -119,6 +119,15 @@ npx tsc --noEmit && npx eslint app && npx vitest run && npm run check:tokens
 3. `supabase/migrations/0006_waitlist.sql` — 번역권 소진 시 결제 오픈 대기자 등록
 4. `supabase/migrations/0007_job_results.sql` — 번역 결과물 보관(30일) + `translation_jobs` 컬럼 추가
 5. `supabase/migrations/0008_copyright_consents.sql` — 첫 번역 전 저작권 동의 기록
+6. `supabase/migrations/0009_beta_metrics.sql` — 베타 계측: 청크별 토큰 실측
+   (`translation_chunk_usage`), 런별 실측 컬럼(`translation_jobs` +
+   `record_job_metrics`), 퍼널 이벤트(`beta_events`), 재방문 피드백 확장
+   (`feedback.usability`/`issue_kinds`/`reported_blocks` +
+   `pending_feedback_job()`). **2026-07-31 기준 아직 미실행** — 실행 전에는
+   계측 관련 API(`/api/translation/metrics`, `/api/events`,
+   `/api/feedback/pending`)가 전부 조용히 실패한다(계측 실패가 번역을 깨면
+   안 된다는 원칙대로 fire-and-forget이라 사용자에게는 안 보이지만, 계측
+   자체는 안 쌓인다).
 
 **마이그레이션과 배포는 붙여서 합니다.** `0004`는 기존 `begin_translation_job(integer)`과
 5인자 `settle_order`를 **drop하고** 새 시그니처로 다시 만듭니다. 이 앱은 Next.js 한 벌이

@@ -9,7 +9,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 [`standards/netflix-korean-gap-review.md`](standards/netflix-korean-gap-review.md).
 
 > 파일 경로 + 함수/심볼 이름으로만 가리킨다(줄 번호는 금방 어긋나서 안 적음).
-> 기준 시점: 2026-07-28. 구조가 바뀌면 이 문서도 같이 고칠 것.
+> 기준 시점: 2026-07-31. 구조가 바뀌면 이 문서도 같이 고칠 것.
 
 메인 경로는 **영화·드라마 분기**다. "기타 영상" 분기는 3단계에서 갈린다.
 
@@ -454,6 +454,31 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   확장자를 정하고, 입력과 같은 형식이면 원본 대소문자를 유지한다.
   완료 화면 실패 개수 표시 → `DoneStep.tsx`.
 
+### 11. 계측 (베타)
+- **코드**: 모델 호출 1회당 — provider의 `generateModelText`(`app/lib/providers/gemini.ts`)가
+  `{ text, usage, thinkingLevel }`를 반환(타입 `app/lib/providers/types.ts`) →
+  `/api/translate`가 `app/lib/server/chunkUsage.ts`(`recordChunkUsage`)로
+  `translation_chunk_usage`에 1행 기록(재시도·§9.65 sweep 라운드도 각각 1행 —
+  sweep은 `phase='sweep'`으로 구분). 런 1회당 — `useTranslation.ts` 완료 시
+  `app/lib/client/metrics.ts`(`sendRunMetrics`) → `/api/translation/metrics` →
+  RPC `record_job_metrics` → `translation_jobs`의 실측 컬럼(청크 수·소요·잔여
+  블록 등). 피드백 — 완료 화면 별점은 그 자리에서(`DoneStep.tsx`,
+  `sendFeedback`), "실제로 썼는지·뭐가 문제였는지"는 재방문 때
+  (`app/hooks/useFeedbackFollowup.ts`, `app/components/beta/FeedbackFollowup.tsx`)
+  `/api/feedback/pending`으로 대상을 받아 `/api/feedback`에 usability·
+  issueKinds·reportedBlocks를 기록(둘 다 `app/lib/client/feedback.ts`). 퍼널
+  이벤트 — `translation_jobs`로 이미 알 수 있는 건 제외한 4개만
+  `app/lib/client/events.ts`(`recordEvent`) → `/api/events` → `beta_events`
+  (업로드 거절 · 설정 확정 · 다운로드 클릭 · 크레딧 소진 화면 노출, 목록은
+  `constants.ts` `BETA_EVENTS`).
+- **스키마**: `supabase/migrations/0009_beta_metrics.sql`(적용 상태는
+  README의 스키마 절 참고).
+- **불변식**: 자막 텍스트는 계측 어디에도 저장하지 않는다 —
+  `feedback.reported_blocks`는 정수(SRT 시퀀스 번호) 배열이고, 그 줄의
+  텍스트는 보관된 결과물(0007)에서 읽는다. 계측 실패가 번역·화면을 깨면 안
+  되므로 모든 경로가 fire-and-forget이고 실패를 삼킨다. 미측정은 `null`로
+  남는다 — "실패 0건"과 "측정 못 함"은 반대되는 사실이라 `0`으로 뭉개지 않는다.
+
 ---
 
 ## 증상 → 고칠 곳 (빠른 인덱스)
@@ -498,6 +523,8 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 에러 종류에 따라 재시도/중단 동작을 바꾸고 싶음 | `translationErrors.ts` 분류(`classifyError`)·성격 함수(`isFatalCode`/`isRetryableCode`) — §9.6 |
 | 진행 링이 너무 빨리 차서 99%에서 오래 기다림(또는 그 반대) | `constants.ts` `TRANSLATION_ESTIMATE_MS`(모델별), 이징 곡선은 `ProgressStep.tsx` — §6 |
 | 화면 문구가 이상함 | `app/i18n/simpleCopy.ts` (하드코딩 금지) |
+| 베타 계측(토큰·이벤트)이 안 남는다 | 서버는 `chunkUsage.ts`/`api/translate/route.ts` 로그부터, 클라는 `metrics.ts`/`events.ts`의 fire-and-forget이 실패를 삼켰을 수 있음 — 네트워크 탭에서 `/api/translation/metrics`·`/api/events` 확인 — §11 |
+| 재방문 피드백 모달이 안 뜬다 | `pending_feedback_job()` 조건(완료 6시간~30일, 미응답, 미해제) 미충족이 정상 — Supabase에서 `translation_jobs`/`feedback` 직접 조회 — §11 |
 
 ---
 
