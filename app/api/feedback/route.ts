@@ -6,49 +6,118 @@ import { requireUser } from '../../lib/server/auth';
  *  rejected rating is a lost signal, and the signal is the point. */
 const MAX_COMMENT = 2000;
 
+/** Each value maps to a different file in the pipeline, which is the whole
+ *  reason these are chips and not free text: a complaint that has to be
+ *  hand-classified is one we would never actually process. */
+const ISSUE_KINDS = [
+  'mistranslation',
+  'speech-level',
+  'naming',
+  'too-long',
+  'unnatural',
+  'timing',
+] as const;
+
+const USABILITY = ['as-is', 'minor-edits', 'major-edits', 'unusable'] as const;
+
+/** Enough to point at a pattern; past this it is an export, not a report. */
+const MAX_REPORTED_BLOCKS = 30;
+
+function parseIssueKinds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value)].filter((kind): kind is string =>
+    ISSUE_KINDS.includes(kind as (typeof ISSUE_KINDS)[number]),
+  );
+}
+
+function parseReportedBlocks(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value)]
+    .filter(
+      (block): block is number =>
+        typeof block === 'number' && Number.isInteger(block) && block > 0,
+    )
+    .slice(0, MAX_REPORTED_BLOCKS);
+}
+
 /**
- * Records a rating for one finished translation.
+ * Records feedback for one finished translation.
  *
- * Upsert on job_id so re-rating replaces the previous answer instead of
- * stacking rows. RLS additionally checks the job belongs to the caller.
+ * Two callers, one row. The completion screen sends a star rating; the
+ * follow-up shown on a later visit sends `usability` and what went wrong —
+ * "did you actually use it?" is unanswerable at the moment the file finishes
+ * downloading, which is why it is asked days later instead.
+ *
+ * Both upsert on job_id, and each writes only the fields it actually
+ * collected: answering the follow-up must not erase the rating, and re-rating
+ * must not erase the follow-up.
+ *
+ * `dismiss` is the third caller — the user closed the follow-up without
+ * answering, recorded so it does not return on every visit forever.
  */
 export async function POST(request: NextRequest) {
   const auth = await requireUser();
   if (!auth.ok) return auth.response;
 
-  let body: { jobId?: unknown; rating?: unknown; comment?: unknown };
+  let body: Record<string, unknown>;
   try {
-    body = await request.json();
+    body = (await request.json()) as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
   const jobId = String(body.jobId ?? '');
-  const rating = Number(body.rating);
   if (!jobId) {
     return NextResponse.json({ error: 'jobId is required' }, { status: 400 });
   }
-  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+
+  const dismiss = body.dismiss === true;
+
+  const hasRating = body.rating !== undefined && body.rating !== null;
+  const rating = Number(body.rating);
+  if (hasRating && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
     return NextResponse.json(
       { error: 'rating must be an integer from 1 to 5' },
       { status: 400 },
     );
   }
 
+  const usability =
+    typeof body.usability === 'string' &&
+    USABILITY.includes(body.usability as (typeof USABILITY)[number])
+      ? body.usability
+      : null;
+
+  if (!hasRating && !usability && !dismiss) {
+    return NextResponse.json({ error: 'nothing to record' }, { status: 400 });
+  }
+
   const comment =
-    typeof body.comment === 'string' ? body.comment.slice(0, MAX_COMMENT) : null;
+    typeof body.comment === 'string' && body.comment
+      ? body.comment.slice(0, MAX_COMMENT)
+      : null;
+
+  // Only the fields this caller collected. A key absent here is a key the
+  // upsert leaves alone — that is what lets two screens write one row without
+  // overwriting each other.
+  const row: Record<string, unknown> = {
+    job_id: jobId,
+    user_id: auth.user.id,
+    updated_at: new Date().toISOString(),
+  };
+  if (hasRating) row.rating = rating;
+  if (comment !== null) row.comment = comment;
+  if (usability) {
+    row.usability = usability;
+    row.issue_kinds = parseIssueKinds(body.issueKinds);
+    row.reported_blocks = parseReportedBlocks(body.reportedBlocks);
+  }
+  if (dismiss) row.followup_dismissed_at = new Date().toISOString();
 
   const supabase = await createClient();
-  const { error } = await supabase.from('feedback').upsert(
-    {
-      job_id: jobId,
-      user_id: auth.user.id,
-      rating,
-      comment,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'job_id' },
-  );
+  const { error } = await supabase
+    .from('feedback')
+    .upsert(row, { onConflict: 'job_id' });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
