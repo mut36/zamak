@@ -9,7 +9,7 @@ import { resolveTargetLang, TARGET_LANGS } from './languages';
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '0.26.1';
+export const APP_VERSION = '0.26.2';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
