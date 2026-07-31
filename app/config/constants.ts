@@ -9,7 +9,7 @@ import { resolveTargetLang, TARGET_LANGS } from './languages';
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '0.26.0';
+export const APP_VERSION = '0.26.1';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
@@ -121,7 +121,7 @@ export const FREE_CONCURRENCY = readPositiveIntEnv(
  * K=16 was sized for B=2000 (⌈2000/2000⌉=1 chunk, K unused) and comfortably
  * covered B=200 in one wave (⌈2000/200⌉=10 ≪ 16). At B=100 a credit-cap-sized
  * file needs ⌈2000/100⌉=20 chunks, which is now *more* than K — two waves, not
- * one (our 1874-block sample already crosses this: 19 chunks > 16). The
+ * one (a 1,874-block film crosses this: 19 chunks > 16). The
  * one-wave rule was already abandoned as a K-derivation basis (2026-07-22,
  * below), so this isn't a regression against any live constraint — just worth
  * knowing before assuming "K is always oversized" from the B=200-era comment.
@@ -157,8 +157,12 @@ export const SERVER_CONCURRENCY = readPositiveIntEnv(
  * but ~half the wall-clock chunk time and 8 chunks at MAX_BLOCKS_PER_CREDIT
  * (2000/250) still fits one wave under SERVER_CONCURRENCY=16.
  *
- * Only measured up to 461 blocks (one drama episode) — full-length-film-scale
- * HIGH chunk behavior at B=250 is not yet measured, see docs/TODO.md.
+ * Measured at feature-length scale 2026-07-31 (decisions.md §2-16): a
+ * 1,124-block film at B=250/HIGH ran its slowest chunk in 141.5s against the
+ * 300s per-chunk timeout, with thinking holding at 44 tok/block (the 461-block
+ * drama gave 40). File length does not move this — chunkSrtBlocksAtGaps caps a
+ * chunk at targetSize + 20% = 300 blocks, so longer files add chunks, not
+ * bigger ones.
  */
 export const PRO_CHUNK_SIZE = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_PRO_CHUNK_SIZE,
@@ -206,21 +210,18 @@ export function resolveTier(): Tier {
  * failing is far worse than it being loose. It still stops someone from
  * spending one credit on a ten-hour concatenation.
  *
- * Cost check (2026-07-25, current B=100, pricing from docs/tuning/gemini-limits.md
- * §4): a 2,000-block file costs ~$0.32 (~440 KRW) on flash, ~$0.49 (~670 KRW) on
- * pro — worst case is pro at the cap, not flash at the average. A 1,480-block
- * file costs ~$0.23 flash / ~$0.36 pro. Pro's estimate reuses flash's measured
- * per-block token counts (chunk-size-model.md §1) since pro hasn't been
- * measured separately — treat it as directional, not exact. Credit pricing has
- * to clear the worst case (pro, at the cap), not the flash average.
+ * Cost at the cap, both paths measured (docs/tuning/cost-per-block.md, current
+ * production settings). Credit pricing has to clear the worst case — pro at the
+ * cap — not the flash average:
  *
- * ⚠️ STALE as of 2026-07-26: the pro figures above assume thoughts=0, copied
- * from flash. Real pro logs show LOW thinking is NOT free (docs/decisions.md
- * §2-4-1) — a 967-block file cost 971원 against this model's ~320원 estimate,
- * with thinking tokens alone accounting for ~58% of the bill. Pro's true
- * worst-case cost is higher than the $0.49/670원 above; re-derive from real
- * pro thoughts data before trusting this for credit pricing (see
- * decisions.md §4 item 10).
+ *   flash (B=100, LOW):  0.23-0.28 KRW/block  →  ~460-560 KRW at 2,000
+ *   pro   (B=250, HIGH): 1.25-1.34 KRW/block  →  ~2,670 KRW at 2,000
+ *
+ * The pro figure is a real measurement now, not flash's numbers reused: a
+ * 1,124-block film at the production settings billed $0.8888 with thinking at
+ * 44 tok/block (decisions.md §2-16). Two earlier estimates here were wrong in
+ * the same direction — both assumed pro thinking was free or cheap, and pro
+ * thinking is most of the bill. Do not re-derive pro from flash.
  */
 export const MAX_BLOCKS_PER_CREDIT = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_MAX_BLOCKS_PER_CREDIT,
@@ -330,9 +331,9 @@ export const THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
  * see PRO_CHUNK_SIZE below, which is what makes HIGH affordable (~575원, same
  * file, B=250).
  *
- * The MAX_BLOCKS_PER_CREDIT cost estimate below predates this measurement and
- * reuses flash's `th=0` assumption for pro — treat that number as stale until
- * re-derived from real pro thoughts data.
+ * Feature-length behaviour is measured too (2026-07-31, decisions.md §2-16):
+ * slowest chunk 141.5s against the 300s timeout, thinking steady at 44
+ * tok/block. HIGH at B=250 has ~2x headroom on any file length.
  */
 export const PRO_THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
   'PRO_THINKING_LEVEL',

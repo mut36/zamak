@@ -43,9 +43,10 @@ import {
   getReadingSpeed,
   MIN_SUBTITLE_DURATION_MS,
   MIN_SUBTITLE_GAP_MS,
-  SERVER_CHUNK_SIZE,
+  CHUNK_TIMEOUT_MS,
   SERVER_CONCURRENCY,
   TRANSLATION_MODEL,
+  chunkSizeForModel,
   thinkingLevelForModel,
 } from '../app/config/constants';
 import type { TranslationStyle } from '../app/types/translation';
@@ -76,6 +77,17 @@ const P = {
 };
 
 /**
+ * Chunk size for the model under test — NOT `SERVER_CHUNK_SIZE`.
+ *
+ * Pro and flash tune B for unrelated reasons (constants.ts `PRO_CHUNK_SIZE`),
+ * and the harness used to hardcode flash's 100. That silently measured Pro at
+ * B=100 — the small-B configuration whose thinking cost is ~2.4x production's
+ * B=250 (decisions.md §2-15). Anything judged on those numbers was judging a
+ * config we do not ship.
+ */
+const CHUNK_SIZE = chunkSizeForModel(TRANSLATION_MODEL);
+
+/**
  * The A/B axis. Today it is translationStyle, the one live switch that changes
  * the prompt (docs/decisions.md — the philosophy file is currently unreachable
  * because page.tsx hardcodes 'meaning'). Add an entry per prompt edit you want
@@ -103,6 +115,16 @@ interface ChunkUsage {
  */
 const callContext = new AsyncLocalStorage<{ id: string }>();
 const usageByChunk = new Map<string, ChunkUsage>();
+
+/**
+ * Wall-clock of every single model call, in ms.
+ *
+ * `CHUNK_TIMEOUT_MS` (and `/api/translate`'s `maxDuration = 300`) bounds ONE
+ * request, not the run — so the total `seconds` below cannot answer "does a
+ * feature-length file fit in 300s". Retries are recorded as separate entries
+ * because the timeout applies to each attempt independently.
+ */
+const callMs: number[] = [];
 const USAGE_LINE =
   /^\[gemini\].*prompt=(\d+) cached=(\d+) thoughts=(\d+) output=(\d+)/;
 
@@ -186,6 +208,8 @@ interface VariantResult {
   recovered: number;
   sweepCalls: number;
   seconds: number;
+  /** Slowest single model call — what the 300s per-chunk timeout binds on. */
+  maxCallMs: number;
   usage: ChunkUsage;
   fit: { tIn: number; pFixed: number };
   costUsd: number;
@@ -203,6 +227,7 @@ async function runVariant(
   }
 
   usageByChunk.clear();
+  callMs.length = 0;
   const movieInfo = { title: P.title, year: P.year, notes: P.notes };
   const startedAt = Date.now();
   let apiFailures = 0;
@@ -231,6 +256,7 @@ async function runVariant(
         chunkPosition,
       });
 
+      const callStartedAt = Date.now();
       const generated = await callContext.run({ id: callId }, () =>
         geminiProvider.generateText({
           model: TRANSLATION_MODEL,
@@ -239,6 +265,7 @@ async function runVariant(
           translationMode: 'chunk',
         }),
       );
+      callMs.push(Date.now() - callStartedAt);
       // The harness reads token counts off the [gemini] log line the provider
       // still prints; only the text matters here.
       const output = generated.text;
@@ -298,7 +325,7 @@ async function runVariant(
       sourceContent: source,
       translatedContent: mainPassContent,
       leftover,
-      chunkSize: SERVER_CHUNK_SIZE,
+      chunkSize: CHUNK_SIZE,
       concurrency: SERVER_CONCURRENCY,
       signal: controller.signal,
       budget: computeSweepBudget(sourceChunks.length),
@@ -354,6 +381,7 @@ async function runVariant(
     recovered: sweepRecovered,
     sweepCalls,
     seconds,
+    maxCallMs: callMs.length ? Math.max(...callMs) : 0,
     usage,
     fit,
     costUsd:
@@ -369,7 +397,8 @@ function summaryMarkdown(results: VariantResult[]): string {
     (r) =>
       `| ${r.name} | ${r.blocks} | ${r.chunks} | ${r.apiFailures} | ` +
       `${r.countMismatchChunks} | ${r.unmatched} (${pct(r.unmatched, r.blocks)}%) | ` +
-      `${r.seconds.toFixed(1)}s | ${r.usage.prompt} | ${r.usage.cached} | ` +
+      `${r.seconds.toFixed(1)}s | ${(r.maxCallMs / 1000).toFixed(1)}s | ` +
+      `${r.usage.prompt} | ${r.usage.cached} | ` +
       `${r.usage.thoughts} | ${r.usage.output} | ` +
       `${r.fit.pFixed.toFixed(0)} | ${r.fit.tIn.toFixed(1)} | ` +
       `$${r.costUsd.toFixed(4)} |`,
@@ -380,13 +409,15 @@ function summaryMarkdown(results: VariantResult[]): string {
     '',
     `- 파일: \`${P.file}\``,
     `- 모델: \`${TRANSLATION_MODEL}\` · THINKING_LEVEL=**${thinkingLevelForModel(TRANSLATION_MODEL)}**`,
-    `- 청크 크기 ${SERVER_CHUNK_SIZE} (gap-based target) · 동시성 ${SERVER_CONCURRENCY}`,
+    `- 청크 크기 ${CHUNK_SIZE} (gap-based target, 모델별) · 동시성 ${SERVER_CONCURRENCY}`,
+    `- 청크 타임아웃 ${(CHUNK_TIMEOUT_MS / 1000).toFixed(0)}s`,
     '',
-    '| 변형 | 블록 | 청크 | API실패 | 블록수불일치 | 정렬실패 | 시간 | 입력tok | 캐시tok | thinking | 출력tok | P_fixed | t_in | 비용 |',
-    '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
+    '| 변형 | 블록 | 청크 | API실패 | 블록수불일치 | 정렬실패 | 총시간 | 최장청크 | 입력tok | 캐시tok | thinking | 출력tok | P_fixed | t_in | 비용 |',
+    '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
     ...rows,
     '',
     '- **정렬실패** = 번역이 붙지 않아 원문으로 남은 블록. 기준선 0.5~0.65%',
+    `- **최장청크** = 가장 오래 걸린 단일 모델 호출. 300초 타임아웃은 총시간이 아니라 이 값에 걸린다`,
     '- **P_fixed·t_in** = 청크별 (블록수, 입력토큰) 최소제곱 적합. 프롬프트를 바꾸면 여기가 움직인다',
     '- thinking은 출력 단가로 과금된다',
   ].join('\n');
@@ -432,12 +463,12 @@ if (blocks.length === 0) {
   process.exit(1);
 }
 
-let sourceChunks = chunkSrtBlocksAtGaps(blocks, SERVER_CHUNK_SIZE);
+let sourceChunks = chunkSrtBlocksAtGaps(blocks, CHUNK_SIZE);
 if (P.limit > 0) sourceChunks = sourceChunks.slice(0, P.limit);
 
 realLog(
   `${P.file}: ${blocks.length} blocks → ${sourceChunks.length} chunks ` +
-    `(target B=${SERVER_CHUNK_SIZE}, gap-based, K=${SERVER_CONCURRENCY}, thinking=${thinkingLevelForModel(TRANSLATION_MODEL)})`,
+    `(target B=${CHUNK_SIZE}, gap-based, K=${SERVER_CONCURRENCY}, thinking=${thinkingLevelForModel(TRANSLATION_MODEL)})`,
 );
 
 const results: VariantResult[] = [];
