@@ -37,6 +37,10 @@ node scripts/chunk-model.mjs file=samples/subtitles/full-movie.srt
 
 ## 1. 실측 파라미터 (2026-07-21)
 
+> ⚠️ **이 표는 이제 런타임 코드다.** `app/lib/progressEstimate.ts`가 v·t_out·θ를
+> 그대로 읽어 진행 바와 설정 화면 ETA를 계산한다. 값을 고치면 UI가 함께 움직이고
+> `app/lib/progressEstimate.test.ts`의 실측 대조가 깨질 수 있다.
+
 461블록 파일 1회 번역의 `[gemini]` 로그 3줄에서 전부 나왔다. 로그 형식:
 
 ```

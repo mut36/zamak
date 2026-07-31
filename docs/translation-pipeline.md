@@ -25,7 +25,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   → [영화] /api/enrich    TMDB + 그라운딩 → 제목/연도/감독/포스터 + 장르/배경/톤
     [기타] /api/summarize 자막 앞부분 요약 → notes
   → (opt-in, 토글 ON시) /api/glossary  전체 자막 1회 스캔 → 글로사리+말투관계
-  → WorkPickStep          후보 선택(영화) / 유형·톤 입력(기타)
+  → WorkPickStep          후보 선택(영화) / 유형·톤 입력(예능·다큐)
   → TranslateSettingsStep 사람이 검토·수정 (+ 글로사리 카드, 켰다면)
   → /api/translation/begin  크레딧 1 차감 → jobId
   → 청킹 (장면 갭 기준)
@@ -40,6 +40,12 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 ## 단계별 상세 + 품질 레버
 
 ### 0. 업로드 & 포맷 정규화 (→ SRT)
+- **콘텐츠 유형이 여기서 정해진다** (2026-07-31~): 드롭존은 유형을 고르기 전까지
+  잠겨 있고, 그 한 번의 선택이 **두 가지**를 동시에 정한다 — ① 정보 수집 분기
+  (`movie`만 TMDB enrich, `variety`/`doc`은 summarize — 아래 2-A/2-B), ②
+  **읽기 속도 프로필**(`languages.ts`의 `shapes`). 값은
+  `ContentType`(=`ContentProfileKey`) `movie` / `variety` / `doc`. 한 줄 자수는
+  프로필과 무관하다 — 도착어가 정한다(§9.5 아래 주석, `decisions.md` §1-19).
 - **코드**: `app/components/simple/UploadStep.tsx`, `app/hooks/useTranslation.ts`
   (`processFile`), **`app/lib/subtitles/`** (`toCanonicalSrt`, `detect`, `parseVtt`/
   `parseSmi`/`parseAss`, `readSubtitleFile`), 이후 `app/lib/srt.ts` (`parseSrtBlocks`)
@@ -83,14 +89,18 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 - **하는 일 / 두 버킷**:
   - **UI 버킷** (화면 표시): 제목·연도·감독·포스터 — TMDB 매치 시 TMDB에서, 미스 시 그라운딩.
   - **AI 버킷** (번역 프롬프트로만 감): 장르(TMDB) + 배경/시대·톤앤매너(그라운딩 검색).
-- **후보가 여러 개일 때 (사용자 선택)**: `searchMovie`는 TMDB 검색 결과가 정확히 1개면
-  바로 상세조회까지 진행하지만, **2개 이상이면(제목이 흔하거나 리메이크가 있을 때)
-  era/tone 추출 없이 후보 목록만 반환**한다(`{status:'ambiguous', candidates}`, 최대
-  `MAX_ENRICH_CANDIDATES`개 — `constants.ts`). 인기도만으로 자동 선택하면 재검색해도
-  계속 다른 작품이 나오는 문제가 있어, 그 대신 `WorkPickStep.tsx`가 포스터·제목·연도·
-  영화/드라마 구분으로 후보 카드(`CandidateCard`)를 보여주고 사용자가 클릭해서
-  고르면(`onSelect` → `confirmWorkPick`, `useWizard.ts`) 그때 `/api/enrich`를 선택
-  모드로 다시 호출해 `enrichMovieById`가 마무리한다.
+- **후보가 여러 개일 때 (1순위 자동 채택, "아니에요"를 눌러야만 목록)**: `searchMovie`는
+  TMDB 검색 결과가 정확히 1개면 바로 상세조회까지 진행하지만, **2개 이상이면(제목이
+  흔하거나 리메이크가 있을 때) era/tone 추출 없이 후보 목록만 반환**한다
+  (`{status:'ambiguous', candidates}`, 최대 `MAX_ENRICH_CANDIDATES`개 — `constants.ts`).
+  클라이언트(`useWizard.ts`의 `runEnrich`)는 이 목록의 **첫 후보를 그 자리에서
+  `/api/enrich` 선택 모드로 다시 호출**해 `enrichMovieById`가 상세조회+era/tone
+  추출을 마무리하고, 확신 있는 단일 매치와 완전히 같은 확인 배너("'X'로 인식했어요.
+  맞나요?")를 설정 화면에 띄운다. 사용자가 "아니에요"를 눌러야만 `WorkPickStep.tsx`가
+  포스터·제목·연도·영화/드라마 구분으로 후보 카드(`CandidateCard`) 전체 목록을
+  보여주고, 거기서 다시 고르면(`onSelect` → `confirmWorkPick`) `/api/enrich`를 선택
+  모드로 또 호출한다. 1순위 자동 해소 자체가 실패한 경우(드묾)에만 곧장 후보 목록
+  화면으로 간다 — 상세는 `docs/decisions.md` §6-4.
 - **품질 레버**:
   - 제목/연도/감독/포스터 틀림 → TMDB 검색·정렬 로직 `tmdb.ts` (`searchCandidates`의
     연도매칭→인기도 정렬), 상세조회 `tmdb.ts` (`lookupById`), 또는 미스 시 그라운딩
@@ -176,11 +186,13 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   이후 배경/시대·톤앤매너 편집·모델 선택은 `app/components/beta/TranslateSettingsStep.tsx`
   (문구 `app/i18n/simpleCopy.ts` `COPY.workPick`/`COPY.settings`), 글로사리 카드는
   `app/components/simple/CastSheetCard.tsx`(§2-C). 옛 단일 화면
-  `app/components/simple/InfoStep.tsx`는 이 두 화면으로 대체돼 더 이상 임포트되지
-  않는 죽은 코드다(의도적으로 삭제 안 함).
-- **하는 일**: (영화) `WorkPickStep`에서 후보를 확정하고, `TranslateSettingsStep`에서
-  배경/시대·톤앤매너를 **사람이 편집 가능** — 자동 수집이 틀려도 여기서 최종 교정된
-  값이 번역에 들어간다. (기타 유형) `WorkPickStep`에서 콘텐츠 유형·톤을 사람이 직접
+  `app/components/simple/InfoStep.tsx`는 이 두 화면으로 대체되며 삭제됐다
+  (`decisions.md` §6-3).
+- **하는 일**: (영화) `WorkPickStep`에서 후보를 확정하고 — 정확히는 1순위가 자동
+  채택되고 "아니에요"를 눌렀을 때만 이 화면에서 직접 고른다(§2-A) —
+  `TranslateSettingsStep`에서 장르·배경/시대·톤앤매너를 **사람이 편집 가능** —
+  자동 수집이 틀려도 여기서 최종 교정된 값이 번역에 들어간다. (기타 유형)
+  `WorkPickStep`에서 콘텐츠 유형·톤을 사람이 직접
   입력하면 각각 `movieInfo.genre`/`movieInfo.tone`으로 들어간다(`confirmWorkPick`,
   `useWizard.ts`). 글로사리 토글을 켰다면 표기·존대관계도 설정 화면에서 편집
   가능(§2-C).
@@ -198,7 +210,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
     노출/전환하려면 여기 + `TranslateSettingsStep`.
   - 도착어 → **`app/config/languages.ts` (`TARGET_LANGS`)** — 한 행이 곧 한 언어다:
     picker 표시(label/mono/enabled), 프롬프트(promptLabel/lineMaxChars/formality),
-    후처리(trailingPunctuation/reading). 현재 활성: 한국어·영어·일본어·스페인어·
+    후처리(trailingPunctuation + `shapes[프로필].target/hardMax`). 현재 활성: 한국어·영어·일본어·스페인어·
     프랑스어·중국어(간체)·독일어. **언어 추가 = 이 표에 한 행 + `prompts/common/
     translation_rules_<code>.txt` 한 개**(둘 중 하나만 있으면 `languages.test.ts`가
     실패한다). 서버는 `requestValidation.parseTargetLanguage`에서 enabled 코드만
@@ -245,10 +257,11 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 - **하는 일**: 청크를 동시 번역. **실패 청크는 원문 유지**(failedChunks) → 항상 완전한 파일.
 - **품질 레버**: 동시성 `constants.ts` `SERVER_CONCURRENCY`. 실패 정책(재시도 안 함) →
   `translationService.ts` / `useTranslation` worker.
-- **진행 링**: 채워지는 속도는 `constants.ts` `TRANSLATION_ESTIMATE_MS`(모델별 고정값 —
-  flash 30초 / pro 3분, 파일 크기 무관), 링 자체는 `ProgressStep.tsx`(99%까지만 이징,
-  100%는 결과 도착 후). **이 숫자를 바꾸면 `simpleCopy.ts`의 "30초" 문구도 같이 바꿀 것**
-  (`decisions.md` §2-7).
+- **진행 바**: 채워지는 속도는 `app/lib/progressEstimate.ts`가 파일 크기(청크 수)와
+  모델로 계산한다(`chunk-size-model.md` §1 실측 파라미터). `constants.ts`
+  `TRANSLATION_ESTIMATE_MS`(flash 20초 / pro 165초)는 블록 수를 모를 때의 폴백뿐이다.
+  바 자체는 `ProgressStep.tsx` + `useEasedProgress.ts` — `max(실제 청크 착지분,
+  밴드 끝을 향한 지수 이징)`이라 천장을 넘지 못한다. 밴드는 `progressStages.ts`.
 
 ### 7. 프롬프트 조합 ⭐ (번역 품질의 핵심 집결지)
 - **코드**: `app/api/translate/route.ts` → `app/lib/server/translationService.ts`
@@ -290,7 +303,9 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   - 메타데이터가 프롬프트에 실리는 형식 → `translationContent.ts` (`formatMovieInfo`)
   - 도착어별 규칙 로딩 → `translationContent.ts` (`requireTargetLang`,
     `buildTranslationRules`), `loader.ts` (`loadTranslationRules`)
-  - 줄 길이 상한 → `languages.ts`의 `lineMaxChars`(ko 25 / ja 20 / zh 18 / 라틴계 42)
+  - 줄 길이 상한 → `languages.ts`의 `lineMaxChars`(ko 25 / ja 20 / zh 18 / 라틴계 42).
+    **도착어별이고 콘텐츠 프로필과 무관하다** — 프로필은 노출 시간만 바꾼다
+    (`decisions.md` §1-19). 그래서 프롬프트 조합은 프로필을 아예 받지 않는다
   - 이름 표기·말투가 청크마다 흔들림 → §2-C(추출) 참조. 표기 고정은 각
     `translation_rules_<code>.txt`의 글로사리·우선순위 규칙에 못박혀 있음
 - **주의**: `castSheet`가 없으면(토글 OFF, 기본값) `<glossary>`/`<speech_relations>`는
@@ -332,25 +347,27 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   내보내는 별개의 실패 모드, 표식 방식과 무관) → `srt.ts` + `TODO.md`. 이게 밀림
   버그의 방어선.
 
-### 9.5. 리딩스피드·최소 길이 타임코드 조정 (CPS / minDuration, 도착어별)
+### 9.5. 리딩스피드·최소 길이 타임코드 조정 (CPS / minDuration, 도착어 × 프로필)
 - **코드**: **`app/lib/srt.ts` (`adjustSubtitleTiming`)**, `constants.ts`
   (`CPS_HARD_MAX`/`CPS_TARGET`/`CPS_RECOMMENDED_MIN`/`MIN_SUBTITLE_GAP_MS`/
   `MIN_SUBTITLE_DURATION_MS`), `useTranslation`에서 청크 합친 직후 1회 호출.
 - **하는 일**: 두 가지 독립된 조건 중 하나라도 걸리면 같은 방식으로 넓힌다 —
-  ① **`cps > 도착어의 hardMax`**(한국어 12 = Netflix 한국어 상한, ja/zh 9, 라틴계 20 —
-  `languages.ts`의 `TargetLang.reading`, 해석은 `constants.ts`의 `getReadingSpeed`) 또는
+  ① **`cps > 프로필의 hardMax`**(한국어: 영화 14 / 예능 16 / 다큐 12 = Netflix 한국어
+  상한, ja/zh 9, 라틴계 20 — `languages.ts`의 `TargetLang.shapes`, 해석은
+  `constants.ts`의 `getReadingSpeed(도착어, 프로필)`) 또는
   ② **구간 길이 < `MIN_SUBTITLE_DURATION_MS`**(기본 800ms, 대사 유무 무관 — 빈 블록도 대상).
   두 조건의 요구량 중 **큰 쪽**을 목표로, **이웃이 비운 침묵(gap)** 안에서 표시창을 넓힌다.
   end를 먼저 뒤로 밀고 모자라면 start를 앞으로 당김. 첫 블록은 앞의 빈 프리롤(0초까지)로
   start를 당길 수 있다. **창은 늘리기만 하고 줄이지 않으며, 절대 겹치지 않는다** — 앞
   블록은 조정된 end, 뒤 블록은 원본 start를 경계로 쓰는 비대칭 + `MIN_SUBTITLE_GAP_MS`.
   전체 파일에 한 번 돌아 청크 경계 이웃까지 커버. 타임코드를 코드가 소유한다는 원칙의 연장.
-- **임계값 3단(CPS)**: 12 초과 = 손봄(위반), 10 = 착지 목표, 8 = 그 아래로는 안 내림(목표가
-  10이라 자동 보장). 10~12 사이는 상한 밑이라 손대지 않는다.
-- **품질 레버**: 언어별 기본값은 `languages.ts`의 `reading`(한국어만 실측, 나머지는
+- **임계값(CPS)**: `hardMax` 초과 = 손봄(위반), `target` = 착지 목표, 그 아래로는 안
+  내림(목표가 target이라 자동 보장). 둘 사이는 상한 밑이라 손대지 않는다. 한국어
+  영화 프로필이면 14 초과를 12로 내리는 식.
+- **품질 레버**: 기본값은 `languages.ts`의 `shapes`(한국어만 실측 기반, 나머지는
   공개 스타일 가이드 기반 추정 — `tuning/reading-speed.md`). env
-  `NEXT_PUBLIC_CPS_HARD_MAX`/`_TARGET`을 설정하면 **모든 언어에 일괄 적용되는
-  전역 오버라이드**로 동작한다. `CPS_HARD_MAX`(낮추면 더 많은 블록을 손봄), `CPS_TARGET`(낮추면 더 여유롭게
+  `NEXT_PUBLIC_CPS_HARD_MAX`/`_TARGET`을 설정하면 **모든 도착어·모든 프로필에
+  일괄 적용되는 전역 오버라이드**로 동작한다. `CPS_HARD_MAX`(낮추면 더 많은 블록을 손봄), `CPS_TARGET`(낮추면 더 여유롭게
   늘리지만 gap을 더 씀), `MIN_SUBTITLE_GAP_MS`(인접 최소 간격), `MIN_SUBTITLE_DURATION_MS`
   (올리면 더 많은 짧은 블록이 늘어남). 모두 `constants.ts` + env.
   gap이 부족하면 목표까지 못 내려가고 가능한 만큼만 조정.
@@ -509,7 +526,8 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 도착어를 추가하고 싶음 | `app/config/languages.ts`에 한 행 + `prompts/common/translation_rules_<code>.txt` — §4. 실제 모델 출력 확인은 `LIVE_LANG_SMOKE=1 npx vitest run app/lib/prompts/liveLang.smoke.test.ts` |
 | 영어/중국어인데 존댓말 관계표가 안 보임 | 정상 — 그 언어엔 문법적 말투 축이 없어 relations를 안 만든다(§2-C, `languages.ts`의 `formality: null`) |
 | 영어 자막인데 문장 끝 마침표가 사라짐 | `languages.ts`의 `trailingPunctuation`이 비어 있어야 정상 — 값이 있으면 §9.7이 지운다 |
-| 일본어/중국어 자막이 너무 빨리 지나감 | `languages.ts`의 `reading`(언어별 CPS) — §9.5 |
+| 일본어/중국어 자막이 너무 빨리 지나감 | `languages.ts`의 `shapes`(도착어×프로필 CPS) — §9.5 |
+| 예능인데 자막이 영화처럼 오래 떠 있음(또는 그 반대) | 업로드 화면의 콘텐츠 유형 선택(§0) → `languages.ts`의 `shapes[프로필]` — §9.5 |
 | 존댓말/반말·인물 말투가 안 맞음(말투 축이 있는 언어) | 먼저 TranslateSettingsStep의 "등장인물·용어 일관성" 토글을 켜봤는지 확인(§2-C, 기본 OFF) — 켰다면 `cast_sheet_extraction.txt` 또는 `CastSheetCard`에서 직접 관계 수정. 안 켰거나 그래도 안 맞으면 `translation_rules_ko.txt`, (cinematic) `cinematic_translation_philosophy_ko.txt`, `TranslateSettingsStep`에서 사람이 톤 입력 |
 | 같은 이름이 청크마다 다르게 번역됨(표기 흔들림) | TranslateSettingsStep 토글을 켜지 않았으면 그게 원인(§2-C, 기본 OFF). 켰는데도 흔들리면 `extractCastSheet.ts` `sanitizeCastSheet`(환각 필터로 그 이름이 버려졌을 수 있음) 또는 `CastSheetCard`에서 직접 추가 |
 | 감정/뉘앙스가 밋밋함 | `cinematic_translation_philosophy_ko.txt` (+ 스타일을 cinematic로) |
@@ -522,7 +540,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 자막이 밀림(번호 재배열) | 청크 크기 ↓ `constants.ts` `SERVER_CHUNK_SIZE` (**≥300 금지**), 재조립 `srt.ts`. 조절 절차는 위 §5 |
 | 특정 구간에서 자막이 대거 미번역(원문 그대로) | 대사 자체가 숫자인 장면(카운트다운 등) → `srt.ts` `[N]` 표식(§7·§9, `decisions.md` §2-1)이 이미 방지함. 그래도 재발하면 그 청크의 `matched`/`unmatched` 로그 확인 |
 | 청크가 대화 중간을 자름 | `srt.ts` (`chunkSrtBlocksAtGaps` 파라미터) |
-| 한국어 자막이 너무 빨리 지나감(읽기 힘듦) | `srt.ts` (`adjustSubtitleTiming`), `constants.ts` `CPS_TARGET`/`MIN_SUBTITLE_GAP_MS` — §9.5 |
+| 한국어 자막이 너무 빨리 지나감(읽기 힘듦) | `srt.ts` (`adjustSubtitleTiming`), `languages.ts` `shapes[프로필].target` (또는 전역 env `CPS_TARGET`)/`MIN_SUBTITLE_GAP_MS` — §9.5 |
 | 자막이 너무 짧게 스쳐 지나감(대사와 무관하게) | `srt.ts` (`adjustSubtitleTiming`), `constants.ts` `MIN_SUBTITLE_DURATION_MS` — §9.5 |
 | 번역이 느림/비쌈 | `constants.ts` `SERVER_CHUNK_SIZE`(flash)/`PRO_CHUNK_SIZE`(Pro)/`CONCURRENCY`/`thinkingLevelForModel`, 모델(고급/빠른). **블록당 실측 원가는 `tuning/cost-per-block.md`** — 비용이 예상과 다르면 여기부터 볼 것 |
 | 비용을 **줄이고 싶다**(어느 노브가 실제로 효과 있나) | `tuning/token-economics.md` — 비용의 67%가 thinking, 6%가 입력이라 프롬프트 토큰 절감·캐싱은 거의 무의미하다. 이미 당긴 레버와 안 당긴 레버가 우선순위로 정리돼 있음 |
@@ -533,7 +551,9 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | sweep 때문에 비용이 걱정됨 | 상한은 `constants.ts` `RECOVERY`(라운드)와 `computeSweepBudget`(호출 수). 실제 소비는 `[sweep] ... calls N` 로그 — §9.65 |
 | API 한도 초과 이후 남은 파일이 통째로 원문 | 의도된 전역 중단(quota/auth) — `chunkRetry.ts` `RetryState.fatalCode`, 화면엔 `stopReason` 배너 — §9.6 |
 | 에러 종류에 따라 재시도/중단 동작을 바꾸고 싶음 | `translationErrors.ts` 분류(`classifyError`)·성격 함수(`isFatalCode`/`isRetryableCode`) — §9.6 |
-| 진행 링이 너무 빨리 차서 99%에서 오래 기다림(또는 그 반대) | `constants.ts` `TRANSLATION_ESTIMATE_MS`(모델별), 이징 곡선은 `ProgressStep.tsx` — §6 |
+| 진행 바가 너무 빨리 차서 끝에서 오래 기다림(또는 그 반대) | `app/lib/progressEstimate.ts`의 v·t_out·θ(출처는 `tuning/chunk-size-model.md` §1), 이징 곡선은 `app/lib/easing.ts` — §6 |
+| 진행 바가 계단으로 튐 / 한참 멈춰 있음 | `useEasedProgress.ts`(rAF·reduced-motion), 밴드는 `progressStages.ts` |
+| 타임코드 검증 단계가 안 보이고 완료로 넘어감 | `constants.ts` `MIN_VERIFY_MS`, 표시 순서는 `useTranslation.ts`의 `finalizing` 세팅 위치 |
 | 화면 문구가 이상함 | `app/i18n/simpleCopy.ts` (하드코딩 금지) |
 | 베타 계측(토큰·이벤트)이 안 남는다 | 서버는 `chunkUsage.ts`/`api/translate/route.ts` 로그부터, 클라는 `metrics.ts`/`events.ts`의 fire-and-forget이 실패를 삼켰을 수 있음 — 네트워크 탭에서 `/api/translation/metrics`·`/api/events` 확인 — §11 |
 | 재방문 피드백 모달이 안 뜬다 | `pending_feedback_job()` 조건(완료 6시간~30일, 미응답, 미해제) 미충족이 정상 — Supabase에서 `translation_jobs`/`feedback` 직접 조회 — §11 |
