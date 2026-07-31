@@ -34,6 +34,8 @@
 - 프로덕션 라우트·`registry.ts`·`ALLOWED_MODELS` 변경. 하네스는 프로덕션의
   보안·과금 경계를 우회하지 않고 **옆으로 비켜서** 자기 경로를 쓴다.
 - 웹 UI(`/dev`). 필요해지면 이 코어 위에 얹는다.
+- **2차 검수 패스**(GPT 번역 → 제미나이 프로 검수). 이 하네스는 단일 패스를
+  잰다. 발판만 남기고 별도 스펙으로 미룬다 — §10.
 - 번역 품질의 자동 채점. 사람이 SRT를 읽고 판단한다. 하네스는 숫자와 산출물만 낸다.
 - `prompt-ab.mts`의 기존 출력 형식·기본 동작 변경. 과거 실험
   (`docs/tuning/experiment-log.md`)과의 비교 가능성을 유지한다.
@@ -81,7 +83,18 @@ export function runPipeline(o: PipelineOptions): Promise<PipelineResult>;
   `VariantResult`에서 `name`·`costUsd`를 뺀 형태 — `blocks`, `chunks`,
   `apiFailures`, `countMismatchChunks`, `unmatched`, `recovered`, `sweepCalls`,
   `seconds`, `maxCallMs`, `callMs[]`, `usage`, `fit`, `srt`, 그리고 신규
-  `perCall: Map<callId, {usage, ms}>`.
+  `perCall: Map<callId, CallRecord>`.
+- **호출 기록은 단계(stage)를 갖는다.**
+
+  ```ts
+  type Stage = 'translate' | 'sweep';
+  interface CallRecord { stage: Stage; model: string; ms: number; usage: TokenUsage; }
+  ```
+
+  오늘 값은 `'translate'`와 `'sweep'` 둘뿐이고 리포트는 합계만 쓴다. 필드를
+  지금 두는 이유는 §10의 2차 검수 패스 때문이다 — 나중에 `'review'`가 붙어도
+  계측·`calls.json`·리포트 집계를 다시 짜지 않는다. 지금은 몇 줄, 나중이면
+  리포트 재작성이다.
 - **토큰 수집 방식 변경.** 현재 `prompt-ab`는 `console.log`를 가로채
   `[gemini] prompt=… ` 줄을 정규식으로 긁는다. `generateText`가 이미
   `usage: TokenUsage`를 반환하므로(`app/lib/providers/types.ts`), 코어는
@@ -285,7 +298,7 @@ enrich의 후보 자동 선택은 CLI에 사람이 없어서 내리는 타협이
 
   머리에 자막 파일·프롬프트 파일·enrich 결과(선택된 작품 + 장르/배경/톤)·
   청크 크기·동시성을 찍는다.
-- `calls.json` — 호출 단위 원자료: `{callId, model, ms, usage}`. 평균 뒤에
+- `calls.json` — 호출 단위 원자료: `{callId, stage, model, ms, usage}`. 평균 뒤에
   숨는 꼬리(한 청크만 3배 느림 등)를 보려면 이게 필요하다.
 - `summary.json` — `summary.md`의 기계 판독본.
 - `diff-<a>-vs-<b>.md` — 인접 모델 쌍의 **다르게 번역된 줄만**. `prompt-ab`의
@@ -340,7 +353,32 @@ CLAUDE.md의 "번역 관련 코드를 바꾸면 문서 지도도 같은 커밋�
 - `README.md` — 명령 목록에 `npm run lab`.
 - `package.json` — `"lab"` 스크립트 + 버전 상승.
 
-## 10. 커밋 단위
+## 10. 범위 밖 — 2차 검수 패스 (별도 스펙)
+
+"GPT로 번역하고 제미나이 프로로 검수하는 2단계 번역"은 **이 스펙에 포함하지
+않는다.** 단일 패스 측정이라는 축이 흐려지고, 아래 네 가지를 따로 설계해야
+하기 때문이다. 이 하네스를 끝낸 뒤 별도 스펙으로 다룬다.
+
+미뤄둔 설계 과제:
+
+1. **불변식 1이 두 번 걸린다.** 검수 모델도 블록 수를 보존해야 하는데, 지금
+   카운트 대조는 번역 1회 기준이다.
+2. **리포트가 한 행에 모델 둘**을 담아야 한다 — 단계별 토큰·시간·비용 분리.
+3. **검수 프롬프트는 원문 + 초벌번역을 둘 다** 받으므로 유저 턴 모양이 다르다.
+   내용도 본질적으로 번역 지침이라 바닐라(§5)와 정반대 방향이다.
+4. **잔여 수거와의 상호작용** — 수거 재요청이 2단계를 다시 도는지.
+
+**이 스펙이 남기는 발판**: `runPipeline`의 `call` 주입점이 2단계를 끼워 넣을
+이음매이고, `CallRecord.stage`(§3-1)가 그때 필요한 계측 축이다. 검수 모델
+자체는 `models.mts`에 한 줄 추가로 갈아끼울 수 있다.
+
+**유력한 방향(당시 검토할 것)**: 검수 모델이 전체를 다시 뱉게 하지 말고
+**고칠 블록만** 뱉게 한다(`[42] 수정된 대사`). 안 건드린 블록은 초벌이 그대로
+남으므로 블록 수 불변식이 자동으로 지켜지고, 출력 토큰이 몇십 분의 일로 줄어
+검수 비용이 실용적인 수준이 된다. 전체 재출력은 번역을 두 번 하는 비용에
+재조립 리스크까지 얹는 구조다.
+
+## 11. 커밋 단위
 
 1. 코어 추출 — `pipeline.mts` 신설, `prompt-ab.mts`를 그 위로 (동작 불변, §8-2로 확인)
 2. 모델 어댑터 + 등록표 — `labProviders.mts`, `models.mts`
