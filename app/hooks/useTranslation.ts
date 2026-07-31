@@ -9,6 +9,7 @@ import {
   JobRefusedError,
 } from '../lib/client/translationJob';
 import { saveResult } from '../lib/client/history';
+import { sendRunMetrics } from '../lib/client/metrics';
 import {
   adjustSubtitleTiming,
   buildOutputFilename,
@@ -387,6 +388,7 @@ export function useTranslation(
       // only fail the same way — the sweep is skipped and the stop reason
       // stands. See app/lib/client/recoverySweep.ts for the cost bounds.
       let sweptContent = mainPassContent;
+      let sweepCalls = 0;
       // Same accounting on both paths: only leftovers that actually hold
       // translatable text are the user's problem.
       let remainingBlocks = countTranslatableLeftovers(content, leftover);
@@ -423,6 +425,10 @@ export function useTranslation(
                 chunk: chunkContent,
                 chunkIndex: 1,
                 totalChunks: 1,
+                // Measurement label only — every sweep round is 1/1 on the
+                // wire, so this is what keeps them apart from a single-chunk
+                // file's one and only call.
+                phase: 'sweep',
                 movieInfo,
                 model,
                 targetLang,
@@ -434,6 +440,7 @@ export function useTranslation(
             ),
         });
         sweptContent = sweep.content;
+        sweepCalls = sweep.calls;
         recoveredBlocks = sweep.recovered;
         // Blocks with nothing to translate (♪, numbers) aren't the user's
         // problem, so they don't go in the warning count.
@@ -520,6 +527,28 @@ export function useTranslation(
       // was off or extraction never resolved.
       void saveResult(newJobId, file.name, translated, {
         glossary: Boolean(castSheet),
+      });
+
+      // Same fire-and-forget contract as saveResult, and for the same reason.
+      // This is the beta's only record of what a run actually cost in time and
+      // leftovers — the token side is written server-side, per model call.
+      void sendRunMetrics(newJobId, {
+        sourceFormat: docRef.current?.format ?? null,
+        targetLang,
+        totalChunks,
+        chunkSize,
+        concurrency,
+        durationMs: Date.now() - startedAt,
+        failedChunks,
+        fallbackBlocks: remainingBlocks,
+        recoveredBlocks,
+        sweepCalls,
+        stopReason: retryState.fatalCode ?? null,
+        // What was actually applied, not what the toggle said — castSheet is
+        // undefined when extraction never resolved (same rule as `glossary`).
+        glossaryTerms: castSheet?.terms?.length ?? 0,
+        relationPairs: castSheet?.relations?.length ?? 0,
+        textRules: textRuleReport,
       });
 
       setTranslationProgress({

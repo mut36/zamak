@@ -102,6 +102,10 @@ export interface ChunkTranslationRequest extends TranslationRequestBase {
   chunk: string;
   chunkIndex: number;
   totalChunks: number;
+  /** Which pass this call belongs to. Measurement only — the server treats
+   *  both identically. Sweep rounds are all sent as 1/1, so without this the
+   *  usage rows could not tell a sweep round from a single-chunk file. */
+  phase?: 'main' | 'sweep';
 }
 
 export interface TranslationEvent {

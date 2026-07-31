@@ -207,6 +207,9 @@ export function parseChunkTranslationRequest(
     chunk: requireString(value, 'chunk'),
     chunkIndex: chunkIndex as number,
     totalChunks: totalChunks as number,
+    // Measurement label, not a control: an unknown value falls back to 'main'
+    // rather than rejecting a translation the user already paid for.
+    phase: value.phase === 'sweep' ? 'sweep' : 'main',
     movieInfo: parseMovieInfo(value.movieInfo),
     model: parseModel(value.model),
     targetLang: parseTargetLanguage(value.targetLang),

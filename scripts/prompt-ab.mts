@@ -231,8 +231,7 @@ async function runVariant(
         chunkPosition,
       });
 
-      let output = '';
-      output = await callContext.run({ id: callId }, () =>
+      const generated = await callContext.run({ id: callId }, () =>
         geminiProvider.generateText({
           model: TRANSLATION_MODEL,
           prompt: user,
@@ -240,6 +239,9 @@ async function runVariant(
           translationMode: 'chunk',
         }),
       );
+      // The harness reads token counts off the [gemini] log line the provider
+      // still prints; only the text matters here.
+      const output = generated.text;
 
       if (countReturnedBlocks(output) !== expected) countMismatchChunks++;
       const rebuilt = reassembleTranslatedChunk(chunk, output);
