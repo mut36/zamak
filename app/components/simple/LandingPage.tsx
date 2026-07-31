@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { COPY } from '../../i18n/simpleCopy';
+import { BrandMark } from '../BrandMark';
 import { SiteFooter } from '../SiteFooter';
-import { Wordmark } from '../Wordmark';
 
 interface Props {
   onSignIn: () => void;
@@ -145,16 +145,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
     <div className='w-full'>
       {/* ── 1. Sticky nav ─────────────────────────────────────── */}
       <nav className='lp-nav glass-nav'>
-        <span
-          className='zchip'
-          style={{
-            fontSize: 13,
-            letterSpacing: '0.1em',
-            padding: '6px 4px 6px 12px',
-          }}
-        >
-          <Wordmark />
-        </span>
+        <BrandMark size={28} />
 
         <div className='flex items-center gap-1.5'>
           {/* 640px 아래에서는 링크를 숨기고 로고+CTA만 남긴다 (핸드오프 "모바일

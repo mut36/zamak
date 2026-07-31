@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { User } from '@supabase/supabase-js';
 import type { CreditBalances } from '../../lib/creditKind';
 import { COPY } from '../../i18n/simpleCopy';
+import { BrandMark } from '../BrandMark';
 
 interface AppNavProps {
   /** Passed in rather than read from useAuth() here: useAuth is a plain hook,
@@ -34,17 +35,7 @@ export function AppNav({ user, signOut, credits, onHome }: AppNavProps) {
   return (
     <nav className='sticky top-0 z-40 h-[52px] border-b border-border-subtle glass-nav'>
       <div className='flex h-full w-full max-w-[600px] lg:max-w-[840px] mx-auto items-center justify-between px-5'>
-        <button
-          type='button'
-          onClick={onHome}
-          aria-label='ZAMAK home'
-          className='bg-transparent border-0 p-0 cursor-pointer'
-        >
-          <span className='zchip text-caption py-[4px] px-[9px]'>
-            {COPY.brand}
-            <span className='zchip-dot w-[3px] h-[3px] ml-[3px]' aria-hidden />
-          </span>
-        </button>
+        <BrandMark size={24} onClick={onHome} />
 
         <div className='flex items-center gap-4'>
           <Link

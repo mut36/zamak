@@ -1,28 +1,35 @@
 /**
- * ZAMAK brand mark — black square chip wordmark + trailing yellow point
- * (design_handoff_zamak_brand: "검은 사각 칩 로고 + 노란 점").
+ * ZAMAK brand mark — logo image (black chip wordmark + yellow point).
+ * Footer uses `Wordmark` (text-only); do not swap that for this image.
  */
+
+const LOGO_SRC = '/brand/zamak-logo.png';
+/** Intrinsic pixel size of `public/brand/zamak-logo.png`. */
+const LOGO_W = 1024;
+const LOGO_H = 377;
+
 interface BrandMarkProps {
-  /** Chip font-size in px (default 19, matching the Simple prototype top bar). */
+  /** Logo height in px (default 28). Width follows the asset aspect ratio. */
   size?: number;
   className?: string;
   /** When set, the mark becomes a home/reset control. */
   onClick?: () => void;
 }
 
-export function BrandMark({ size = 19, className, onClick }: BrandMarkProps) {
-  const chip = (
-    <span
-      className='zchip'
-      style={{ fontSize: size, padding: `${size * 0.42}px ${size * 0.74}px` }}
-    >
-      ZAMAK
-      <span
-        className='zchip-dot'
-        style={{ width: size * 0.18, height: size * 0.18, marginLeft: size * 0.12 }}
-        aria-hidden
-      />
-    </span>
+export function BrandMark({ size = 28, className, onClick }: BrandMarkProps) {
+  const height = size;
+  const width = Math.round((size * LOGO_W) / LOGO_H);
+
+  const mark = (
+    // eslint-disable-next-line @next/next/no-img-element -- static public brand asset; no optimization needed
+    <img
+      src={LOGO_SRC}
+      alt='ZAMAK'
+      width={width}
+      height={height}
+      draggable={false}
+      className='block'
+    />
   );
 
   if (onClick) {
@@ -35,12 +42,12 @@ export function BrandMark({ size = 19, className, onClick }: BrandMarkProps) {
           className ? ` ${className}` : ''
         }`}
       >
-        {chip}
+        {mark}
       </button>
     );
   }
 
   return (
-    <div className={`select-none${className ? ` ${className}` : ''}`}>{chip}</div>
+    <div className={`select-none${className ? ` ${className}` : ''}`}>{mark}</div>
   );
 }
