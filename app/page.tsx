@@ -10,11 +10,14 @@ import { DoneStep } from './components/simple/DoneStep';
 import { LandingPage } from './components/simple/LandingPage';
 import { ExhaustedStep } from './components/beta/ExhaustedStep';
 import { CopyrightModal } from './components/beta/CopyrightModal';
+import { FeedbackFollowup } from './components/beta/FeedbackFollowup';
 import { AppNav } from './components/beta/AppNav';
 import { SiteFooter } from './components/SiteFooter';
 import { useWizard } from './hooks/useWizard';
 import { useAuth } from './hooks/useAuth';
+import { useFeedbackFollowup } from './hooks/useFeedbackFollowup';
 import { isSupabaseConfigured } from './lib/supabase/env';
+import { recordEvent } from './lib/client/events';
 import { estimateTranslationMs, GLOSSARY_WAIT_MS } from './config/constants';
 import { COPY } from './i18n/simpleCopy';
 
@@ -103,6 +106,12 @@ export default function Home() {
     refreshBalance,
     !!user,
   );
+
+  // Re-visit follow-up: "did you actually use it" can't be answered on the
+  // completion screen, so it's asked once on app entry instead — see
+  // useFeedbackFollowup and app/api/feedback/pending.
+  const { item: pendingFeedback, clear: clearPendingFeedback } =
+    useFeedbackFollowup(!!user);
 
   // Settings screen's confirm banner vs. settled card — a single confident
   // TMDB match needs a yes/no before it's trusted, a manual pick or an
@@ -209,6 +218,10 @@ export default function Home() {
           <div className='card p-4 mb-[14px] text-sm'>{purchaseNotice}</div>
         )}
 
+        {!refusal && screen === 'upload' && pendingFeedback && (
+          <FeedbackFollowup item={pendingFeedback} onDone={clearPendingFeedback} />
+        )}
+
         {!refusal && screen === 'upload' && (
           <UploadStep
             contentType={contentType}
@@ -287,7 +300,15 @@ export default function Home() {
                 )
               }
               etaSeconds={etaSeconds}
-              onStart={() => handleTranslate(model)}
+              onStart={() => {
+                void recordEvent('settings_confirmed', {
+                  contentType: contentType ?? 'movie',
+                  model,
+                  glossaryEnabled: castSheet.enabled,
+                  targetLang,
+                });
+                handleTranslate(model);
+              }}
             />
           </>
         )}

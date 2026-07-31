@@ -530,6 +530,43 @@ export const COPY = {
     },
   },
 
+  // 재방문 후속 모달 — "실제로 쓰셨나요"는 완료 화면에서 답할 수 없는
+  // 질문이라(그 시점엔 파일을 열어보지도 않았다) 나중 방문에 따로 묻는다.
+  // 대상·시점은 서버(pending_feedback_job)가 정한다.
+  feedbackFollowup: {
+    title: '지난 번역, 어땠나요?',
+    subtitle: (filename: string) => `${filename}을(를) 실제로 써보셨나요?`,
+    usability: {
+      'as-is': '그대로 썼어요',
+      'minor-edits': '조금 고쳐서 썼어요',
+      'major-edits': '많이 고쳐서 썼어요',
+      unusable: '쓸 수 없었어요',
+    },
+    issuesTitle: '어떤 부분이 문제였나요? (복수 선택 가능)',
+    issues: {
+      mistranslation: '오역',
+      'speech-level': '존댓말·반말',
+      naming: '이름·용어 표기',
+      'too-long': '자막이 너무 길어요',
+      unnatural: '어색한 문장',
+      timing: '타이밍',
+    },
+    linesTitle: '문제가 된 줄이 있다면 골라주세요 (선택)',
+    linesHint: (max: number) => `최대 ${max}줄까지 고를 수 있어요.`,
+    linesSearchPlaceholder: '대사로 검색',
+    linesEmpty: '검색 결과가 없어요.',
+    linesLoadFailed: '결과물을 불러오지 못해 이 단계는 건너뛸게요.',
+    linesSkip: '건너뛰기',
+    commentTitle: '한 줄로 남겨주신다면',
+    commentPlaceholder: '자유롭게 남겨주세요 (선택)',
+    next: '다음',
+    submit: '보내기',
+    later: '나중에',
+    thanks: '의견 감사해요. 베타를 다듬는 데 큰 힘이 됩니다.',
+    close: '닫기',
+    failed: '저장하지 못했어요. 잠시 후 다시 시도해 주세요.',
+  },
+
   // 내 번역(/mypage) — 번역권 잔여 + 지난 번역 기록.
   mypage: {
     title: '내 번역',
