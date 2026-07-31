@@ -250,36 +250,6 @@ export const COPY = {
     back: '설정으로 돌아가기',
   },
 
-  // Prepaid credit packs. The anchor is deliberately the human-translator price
-  // (~150,000원/편), not our cost — see docs/decisions.md.
-  purchase: {
-    title: '번역권 충전',
-    subtitle: '사람에게 맡기면 편당 15만 원. 번역권은 유효기간이 없어요.',
-    creditsUnit: (n: number) => `번역권 ${n}편`,
-    price: (won: number) => `${won.toLocaleString()}원`,
-    perCredit: (won: number) => `편당 ${won.toLocaleString()}원`,
-    coverage: (max: number) => `1편 = 자막 ${max.toLocaleString()}줄까지`,
-    cta: '결제하기',
-    opening: '결제창을 여는 중…',
-    close: '돌아가기',
-    balance: (n: number) => `현재 번역권 ${n}편`,
-    notice: [
-      '번역권은 유효기간이 없어요.',
-    ],
-    terms: '이용 안내',
-    done: (n: number) => `번역권 ${n}편이 충전됐어요!`,
-    // Toss error codes are opaque to buyers; only the cause that they can act
-    // on is worth naming, and everything else gets one honest sentence.
-    failed: '결제가 완료되지 않았어요. 다시 시도해주세요.',
-    canceled: '결제를 취소했어요.',
-    failedCode: (code: string) => `오류 코드: ${code}`,
-    // Payments are dark until the Toss merchant review clears (weeks away,
-    // not a retry-in-a-bit situation), so this points at the manual top-up
-    // path instead of implying the button will just work again soon.
-    notConfigured:
-      '결제가 아직 준비 중이에요. hello@mut36.com으로 알려주시면 번역권을 넣어드릴게요.',
-  },
-
   upload: {
     title: '파일 업로드',
     subtitle: '타임코드는 그대로, 대사만 자연스러운 한국어로 옮겨 드립니다.',
@@ -296,10 +266,6 @@ export const COPY = {
     readingSub: '타임코드를 확인하고 작품을 찾고 있어요',
     noVideoNeeded:
       '영상 파일은 필요하지 않아요. 조잡한 자동 자막도 괜찮습니다.',
-    // LanguageSelect.tsx는 이 화면에서 더 이상 호출되지 않지만 컴포넌트 자체는
-    // 확장 대비로 남아 있고, 그 컴포넌트가 이 두 키를 여전히 읽는다.
-    langLabel: '어떤 언어로 바꿔드릴까요?',
-    comingSoon: '곧 지원',
     invalidFile: 'SRT, VTT, SMI, ASS 파일만 올릴 수 있어요.',
     unreadableFile:
       '자막을 읽지 못했어요. 파일이 손상되지 않았는지 확인하고 다시 올려주세요.',

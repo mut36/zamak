@@ -13,7 +13,7 @@ SRT·VTT·SMI·ASS 자막을 Gemini로 번역하는 웹 애플리케이션입니
 - **AI 자막 번역** — 빠른번역(Gemini 3.6 Flash)과 고급번역(Gemini 3.1 Pro Preview) 중 선택
 - **키 입력 없이 바로 번역** — 모든 요청이 서버 키(`GOOGLE_GENAI_API_KEY`)로 동작합니다. 사용자가 API 키를 다루는 화면은 없습니다
 - **Google 로그인 + 크레딧** — 베타 가입 시 번역권 3편 자동 지급. 모델을 호출하는 모든 라우트가 로그인을 요구하고, 크레딧은 파일 단위로 차감됩니다
-- **번역권 충전** — 토스페이먼츠(카드·간편결제) 선불 크레딧. 가격은 서버가 확정하고, 승인·지급은 멱등한 서버 라우트에서 일어납니다
+- **번역권 충전** — 베타에는 없습니다. 토스페이먼츠 연동은 완성돼 있지만 가맹점 심사가 남아서 `feature/payments` 브랜치에 보관 중입니다 ([결제](#결제-featurepayments) 참조)
 - **타임코드 무결성** — AI에게는 `[번호] 대사` 형태로 줄마다 표식을 붙여 보내고(타임스탬프는 토큰 낭비), 응답을 **표식으로 대조해 원본 타임코드와 재결합**합니다. 모든 줄이 스스로를 식별하므로 대사가 숫자여도 번호와 안 겹치고, AI가 표식을 빠뜨려도 그 텍스트가 옆 자막을 오염시키지 않으며, 자막을 합치거나 빠뜨려도 이후 자막이 밀리지 않습니다
 - **티어별 청크 병렬 번역** — 자막을 청크로 나눠 동시 번역. 크기와 동시성은 티어별로 다릅니다 ([산출 근거](docs/tuning/chunk-size-model.md))
 - **다중 자막 포맷** — `.srt`/`.vtt`/`.smi`/`.ass`/`.ssa` 업로드 → 정규 SRT로 변환 후 번역. **VTT는 올린 형식 그대로** 돌려받습니다. 파일을 새로 써내는 게 아니라 원본에서 대사 자리만 바꾸는 방식이라, 헤더·NOTE/STYLE·cue id·cue settings가 그대로 남습니다. ASS/SMI는 아직 `.srt`로만 (writer 미구현 — `docs/TODO.md`)
@@ -42,7 +42,7 @@ SRT·VTT·SMI·ASS 자막을 Gemini로 번역하는 웹 애플리케이션입니
 - Supabase 프로젝트 (로그인 + 크레딧 저장) — 아래 [인증 설정](#인증-설정) 참조
 - Google Cloud OAuth 클라이언트 (Google 로그인용)
 - TMDB API 키 (작품 정보 조회용, 서버 전용)
-- 토스페이먼츠 API 키 (크레딧 결제용) — 없어도 번역은 동작합니다. 실키 발급에는 사업자등록과 통신판매업 신고가 필요하고, 그 전까지는 테스트 키로 전 흐름을 확인할 수 있습니다
+- 토스페이먼츠 API 키 — **main에서는 필요 없습니다.** 결제 코드는 `feature/payments`에 있고, 그 브랜치에서 작업할 때만 필요합니다
 - Gemini API 키 (서버 전용) — **필수.** 모든 요청이 이 키로 돌아갑니다. Google Search grounding(`/api/enrich`)은 무료 등급 프로젝트에서 동작하지 않으므로 **결제가 연결된 프로젝트의 키**여야 합니다
 
 ### Installation
@@ -67,11 +67,9 @@ GOOGLE_GENAI_API_KEY=your_gemini_api_key
 NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 
-# 토스페이먼츠 — 크레딧 결제. 없으면 결제만 닫히고 번역은 그대로 동작합니다.
-# 가맹점 심사 전에는 개발자센터의 테스트 키를 그대로 넣어 전 흐름을 돌려볼 수 있습니다.
-TOSS_SECRET_KEY=test_sk_...
-NEXT_PUBLIC_TOSS_CLIENT_KEY=test_ck_...
 ```
+
+토스페이먼츠 키는 main에 필요 없습니다 — 결제 코드가 `feature/payments`에 있습니다.
 
 개발 서버 실행:
 
@@ -153,39 +151,25 @@ Supabase 한 개를 보는 구조라 블루/그린도, 버전 핀도 없습니�
 | 2,000블록 초과 | `413 file_too_large` |
 | job이 없거나 만료(기본 60분) | `403 invalid_or_expired_job` |
 
-크레딧이 떨어지면 [결제](#결제-토스페이먼츠)로 충전합니다.
+베타에서 크레딧이 떨어지면 소진 화면이 결제창 대신 **대기자 등록**을 띄웁니다. 충전은 아래 수동 지급으로 처리합니다 ([결제](#결제-featurepayments) 참조).
 
 개발 중 크레딧 충전·페이월 테스트·job 이력 확인은 [`supabase/dev-seed.sql`](supabase/dev-seed.sql)의 스니펫을 SQL Editor에 붙여넣어 처리합니다. **이 파일은 프로덕션에서 실행하지 않습니다** — 잔액을 덮어쓰기 때문입니다.
 
 결제가 열리기 전(베타 기간) 수동 크레딧 지급은 [`supabase/comp-credit.sql`](supabase/comp-credit.sql)을 씁니다. dev-seed와 달리 잔액을 더하기 때문에 프로덕션에서 실행해도 안전합니다.
 
-### 결제 (토스페이먼츠)
+### 결제 (`feature/payments`)
 
-선불 크레딧 팩이 유일한 상품입니다. 팩 정의는 [`app/config/packs.ts`](app/config/packs.ts) 한 곳에 있고, **그 파일이 가격의 원본**입니다 — 브라우저는 팩 id만 보냅니다.
+**베타(main)에는 결제가 없습니다.** 토스페이먼츠 연동은 완성돼 동작하지만, 가맹점 심사에 사업자등록과 통신판매업 신고가 필요해서 열 수 없는 상태입니다. 그래서 코드를 main에서 걷어내 `feature/payments` 브랜치에 보관합니다 — main에 두면 진입점 없는 결제 코드가 계속 리뷰·리팩터 대상이 되고, 실제로 열 때는 어차피 새 디자인으로 UI를 다시 붙여야 합니다.
 
-```text
-팩 선택 → /api/payments/prepare        가격을 orders 행에 기록 → orderId
-        → 토스 결제창 (카드·간편결제)
-        → /api/payments/confirm        승인 + 크레딧 지급 (성공 시 Toss가 리다이렉트)
-        → /?purchase=done&credits=N
-   실패 → /api/payments/fail           주문 종료 → /?purchase=failed&code=…
+```bash
+git worktree add /Users/jian/projects/zamak-worktrees/payments feature/payments
 ```
 
-설계상 중요한 두 가지:
+그 브랜치에 있는 것: `app/api/payments/*`, `app/lib/server/toss.ts`, `app/lib/client/payments.ts`, `app/config/packs.ts`(가격의 원본), `PurchaseStep.tsx`, `COPY.purchase`, 그리고 `/?purchase=done|failed` 복귀 처리.
 
-- **금액은 결제창을 열기 전에 서버가 정합니다.** 정산 함수(`settle_order`)는 Toss가 승인한 금액이 주문 행과 다르면 거절하므로, 클라이언트를 고쳐도 30편을 100원에 살 수 없습니다.
-- **승인은 successUrl인 서버 라우트에서 일어납니다.** 결제창은 `paymentKey`만 만들 뿐 돈은 아직 움직이지 않았고, 승인을 클라이언트에 두면 우리 JS가 도는지에 결제가 걸립니다. 이 URL은 새로고침될 수 있으므로 전 경로가 멱등입니다(이미 `paid`면 재승인 없이 통과).
+**main에 남아 있는 것**: `supabase/migrations/0002_payments.sql`. `0004_credit_tiers.sql`이 그 안의 `settle_order`를 재정의하므로, 빼면 새 DB를 처음부터 세팅할 때 마이그레이션 체인이 끊깁니다.
 
-**가상계좌·계좌이체는 제공하지 않습니다.** 입금이 나중에 웹훅으로 오는데 수신부가 없어서, 열면 "결제는 됐는데 크레딧이 없는" 주문이 생깁니다.
-
-돈을 실제로 받으려면 코드 밖에서 네 가지가 필요합니다:
-
-1. **토스페이먼츠 가맹점 계약** — 사업자등록증 + 통신판매업 신고번호가 있어야 심사가 통과됩니다. 심사 전에도 테스트 키로 전 흐름을 돌려볼 수 있습니다
-2. `.env.local`(및 Vercel)에 `TOSS_SECRET_KEY`, `NEXT_PUBLIC_TOSS_CLIENT_KEY` 추가
-3. `supabase/migrations/0002_payments.sql`을 SQL Editor에서 실행
-4. [`app/legal/page.tsx`](app/legal/page.tsx)의 `SELLER_INFO` TODO를 실제 사업자 정보로 채우기 — **전자상거래법 표시사항이라 비워둔 채로 결제를 열면 안 됩니다**
-
-환불은 "미사용 크레딧 전액 환불, 사용분 불가"이고 `/legal`에 고지돼 있습니다. 처리는 당분간 토스 대시보드에서 수동으로 합니다(제품 안에 환불 버튼 없음).
+결제를 열 때 필요한 것은 `docs/TODO.md`의 "결제 오픈 시 후속 작업"에 정리돼 있습니다. 요약하면 가맹점 심사, env 키 2개, `settle_order`에 `p_kind` 전달(라이트/프로 팩 가격 결정 필요), `SELLER_INFO` 실제 값 기입입니다.
 
 ### 티어별 청크·동시성
 

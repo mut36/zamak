@@ -61,3 +61,9 @@
   개발한다. 워크트리는 리포 밖 형제 디렉터리에 만든다
   (`/Users/jian/projects/zamak-worktrees/<이름>`) — 리포 안에 두면 dev 서버
   워처와 tsc/eslint 글로브가 워크트리를 함께 훑는다.
+  - 현재 분리된 것: **`feature/payments`** — 토스페이먼츠 결제 일체(라우트·
+    toss.ts·packs.ts·PurchaseStep·`COPY.purchase`). 가맹점 심사 대기 중이라
+    베타에서 뺐다. 상세와 재개 절차는 `docs/TODO.md`의 "결제 오픈 시 후속 작업".
+  - **main에서 기능을 뺄 때 마이그레이션은 같이 빼지 말 것.** 이미 실 DB에
+    적용됐고 뒤 번호가 앞 번호를 참조할 수 있다(예: `0004`가 `0002`의
+    `settle_order`를 재정의) — 파일을 지우면 새 DB 세팅에서 체인이 끊긴다.

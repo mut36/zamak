@@ -33,7 +33,6 @@ const ENRICH_ALWAYS_DONE = true;
 
 export default function Home() {
   const [authError, setAuthError] = useState('');
-  const [purchaseNotice, setPurchaseNotice] = useState('');
 
   const router = useRouter();
 
@@ -127,52 +126,22 @@ export default function Home() {
       1000,
   );
 
-  // page.tsx owns purchaseNotice (payment return chrome, not wizard state), so
-  // "start over" clears both the wizard and this screen's leftover banner.
-  const resetAll = () => {
-    resetWizard();
-    setPurchaseNotice('');
-  };
+  const resetAll = resetWizard;
 
-  // Both round-trips that leave the app — OAuth and the Toss payment window —
-  // report back through query params. Read them once, then clean the URL so a
-  // refresh does not re-show a stale banner (or re-count a purchase).
+  // OAuth is the one round-trip that leaves the app and reports back through a
+  // query param. Read it once, then clean the URL so a refresh does not
+  // re-show a stale banner. (The payment window was the other one; it lives on
+  // feature/payments until Toss merchant review clears.)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const purchase = params.get('purchase');
-    let handled = false;
+    if (!new URLSearchParams(window.location.search).get('auth_error')) return;
 
-    if (params.get('auth_error')) {
-      // This effect only runs to sync a one-time redirect query param into
-      // state on mount (an external system, per the rule's own carve-out) —
-      // there is no render-time equivalent for "the URL said auth failed".
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAuthError(COPY.auth.failed);
-      handled = true;
-    }
-
-    if (purchase === 'done') {
-      const credits = Number(params.get('credits'));
-      setPurchaseNotice(
-        COPY.purchase.done(Number.isFinite(credits) ? credits : 0),
-      );
-      // The grant already happened server-side; this only catches the header up.
-      refreshBalance();
-      handled = true;
-    } else if (purchase === 'failed') {
-      const code = params.get('code') || '';
-      setPurchaseNotice(
-        code === 'PAY_PROCESS_CANCELED'
-          ? COPY.purchase.canceled
-          : `${COPY.purchase.failed} ${code ? COPY.purchase.failedCode(code) : ''}`.trim(),
-      );
-      handled = true;
-    }
-
-    if (handled) {
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, [refreshBalance]);
+    // This effect only runs to sync a one-time redirect query param into
+    // state on mount (an external system, per the rule's own carve-out) —
+    // there is no render-time equivalent for "the URL said auth failed".
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAuthError(COPY.auth.failed);
+    window.history.replaceState({}, '', window.location.pathname);
+  }, []);
 
   // Auth is the outermost gate: every route that spends the server key is
   // closed to anonymous callers, so there is nothing to show behind it.
@@ -212,10 +181,6 @@ export default function Home() {
             pending={consentPending}
             error={consentError}
           />
-        )}
-
-        {purchaseNotice && (
-          <div className='card p-4 mb-[14px] text-sm'>{purchaseNotice}</div>
         )}
 
         {!refusal && screen === 'upload' && pendingFeedback && (

@@ -21,10 +21,28 @@
 지난 객체를 Storage에서 실제로 지우지 않는다. RPC 실패로 행 없이 남는 orphan
 바이트 방지도 함께 고려할 것(`app/api/translation/result/route.ts`).
 
-### 결제 오픈 시 후속 작업 (2026-07-29, 리디자인 마무리 시점 기록)
+### 결제 오픈 시 후속 작업 (2026-07-29 기록, 2026-07-31 브랜치 분리 반영)
+
+**결제 코드는 이제 main에 없다 — `feature/payments` 브랜치에 있다.**
+main 머지(852dea9) 직후 걷어냈다: `app/api/payments/*`, `app/lib/server/toss.ts`,
+`app/lib/client/payments.ts`, `app/config/packs.ts`(+테스트), `PurchaseStep.tsx`,
+`COPY.purchase`, `page.tsx`의 `/?purchase=` 복귀 처리. 진입점 없는 결제 코드를
+main에 두면 계속 리뷰·리팩터 대상이 되는데, 정작 열 때는 새 디자인으로 UI를
+다시 붙여야 해서 남겨둘 이득이 없었다.
+
+`supabase/migrations/0002_payments.sql`은 **main에 남겼다** — `0004_credit_tiers.sql`이
+그 안의 `settle_order`를 재정의하므로, 빼면 새 DB 세팅에서 마이그레이션 체인이
+끊긴다.
+
+작업 재개:
+```bash
+git worktree add /Users/jian/projects/zamak-worktrees/payments feature/payments
+```
+분리 이후 main이 움직였으면 그 브랜치를 먼저 main에 리베이스할 것.
 
 - [ ] 결제 오픈 시 `PurchaseStep`을 새 디자인으로 재연결 (`settle_order`에 이미
-      있는 `p_kind` 인자를 실제로 전달해야 함)
+      있는 `p_kind` 인자를 실제로 전달해야 함). 베타 리디자인 이후 디자인 토큰이
+      전부 바뀌었으므로 그대로 되살리면 안 되고 새 토큰으로 다시 그려야 한다.
 - [ ] 프로 팩 가격 정책 결정 필요 — 지금 패키지는 lite 원가 기준이라
       `p_kind='pro'`를 넘기는 호출부가 생기기 전에 프로 팩 가격을 정해야 함
       (`app/config/packs.ts`에 lite/pro 구분 없음)
