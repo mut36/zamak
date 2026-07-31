@@ -18,7 +18,8 @@ import { useAuth } from './hooks/useAuth';
 import { useFeedbackFollowup } from './hooks/useFeedbackFollowup';
 import { isSupabaseConfigured } from './lib/supabase/env';
 import { recordEvent } from './lib/client/events';
-import { estimateTranslationMs, GLOSSARY_WAIT_MS } from './config/constants';
+import { GLOSSARY_WAIT_MS } from './config/constants';
+import { estimateRunMsFromBlocks } from './lib/progressEstimate';
 import { COPY } from './i18n/simpleCopy';
 
 // Work identification (enrich for the movie branch, otherType/toneText for
@@ -121,12 +122,13 @@ export default function Home() {
   // already-confirmed one doesn't.
   const needsConfirm = autoMatched && !workConfirmed;
 
-  // ETA promise for the settings screen's bottom bar — reuses the same
-  // per-model estimate the progress ring fills against (TRANSLATION_ESTIMATE_MS
-  // via estimateTranslationMs), plus the cast-sheet grace period when that
-  // toggle is on. No separate formula invented here.
+  // 설정 화면 하단 바의 ETA 약속. 진행 바가 채워질 때 쓰는 것과 **같은 식**을
+  // 쓴다 — 업로드 시점에 totalLines가 이미 잡혀 있으므로 파일 크기를 반영할 수
+  // 있다. decisions.md §2-7이 걱정했던 "같은 화면에서 카피와 링이 다른 시간을
+  // 말한다"가 여기서 해소된다: 두 숫자가 한 함수에서 나온다.
   const etaSeconds = Math.round(
-    (estimateTranslationMs(model) + (castSheet.enabled ? GLOSSARY_WAIT_MS : 0)) /
+    (estimateRunMsFromBlocks(totalLines, model) +
+      (castSheet.enabled ? GLOSSARY_WAIT_MS : 0)) /
       1000,
   );
 
