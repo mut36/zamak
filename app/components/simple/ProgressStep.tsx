@@ -3,8 +3,20 @@
 import type { TranslationProgress } from '../../types/translation';
 import { StepBreadcrumb } from '../StepBreadcrumb';
 import { COPY } from '../../i18n/simpleCopy';
-import { DEFAULT_MODEL, estimateTranslationMs } from '../../config/constants';
-import { overallPercent, stageViews, type StageKey } from '../../lib/progressStages';
+import {
+  DEFAULT_MODEL,
+  GLOSSARY_WAIT_MS,
+  MIN_VERIFY_MS,
+  estimateTranslationMs,
+} from '../../config/constants';
+import { useEasedProgress } from '../../hooks/useEasedProgress';
+import {
+  activeStage,
+  bandsFor,
+  overallPercent,
+  stageViews,
+  type StageKey,
+} from '../../lib/progressStages';
 
 interface ProgressStepProps {
   progress: TranslationProgress;
@@ -23,18 +35,19 @@ interface ProgressStepProps {
 
 const c = COPY.progress;
 
-/** Fallback title while every band is past its end (percent === 100) — the
- *  screen swaps to 'done' right after, so this is only ever visible for a
- *  frame. */
-const FALLBACK_STAGE: StageKey = 'verify';
+/** enrich에는 대기 상수가 없다 — 이징이 기댈 수 있는 최소한의 값. */
+const CONTEXT_EXPECTED_MS = 3_000;
 
 /**
- * Flat progress bar + 4-stage checklist (context → glossary → translate →
- * verify), driven entirely by `percent` — a single real number computed from
- * chunk-completion ratios (overallPercent), never from a client-side timer.
- * A bar that moves while nothing happens is a lie the user eventually
- * catches, so translation's 25–90% band is the only part that advances on
- * its own — everything else is a fast, real pass-through.
+ * Flat progress bar + stage checklist (context → [glossary] → translate →
+ * verify).
+ *
+ * 바가 그리는 값은 `max(실제 청크 착지분, 밴드 끝을 향한 지수 이징)`이다
+ * (`useEasedProgress`). 실제 진행만 쓰면 계단으로 튀고 — Pro는 한 웨이브라
+ * 142초 동안 아예 멈춰 있다 — 시간만 쓰면 거짓말이 된다.
+ *
+ * 글로사리를 끈 런에서는 그 단계가 목록에서 사라지고, 15–25 구간은 context가
+ * 흡수한다 (`bandsFor`).
  */
 export function ProgressStep({
   progress,
@@ -44,22 +57,40 @@ export function ProgressStep({
   glossaryEnabled,
   glossaryDone,
 }: ProgressStepProps) {
-  const percent = overallPercent(progress, {
+  const floor = overallPercent(progress, {
     enrichDone,
     glossaryEnabled,
     glossaryDone,
   });
-  const views = stageViews(percent, glossaryEnabled);
-  const activeKey =
-    views.find((v) => v.state === 'active')?.key ?? FALLBACK_STAGE;
-  const title = c.stages[activeKey];
+  const stage = activeStage(floor, glossaryEnabled);
+  const bands = bandsFor(glossaryEnabled);
 
-  const estimate =
-    progress.totalEstimateMs || estimateTranslationMs(DEFAULT_MODEL);
+  // 밴드마다 이징이 기댈 시간이 다르다. translate는 실측 보정을 거친
+  // estimatedRemainingMs(useTranslation), 나머지는 그 단계의 대기 상수.
+  const expectedMs: Record<StageKey, number> = {
+    context: CONTEXT_EXPECTED_MS,
+    glossary: GLOSSARY_WAIT_MS,
+    translate:
+      progress.estimatedRemainingMs ||
+      progress.totalEstimateMs ||
+      estimateTranslationMs(DEFAULT_MODEL),
+    verify: MIN_VERIFY_MS,
+  };
+
+  const percent = useEasedProgress({
+    floor,
+    bandEnd: bands[stage][1],
+    expectedMs: expectedMs[stage],
+    snap: progress.stage === 'done',
+  });
+
+  const views = stageViews(percent, glossaryEnabled);
+  const title = c.stages[stage];
+
+  // expectedMs.translate는 이미 **남은** 시간이다(useTranslation이 실측 보정해
+  // 넣는다). 여기서 (1 - percent/100)을 다시 곱하면 이중으로 깎인다.
   const remainingSec =
-    percent >= 100
-      ? 0
-      : Math.max(1, Math.round((estimate * (1 - percent / 100)) / 1000));
+    percent >= 100 ? 0 : Math.max(1, Math.round(expectedMs.translate / 1000));
   const processedLines = Math.round((percent / 100) * totalLines);
 
   return (
@@ -74,9 +105,11 @@ export function ProgressStep({
       </div>
 
       <div className='w-full h-[6px] rounded-full bg-track overflow-hidden mt-4 mb-4'>
+        {/* rAF가 매 프레임 값을 주므로 CSS 트랜지션을 걸지 않는다 — 이중 이징이
+            되면 바가 늘어지고 실제 착지 반영이 늦어진다. */}
         <div
           className='h-full rounded-full bg-ink-strong'
-          style={{ width: `${percent}%`, transition: 'width 0.15s linear' }}
+          style={{ width: `${Math.min(100, percent)}%` }}
         />
       </div>
 
@@ -85,33 +118,32 @@ export function ProgressStep({
           <div
             key={view.key}
             className={`flex items-center gap-3${
-              view.state === 'skipped' || view.state === 'pending' ? ' opacity-40' : ''
+              view.state === 'pending' ? ' opacity-40' : ''
             }`}
           >
             {view.state === 'done' ? (
               <span
-                className='flex items-center justify-center w-5 h-5 rounded-[5px] text-white text-mono-step font-bold shrink-0'
+                className='flex items-center justify-center w-5 h-5 rounded-full text-white text-mono-step font-bold shrink-0'
                 style={{ background: 'var(--success)' }}
               >
                 ✓
               </span>
             ) : (
               <span
-                className={`w-5 h-5 rounded-[5px] shrink-0${
+                className={`w-5 h-5 rounded-full shrink-0${
                   view.state === 'active' ? ' animate-zbreathe' : ''
                 }`}
                 style={{
-                  background: view.state === 'active' ? 'var(--ink-strong)' : 'transparent',
-                  border: view.state === 'active' ? 'none' : '1.5px solid var(--border-step)',
+                  background:
+                    view.state === 'active' ? 'var(--ink-strong)' : 'transparent',
+                  border:
+                    view.state === 'active'
+                      ? 'none'
+                      : '1.5px solid var(--border-step)',
                 }}
               />
             )}
             <span className='text-body text-nav'>{c.stages[view.key]}</span>
-            {view.state === 'skipped' && (
-              <span className='ml-auto text-fineprint text-secondary'>
-                {c.stageSkipped}
-              </span>
-            )}
           </div>
         ))}
       </div>
