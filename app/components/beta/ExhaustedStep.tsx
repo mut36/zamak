@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { joinWaitlist } from '../../lib/client/waitlist';
+import { recordEvent } from '../../lib/client/events';
 import type { CreditKind } from '../../lib/creditKind';
 import { COPY } from '../../i18n/simpleCopy';
 
@@ -31,6 +32,12 @@ export function ExhaustedStep({
 }: ExhaustedStepProps) {
   const [email, setEmail] = useState(defaultEmail);
   const [status, setStatus] = useState<JoinStatus>('idle');
+
+  // Fires once per exposure (mount), not per click — the fact worth
+  // measuring is that the user hit this dead end at all.
+  useEffect(() => {
+    void recordEvent('credits_exhausted_shown', { kind });
+  }, [kind]);
 
   const kindLabel = kind === 'pro' ? c.kindPro : c.kindLite;
 

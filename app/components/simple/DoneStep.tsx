@@ -6,6 +6,7 @@ import { CheckIcon, FileIcon, DownloadIcon } from '../icons';
 import { downloadFile } from '../../utils/downloadFile';
 import { buildReport, type ReportItem } from '../../lib/doneReport';
 import { sendFeedback } from '../../lib/client/feedback';
+import { recordEvent } from '../../lib/client/events';
 import type { TranslationResult, MovieInfo } from '../../types/translation';
 import type { CastSheet } from '../../types/glossary';
 import { COPY } from '../../i18n/simpleCopy';
@@ -112,7 +113,10 @@ export function DoneStep({
         <button
           type='button'
           className='btn btn-primary btn-block'
-          onClick={() => downloadFile(primary.content, primary.filename, primary.mime)}
+          onClick={() => {
+            downloadFile(primary.content, primary.filename, primary.mime);
+            void recordEvent('download_clicked', { extension: primary.extension });
+          }}
         >
           <DownloadIcon />
           {alternates.length > 0 ? c.downloadAs(primary.extension) : c.download}
@@ -127,9 +131,10 @@ export function DoneStep({
                 key={option.extension}
                 type='button'
                 className='btn btn-ghost btn-block mt-1'
-                onClick={() =>
-                  downloadFile(option.content, option.filename, option.mime)
-                }
+                onClick={() => {
+                  downloadFile(option.content, option.filename, option.mime);
+                  void recordEvent('download_clicked', { extension: option.extension });
+                }}
               >
                 {c.downloadAs(option.extension)}
               </button>

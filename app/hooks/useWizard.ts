@@ -11,11 +11,19 @@ import {
   loadSubtitleFile,
 } from '../lib/subtitles';
 import { fetchConsent, recordConsent } from '../lib/client/consent';
+import { recordEvent } from '../lib/client/events';
 import { DEFAULT_TARGET_LANG } from '../config/languages';
 import { DEFAULT_MODEL, type AllowedModel } from '../config/constants';
 import type { ContentType, MovieInfo } from '../types/translation';
 
 const EMPTY_MOVIE_INFO: MovieInfo = { title: '', year: '', notes: '' };
+
+/** Extension for an upload_rejected event's `format` detail — a display-only
+ *  read, not the format-detection logic in lib/subtitles/detect.ts. */
+function fileExtension(filename: string): string | null {
+  const match = filename.toLowerCase().match(/\.([a-z0-9]+)$/);
+  return match?.[1] ?? null;
+}
 
 /**
  * A bilingual SAMI is the one failure with a fix the user can act on (upload a
@@ -334,6 +342,10 @@ export function useWizard(
     if (!isSupportedSubtitleFilename(selected.name)) {
       setUploadError(messages.upload.invalidFile);
       setUploading(false);
+      void recordEvent('upload_rejected', {
+        reason: 'invalidFile',
+        format: fileExtension(selected.name),
+      });
       return;
     }
     setUploadError('');
@@ -347,6 +359,10 @@ export function useWizard(
     } catch (err) {
       setUploadError(uploadErrorMessage(err, messages.upload));
       setUploading(false);
+      void recordEvent('upload_rejected', {
+        reason: err instanceof BilingualSmiError ? 'bilingualSmi' : 'unreadable',
+        format: fileExtension(selected.name),
+      });
       return;
     }
 
