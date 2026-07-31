@@ -1697,6 +1697,46 @@ button:disabled {
     font-weight: 600;
     color: var(--text-secondary);
   }
+  /* 판매자 표시 아코디언 */
+  .site-footer-seller-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .site-footer-seller-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px 9px;
+    font-size: var(--fs-fineprint);
+    color: var(--text-quaternary);
+    line-height: 1.6;
+  }
+  .seller-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-quaternary);
+    font-size: var(--fs-fineprint);
+    font-weight: 400;
+    transition: color 0.2s;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  .seller-toggle-btn:hover {
+    color: var(--text-secondary);
+    text-decoration: underline;
+  }
+  .seller-toggle-btn svg {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.2s;
+  }
+  .seller-toggle-btn[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+  }
   /* 판매자 표시는 <address> — 기본 이탤릭을 되돌리고, `·` 구분자가 좁은
      화면에서 줄바꿈을 타도록 inline flex wrap으로 흘린다. */
   .site-footer-seller {
@@ -1713,6 +1753,11 @@ button:disabled {
     text-decoration: underline;
   }
   .site-footer-bottom {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .site-footer-copyright {
     display: flex;
     justify-content: space-between;
     flex-wrap: wrap;

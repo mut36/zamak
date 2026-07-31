@@ -27,18 +27,13 @@ const PROCESSORS: { name: string; country: string; purpose: string }[] = [
   {
     name: 'Supabase Inc.',
     country: '미국',
-    purpose: '계정 인증, 번역권·결제 기록 보관, 번역 결과물 보관',
+    purpose: '계정 인증, 번역권 기록 보관, 번역 결과물 보관',
   },
   { name: 'Vercel Inc.', country: '미국', purpose: '서비스 호스팅' },
   {
     name: 'Google LLC',
     country: '미국',
     purpose: '로그인 인증, 자막 번역(Gemini API)',
-  },
-  {
-    name: '토스페이먼츠(주)',
-    country: '대한민국',
-    purpose: '번역권 결제 처리',
   },
 ];
 
@@ -57,11 +52,6 @@ const COLLECTED: { kind: string; items: string; how: string }[] = [
     kind: '번역 결과물',
     items: '완성된 번역 자막 파일',
     how: '번역이 끝날 때 저장 — 원본 자막은 저장하지 않습니다',
-  },
-  {
-    kind: '결제',
-    items: '주문번호, 상품명, 결제 금액, 결제수단, 결제 시각, 영수증 링크',
-    how: '번역권을 구매할 때 기록',
   },
 ];
 
@@ -108,10 +98,6 @@ export default function PrivacyPage() {
           ))}
         </dl>
         <p className='mt-4'>
-          카드번호 등 결제수단 정보는 토스페이먼츠(주)가 처리하며 ZAMAK은
-          전달받지도, 저장하지도 않습니다.
-        </p>
-        <p>
           영화·드라마를 번역할 때 작품 정보를 불러오기 위해 이용자가 입력한 작품
           제목이 TMDB와 Google 검색으로 전달됩니다. 이 요청에는 개인정보가 포함되지
           않습니다.
@@ -123,7 +109,6 @@ export default function PrivacyPage() {
           <li>로그인과 이용자 식별</li>
           <li>번역권 지급, 차감, 잔액 확인</li>
           <li>번역 기록 표시와 완성된 결과물 다시 받기</li>
-          <li>번역권 구매와 환불 처리</li>
           <li>오류 대응과 고객 문의 응대</li>
         </ul>
         <p className='mt-3'>
@@ -146,10 +131,6 @@ export default function PrivacyPage() {
           </li>
           <li>
             <b>번역권 사용 기록</b> — 회원 탈퇴 시까지
-          </li>
-          <li>
-            <b>결제·거래 기록</b> — 전자상거래법에 따라 대금 결제 및 재화 공급
-            기록은 5년, 소비자 불만 및 분쟁 처리 기록은 3년
           </li>
         </ul>
         <p className='mt-3'>
@@ -203,9 +184,7 @@ export default function PrivacyPage() {
         <p>
           회원 탈퇴를 요청하시면 계정 정보와 이용 기록, 보관 중인 번역 결과물을
           모두 삭제합니다. 결과물만 먼저 지우고 싶으시면 그것도 요청하실 수
-          있습니다. 다만 위
-          &lsquo;보관 기간&rsquo;에 적힌 법령상 보관 의무가 있는 결제·거래 기록은
-          해당 기간 동안 분리 보관합니다.
+          있습니다.
         </p>
       </Section>
 
@@ -214,7 +193,7 @@ export default function PrivacyPage() {
           <li>모든 통신은 HTTPS로 암호화됩니다.</li>
           <li>
             데이터베이스에 행 수준 보안(RLS)을 적용해, 이용자는 자신의 기록만 조회할
-            수 있고 잔액과 결제 기록은 클라이언트에서 수정할 수 없습니다.
+            수 있고 잔액은 클라이언트에서 수정할 수 없습니다.
           </li>
           <li>
             번역 결과물을 담는 저장소는 비공개이며, 같은 행 수준 보안이 적용됩니다.
@@ -243,7 +222,7 @@ export default function PrivacyPage() {
         </p>
         <p>
           이 방침이 변경되면 시행일 7일 전부터 이 페이지에 공지합니다. 사업자
-          정보와 환불 기준은{' '}
+          정보는{' '}
           <Link href={COPY.legal.termsHref} className='underline'>
             {COPY.legal.terms}
           </Link>

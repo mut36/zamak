@@ -1,7 +1,5 @@
 import Link from 'next/link';
-import { CREDIT_PACKS } from '../config/packs';
 import {
-  MAX_BLOCKS_PER_CREDIT,
   RESULT_RETENTION_DAYS,
 } from '../config/constants';
 import { COPY } from '../i18n/simpleCopy';
@@ -9,19 +7,17 @@ import { SITE } from '../lib/brand';
 import { Contents, KeyPoint, LegalShell, Section } from './parts';
 
 export const metadata = {
-  title: '이용약관 · 환불 안내 | ZAMAK',
-  description: 'ZAMAK 이용약관, 자막 저작권과 이용자 책임, 번역권 구매·환불 안내',
+  title: '이용약관 | ZAMAK',
+  description: 'ZAMAK 이용약관, 자막 저작권과 이용자 책임',
 };
 
 /**
  * Required alongside payments, not optional polish: Korean e-commerce law
- * (전자상거래법) requires the seller's identity and the refund terms to be
- * readable before purchase, and card acquirers check for this page during the
- * Toss Payments merchant review.
+ * (전자상거래법) requires the seller's identity to be readable before purchase.
  *
  * 값 자체는 `COPY.seller`에 있다 — 전 페이지 푸터(`SiteFooter`)가 같은 항목을
  * 표시하므로, 여기 하드코딩하면 한쪽만 고쳐져 갈라진다. 이 배열은 그 값에
- * 이 페이지용 라벨만 붙인다. 호스팅·결제대행은 법정 표시 항목이 아니라
+ * 이 페이지용 라벨만 붙인다. 호스팅은 법정 표시 항목이 아니라
  * 신뢰 신호라 푸터에는 없고 이 표에만 있다.
  */
 const SELLER_INFO: { label: string; value: string }[] = [
@@ -34,12 +30,9 @@ const SELLER_INFO: { label: string; value: string }[] = [
   { label: '홈페이지', value: SITE.url },
   { label: '고객문의', value: COPY.footer.feedbackEmail },
   { label: '호스팅 제공', value: COPY.seller.hosting },
-  { label: '결제대행', value: COPY.seller.pg },
 ];
 
 const CONTENTS = [
-  { id: 'product', label: '판매하는 것' },
-  { id: 'refund', label: '환불' },
   { id: 'copyright', label: '자막 저작권과 이용자 책임' },
   { id: 'data', label: '파일과 데이터 처리' },
   { id: 'liability', label: '책임의 한계' },
@@ -51,8 +44,8 @@ const CONTENTS = [
 export default function LegalPage() {
   return (
     <LegalShell
-      title='이용약관 · 환불 안내'
-      subtitle='번역권을 구매하거나 자막을 올리기 전에 확인해주세요.'
+      title='이용약관'
+      subtitle='자막을 올리기 전에 확인해주세요.'
       effectiveDate='2026년 8월 1일'
       otherDoc={{ href: COPY.legal.privacyHref, label: COPY.legal.privacy }}
     >
@@ -65,41 +58,6 @@ export default function LegalPage() {
         본인만 접근할 수 있는 비공개 저장소에 {RESULT_RETENTION_DAYS}일간
         보관합니다.
       </KeyPoint>
-
-      <Section title='판매하는 것' id='product'>
-        <p className='m-0'>
-          ZAMAK은 SRT 자막 파일을 번역해주는 서비스이고, 판매하는 상품은 선불
-          번역권입니다. 번역권 1편으로 자막{' '}
-          {MAX_BLOCKS_PER_CREDIT.toLocaleString()}줄까지의 파일 하나를 번역할 수
-          있습니다.
-        </p>
-        <ul className='mt-3 pl-4'>
-          {CREDIT_PACKS.map((pack) => (
-            <li key={pack.id}>
-              번역권 {pack.credits}편 — {pack.amount.toLocaleString()}원 (부가세
-              포함)
-            </li>
-          ))}
-        </ul>
-        <p>번역권에는 유효기간이 없습니다.</p>
-      </Section>
-
-      <Section title='환불' id='refund'>
-        <p className='m-0'>
-          <b>사용하지 않은 번역권은 전액 환불됩니다.</b> 이미 사용한 번역권은
-          결과물(번역된 자막 파일)이 즉시 제공되므로 환불되지 않습니다. 예를 들어
-          10편을 구매하고 2편을 사용했다면 8편분이 환불 대상입니다.
-        </p>
-        <p>
-          환불은 아래 고객문의로 요청해주세요. 결제하신 수단으로 영업일 기준 3일
-          이내에 처리됩니다. 카드 결제의 경우 카드사 사정에 따라 취소 반영까지
-          며칠이 더 걸릴 수 있습니다.
-        </p>
-        <p>
-          번역이 서비스 오류로 실패했는데 번역권이 차감된 경우에도 같은 경로로
-          알려주세요. 사용 여부와 무관하게 복구해 드립니다.
-        </p>
-      </Section>
 
       <Section title='자막 저작권과 이용자 책임' id='copyright'>
         <p className='m-0'>
@@ -163,8 +121,7 @@ export default function LegalPage() {
         </p>
         <p>
           서비스 점검이나 외부 API 장애 등으로 번역이 중단되거나 실패할 수
-          있습니다. 이 경우 차감된 번역권은 위 &lsquo;환불&rsquo; 항목에 따라
-          복구해 드립니다. 그 밖에 서비스 이용으로 발생한 손해에 대해서는 ZAMAK의
+          있습니다. 그 밖에 서비스 이용으로 발생한 손해에 대해서는 ZAMAK의
           고의 또는 과실이 있는 범위에서 책임집니다.
         </p>
         <p>

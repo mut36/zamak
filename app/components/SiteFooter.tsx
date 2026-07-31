@@ -2,9 +2,9 @@ import Link from 'next/link';
 import { APP_VERSION } from '../config/constants';
 import { COPY } from '../i18n/simpleCopy';
 import { Wordmark } from './Wordmark';
+import { SellerInfoToggle } from './SellerInfoToggle';
 
 const F = COPY.footer;
-const S = COPY.seller;
 
 /**
  * 전 페이지 공용 푸터.
@@ -43,26 +43,12 @@ export function SiteFooter() {
         </nav>
       </div>
 
-      {/* 판매자 표시. `·`로 이어 붙여 좁은 화면에서 자연스럽게 접히게 둔다. */}
-      <address className='site-footer-seller'>
-        <span>{S.name}</span>
-        <span className='dot-sep' />
-        <span>대표 {S.ceo}</span>
-        <span className='dot-sep' />
-        <span>{S.address}</span>
-        <span className='dot-sep' />
-        <span>사업자등록번호 {S.bizNo}</span>
-        <span className='dot-sep' />
-        <span>{S.mailOrderShort}</span>
-        <span className='dot-sep' />
-        <a href={`tel:${S.tel.replace(/-/g, '')}`}>전화 {S.tel}</a>
-        <span className='dot-sep' />
-        <a href={`mailto:${F.feedbackEmail}`}>{F.feedbackEmail}</a>
-      </address>
-
       <div className='site-footer-bottom'>
-        <span>{F.copyright}</span>
-        <span className='mono'>v{APP_VERSION} · Beta</span>
+        <SellerInfoToggle />
+        <div className='site-footer-copyright'>
+          <span>{F.copyright}</span>
+          <span className='mono'>v{APP_VERSION} · Beta</span>
+        </div>
       </div>
     </footer>
   );

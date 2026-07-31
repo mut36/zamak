@@ -264,10 +264,9 @@ export const COPY = {
     close: '돌아가기',
     balance: (n: number) => `현재 번역권 ${n}편`,
     notice: [
-      '카드·간편결제로 결제돼요. 결제는 토스페이먼츠가 처리해요.',
-      '번역권은 유효기간이 없고, 사용하지 않은 번역권은 환불할 수 있어요.',
+      '번역권은 유효기간이 없어요.',
     ],
-    terms: '환불 · 이용 안내',
+    terms: '이용 안내',
     done: (n: number) => `번역권 ${n}편이 충전됐어요!`,
     // Toss error codes are opaque to buyers; only the cause that they can act
     // on is worth naming, and everything else gets one honest sentence.
@@ -588,6 +587,7 @@ export const COPY = {
   footer: {
     feedback: '피드백 보내기',
     feedbackEmail: 'hello@mut36.com',
+    sellerInfo: '사업자 정보 확인',
     tagline: '타임코드가 밀리지 않는 자막 번역기.',
     serviceGroup: '서비스',
     policyGroup: '정책',
@@ -613,7 +613,6 @@ export const COPY = {
     mailOrder: '신고 면제 (직전 연도 통신판매 거래 횟수 50회 미만)',
     mailOrderShort: '통신판매업 신고 면제',
     hosting: 'Vercel Inc.',
-    pg: '토스페이먼츠(주)',
   },
 
   // 첫 번역 전에 한 번 받는 저작권 동의 모달. 닫기 없이 동의만 가능한
