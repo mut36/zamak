@@ -28,8 +28,8 @@ const SELLER_INFO: { label: string; value: string }[] = [
   { label: '상호', value: '뭍36 (MUT36)' },
   { label: '대표자', value: '이지안' },
   { label: '사업자등록번호', value: '224-23-65160' },
-  { label: '통신판매업 신고번호', value: '결제 미가동 — 결제 오픈 시 신고 또는 면제 근거로 표기' },
-  { label: '사업장 주소', value: 'TODO' },
+  { label: '통신판매업 신고번호', value: '신고 면제 (직전 연도 통신판매 거래 횟수 50회 미만)' },
+  { label: '사업장 주소', value: '서울특별시 여의대방로22길 24' },
   { label: '홈페이지', value: SITE.url },
   { label: '고객문의', value: COPY.footer.feedbackEmail },
   { label: '호스팅 제공', value: 'Vercel Inc.' },
@@ -52,7 +52,7 @@ export default function LegalPage() {
     <LegalShell
       title='이용약관 · 환불 안내'
       subtitle='번역권을 구매하거나 자막을 올리기 전에 확인해주세요.'
-      effectiveDate='2026년 7월 27일'
+      effectiveDate='2026년 8월 1일'
       otherDoc={{ href: COPY.legal.privacyHref, label: COPY.legal.privacy }}
     >
       <Contents items={CONTENTS} />
@@ -147,7 +147,7 @@ export default function LegalPage() {
         </p>
         <p>
           그 밖에 ZAMAK이 기록하는 것은 번역한 자막의 줄 수와 시각, 올린 파일의
-          이름뿐입니다. 계정·결제 정보를 포함한 자세한 내용은{' '}
+          이름, 사용한 번역 모델과 설정(글로사리 등)뿐입니다. 계정·결제 정보를 포함한 자세한 내용은{' '}
           <Link href={COPY.legal.privacyHref} className='underline'>
             {COPY.legal.privacy}
           </Link>

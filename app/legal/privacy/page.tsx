@@ -50,7 +50,7 @@ const COLLECTED: { kind: string; items: string; how: string }[] = [
   },
   {
     kind: '이용 기록',
-    items: '번역한 자막의 줄 수, 번역 시각, 올린 파일의 이름, 사용한 번역 모델',
+    items: '번역한 자막의 줄 수, 번역 시각, 올린 파일의 이름, 사용한 번역 모델과 설정(글로사리 등)',
     how: '번역권을 사용할 때 자동 기록',
   },
   {
@@ -80,13 +80,13 @@ export default function PrivacyPage() {
     <LegalShell
       title='개인정보처리방침'
       subtitle='ZAMAK이 어떤 정보를 받고, 어디에 쓰고, 얼마나 보관하는지 정리했습니다.'
-      effectiveDate='2026년 7월 27일'
+      effectiveDate='2026년 8월 1일'
       otherDoc={{ href: COPY.legal.termsHref, label: COPY.legal.terms }}
     >
       <Contents items={CONTENTS} />
 
       <KeyPoint>
-        <b className='text-ink-strong'>올리신 자막 원본은 저장하지 않습니다.</b> 원본은
+        <b className='text-ink-strong'>올리신 자막 원본은 저장하지 않습니다.</b> 원본의 내용은
         브라우저에서 열려 번역되는 동안에만 서버를 거쳐 가고, 어디에도 기록되지
         않습니다. 다만 <b className='text-ink-strong'>완성된 번역 결과물</b>은 나중에 다시
         받으실 수 있도록, 본인만 접근할 수 있는 비공개 저장소에 {RESULT_RETENTION_DAYS}
@@ -154,7 +154,7 @@ export default function PrivacyPage() {
         </ul>
         <p className='mt-3'>
           번역 결과물은 이용자별로 분리된 <b>비공개 저장소</b>에 보관됩니다. 검색
-          엔진에 노출되지 않고, 다시 받으실 때마다 유효기간이 5분인 일회성 주소가
+          엔진에 노출되지 않고, 다시 받으실 때마다 유효기간이 5분인 한시적 주소가
           발급되며, 본인 외에는 열람하지 않습니다.
         </p>
         <p>

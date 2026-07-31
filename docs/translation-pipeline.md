@@ -100,7 +100,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 
 ### 2-B. 작품 정보 수집 — 기타 영상 (summarize)
 - **코드**: `app/api/summarize/route.ts` (AUX 모델, 앞 `SUMMARY_SAMPLE_LINES`줄 샘플)
-- **하는 일**: 내용 1~2문장 요약 → `movieInfo.notes`.
+- **하는 일**: 내용 1~2문장 요약 → `movieInfo.notes` (`TranslateSettingsStep`에서 사용자가 보고 고칠 수 있는 입력란).
 - **품질 레버**: 요약 프롬프트는 `summarize/route.ts` 안에 인라인. 샘플 줄 수는
   `constants.ts` `SUMMARY_SAMPLE_LINES`.
 
