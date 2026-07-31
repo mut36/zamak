@@ -179,13 +179,21 @@ main = 9936527 (feat/landing 미머지)
 
 ## 현재 설정값
 
+⚠️ **B와 사고 레벨은 모델마다 다르다.** flash와 Pro는 같은 노브를 **반대 이유로**
+쓴다 — flash의 B는 재번호 드리프트를 막는 안전 상한이고, Pro의 B는 thinking
+비용을 낮추는 레버라 클수록 싸다. 한쪽 값을 다른 쪽에 가져다 쓰지 말 것
+(`decisions.md` §2-15, `tuning/token-economics.md` §5).
+
 | 항목 | 값 | 근거 |
 |---|---|---|
-| B (청크 크기) | **100** | 재번호 드리프트 + 마커 오염(2026-07-25 하네스) 경험적 안전선. 계산상 최적 아님 (`chunk-size-model.md` §5·§8, `decisions.md` §2-3-3) |
-| K (동시성) | **16** | B=200까진 과분했지만 B=100에서 크레딧 상한 파일은 `⌈2000/100⌉=20 > 16` — **2웨이브**. 1웨이브 규칙은 이미 폐기됨(§4-2), 회귀 아님 |
-| THINKING_LEVEL | **LOW** | 확정 |
-| 크레딧 상한 | 2,000블록 | `MAX_BLOCKS_PER_CREDIT` |
-| 모델 | `gemini-3.6-flash` | 보조 라우트는 `gemini-3.5-flash-lite` |
+| B — flash (`SERVER_CHUNK_SIZE`) | **100** | 재번호 드리프트 + 마커 오염(2026-07-25 하네스) 경험적 안전선. 계산상 최적 아님 (`chunk-size-model.md` §5·§8, `decisions.md` §2-3-3) |
+| B — Pro (`PRO_CHUNK_SIZE`) | **250** | HIGH thinking 비용 절감. B≈120에서 113 tok/블록 → 250에서 40으로 2.4배 절감. `chunkSizeForModel(model)`이 분기 (`decisions.md` §2-15) |
+| K (동시성) | **16** | B=200까진 과분했지만 B=100에서 크레딧 상한 파일은 `⌈2000/100⌉=20 > 16` — **2웨이브**. 1웨이브 규칙은 이미 폐기됨(§4-2), 회귀 아님. Pro는 B=250이라 8청크로 1웨이브 |
+| THINKING_LEVEL — flash | **LOW** | 실측 `thoughts=0`. lean 프롬프트가 HIGH와 같은 정확도를 5.1배 싸게 낸다 (`token-economics.md` §3) |
+| PRO_THINKING_LEVEL | **HIGH** | 대표 전문 검수 결과 LOW·MEDIUM은 품질 차이 없고 HIGH가 압도적. 장편 300초 타임아웃 통과 확인(최장청크 141.5s, 여유 2.1배 — `decisions.md` §2-16) |
+| 크레딧 상한 | 2,000블록 | `MAX_BLOCKS_PER_CREDIT`. 업로드 시점(`useWizard.ts`)과 서버(`api/translation/begin`) 두 곳에서 막는다 |
+| 모델 | 빠른번역 `gemini-3.6-flash` / 고급번역 `gemini-3.1-pro-preview` | 보조 라우트는 `gemini-3.5-flash-lite`, 글로사리는 `gpt-5.6-luna`(`decisions.md` §2-14) |
+| 편당 실측 원가 (상한 2,000블록) | flash **~460원** / Pro **~2,670원** | `tuning/cost-per-block.md`. 판매가와 직접 비교 금지 — VAT·PG 수수료 뺀 실수취액으로 계산할 것(`decisions.md` §1-17) |
 | Gemini 등급 | **유료 Tier 2** (2026-07-26 승급) | flash 2,000 RPM / 3M TPM / 100K RPD. pro 1,000 / 5M / 50K, flash-lite 10,000 / 10M / 350K (`gemini-limits.md` §2-1) |
 
 **운영 천장** (B=100·K=16): 동시 번역 약 11~20명(큰 파일일수록 낮음, **TPM이 먼저 조인다**),
@@ -201,8 +209,8 @@ main = 9936527 (feat/landing 미머지)
 
 - UI 문구는 `app/i18n/simpleCopy.ts`의 `COPY` 객체로만 (컴포넌트 하드코딩 금지)
 - 기능 끌 땐 env 플래그 뒤로 (`THINKING_LEVEL`, `TRANSLATION_STRICT_MODE`)
-- 변경 후 `npx tsc --noEmit` / `npx eslint app proxy.ts` / `npx vitest run` (현재 43 통과)
-  - ⚠️ 머지 전까지는 `middleware.ts`, 머지 후에는 `proxy.ts`
+- 변경 후 `npx tsc --noEmit && npx eslint app && npx vitest run && npm run check:tokens`
+  (현재 250 통과 / 7 skip). CLAUDE.md의 "명령" 절이 정본
 - dev 서버는 `preview_start(name: "zamak-dev")`. Next 16이 디렉터리당 1개 제한
 - **`THINKING_LEVEL`은 모듈 로드 시 1회 상수라 변경 시 dev 서버 재시작 필수**.
   `NEXT_PUBLIC_CHUNK_SIZE` 등은 핫리로드 됨
@@ -210,4 +218,7 @@ main = 9936527 (feat/landing 미머지)
 - `samples/subtitles/*.srt`와 `.harness/`도 gitignore. 커밋 전 `git add --dry-run` 확인
 - 나(Claude)는 계정 생성·비밀번호 입력이 금지 — 실제 Google 로그인이 필요한 검증은 대표가
   직접. 브라우저 자동화 파일 업로드와 익명 curl 검증은 가능
-- 실측값은 `docs/tuning/chunk-size-model.md` §1, 조회값은 `gemini-limits.md`에 분리 기록
+- 실측값은 `docs/tuning/chunk-size-model.md` §1, 조회값은 `gemini-limits.md`에 분리 기록.
+  하네스 런은 **전부** `tuning/experiment-log.md`에 한 줄 남길 것 — `.harness/`가
+  gitignore라 거기가 유일한 기록이다. "그래서 어디를 고치면 싸지나"는
+  `tuning/token-economics.md`

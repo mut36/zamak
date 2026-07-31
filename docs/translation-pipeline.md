@@ -47,8 +47,18 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   실패 시 EUC-KR/CP949) → `parseSubtitleDocument`가 **정규 SRT + 원본 오프셋 맵**
   (`SubtitleDoc`)을 만듦 → 블록 분리(번호/타임코드/본문). 이후 파이프라인은 SRT만 본다.
   원본과 맵은 다운로드 단계에서 원본 형식으로 되돌리는 데만 쓰인다 (`decisions.md` §2-13).
-- **읽기 실패는 여기서 끝난다**: 파싱은 `page.tsx`의 `handleFile`이 await하므로,
-  읽히지 않는 파일·이중 언어 SMI는 업로드 화면에 머무른다(다음 단계로 안 넘어감).
+- **읽기 실패는 여기서 끝난다**: 파싱은 `app/hooks/useWizard.ts`의 `handleFile`이
+  await하므로, 읽히지 않는 파일·이중 언어 SMI는 업로드 화면에 머무른다(다음
+  단계로 안 넘어감).
+- **크레딧 상한 초과도 여기서 끝난다** (2026-07-31~): 같은 `handleFile`이 파싱
+  직후 `countBlocks(doc.srt) > MAX_BLOCKS_PER_CREDIT`이면 드롭존에서 돌려보낸다.
+  **`/api/translation/begin`의 같은 검사보다 먼저 걸러야 하는 이유는 비용이다** —
+  다음 화면(설정)에 도달하는 순간 enrich·summarize·글로사리 추출이 전부 실제
+  API 호출로 나가는데, 어차피 거절할 파일이면 그게 전부 낭비다. 서버 검사는
+  그대로 남아 있다(클라이언트는 UX·낭비 방지, 과금 방어는 서버).
+  경계는 `>`라 정확히 상한과 같은 블록 수는 통과한다 — 두 검사가 한 블록이라도
+  어긋나면 서버가 받아줄 파일을 클라이언트가 거절하므로 `useWizard.test.ts`가
+  이 경계를 고정한다.
 - **품질 레버**: 포맷 파싱 이상 → `app/lib/subtitles/*`. 정규화 이후 SRT 파싱 문제 →
   `parseSrtBlocks`. 프롬프트는 건드릴 필요 없음(모델은 `[N] 대사`만 봄).
 - **불변식**: 큐 본문에 빈 줄이 들어가면 SRT 블록이 쪼개져 번호 없는 고아 블록이 되므로
@@ -515,6 +525,8 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 한국어 자막이 너무 빨리 지나감(읽기 힘듦) | `srt.ts` (`adjustSubtitleTiming`), `constants.ts` `CPS_TARGET`/`MIN_SUBTITLE_GAP_MS` — §9.5 |
 | 자막이 너무 짧게 스쳐 지나감(대사와 무관하게) | `srt.ts` (`adjustSubtitleTiming`), `constants.ts` `MIN_SUBTITLE_DURATION_MS` — §9.5 |
 | 번역이 느림/비쌈 | `constants.ts` `SERVER_CHUNK_SIZE`(flash)/`PRO_CHUNK_SIZE`(Pro)/`CONCURRENCY`/`thinkingLevelForModel`, 모델(고급/빠른). **블록당 실측 원가는 `tuning/cost-per-block.md`** — 비용이 예상과 다르면 여기부터 볼 것 |
+| 비용을 **줄이고 싶다**(어느 노브가 실제로 효과 있나) | `tuning/token-economics.md` — 비용의 67%가 thinking, 6%가 입력이라 프롬프트 토큰 절감·캐싱은 거의 무의미하다. 이미 당긴 레버와 안 당긴 레버가 우선순위로 정리돼 있음 |
+| "파일이 너무 커요"로 거절됨 | 정상 — `MAX_BLOCKS_PER_CREDIT`(2,000) 초과. 업로드 시점(`useWizard.ts` `handleFile`)과 서버(`api/translation/begin`) 두 곳에서 막는다 — §0. 상한 자체를 바꾸려면 `constants.ts`(원가 근거가 그 주석에 있음) |
 | 특정 청크만 원문 그대로 | 그 청크 호출 실패 + sweep도 못 건짐 — `gemini.ts` 로그, `chunkRetry.ts`(1차 판단), `[sweep]` 콘솔 로그의 `stoppedBy` — §9.6·§9.65 |
 | 일부 줄만 원문 그대로 | sweep을 통과하고도 남은 줄. `[sweep] ... stopped by` 로그로 원인 구분: `no-progress`(모델이 계속 같은 실패) / `budget`(호출 상한) / `fatal`(quota·auth) — §9.65 |
 | 원문으로 남은 줄이 늘었는데 비용은 그대로 | sweep이 안 돌았다는 뜻. `leftover` 수거(`useTranslation.ts`)나 `unmatchedIndices` 배관(`srt.ts`→SSE)이 끊겼는지 확인 — §9.65 |
