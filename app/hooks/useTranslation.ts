@@ -41,15 +41,19 @@ import type {
 import type { CastSheet } from '../types/glossary';
 import {
   chunkSizeForModel,
-  estimateTranslationMs,
   getReadingSpeed,
   getTierLimits,
   MIN_SUBTITLE_DURATION_MS,
   MIN_SUBTITLE_GAP_MS,
+  MIN_VERIFY_MS,
   resolveTier,
   type AllowedModel,
 } from '../config/constants';
-import { resolveTargetLang } from '../config/languages';
+import {
+  resolveTargetLang,
+  type ContentProfileKey,
+} from '../config/languages';
+import { estimateRunMsFromChunks } from '../lib/progressEstimate';
 
 interface TranslationState {
   isTranslating: boolean;
@@ -157,6 +161,23 @@ function buildDownloads(
   }
 }
 
+/**
+ * `ms`만큼 기다리되, 사용자가 취소하면 즉시 깨어난다. 검증 단계 최소 노출이
+ * 취소를 삼키면 안 되기 때문에 필요하다.
+ */
+function sleepUnlessAborted(ms: number, signal: AbortSignal): Promise<void> {
+  if (ms <= 0 || signal.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    const finish = () => {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', finish);
+      resolve();
+    };
+    const timer = setTimeout(finish, ms);
+    signal.addEventListener('abort', finish, { once: true });
+  });
+}
+
 const IDLE_PROGRESS: TranslationProgress = {
   stage: 'idle',
   currentChunk: 0,
@@ -248,6 +269,10 @@ export function useTranslation(
     translationStyle: TranslationStyle,
     onSuccess?: () => void,
     castSheet?: CastSheet,
+    // Only the timing pass uses this — the profile decides how long a finished
+    // line stays on screen, and nothing in the prompt depends on it, so it is
+    // never sent to the server (docs/decisions.md §1-19).
+    contentProfile?: ContentProfileKey,
   ): Promise<boolean> => {
     if (!file) return false;
 
@@ -285,8 +310,15 @@ export function useTranslation(
       // between scenes instead of mid-conversation.
       const chunks = chunkSrtBlocksAtGaps(blocks, chunkSize);
       const totalChunks = chunks.length;
-      // One figure per model — the same one the landing copy promises.
-      const totalEstimateMs = estimateTranslationMs(model);
+      // 파일 크기를 반영한 추정. 청크 수는 chunkSrtBlocksAtGaps()가 방금
+      // 확정했으므로 블록 근사가 아니라 실제 개수를 쓴다.
+      // (docs/tuning/chunk-size-model.md §1·§2 → app/lib/progressEstimate.ts)
+      const totalEstimateMs = estimateRunMsFromChunks(
+        totalChunks,
+        chunkSize,
+        model,
+      );
+      const translateStartedAt = Date.now();
 
       setTranslationProgress({
         stage: 'translating',
@@ -363,11 +395,25 @@ export function useTranslation(
           }
         },
         onCompleted: (completed) => {
+          // 관측 처리율로 남은 시간을 다시 재고, 모델 예측과 섞는다. 가중치는
+          // 한 웨이브(=concurrency)가 착지하면 1이 된다 — 그때부터는 이번 런의
+          // 실제 속도가 모델 예측보다 낫다. 웨이브가 하나뿐인 런(Pro)은 보정
+          // 기회가 없지만, 거기서는 모델 예측이 이미 정확하다.
+          const modelRemaining = totalEstimateMs * (1 - completed / totalChunks);
+          const elapsed = Date.now() - translateStartedAt;
+          const measuredRemaining =
+            completed > 0
+              ? (elapsed * (totalChunks - completed)) / completed
+              : modelRemaining;
+          const w = Math.min(
+            1,
+            completed / Math.max(1, Math.min(totalChunks, concurrency)),
+          );
           setTranslationProgress((prev) => ({
             ...prev,
             currentChunk: completed,
             estimatedRemainingMs:
-              totalEstimateMs * (1 - completed / totalChunks),
+              (1 - w) * modelRemaining + w * measuredRemaining,
             lastUpdateTimestamp: Date.now(),
           }));
         },
@@ -455,6 +501,19 @@ export function useTranslation(
         return false;
       }
 
+      // 검증 표시는 실제 검증 앞에 선다. 예전엔 이 블록이 작업 뒤에 있었고,
+      // 바로 다음 줄의 setTranslationProgress({stage:'done'})와 같은 tick에
+      // 묶여서 React가 배치해 버렸다 — verify 단계가 한 프레임도 그려지지
+      // 않았고, 사용자에겐 타임코드 검증을 건너뛴 것으로 보였다.
+      const verifyStartedAt = Date.now();
+      setTranslationProgress((prev) => ({
+        ...prev,
+        stage: 'finalizing',
+        currentChunk: totalChunks,
+        totalChunks,
+        estimatedRemainingMs: 0,
+      }));
+
       // Mechanical text rules (2-line cap, and sentence-final punctuation for
       // the languages whose convention drops it) have exactly one correct
       // output, so code enforces them rather than hoping the model always
@@ -482,7 +541,7 @@ export function useTranslation(
       const translated = adjustSubtitleTiming(
         ruleEnforced,
         {
-          ...getReadingSpeed(targetLang),
+          ...getReadingSpeed(targetLang, contentProfile),
           minGapMs: MIN_SUBTITLE_GAP_MS,
           minDurationMs: MIN_SUBTITLE_DURATION_MS,
         },
@@ -493,17 +552,6 @@ export function useTranslation(
         targetLang,
         translated,
       );
-
-      setTranslationProgress({
-        stage: 'finalizing',
-        currentChunk: totalChunks,
-        totalChunks,
-        estimatedRemainingMs: 0,
-        lastUpdateTimestamp: 0,
-        totalEstimateMs: 0,
-        sweepRecovered: recoveredBlocks,
-        sweepRemaining: remainingBlocks,
-      });
 
       // Persist the result for the completion screen — no auto-download,
       // no auto-reset. The user downloads explicitly and can start over.
@@ -550,6 +598,17 @@ export function useTranslation(
         relationPairs: castSheet?.relations?.length ?? 0,
         textRules: textRuleReport,
       });
+
+      // 검증이 눈에 보이도록 최소 시간을 채운다. 고정 대기가 아니라 최소
+      // 보장이다 — 스윕이 더 걸렸으면 이미 지나가서 0이 된다.
+      await sleepUnlessAborted(
+        MIN_VERIFY_MS - (Date.now() - verifyStartedAt),
+        controller.signal,
+      );
+      if (controller.signal.aborted) {
+        setTranslationProgress(IDLE_PROGRESS);
+        return false;
+      }
 
       setTranslationProgress({
         stage: 'done',
