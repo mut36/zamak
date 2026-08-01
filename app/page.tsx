@@ -43,7 +43,6 @@ export default function Home() {
     email,
     loading: authLoading,
     signIn,
-    signOut,
     refreshBalance,
   } = useAuth();
 
@@ -174,8 +173,6 @@ export default function Home() {
   return (
     <div className='min-h-screen'>
       <AppNav
-        user={user}
-        signOut={signOut}
         credits={credits}
         onHome={resetAll}
       />

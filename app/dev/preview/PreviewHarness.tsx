@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import type { User } from '@supabase/supabase-js';
 import { AppNav } from '../../components/beta/AppNav';
 import { CopyrightModal } from '../../components/beta/CopyrightModal';
 import { ExhaustedStep } from '../../components/beta/ExhaustedStep';
@@ -21,12 +20,6 @@ import type {
 } from '../../types/translation';
 
 /* ------------------------------------------------------------------ mocks -- */
-
-const USER = {
-  id: 'preview',
-  email: 'preview@zamak.test',
-  user_metadata: { full_name: '미리보기', avatar_url: '' },
-} as unknown as User;
 
 const CREDITS = { lite: 3, pro: 1 };
 
@@ -127,8 +120,6 @@ export function PreviewHarness() {
     <div className='min-h-screen'>
       {showNav && (
         <AppNav
-          user={USER}
-          signOut={noop}
           credits={CREDITS}
           onHome={() => setScreen('upload')}
         />

@@ -15,9 +15,8 @@ export const COPY = {
   },
 
   nav: {
-    history: '내 번역',
     credits: (lite: number, pro: number) => `라이트 ${lite} · 프로 ${pro}`,
-    signOut: '로그아웃',
+    mypage: '마이페이지',
   },
 
   auth: {
@@ -562,6 +561,7 @@ export const COPY = {
     expired: '보관 기간 지남',
     empty: '아직 번역한 파일이 없습니다.',
     again: '새 파일 번역하기',
+    signOut: '로그아웃',
     // 용어집은 적용됐을 때만 붙는다 — 켰지만 추출이 실패한 런에는 붙지 않는다.
     meta: (date: string, model: string, glossary: boolean) =>
       `${date} · ${model}${glossary ? ' · 용어집' : ''}`,

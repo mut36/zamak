@@ -101,8 +101,6 @@ export default function MyPage() {
   return (
     <div className='min-h-screen'>
       <AppNav
-        user={user}
-        signOut={signOut}
         credits={credits}
         onHome={() => router.push('/')}
       />
@@ -145,6 +143,14 @@ export default function MyPage() {
             onClick={() => router.push('/')}
           >
             {c.again}
+          </button>
+
+          <button
+            type='button'
+            className='btn btn-ghost btn-block mt-2.5'
+            onClick={signOut}
+          >
+            {c.signOut}
           </button>
         </div>
       </main>
