@@ -1,23 +1,23 @@
 'use client';
 
 import { useRef, useState, type DragEvent } from 'react';
-import Link from 'next/link';
 import { UploadIcon } from '../icons';
 import { StepBreadcrumb } from '../StepBreadcrumb';
 import type { ContentType } from '../../types/translation';
 import { COPY } from '../../i18n/simpleCopy';
 
 interface UploadStepProps {
-  /** null before the user picks a content type — the dropzone stays locked
-   *  (visually dimmed and inert to clicks/drops) until this is set. */
   contentType: ContentType | null;
   onContentType: (type: ContentType) => void;
   /** True while a just-dropped/selected file is being parsed. */
   uploading: boolean;
   /** Name of the file being read, shown in the reading-state message. */
   uploadingFileName: string;
+  /** Name of the successfully parsed file. */
+  fileName?: string;
   error: string;
   onFile: (file: File) => void;
+  onNext: () => void;
 }
 
 export function UploadStep({
@@ -25,14 +25,16 @@ export function UploadStep({
   onContentType,
   uploading,
   uploadingFileName,
+  fileName,
   error,
   onFile,
+  onNext,
 }: UploadStepProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const c = COPY.upload;
-  const locked = contentType === null;
-  const inert = locked || uploading;
+  const inert = uploading;
+  const canProceed = contentType !== null && !!fileName;
 
   const handleDrop = (e: DragEvent) => {
     e.preventDefault();
@@ -48,7 +50,8 @@ export function UploadStep({
   };
 
   return (
-    <div className='animate-zslide max-w-[760px] mx-auto'>
+    <>
+    <div className='animate-zslide max-w-[760px] mx-auto pb-28'>
       <StepBreadcrumb current='upload' className='mb-[24px]' />
       <div className='head mb-[40px]'>
         <h1>{c.title}</h1>
@@ -64,32 +67,35 @@ export function UploadStep({
         </div>
       )}
 
-      {/* Content type — chosen before the dropzone unlocks. Square check
-          (brand radio motif), never a circle. */}
+      {/* Content type — chosen before the dropzone unlocks. */}
       <div className='flex items-center gap-[10px] mb-[18px]'>
         <p className='text-label text-secondary'>{c.kindLabel}</p>
-        <p className='text-fineprint text-tertiary font-medium'>둘 중 하나를 눌러 선택하세요</p>
+        <p className='text-fineprint text-tertiary font-medium'>{c.kindHint}</p>
       </div>
-      <div className='grid grid-cols-2 gap-[14px] mb-[28px]'>
+      {/* 유형은 정보 수집 분기만 고르는 게 아니라 읽기 속도 프로필까지 고른다
+          — `config/languages.ts`의 `shapes`. 다큐멘터리는 영화 프로필에 얹는다
+          (카드 4장은 업로드 화면을 퀴즈로 만든다, `decisions.md` §1-19). */}
+      <div className='grid grid-cols-1 sm:grid-cols-3 gap-[14px] mb-[28px]'>
         <ContentTypeCard
           selected={contentType === 'movie'}
           label={c.kindMovie}
-          subLabel={c.kindMovieSub}
           onClick={() => onContentType('movie')}
         />
         <ContentTypeCard
-          selected={contentType === 'other'}
-          label={c.kindOther}
-          subLabel={c.kindOtherSub}
-          onClick={() => onContentType('other')}
+          selected={contentType === 'variety'}
+          label={c.kindVariety}
+          onClick={() => onContentType('variety')}
+        />
+        <ContentTypeCard
+          selected={contentType === 'talk'}
+          label={c.kindTalk}
+          onClick={() => onContentType('talk')}
         />
       </div>
 
-      {/* Dropzone — locked (dimmed, inert to clicks/drops) until a content
-          type is picked above. Dimming alone isn't a lock: both the drop
-          handler and the click handler bail out while `inert`. */}
+      {/* Dropzone — always unlocked so users can upload files before picking a type. */}
       <div
-        className={`rounded-drop bg-surface shadow-drop hover:shadow-drop-hover p-[64px_40px] text-center transition ${locked ? '' : 'cursor-pointer'} ${over && !inert ? ' bg-accent-wash' : ''}`}
+        className={`rounded-drop bg-surface shadow-drop hover:shadow-drop-hover p-[64px_40px] text-center transition cursor-pointer ${over && !inert ? ' bg-accent-wash' : ''}`}
         onDragOver={(e) => {
           e.preventDefault();
           if (!inert) setOver(true);
@@ -102,14 +108,13 @@ export function UploadStep({
         onClick={openPicker}
         role='button'
         tabIndex={inert ? -1 : 0}
-        aria-disabled={locked}
         onKeyDown={(e) => {
           if (inert) return;
           if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click();
         }}
       >
-        <div className={`drop-ico${uploading ? ' animate-zbreathe' : ''}`} style={{ color: locked ? 'var(--text-tertiary)' : 'var(--ink)' }}>
-          <UploadIcon strokeWidth={locked ? 1.2 : 1.6} />
+        <div className={`drop-ico${uploading ? ' animate-zbreathe' : ''}`} style={{ color: 'var(--ink)' }}>
+          <UploadIcon strokeWidth={1.25} />
         </div>
 
         {uploading ? (
@@ -117,26 +122,35 @@ export function UploadStep({
             <h3 className='text-lead font-semibold text-ink mb-2'>{c.readingTitle(uploadingFileName)}</h3>
             <p className='text-body text-nav mb-0'>{c.readingSub}</p>
           </>
+        ) : fileName ? (
+          <>
+            <h3 className='text-lead font-semibold text-ink mb-2'>{fileName}</h3>
+            <p className='text-caption text-tertiary mb-[22px]'>{c.fileReady}</p>
+            <button
+              type='button'
+              className='btn btn-secondary btn-lg mt-3'
+              onClick={(e) => {
+                e.stopPropagation();
+                openPicker();
+              }}
+            >
+              {c.changeFile}
+            </button>
+          </>
         ) : (
           <>
-            <h3 className={`text-lead font-semibold mb-2 ${locked ? 'text-tertiary' : 'text-ink'}`}>{c.dropTitle}</h3>
-            <p className={`text-caption mb-[22px] ${locked ? 'text-quaternary' : 'text-tertiary'}`}>{c.dropFormats}</p>
-            
-            {locked ? (
-              <p className='text-caption text-tertiary mt-[28px]'>{c.dropLocked}</p>
-            ) : (
-              <button
-                type='button'
-                className='btn btn-primary btn-lg mt-3'
-                disabled={locked}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openPicker();
-                }}
-              >
-                {c.dropButton}
-              </button>
-            )}
+            <h3 className='text-lead font-semibold text-ink mb-2'>{c.dropTitle}</h3>
+            <p className='text-caption text-tertiary mb-[22px]'>{c.dropFormats}</p>
+            <button
+              type='button'
+              className='btn btn-primary btn-lg mt-3'
+              onClick={(e) => {
+                e.stopPropagation();
+                openPicker();
+              }}
+            >
+              {c.dropButton}
+            </button>
           </>
         )}
 
@@ -154,28 +168,35 @@ export function UploadStep({
         />
       </div>
 
-      <div className='mt-[20px] flex flex-col gap-2'>
+      <div className='mt-[20px]'>
         <p className='text-caption-sm text-quaternary font-medium'>{c.noVideoNeeded}</p>
-        <p className='text-fineprint text-quaternary'>
-          {c.rightsNotice} {c.storageNotice}{' '}
-          <Link href={COPY.legal.termsHref} className='underline'>
-            {COPY.legal.detail}
-          </Link>
-        </p>
       </div>
     </div>
+
+      {/* Outside animate-zslide: a transform ancestor becomes a backdrop root
+          and clips fixed positioning, which kills the glass blur. */}
+      <div className='fixed bottom-0 left-0 right-0 z-40 flex justify-center p-4 glass-nav glass-bar backdrop-blur-[20px] backdrop-saturate-[180%]'>
+        <button
+          type='button'
+          disabled={!canProceed}
+          onClick={onNext}
+          className='text-white text-card-title font-medium px-11 py-[13px] rounded-[var(--r-btn)] transition active:scale-[0.97] disabled:cursor-default'
+          style={{ background: canProceed ? 'var(--ink-strong)' : 'var(--ink-disabled)' }}
+        >
+          {c.next}
+        </button>
+      </div>
+    </>
   );
 }
 
 function ContentTypeCard({
   selected,
   label,
-  subLabel,
   onClick,
 }: {
   selected: boolean;
   label: string;
-  subLabel: string;
   onClick: () => void;
 }) {
   return (
@@ -188,16 +209,17 @@ function ContentTypeCard({
         boxShadow: selected ? 'var(--shadow-hover)' : 'var(--shadow-card)',
       }}
     >
-      <span className={`zcheck shrink-0 w-5 h-5 mt-[2px]${selected ? ' on' : ''}`}>
+      <span
+        className={`zcheck shrink-0 w-5 h-5 mt-[2px] rounded-full${selected ? ' on' : ''}`}
+      >
         {selected && (
           <span className='text-mono-step font-bold leading-none'>✓</span>
         )}
       </span>
       <div className='flex-1'>
-        <div className='flex items-center gap-[6px] mb-1'>
+        <div className='flex items-center gap-[6px]'>
           <span className='text-title-sm text-ink'>{label}</span>
         </div>
-        <div className='text-caption text-tertiary'>{subLabel}</div>
       </div>
     </button>
   );

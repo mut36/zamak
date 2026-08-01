@@ -23,11 +23,36 @@ export const APP_VERSION = '0.26.10';
 export const RESULT_RETENTION_DAYS = 30;
 
 /**
- * Version of the copyright notice the user agrees to before their first
- * translation. Bump this when the wording changes materially and everyone is
- * asked again — an agreement to old wording is not an agreement to new wording.
+ * Whether the glossary / speech-relation prepass (§2-9) is offered at all.
+ *
+ * OFF for the beta launch (2026-08-02): the feature works but its editing
+ * surface isn't finished, and shipping a half-built control is worse than
+ * shipping without it. Planned to come back during the beta.
+ *
+ * A single flag rather than commenting the JSX out, because the toggle's
+ * on/off state is **persisted per browser** (`zamak.castSheet.enabled` in
+ * useCastSheet). Hiding only the UI would leave anyone who ever switched it on
+ * — every pre-beta tester, this laptop included — silently running the
+ * extraction on every file with no way to stop it: an extra model call, an
+ * extra wait in the ETA, and a fourth stage in the progress bar. This flag is
+ * read at both ends, so off means off.
+ *
+ * Typed `boolean` (not inferred as `false`) so flipping it needs no other edit.
  */
-export const COPYRIGHT_NOTICE_VERSION = '2026-07-29';
+export const GLOSSARY_UI_ENABLED: boolean = false;
+
+/**
+ * Version of the notice the user agrees to before their first translation.
+ * Bump this when the wording changes materially and everyone is asked again —
+ * an agreement to old wording is not an agreement to new wording.
+ *
+ * 2026-08-02: the gate now covers the terms and the privacy policy as well as
+ * the copyright notice (COPY.copyright), so every account that agreed to the
+ * 07-29 wording is asked once more. That re-ask is the point, not a side
+ * effect: it is what turns the redesign's dropped always-on notices into a
+ * recorded, versioned consent.
+ */
+export const COPYRIGHT_NOTICE_VERSION = '2026-08-02';
 
 /**
  * Funnel steps worth their own beta_events row (0009_beta_metrics.sql) —

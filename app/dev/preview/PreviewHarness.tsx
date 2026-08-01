@@ -14,7 +14,11 @@ import { UploadStep } from '../../components/simple/UploadStep';
 import { DEFAULT_MODEL, PRO_MODEL } from '../../config/constants';
 import type { EnrichCandidate } from '../../hooks/useEnrich';
 import { EMPTY_CAST_SHEET } from '../../types/glossary';
-import type { MovieInfo, TranslationResult } from '../../types/translation';
+import type {
+  ContentType,
+  MovieInfo,
+  TranslationResult,
+} from '../../types/translation';
 
 /* ------------------------------------------------------------------ mocks -- */
 
@@ -108,9 +112,7 @@ export function PreviewHarness() {
   const [screen, setScreen] = useState<Screen>('upload');
   // Live state for the controls that would otherwise be inert — a static
   // screen cannot show a selected card, a flipped toggle or a filled star.
-  const [contentType, setContentType] = useState<'movie' | 'other' | null>(
-    'movie',
-  );
+  const [contentType, setContentType] = useState<ContentType | null>('movie');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [model, setModel] = useState<string>(DEFAULT_MODEL);
   const [castSheetOn, setCastSheetOn] = useState(false);
@@ -149,14 +151,16 @@ export function PreviewHarness() {
             onContentType={setContentType}
             uploading={screen === 'upload:uploading'}
             uploadingFileName='eternal.sunshine.2004.1080p.srt'
+            fileName={screen === 'upload' ? 'eternal.sunshine.2004.1080p.srt' : undefined}
             error=''
             onFile={noop}
+            onNext={() => setScreen('settings')}
           />
         )}
 
         {screen.startsWith('workPick') && (
           <WorkPickStep
-            contentType={screen === 'workPick:other' ? 'other' : 'movie'}
+            contentType={screen === 'workPick:other' ? 'variety' : 'movie'}
             fileName='eternal.sunshine.2004.1080p.srt'
             candidates={CANDIDATES}
             selectedIndex={selectedIndex}

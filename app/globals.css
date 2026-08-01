@@ -105,8 +105,8 @@
   --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.03), 0 4px 16px rgba(0, 0, 0, 0.04);
   --shadow-drop: 0 1px 1px rgba(0, 0, 0, 0.03), 0 8px 30px rgba(0, 0, 0, 0.05);
   --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.06);
-  --shadow-drop-hover: 0 1px 1px rgba(0, 0, 0, 0.03),
-    0 14px 44px rgba(0, 0, 0, 0.09);
+  --shadow-drop-hover:
+    0 1px 1px rgba(0, 0, 0, 0.03), 0 14px 44px rgba(0, 0, 0, 0.09);
   --shadow-accent: 0 8px 28px rgba(255, 212, 0, 0.25);
   --shadow-knob: 0 3px 8px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.16);
   --shadow-modal: 0 24px 80px rgba(0, 0, 0, 0.25);
@@ -121,12 +121,13 @@
   --focus-ring: 0 0 0 3.5px rgba(255, 212, 0, 0.45);
 
   /* ── Materials ──────────────────────────────────────────────
-     Glass is a pair: a translucent tint plus a blur/saturate filter. Both
-     are tokens so `prefers-reduced-transparency` can swap them together. */
-  --glass-nav: rgba(245, 245, 247, 0.72);
-  --glass-nav-filter: blur(20px) saturate(180%);
+     One tint for top + bottom chrome. Frost via Tailwind utilities
+     (`backdrop-blur-[20px] backdrop-saturate-[180%]`). LightningCSS strips
+     unprefixed `backdrop-filter` from hand-written @layer rules. */
+  --glass-nav: rgba(255, 255, 255, 0.5);
   --glass-modal: rgba(255, 255, 255, 0.92);
-  --glass-modal-filter: blur(30px) saturate(180%);
+  --glass-edge: rgba(255, 255, 255, 0.4);
+  --glass-edge-shadow: rgba(0, 0, 0, 0.06);
 
   /* ── Motion ─────────────────────────────────────────────── */
   --ease-apple: cubic-bezier(0.32, 0.72, 0, 1);
@@ -366,18 +367,20 @@ button:disabled {
     flex: none;
   }
 
-  /* Glass surfaces — nav/action bars and the modal. Kept as classes rather
-     than Tailwind utility stacks so `prefers-reduced-transparency` (bottom of
-     file) can swap tint and filter together in one place. */
+  /* Shared glass chrome (top nav + bottom action bar). `.glass-bar` only
+     flips the hairline to the top edge — tint/frost match `.glass-nav`. */
   .glass-nav {
     background: var(--glass-nav);
-    backdrop-filter: var(--glass-nav-filter);
-    -webkit-backdrop-filter: var(--glass-nav-filter);
+    border-bottom: 0.5px solid var(--glass-edge-shadow);
+    box-shadow: inset 0 -0.5px 0 var(--glass-edge);
+  }
+  .glass-nav.glass-bar {
+    border-bottom: none;
+    box-shadow: inset 0 0.5px 0 var(--glass-edge);
+    border-top: 0.5px solid var(--glass-edge-shadow);
   }
   .glass-modal {
     background: var(--glass-modal);
-    backdrop-filter: var(--glass-modal-filter);
-    -webkit-backdrop-filter: var(--glass-modal-filter);
   }
 
   /* Square check/radio mark — brand's radio/checkbox motif (5–6px round
@@ -1094,12 +1097,14 @@ button:disabled {
     min-height: 22px;
   }
 
-  /* Done / exhausted hero icon — 56px round-square (brand), background and
-     glyph color set per-screen via inline style (green check vs. neutral "0"). */
+  /* Done / exhausted hero icon — background and glyph color set per-screen
+     via inline style (success check vs. neutral "0"). Done's check runs
+     64px for more presence as the "moment" of the wizard; exhausted stays
+     at the smaller 56px default. */
   .bigcheck {
     width: 56px;
     height: 56px;
-    border-radius: 10px;
+    border-radius: 50%;
     display: grid;
     place-items: center;
     margin: 0 auto 16px;
@@ -1107,8 +1112,75 @@ button:disabled {
   .bigcheck svg {
     width: 26px;
     height: 26px;
-    color: #fff;
+    color: inherit;
   }
+  .done-hero .bigcheck {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 20px;
+  }
+  .done-hero .bigcheck svg {
+    width: 30px;
+    height: 30px;
+  }
+
+  /* Done step — layout/glow only. Entrance animations live unlayered
+     next to `.animate-zpop` so LightningCSS keeps their @keyframes.
+     The halo used to be a single static box-shadow; it's now two rings
+     that spread out from the circle and fade (::before/::after), plus a
+     soft blurred bloom behind it (a ::before on done-hero, since the
+     ring pseudo-elements already own the check's own before/after).
+     Rings run a fixed 2 cycles — like zdonesuccess, this marks an
+     achievement, not an ongoing state, so it must not loop forever. */
+  .done-check {
+    position: relative;
+  }
+  .done-check::before,
+  .done-check::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    box-shadow: 0 0 0 0 var(--accent-soft);
+    animation: donecheckring 1.4s ease-out 2;
+    pointer-events: none;
+  }
+  .done-check::after {
+    animation-delay: 0.5s;
+  }
+  .done-hero {
+    position: relative;
+    margin-bottom: 28px;
+  }
+  .done-hero::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    width: 180px;
+    height: 180px;
+    background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+    filter: blur(28px);
+    opacity: 0;
+    transform: translateX(-50%) scale(0.6);
+    animation: donecheckbloom 1.2s var(--ease-apple) both;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .done-hero > * {
+    position: relative;
+    z-index: 1;
+  }
+  .done-title h1 {
+    letter-spacing: -0.022em;
+  }
+  .done .dl-card {
+    margin-bottom: 12px;
+  }
+  .done .pvm {
+    margin-bottom: 12px;
+  }
+
   .dl-card {
     padding: 22px;
     text-align: center;
@@ -1165,7 +1237,7 @@ button:disabled {
   .pvm-row .check {
     width: 18px;
     height: 18px;
-    border-radius: 5px;
+    border-radius: 50%;
     background: var(--success);
     color: #fff;
     font-size: var(--fs-micro);
@@ -1181,6 +1253,18 @@ button:disabled {
     color: var(--text-nav);
     font-weight: 400;
     line-height: 1.5;
+  }
+
+  /* Done's closing actions — start-over and go-to-history are both
+     low-priority secondary nav, not competing CTAs, so they sit side by
+     side at half width instead of stacked full-width like the primary
+     download button above them. */
+  .done-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .done-actions .btn {
+    flex: 1 1 0;
   }
 
   /* Feedback card (Done step) */
@@ -1199,14 +1283,16 @@ button:disabled {
     line-height: 1;
     color: var(--border-step);
     transition:
-      transform 0.15s ease-out,
+      transform 0.12s ease-out,
       color 0.15s;
   }
-  .star-btn:hover {
-    transform: scale(1.15);
+  @media (hover: hover) and (pointer: fine) {
+    .star-btn:hover {
+      transform: scale(1.12);
+    }
   }
   .star-btn:active {
-    transform: scale(0.92);
+    transform: scale(0.94);
   }
   .star-btn .on {
     color: var(--star);
@@ -1659,16 +1745,16 @@ button:disabled {
      판매자 표시 / 저작권+버전. */
   .site-footer {
     border-top: 1px solid var(--border-chip);
-    padding: 40px clamp(20px, 5vw, 48px) 32px;
+    padding: 24px clamp(20px, 5vw, 48px) 20px;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 12px;
   }
   .site-footer-top {
     display: flex;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 28px;
+    gap: 16px;
   }
   .site-footer-tagline {
     margin-top: 8px;
@@ -1677,7 +1763,7 @@ button:disabled {
   }
   .site-footer-links {
     display: flex;
-    gap: clamp(32px, 8vw, 72px);
+    gap: clamp(24px, 6vw, 56px);
   }
   .site-footer-links div {
     display: flex;
@@ -1734,7 +1820,7 @@ button:disabled {
     height: 12px;
     transition: transform 0.2s;
   }
-  .seller-toggle-btn[aria-expanded="true"] svg {
+  .seller-toggle-btn[aria-expanded='true'] svg {
     transform: rotate(180deg);
   }
   /* 판매자 표시는 <address> — 기본 이탤릭을 되돌리고, `·` 구분자가 좁은
@@ -1755,7 +1841,7 @@ button:disabled {
   .site-footer-bottom {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
   }
   .site-footer-copyright {
     display: flex;
@@ -1846,14 +1932,18 @@ button:disabled {
 
 /* Respect the user's transparency preference: glass becomes solid. The blur
    is dropped too — a backdrop-filter with an opaque backdrop costs a
-   compositor layer for nothing. Overrides the token, so every `.glass-*`
-   surface (and anything else reading it) turns solid at once. */
+   compositor layer for nothing. */
 @media (prefers-reduced-transparency: reduce) {
   :root {
     --glass-nav: var(--bg);
-    --glass-nav-filter: none;
     --glass-modal: var(--surface);
-    --glass-modal-filter: none;
+    --glass-edge: transparent;
+    --glass-edge-shadow: var(--border-subtle, rgba(0, 0, 0, 0.08));
+  }
+  .glass-nav,
+  .glass-modal {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
 }
 
@@ -1872,12 +1962,29 @@ button:disabled {
   .animate-zbreathe,
   .animate-zblink,
   .animate-zpop,
+  .animate-zdonesuccess,
+  .animate-zdonesuccess svg polyline,
   .animate-zscrim,
   .animate-zrise,
   .lp-hero-ko,
   .lp-subin,
-  .lp-cps-card {
+  .lp-cps-card,
+  .done-title,
+  .done-section,
+  .done-row {
     animation: none;
+  }
+  .done-check::before,
+  .done-check::after {
+    animation: none;
+    box-shadow: 0 0 0 6px var(--accent-soft);
+  }
+  .done-hero::before {
+    animation: none;
+    opacity: 0;
+  }
+  .animate-zdonesuccess svg polyline {
+    stroke-dashoffset: 0%;
   }
   .step.active .dot::after {
     animation: none;
@@ -1892,43 +1999,170 @@ button:disabled {
 
 /* ── 프로토타입 모션 (design_handoff_zamak_brand) ── */
 @keyframes zslide {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 @keyframes zbreathe {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.45; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }
 @keyframes zblink {
-  0%, 49%   { opacity: 1; }
-  50%, 100% { opacity: 0; }
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
 }
 /* Landing (design_handoff_zamak_landing) — "자막이 화면에 뜨는" 등장과
    히어로 진입. zsubin은 번역 결과·CPS 카드 교체에도 재사용된다. */
 @keyframes zsubin {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 @keyframes zrise {
-  from { opacity: 0; transform: translateY(18px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 /* Modal / success-icon materialize — scale + blur settling to normal. */
 @keyframes zpop {
-  from { opacity: 0; transform: scale(1.04); filter: blur(10px); }
-  to   { opacity: 1; transform: scale(1); filter: blur(0); }
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+/* Done success icon — soft overshoot then settle (achievement, not a loop). */
+@keyframes zdonesuccess {
+  0% {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  62% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/* Yellow ring spreading from the done check and fading — see .done-check
+   above. 2 fixed cycles (set via `2` on the animation shorthand), not
+   infinite, to match zdonesuccess: this marks a completed moment. */
+@keyframes donecheckring {
+  0% {
+    box-shadow: 0 0 0 0 var(--accent-soft);
+  }
+  70% {
+    box-shadow: 0 0 0 22px rgba(255, 212, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 212, 0, 0);
+  }
+}
+/* Soft yellow bloom behind the hero, blooming outward once on entrance. */
+@keyframes donecheckbloom {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.6);
+  }
+  45% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scale(1.15);
+  }
+}
+/* pathLength=1 on the check polyline; % stays unit-stable under LightningCSS
+   (unitless values get rewritten to px and break SVG dashes). */
+@keyframes donecheckdraw {
+  from {
+    stroke-dashoffset: 100%;
+  }
+  to {
+    stroke-dashoffset: 0%;
+  }
 }
 @keyframes zscrim {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
-.animate-zslide { animation: zslide 0.5s var(--ease-apple); }
-.animate-zbreathe { animation: zbreathe 1.2s ease-in-out infinite; }
-.animate-zblink { animation: zblink 1.06s step-end infinite; }
-.animate-zpop { animation: zpop 0.45s var(--ease-apple); }
-.animate-zscrim { animation: zscrim 0.3s ease; }
-.animate-zrise { animation: zrise 0.6s var(--ease-apple); }
+.animate-zslide {
+  animation: zslide 0.5s var(--ease-apple);
+}
+.animate-zbreathe {
+  animation: zbreathe 1.2s ease-in-out infinite;
+}
+.animate-zblink {
+  animation: zblink 1.06s step-end infinite;
+}
+.animate-zpop {
+  animation: zpop 0.45s var(--ease-apple);
+}
+.animate-zdonesuccess {
+  animation: zdonesuccess 0.5s var(--ease-apple) both;
+}
+/* Check stroke draw — % of pathLength (unitless gets compiled to px). */
+.animate-zdonesuccess svg polyline {
+  stroke-dasharray: 100%;
+  stroke-dashoffset: 100%;
+  animation: donecheckdraw 0.35s var(--ease-apple) 0.15s both;
+}
+.done-title {
+  animation: zsubin 0.4s var(--ease-apple) both;
+  animation-delay: 70ms;
+}
+.done-section {
+  animation: zsubin 0.4s var(--ease-apple) both;
+  animation-delay: calc(110ms + var(--done-i, 0) * 55ms);
+}
+.done-row {
+  animation: zsubin 0.32s var(--ease-apple) both;
+  animation-delay: calc(180ms + var(--done-row-i, 0) * 40ms);
+}
+.animate-zscrim {
+  animation: zscrim 0.3s ease;
+}
+.animate-zrise {
+  animation: zrise 0.6s var(--ease-apple);
+}
 
 /* Anchor scrolling for the landing's three in-page links. Paired with
    `.lp-anchor`'s scroll-margin-top so the sticky nav never covers a heading;

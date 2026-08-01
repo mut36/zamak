@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { COPY } from '../../i18n/simpleCopy';
+import { useScrollReveal } from '../../hooks/useScrollReveal';
 import { BrandMark } from '../BrandMark';
 import { SiteFooter } from '../SiteFooter';
 
@@ -17,6 +17,17 @@ const L = COPY.landing;
 /** 히어로 데모 순환 주기 / 번역문이 뜨기 전 대기 시간 (핸드오프 명세값). */
 const HERO_CYCLE_MS = 3800;
 const HERO_WAIT_MS = 500;
+
+/**
+ * 한 섹션 안의 블록들이 동시에 튀어나오지 않도록 주는 간격. `.reveal`의
+ * transition-delay로 들어간다(globals.css의 "Transition-delay on the element
+ * creates card stagger"). 모션 최소화 설정에서는 `.reveal`의 transition 자체가
+ * 꺼지므로 이 값도 함께 무력화된다.
+ */
+const REVEAL_STEP_MS = 60;
+const revealDelay = (order: number) => ({
+  transitionDelay: `${order * REVEAL_STEP_MS}ms`,
+});
 
 const TAG_CLASS: Record<string, string> = {
   red: 'lp-tag-red',
@@ -118,6 +129,10 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
   const [engine, setEngine] = useState(2); // 초기값 ZAMAK
   const [profile, setProfile] = useState(0); // 초기값 영화 · 드라마
 
+  // 히어로 아래 섹션들은 스크롤로 도달할 때 올라온다. 히어로는 진입 즉시
+  // 보여야 하므로 `.reveal`이 아니라 `animate-zrise`를 그대로 쓴다.
+  const revealRoot = useScrollReveal<HTMLDivElement>();
+
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
@@ -142,9 +157,9 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
   const cps = L.cps.profiles[profile]!;
 
   return (
-    <div className='w-full'>
+    <div ref={revealRoot} className='w-full'>
       {/* ── 1. Sticky nav ─────────────────────────────────────── */}
-      <nav className='lp-nav glass-nav'>
+      <nav className='lp-nav glass-nav backdrop-blur-[20px] backdrop-saturate-[180%]'>
         <BrandMark size={28} />
 
         <div className='flex items-center gap-1.5'>
@@ -178,7 +193,24 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           <h1 className='lp-h1 mb-[18px] whitespace-pre-line'>
             {L.hero.title}
           </h1>
-          <p className='lp-hero-sub mb-[34px] max-w-[520px]'>{L.hero.sub}</p>
+          <p className='lp-hero-sub mb-[34px] max-w-full break-keep whitespace-pre-line'>
+            {L.hero.sub.split('*').map((part, i) =>
+              i % 2 === 1 ? (
+                <span
+                  key={i}
+                  style={{
+                    color: 'var(--ink-strong)',
+                    fontWeight: 600,
+                    background: 'linear-gradient(180deg, transparent 55%, var(--accent-soft) 55%)',
+                  }}
+                >
+                  {part}
+                </span>
+              ) : (
+                part
+              )
+            )}
+          </p>
 
           <div className='flex flex-wrap items-center justify-center gap-3'>
             <Cta
@@ -201,23 +233,6 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
             </p>
           )}
           {error && <p className='mt-4 text-sm text-danger'>{error}</p>}
-
-          {/* signup-wrap. 가입이라는 능동적 행위에 결합돼 있어 푸터 링크
-            (browsewrap) 단독보다 효력이 안정적이다 — docs/decisions.md §1-11이
-            고른 3개 노출 지점 중 두 번째. */}
-          {configured && (
-            <p className='mt-4 max-w-[320px] text-fineprint leading-[1.6] text-quaternary'>
-              {COPY.legal.consentPrefix}
-              <Link href={COPY.legal.termsHref} className='underline'>
-                {COPY.legal.terms}
-              </Link>
-              {COPY.legal.consentAnd}
-              <Link href={COPY.legal.privacyHref} className='underline'>
-                {COPY.legal.privacy}
-              </Link>
-              {COPY.legal.consentSuffix}
-            </p>
-          )}
 
           {/* 자막 데모 카드 */}
           <div
@@ -259,12 +274,15 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           className='lp-anchor bg-surface border-t border-border-subtle px-6 py-[90px]'
         >
           <div className='max-w-[880px] mx-auto'>
-            <h2 className='lp-h2 text-center mb-2.5'>{L.compare.title}</h2>
-            <p className='lp-section-sub text-center max-w-[480px] mx-auto mb-10'>
+            <h2 className='lp-h2 text-center mb-2.5 reveal'>{L.compare.title}</h2>
+            <p
+              className='lp-section-sub text-center max-w-[480px] mx-auto mb-10 break-keep reveal'
+              style={revealDelay(1)}
+            >
               {L.compare.sub}
             </p>
 
-            <div className='flex justify-center mb-7'>
+            <div className='flex justify-center mb-7 reveal' style={revealDelay(2)}>
               <Segmented
                 label={L.compare.tablistLabel}
                 idPrefix='engine'
@@ -274,7 +292,13 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
               />
             </div>
 
-            <div className='grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-[18px] items-stretch'>
+            {/* `.reveal`은 카드가 아니라 그리드에 건다 — `.lp-card-result`는
+                자체 `transition: all 0.3s`를 갖고 있어 리빌 transition과
+                충돌한다(레이어 밖 `.reveal`이 이겨서 탭 전환이 느려진다). */}
+            <div
+              className='grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-[18px] items-stretch reveal'
+              style={revealDelay(3)}
+            >
               <div className='lp-card-source'>
                 <span className='lp-card-label'>{L.compare.sourceLabel}</span>
                 <p className='lp-line'>{L.compare.sourceLine}</p>
@@ -296,7 +320,15 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                 <p key={`e${engine}`} className='lp-line lp-subin'>
                   {eng.out}
                 </p>
-                <div className='flex flex-wrap gap-2'>
+                {/* 번역문(`.lp-subin`)이 다시 뜨는데 판정 태그만 즉시 교체되면
+                    카드의 반쪽만 애니메이션하는 꼴이 된다. 같은 등장을 한 박자
+                    늦춰 재사용한다 — `both`가 없으면 지연 동안 옛 태그가
+                    번쩍인다. */}
+                <div
+                  key={`t${engine}`}
+                  className='flex flex-wrap gap-2 lp-subin'
+                  style={{ animationDelay: '80ms', animationFillMode: 'both' }}
+                >
                   {eng.tags.map((tag) => (
                     <span
                       key={tag.label}
@@ -309,7 +341,10 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
               </div>
             </div>
 
-            <p className='mt-7 mx-auto max-w-[560px] text-center text-sm text-tertiary leading-[1.6]'>
+            <p
+              className='mt-7 mx-auto max-w-full text-center text-sm text-tertiary leading-[1.6] break-keep whitespace-pre-line reveal'
+              style={revealDelay(4)}
+            >
               {L.compare.outro}
             </p>
           </div>
@@ -321,7 +356,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           className='lp-anchor bg-ink-strong text-on-ink px-6 py-[100px]'
         >
           <div className='max-w-[880px] mx-auto grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-14 items-center'>
-            <div>
+            <div className='reveal'>
               <h2 className='lp-h2-dark mb-4'>
                 {L.speed.titleTop}
                 <br />
@@ -330,7 +365,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                 </span>
               </h2>
               <p
-                className='mb-7 text-[16px] leading-[1.6] max-w-[400px]'
+                className='mb-7 text-[16px] leading-[1.6] max-w-full break-keep whitespace-pre-line'
                 style={{ color: 'rgba(250,249,245,0.6)' }}
               >
                 {L.speed.body}
@@ -342,15 +377,25 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                 configured={configured}
                 className='lp-btn lp-btn-accent text-[15px] px-[26px] py-3'
               />
+              {/* 12초의 실측 조건을 문구 옆에 붙여 둔다 — 조건 없이 쓰면
+                  장편(17.8초)에 대해 거짓이 된다(COPY.landing.speed 주석). */}
+              <p
+                className='mt-5 max-w-[400px] text-fineprint leading-[1.6] break-keep'
+                style={{ color: 'rgba(250,249,245,0.4)' }}
+              >
+                {L.speed.note}
+              </p>
             </div>
 
+            {/* 이 목록은 내용 자체가 "12초 동안 무슨 일이 일어나는가"다. 한 행씩
+                차례로 올라오게 해서 경과 시간을 모션으로도 읽히게 한다. */}
             <ol className='flex flex-col list-none m-0 p-0'>
-              {L.speed.steps.map((step) => (
-                <li key={step.time} className='lp-step'>
+              {L.speed.steps.map((step, i) => (
+                <li key={step.time} className='lp-step reveal' style={revealDelay(i)}>
                   <span className='lp-step-time'>{step.time}</span>
                   <div>
                     <div className='lp-step-title'>{step.title}</div>
-                    <div className='lp-step-desc'>{step.desc}</div>
+                    <div className='lp-step-desc break-keep'>{step.desc}</div>
                   </div>
                 </li>
               ))}
@@ -361,66 +406,72 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
         {/* ── 5. CPS 자동 조정 ──────────────────────────────────── */}
         <section id='cps' className='lp-anchor bg-bg px-6 py-24'>
           <div className='max-w-[880px] mx-auto'>
-            <h2 className='lp-h2 mb-2.5'>{L.cps.title}</h2>
-            <p className='lp-section-sub max-w-[560px] mb-9 leading-[1.55]'>
+            <h2 className='lp-h2 mb-2.5 reveal'>{L.cps.title}</h2>
+            <p
+              className='lp-section-sub max-w-full mb-9 leading-[1.55] break-keep whitespace-pre-line reveal'
+              style={revealDelay(1)}
+            >
               {L.cps.sub}
             </p>
 
-            <Segmented
-              label={L.cps.tablistLabel}
-              idPrefix='cps'
-              options={L.cps.profiles.map((p) => p.name)}
-              value={profile}
-              onChange={setProfile}
-              onCanvas
-              className='w-fit max-w-full flex-wrap mb-6'
-            />
+            <div className='reveal' style={revealDelay(2)}>
+              <Segmented
+                label={L.cps.tablistLabel}
+                idPrefix='cps'
+                options={L.cps.profiles.map((p) => p.name)}
+                value={profile}
+                onChange={setProfile}
+                onCanvas
+                className='w-fit max-w-full flex-wrap mb-6'
+              />
+            </div>
 
-            <div
-              key={`c${profile}`}
-              id='cps-panel'
-              role='tabpanel'
-              aria-live='polite'
-              aria-labelledby={`cps-tab-${profile}`}
-              className='lp-cps-card'
-            >
-              <div className='flex flex-col gap-[18px]'>
-                <div>
-                  <div className='text-caption font-semibold text-tertiary mb-1.5'>
-                    {L.cps.speedLabel}
+            {/* 카드 자신은 프로필을 바꿀 때마다 key로 리마운트된다 — `.reveal`을
+                직접 걸면 새 노드가 `.is-visible` 없이 태어나 영영 투명해진다.
+                리빌은 리마운트되지 않는 래퍼가 맡는다. */}
+            <div className='reveal' style={revealDelay(3)}>
+              <div
+                key={`c${profile}`}
+                id='cps-panel'
+                role='tabpanel'
+                aria-live='polite'
+                aria-labelledby={`cps-tab-${profile}`}
+                className='lp-cps-card'
+              >
+                <div className='flex flex-col gap-[18px]'>
+                  <div>
+                    <div className='text-caption font-semibold text-tertiary mb-1.5'>
+                      {L.cps.speedLabel}
+                    </div>
+                    <div className='lp-cps-value'>
+                      {cps.value}
+                      <span className='lp-cps-unit'>{L.cps.unit}</span>
+                    </div>
                   </div>
-                  <div className='lp-cps-value'>
-                    {cps.value}
-                    <span className='lp-cps-unit'>{L.cps.unit}</span>
+                  <div className='flex flex-col gap-2.5'>
+                    <div className='lp-spec'>
+                      <span>{L.cps.lineCountLabel}</span>
+                      <b>{L.cps.lineCountValue}</b>
+                    </div>
+                    <div className='lp-spec'>
+                      <span>{L.cps.actionLabel}</span>
+                      <b className='break-keep whitespace-pre-line'>{cps.action}</b>
+                    </div>
                   </div>
                 </div>
-                <div className='flex flex-col gap-2.5'>
-                  <div className='lp-spec'>
-                    <span>{L.cps.lineLenLabel}</span>
-                    <b>{cps.lineLen}</b>
-                  </div>
-                  <div className='lp-spec'>
-                    <span>{L.cps.lineCountLabel}</span>
-                    <b>{L.cps.lineCountValue}</b>
-                  </div>
-                  <div className='lp-spec'>
-                    <span>{L.cps.actionLabel}</span>
-                    <b>{cps.action}</b>
-                  </div>
-                </div>
-              </div>
 
-              <div className='lp-preview'>
-                <div className='text-center flex flex-col gap-1'>
-                  {cps.lines.map((line) => (
-                    <span key={line} className='lp-preview-line'>
-                      {line}
-                    </span>
-                  ))}
-                </div>
-                <div className='lp-preview-meta'>
-                  <span>{cps.tc}</span>
-                  <span style={{ color: 'var(--accent)' }}>{cps.measured}</span>
+                <div className='lp-preview'>
+                  <div className='text-center flex flex-col gap-1'>
+                    {cps.lines.map((line) => (
+                      <span key={line} className='lp-preview-line'>
+                        {line}
+                      </span>
+                    ))}
+                  </div>
+                  <div className='lp-preview-meta'>
+                    <span>{cps.tc}</span>
+                    <span style={{ color: 'var(--accent)' }}>{cps.measured}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -430,17 +481,17 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
         {/* ── 6. 기능 벤토 ──────────────────────────────────────── */}
         <section className='bg-surface border-t border-border-subtle px-6 py-24'>
           <div className='max-w-[880px] mx-auto'>
-            <h2 className='lp-h2 text-center max-w-[560px] mx-auto mb-11 whitespace-pre-line'>
+            <h2 className='lp-h2 text-center max-w-full mx-auto mb-11 whitespace-pre-line reveal'>
               {L.features.title}
             </h2>
 
             <div className='flex flex-col gap-[18px]'>
-              <div className='lp-bento-wide'>
+              <div className='lp-bento-wide reveal' style={revealDelay(1)}>
                 <div>
                   <div className='text-[19px] font-semibold tracking-[-0.012em] mb-2'>
                     {L.features.rules.title}
                   </div>
-                  <p className='m-0 text-[14.5px] text-secondary leading-[1.6]'>
+                  <p className='m-0 text-[14.5px] text-secondary leading-[1.6] break-keep whitespace-pre-line'>
                     {L.features.rules.body}
                   </p>
                 </div>
@@ -458,12 +509,15 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
               </div>
 
               <div className='grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-[18px]'>
-                <div className='lp-bento-card lp-bento-ink'>
+                <div
+                  className='lp-bento-card lp-bento-ink reveal'
+                  style={revealDelay(2)}
+                >
                   <div className='lp-bento-title'>
                     {L.features.formats.title}
                   </div>
                   <p
-                    className='m-0 text-sm leading-[1.6] flex-1'
+                    className='m-0 text-sm leading-[1.6] flex-1 break-keep whitespace-pre-line'
                     style={{ color: 'rgba(250,249,245,0.55)' }}
                   >
                     {L.features.formats.body}
@@ -477,12 +531,15 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                   </div>
                 </div>
 
-                <div className='lp-bento-card lp-bento-accent'>
+                <div
+                  className='lp-bento-card lp-bento-accent reveal'
+                  style={revealDelay(3)}
+                >
                   <div className='lp-bento-title'>
                     {L.features.languages.title}
                   </div>
                   <p
-                    className='m-0 text-sm leading-[1.6] flex-1'
+                    className='m-0 text-sm leading-[1.6] flex-1 break-keep'
                     style={{ color: 'rgba(22,22,20,0.65)' }}
                   >
                     {L.features.languages.body}
@@ -501,18 +558,29 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
 
         {/* ── 7. 최종 CTA ───────────────────────────────────────── */}
         <section className='text-center px-6 pt-[110px] pb-[90px]'>
-          <h2 className='lp-h2-final mb-3.5 whitespace-pre-line'>
+          <h2 className='lp-h2-final mb-3.5 whitespace-pre-line reveal'>
             {L.final.title}
           </h2>
-          <p className='lp-section-sub mb-8'>{L.final.sub}</p>
-          <Cta
-            location='footer'
-            onSignIn={onSignIn}
-            configured={configured}
-            className='lp-btn lp-btn-ink text-[16px] px-8 py-[14px]'
-          />
-          <p className='mt-[52px] flex items-center justify-center gap-1.5 text-fineprint text-quaternary'>
-            <span className='zchip-dot w-[5px] h-[5px]' aria-hidden />
+          <p className='lp-section-sub mb-8 break-keep reveal' style={revealDelay(1)}>
+            {L.final.sub}
+          </p>
+          {/* 리빌은 버튼이 아니라 래퍼에 건다 — `.lp-btn`의 누름 transition(0.15s)이
+              레이어 밖 `.reveal`의 0.55s에 밀려 눌림이 물러진다. */}
+          <div className='reveal' style={revealDelay(2)}>
+            <Cta
+              location='footer'
+              onSignIn={onSignIn}
+              configured={configured}
+              className='lp-btn lp-btn-ink text-[16px] px-8 py-[14px]'
+            />
+          </div>
+          <p
+            className='mt-[52px] flex items-center justify-center gap-1.5 text-fineprint text-quaternary reveal'
+            style={revealDelay(3)}
+          >
+            {/* 앱의 "확인 필요" 인디케이터와 같은 숨쉬는 점 — 페이지 끝의 이
+                한 곳만 살아 있게 둔다. */}
+            <span className='zchip-dot animate-zbreathe w-[5px] h-[5px]' aria-hidden />
             {L.final.badge}
           </p>
         </section>

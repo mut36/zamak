@@ -47,6 +47,7 @@ export function WorkPickStep({
       : true;
 
   return (
+    <>
     <div className='animate-zslide pb-28 max-w-[760px] mx-auto'>
       <StepBreadcrumb current='settings' className='mb-6' />
       <div className='flex items-center gap-2 mb-[6px] text-fineprint text-secondary'>
@@ -78,8 +79,9 @@ export function WorkPickStep({
           onToneText={onToneText}
         />
       )}
+    </div>
 
-      <div className='fixed bottom-0 left-0 right-0 flex justify-center p-4 glass-nav border-t border-border-subtle'>
+      <div className='fixed bottom-0 left-0 right-0 z-40 flex justify-center p-4 glass-nav glass-bar backdrop-blur-[20px] backdrop-saturate-[180%]'>
         <button
           type='button'
           disabled={!canConfirm}
@@ -90,7 +92,7 @@ export function WorkPickStep({
           {c.confirm}
         </button>
       </div>
-    </div>
+    </>
   );
 }
 

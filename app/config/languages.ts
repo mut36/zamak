@@ -1,8 +1,8 @@
 // ============================================================
 // Target languages
 // One table, three consumers: the picker (label/mono/enabled),
-// the prompt (promptLabel/rulesKey/lineMaxChars/formality) and
-// the post-processing pass (trailingPunctuation/reading).
+// the prompt (promptLabel/lineMaxChars/formality) and the
+// post-processing pass (trailingPunctuation + shapes[profile]).
 // Adding a language = one row here + one prompts/common/
 // translation_rules_<code>.txt file.
 // The source language is auto-detected by the model, so it is
@@ -27,6 +27,52 @@ export interface FormalityAxis {
   mixed: string;
 }
 
+/**
+ * How fast a viewer reads depends on what they're watching, not only on the
+ * language: a variety clip's on-screen banter is skimmed, a documentary's
+ * narration is read. So reading speed has two axes — the language (a Hangul
+ * line carries far more meaning per character than a Latin one) and the
+ * content profile below. Line length has only one axis, the language: see
+ * `lineMaxChars`. This key is the same value as `ContentType`
+ * (app/types/translation.ts): the picker on the upload screen chooses both the
+ * info-gathering branch and the reading-speed band at once. Documentaries ride
+ * along with `movie` — they read like film, and a fourth card would make the
+ * upload screen a quiz.
+ */
+export type ContentProfileKey = 'movie' | 'variety' | 'talk';
+
+export const CONTENT_PROFILE_KEYS: ContentProfileKey[] = [
+  'movie',
+  'variety',
+  'talk',
+];
+
+/** Default when a caller has no profile (older clients, direct API calls). */
+export const DEFAULT_CONTENT_PROFILE: ContentProfileKey = 'movie';
+
+export function isContentProfileKey(value: unknown): value is ContentProfileKey {
+  return (
+    typeof value === 'string' &&
+    (CONTENT_PROFILE_KEYS as string[]).includes(value)
+  );
+}
+
+/** The reading-speed band one profile decides. */
+export interface SubtitleShape {
+  /**
+   * Reading speed (characters per second) a widened block aims for — the
+   * landing page's "권장 읽기 속도" and what `adjustSubtitleTiming` pulls a
+   * too-fast block down to.
+   */
+  target: number;
+  /**
+   * Ceiling: only blocks reading faster than this are touched at all. Kept two
+   * above `target` so a fixed block lands with margin rather than right back
+   * on the trigger line.
+   */
+  hardMax: number;
+}
+
 export interface TargetLang {
   /** Passed to the translation API + used for the output file suffix. */
   code: TargetLangCode;
@@ -40,7 +86,10 @@ export interface TargetLang {
   promptLabel: string;
   /**
    * Per-line character budget the model is asked to respect. CJK glyphs carry
-   * far more meaning per character than Latin ones, hence ~25 vs ~42.
+   * far more meaning per character than Latin ones, hence ~25 vs ~42. This is
+   * deliberately **not** part of the content profile: a shorter line changes
+   * the translation itself (more splitting and compression), where the profile
+   * is only meant to change how long a finished line stays on screen.
    */
   lineMaxChars: number;
   formality: FormalityAxis | null;
@@ -52,14 +101,20 @@ export interface TargetLang {
    */
   trailingPunctuation: string;
   /**
-   * Reading-speed band (characters per second) for adjustSubtitleTiming.
-   * See docs/tuning/reading-speed.md — Korean is measured, the rest are
-   * derived from public style guides and want re-measuring.
+   * Reading-speed band per content profile. See docs/tuning/reading-speed.md —
+   * Korean is measured, the rest are derived from public style guides and want
+   * re-measuring, so they use one shape for all three profiles until someone
+   * measures them.
    */
-  reading: { hardMax: number; target: number };
+  shapes: Record<ContentProfileKey, SubtitleShape>;
 }
 
-const LATIN_READING = { hardMax: 20, target: 17 };
+/** One band for all three profiles — for languages nobody has tuned yet. */
+function uniformShapes(shape: SubtitleShape): Record<ContentProfileKey, SubtitleShape> {
+  return { movie: shape, variety: shape, talk: shape };
+}
+
+const LATIN_SHAPE: SubtitleShape = { target: 17, hardMax: 20 };
 /** usted/tú, Sie/du, vous/tu — same axis, different pronouns. */
 const T_V_AXIS = (formal: string, informal: string): FormalityAxis => ({
   formal: `${formal}(격식)`,
@@ -77,7 +132,15 @@ export const TARGET_LANGS: TargetLang[] = [
     lineMaxChars: 25,
     formality: { formal: '존댓말', informal: '반말', mixed: '혼용' },
     trailingPunctuation: '.,',
-    reading: { hardMax: 12, target: 10 },
+    // 유도는 docs/tuning/reading-speed.md §3. 예능이 가장 느긋하고(화면에 이미
+    // 읽을 것이 많다), 강연·토크가 가장 촘촘하다(말이 끊이지 않아 노출을 넓히면
+    // 다음 대사를 밀어낸다). 영화는 프로필 도입 전의 한국어 밴드 그대로 —
+    // 상한 12 = Netflix 한국어 성인 상한, 다큐멘터리도 이 프로필에 들어간다.
+    shapes: {
+      movie: { target: 10, hardMax: 12 },
+      variety: { target: 8, hardMax: 11 },
+      talk: { target: 12, hardMax: 15 },
+    },
   },
   {
     code: 'en',
@@ -88,7 +151,7 @@ export const TARGET_LANGS: TargetLang[] = [
     lineMaxChars: 42,
     formality: null,
     trailingPunctuation: '',
-    reading: LATIN_READING,
+    shapes: uniformShapes(LATIN_SHAPE),
   },
   {
     code: 'ja',
@@ -103,7 +166,7 @@ export const TARGET_LANGS: TargetLang[] = [
       mixed: '혼용',
     },
     trailingPunctuation: '.,。、',
-    reading: { hardMax: 9, target: 8 },
+    shapes: uniformShapes({ target: 8, hardMax: 9 }),
   },
   {
     code: 'es',
@@ -114,7 +177,7 @@ export const TARGET_LANGS: TargetLang[] = [
     lineMaxChars: 42,
     formality: T_V_AXIS('usted', 'tú'),
     trailingPunctuation: '',
-    reading: LATIN_READING,
+    shapes: uniformShapes(LATIN_SHAPE),
   },
   {
     code: 'fr',
@@ -125,7 +188,7 @@ export const TARGET_LANGS: TargetLang[] = [
     lineMaxChars: 42,
     formality: T_V_AXIS('vous', 'tu'),
     trailingPunctuation: '',
-    reading: LATIN_READING,
+    shapes: uniformShapes(LATIN_SHAPE),
   },
   {
     code: 'zh',
@@ -136,7 +199,7 @@ export const TARGET_LANGS: TargetLang[] = [
     lineMaxChars: 18,
     formality: null,
     trailingPunctuation: '.,。，',
-    reading: { hardMax: 9, target: 8 },
+    shapes: uniformShapes({ target: 8, hardMax: 9 }),
   },
   {
     code: 'de',
@@ -147,7 +210,7 @@ export const TARGET_LANGS: TargetLang[] = [
     lineMaxChars: 42,
     formality: T_V_AXIS('Sie', 'du'),
     trailingPunctuation: '',
-    reading: LATIN_READING,
+    shapes: uniformShapes(LATIN_SHAPE),
   },
 ];
 
@@ -170,4 +233,18 @@ export function getEnabledTargetLang(code: string): TargetLang | undefined {
 /** Fallback-safe lookup for display paths that must render something. */
 export function resolveTargetLang(code: string): TargetLang {
   return getEnabledTargetLang(code) ?? TARGET_LANGS[0];
+}
+
+/**
+ * The one place the two axes meet. An unknown profile resolves to the default
+ * rather than throwing: a shape is needed on paths (older clients, direct API
+ * calls) where refusing to render a subtitle at all would be worse than
+ * rendering it as a film.
+ */
+export function resolveSubtitleShape(
+  code: string,
+  profile?: ContentProfileKey | string,
+): SubtitleShape {
+  const shapes = resolveTargetLang(code).shapes;
+  return shapes[isContentProfileKey(profile) ? profile : DEFAULT_CONTENT_PROFILE];
 }

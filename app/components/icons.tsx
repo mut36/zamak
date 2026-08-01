@@ -34,7 +34,7 @@ export function FileIcon(props: SVGProps<SVGSVGElement>) {
 export function CheckIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>
-      <polyline points='20 6 9 17 4 12' />
+      <polyline pathLength={1} points='20 6 9 17 4 12' />
     </svg>
   );
 }

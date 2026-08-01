@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { CheckIcon, FileIcon, DownloadIcon } from '../icons';
 import { downloadFile } from '../../utils/downloadFile';
@@ -71,13 +71,21 @@ export function DoneStep({
     setFeedbackStatus(ok ? 'sent' : 'failed');
   };
 
+  // Stagger indices keep the entrance order stable even when the warning /
+  // feedback blocks are absent — download stays first after the hero.
+  let section = 0;
+  const nextSection = () => section++;
+
   return (
-    <div className='animate-zslide max-w-[680px] mx-auto'>
-      <div className='text-center mb-2'>
-        <div className='bigcheck animate-zpop' style={{ background: 'var(--success)' }}>
-          <CheckIcon />
+    <div className='done max-w-[680px] mx-auto'>
+      <div className='done-hero text-center'>
+        <div
+          className='bigcheck done-check animate-zdonesuccess'
+          style={{ background: 'var(--accent)', color: 'var(--ink-strong)' }}
+        >
+          <CheckIcon strokeWidth={3} />
         </div>
-        <div className='head'>
+        <div className='head done-title'>
           <h1>{c.title}</h1>
           <p>{c.subtitle(result.lineCount, time)}</p>
         </div>
@@ -90,11 +98,14 @@ export function DoneStep({
           it says nothing about the file being downloaded. */}
       {result.stopReason || result.fallbackBlocks ? (
         <div
-          className='card p-4 mt-6 text-caption leading-relaxed'
-          style={{
-            color: 'oklch(0.5 0.13 75)',
-            background: 'oklch(0.97 0.03 85)',
-          }}
+          className='card done-section p-4 mt-6 text-caption leading-relaxed'
+          style={
+            {
+              '--done-i': nextSection(),
+              color: 'oklch(0.5 0.13 75)',
+              background: 'oklch(0.97 0.03 85)',
+            } as CSSProperties
+          }
         >
           {result.stopReason
             ? c.stopReason[result.stopReason]
@@ -105,7 +116,10 @@ export function DoneStep({
       {/* Download card. A second button appears only when the uploaded format
           could be rebuilt — primary is that format, SRT is always the
           fallback, so there is never a state with no way to download. */}
-      <div className='card dl-card mt-6'>
+      <div
+        className='card dl-card done-section mt-6'
+        style={{ '--done-i': nextSection() } as CSSProperties}
+      >
         <div className='dl-file'>
           <FileIcon />
           <span className='nm'>{primary.filename}</span>
@@ -144,10 +158,17 @@ export function DoneStep({
       </div>
 
       {/* Report card — only what we actually measured (see doneReport.ts). */}
-      <div className='pvm'>
+      <div
+        className='pvm done-section'
+        style={{ '--done-i': nextSection() } as CSSProperties}
+      >
         <div className='pvm-h'>{c.reportTitle}</div>
-        {reportItems.map((item) => (
-          <div className='pvm-row' key={item.key}>
+        {reportItems.map((item, i) => (
+          <div
+            className='pvm-row done-row'
+            key={item.key}
+            style={{ '--done-row-i': i } as CSSProperties}
+          >
             <span className='check'>✓</span>
             <div className='t'>{reportLine(item)}</div>
           </div>
@@ -157,7 +178,10 @@ export function DoneStep({
       {/* Feedback card — the beta's only quantitative quality signal. Omitted
           entirely when there is no job to attach the rating to. */}
       {jobId && (
-        <div className='card p-5 mt-4 text-center'>
+        <div
+          className='card done-section p-5 mt-4 text-center'
+          style={{ '--done-i': nextSection() } as CSSProperties}
+        >
           {feedbackStatus === 'sent' ? (
             <p className='text-body text-nav'>{c.feedbackThanks}</p>
           ) : (
@@ -202,12 +226,17 @@ export function DoneStep({
         </div>
       )}
 
-      <button type='button' className='btn btn-ghost btn-block mt-4' onClick={onStartOver}>
-        {c.startOver}
-      </button>
-      <Link href='/mypage' className='btn btn-ghost btn-block mt-2'>
-        {c.goHistory}
-      </Link>
+      <div
+        className='done-section done-actions mt-4'
+        style={{ '--done-i': nextSection() } as CSSProperties}
+      >
+        <button type='button' className='btn btn-ghost' onClick={onStartOver}>
+          {c.startOver}
+        </button>
+        <Link href='/mypage' className='btn btn-ghost'>
+          {c.goHistory}
+        </Link>
+      </div>
     </div>
   );
 }

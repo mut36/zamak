@@ -4,13 +4,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CastSheet } from '../types/glossary';
 import { EMPTY_CAST_SHEET } from '../types/glossary';
 import type { MovieInfo } from '../types/translation';
-import { GLOSSARY_WAIT_MS } from '../config/constants';
+import { GLOSSARY_UI_ENABLED, GLOSSARY_WAIT_MS } from '../config/constants';
 
 export type CastSheetStatus = 'idle' | 'extracting' | 'ready' | 'error';
 
 const STORAGE_KEY = 'zamak.castSheet.enabled';
 
 function readStoredEnabled(): boolean {
+  // The remembered preference is only honoured while the feature is actually
+  // offered. Without this guard, hiding the toggle would strand every browser
+  // that had it switched on in a state it can no longer leave — see
+  // GLOSSARY_UI_ENABLED. The stored value is left in place rather than cleared,
+  // so turning the feature back on restores each user's own choice.
+  if (!GLOSSARY_UI_ENABLED) return false;
   if (typeof window === 'undefined') return false;
   return window.localStorage.getItem(STORAGE_KEY) === '1';
 }

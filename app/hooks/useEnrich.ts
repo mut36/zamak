@@ -37,6 +37,17 @@ interface EnrichApiResponse {
 }
 
 /**
+ * Return value of a fresh search (enrich()). `candidates` is read directly
+ * off the just-awaited response rather than the hook's own `candidates`
+ * state, so a caller that wants to act on an ambiguous result (auto-picking
+ * the top candidate) never races a stale render-time closure.
+ */
+export interface EnrichOutcome {
+  result: EnrichResult | null;
+  candidates: EnrichCandidate[];
+}
+
+/**
  * Movie/drama enrichment: takes a title (+ year) and resolves it via TMDB
  * first, falling back to a Google-grounded search for whatever TMDB has no
  * record of (see searchMovie() server-side).
@@ -57,27 +68,15 @@ export function useEnrich() {
   const [error, setError] = useState('');
   const [candidates, setCandidates] = useState<EnrichCandidate[]>([]);
 
-  const applyResponse = useCallback(
-    (data: EnrichApiResponse): EnrichResult | null => {
-      if (data.status === 'found' && data.enrichment) {
-        setCandidates([]);
-        setStatus('found');
-        return data.enrichment;
-      }
-      if (data.status === 'ambiguous') {
-        setCandidates(data.candidates ?? []);
-        setStatus('ambiguous');
-        return null;
-      }
-      setCandidates([]);
-      setStatus('notFound');
-      return null;
-    },
-    [],
-  );
-
   const post = useCallback(
-    async (body: unknown): Promise<EnrichResult | null> => {
+    async (
+      body: unknown,
+      // Set by selectCandidate: resolving one candidate from an ambiguous
+      // list to 'found' shouldn't wipe the list that produced it — the
+      // "이 작품이 아니에요" flow needs the original candidates still sitting
+      // in state to show the picker with something other than an empty list.
+      opts?: { preserveCandidatesOnFound?: boolean },
+    ): Promise<EnrichOutcome> => {
       setError('');
       setStatus('searching');
       try {
@@ -96,24 +95,37 @@ export function useEnrich() {
           );
         }
         const data = (await res.json()) as EnrichApiResponse;
-        return applyResponse(data);
+        if (data.status === 'found' && data.enrichment) {
+          if (!opts?.preserveCandidatesOnFound) setCandidates([]);
+          setStatus('found');
+          return { result: data.enrichment, candidates: [] };
+        }
+        if (data.status === 'ambiguous') {
+          const found = data.candidates ?? [];
+          setCandidates(found);
+          setStatus('ambiguous');
+          return { result: null, candidates: found };
+        }
+        setCandidates([]);
+        setStatus('notFound');
+        return { result: null, candidates: [] };
       } catch (err) {
         setCandidates([]);
         setError(err instanceof Error ? err.message : 'Enrichment failed');
         setStatus('notFound');
-        return null;
+        return { result: null, candidates: [] };
       }
     },
-    [applyResponse],
+    [],
   );
 
   const enrich = useCallback(
-    async (title: string, year: string): Promise<EnrichResult | null> => {
+    async (title: string, year: string): Promise<EnrichOutcome> => {
       setError('');
       setCandidates([]);
       if (!title.trim()) {
         setStatus('notFound');
-        return null;
+        return { result: null, candidates: [] };
       }
       return post({ title: title.trim(), year: year.trim() });
     },
@@ -121,8 +133,17 @@ export function useEnrich() {
   );
 
   const selectCandidate = useCallback(
-    (candidate: EnrichCandidate, title: string, year: string) =>
-      post({ candidate, title: title.trim(), year: year.trim() }),
+    async (
+      candidate: EnrichCandidate,
+      title: string,
+      year: string,
+    ): Promise<EnrichResult | null> => {
+      const { result } = await post(
+        { candidate, title: title.trim(), year: year.trim() },
+        { preserveCandidatesOnFound: true },
+      );
+      return result;
+    },
     [post],
   );
 

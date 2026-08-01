@@ -33,8 +33,9 @@ export function AppNav({ user, signOut, credits, onHome }: AppNavProps) {
   ).toUpperCase();
 
   return (
-    <nav className='sticky top-0 z-40 h-[52px] border-b border-border-subtle glass-nav'>
-      <div className='flex h-full w-full max-w-[600px] lg:max-w-[840px] mx-auto items-center justify-between px-5'>
+    <>
+    <nav className='fixed top-0 left-0 right-0 z-40 h-[52px] glass-nav backdrop-blur-[20px] backdrop-saturate-[180%]'>
+      <div className='flex h-full w-full max-w-[840px] mx-auto items-center justify-between px-5 sm:px-10'>
         <BrandMark size={24} onClick={onHome} />
 
         <div className='flex items-center gap-4'>
@@ -80,5 +81,8 @@ export function AppNav({ user, signOut, credits, onHome }: AppNavProps) {
         </div>
       </div>
     </nav>
+    {/* Spacer so fixed nav doesn't cover page content. */}
+    <div className='h-[52px]' aria-hidden />
+    </>
   );
 }

@@ -9,6 +9,7 @@ import type { CreditBalances } from '../../lib/creditKind';
 import type { ContentType, MovieInfo } from '../../types/translation';
 import {
   FLASH_MODEL,
+  GLOSSARY_UI_ENABLED,
   PRO_MODEL,
   type AllowedModel,
 } from '../../config/constants';
@@ -50,8 +51,8 @@ interface TranslateSettingsStepProps {
 }
 
 const CARDS = [
-  { model: FLASH_MODEL, name: c.liteName, desc: [c.liteDesc, c.liteDescSpeed] },
-  { model: PRO_MODEL, name: c.proName, desc: [c.proDesc] },
+  { model: FLASH_MODEL, name: c.liteName, desc: c.liteDesc },
+  { model: PRO_MODEL, name: c.proName, desc: c.proDesc },
 ] as const;
 
 export function TranslateSettingsStep({
@@ -81,6 +82,7 @@ export function TranslateSettingsStep({
   } as const;
 
   return (
+    <>
     <div className='animate-zslide pb-28 max-w-[760px] mx-auto'>
       <StepBreadcrumb current='settings' className='mb-6' />
       <div className='head mb-8'>
@@ -168,12 +170,12 @@ export function TranslateSettingsStep({
         </div>
       )}
 
-      {/* 'other' has no TMDB card, so its "what is this" surface is the
+      {/* Non-movie content has no TMDB card, so its "what is this" surface is the
           auto-written summary /api/summarize put into movieInfo.notes. That
           value ships to the prompt as <user_notes>, and notes is by invariant
           사용자 자유 입력 전용 (CLAUDE.md) — so it must stay visible and
           editable rather than being machine-written behind the user's back. */}
-      {contentType === 'other' && (
+      {contentType !== 'movie' && (
         <div className='card p-[18px] mb-[14px]'>
           <div className='dbadge mb-3'>
             <b />
@@ -198,6 +200,15 @@ export function TranslateSettingsStep({
           {c.contextEditable}
         </div>
         <div className='field !mb-0'>
+          <label>{c.genreLabel}</label>
+          <input
+            className='input'
+            placeholder={c.genrePlaceholder}
+            value={movieInfo.genre ?? ''}
+            onChange={(e) => onMovieInfo({ genre: e.target.value })}
+          />
+        </div>
+        <div className='field mt-3 !mb-0'>
           <label>{c.eraLabel}</label>
           <input
             className='input'
@@ -249,57 +260,59 @@ export function TranslateSettingsStep({
                   {c.creditsLeft(left)}
                 </span>
               </div>
-              {card.desc.map((line) => (
-                <p
-                  key={line}
-                  className='mt-2 text-caption text-secondary leading-[1.5]'
-                >
-                  {line}
-                </p>
-              ))}
+              <p className='mt-2 text-caption text-secondary leading-normal whitespace-pre-line'>
+                {card.desc}
+              </p>
             </button>
           );
         })}
       </div>
 
-      <p className='qlabel'>{c.sectionAdvanced}</p>
+      {/* 베타 오픈에서는 접어둔 섹션. 편집 화면이 아직 덜 만들어졌다 —
+          자세한 이유와 "왜 주석이 아니라 플래그인가"는 GLOSSARY_UI_ENABLED. */}
+      {GLOSSARY_UI_ENABLED && (
+        <>
+          <p className='qlabel'>{c.sectionAdvanced}</p>
 
-      {castSheetEnabled ? (
-        <div className='animate-zslide mb-[14px]'>
-          <CastSheetCard
-            enabled={castSheetEnabled}
-            onToggle={onCastSheetToggle}
-            status={castSheetStatus}
-            sheet={castSheet}
-            onChangeSheet={onCastSheetChange}
-            onRefetch={onCastSheetRefetch}
-            targetLang={targetLang}
-          />
-        </div>
-      ) : (
-        <button
-          type='button'
-          className='card w-full flex items-center justify-between gap-3 p-[18px_24px] text-left mb-[14px]'
-          onClick={() => onCastSheetToggle(true)}
-        >
-          <span className='flex-1 min-w-0'>
-            <span className='flex items-center gap-2'>
-              <span className='text-title-sm font-semibold tracking-[-0.01em]'>
-                {c.glossaryTitle}
+          {castSheetEnabled ? (
+            <div className='animate-zslide mb-[14px]'>
+              <CastSheetCard
+                enabled={castSheetEnabled}
+                onToggle={onCastSheetToggle}
+                status={castSheetStatus}
+                sheet={castSheet}
+                onChangeSheet={onCastSheetChange}
+                onRefetch={onCastSheetRefetch}
+                targetLang={targetLang}
+              />
+            </div>
+          ) : (
+            <button
+              type='button'
+              className='card w-full flex items-center justify-between gap-3 p-[18px_24px] text-left mb-[14px]'
+              onClick={() => onCastSheetToggle(true)}
+            >
+              <span className='flex-1 min-w-0'>
+                <span className='flex items-center gap-2'>
+                  <span className='text-title-sm font-semibold tracking-[-0.01em]'>
+                    {c.glossaryTitle}
+                  </span>
+                  <span className='dbadge-pro'>{c.glossaryBadge}</span>
+                </span>
+                <span className='block text-caption-sm text-tertiary mt-0.5'>
+                  {c.glossaryDesc}
+                </span>
               </span>
-              <span className='dbadge-pro'>{c.glossaryBadge}</span>
-            </span>
-            <span className='block text-caption-sm text-tertiary mt-0.5'>
-              {c.glossaryDesc}
-            </span>
-          </span>
-          <span className='ztoggle' aria-hidden>
-            <span className='ztoggle-knob' />
-          </span>
-        </button>
+              <span className='ztoggle' aria-hidden>
+                <span className='ztoggle-knob' />
+              </span>
+            </button>
+          )}
+        </>
       )}
+    </div>
 
-      <div className='fixed bottom-0 left-0 right-0 glass-nav border-t border-border-subtle'>
+      <div className='fixed bottom-0 left-0 right-0 z-40 glass-nav glass-bar backdrop-blur-[20px] backdrop-saturate-[180%]'>
         <div className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 py-4 flex items-center justify-center gap-4'>
           <span className='text-caption text-tertiary'>{c.eta(etaSeconds)}</span>
           <button
@@ -312,6 +325,6 @@ export function TranslateSettingsStep({
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }

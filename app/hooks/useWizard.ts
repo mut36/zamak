@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation, type TranslationMessages } from './useTranslation';
-import { useEnrich, type EnrichCandidate, type EnrichStatus } from './useEnrich';
+import { useEnrich, type EnrichCandidate, type EnrichResult } from './useEnrich';
 import { useCastSheet } from './useCastSheet';
 import { parseSrtBlocks } from '../lib/srt';
 import {
@@ -96,18 +96,17 @@ export type WizardScreen =
   | 'exhausted';
 
 /**
- * Where to go once a file is read and the work search has settled.
+ * The screen the upload handoff lands on — and therefore the screen the
+ * auto-analysis effect has to watch for.
  *
- * A confident match skips the picker: it is confirmed inline on the settings
- * screen instead, because a list of one asks the user nothing.
- *
- * Driven by the search's own status, not by how many candidates came back —
- * useEnrich clears `candidates` to [] on a confident match, so a length check
- * would route every auto-matched film into an empty picker.
+ * One constant for both, because they drifted apart once and the drift was
+ * silent: the handoff moved from 'workPick' to 'settings' while the effect
+ * kept waiting for 'workPick', so runEnrich() never fired. Nothing errored —
+ * enrichStatus simply stayed 'idle', which the settings screen renders as
+ * "검색 중", so the spinner span forever and no /api/enrich request was ever
+ * made. Never write either screen name literally at those two sites again.
  */
-export function nextScreenAfterUpload(status: EnrichStatus): WizardScreen {
-  return status === 'found' ? 'settings' : 'workPick';
-}
+export const POST_UPLOAD_SCREEN: WizardScreen = 'settings';
 
 export interface WizardState {
   screen: WizardScreen;
@@ -218,6 +217,7 @@ export function useWizard(
     result,
     refusal,
     jobId,
+    errorCreditSpent,
     processFile,
     translate,
     cancelTranslation,
@@ -253,14 +253,12 @@ export function useWizard(
   const enrichStartedRef = useRef(false);
   const summarizeStartedRef = useRef(false);
 
-  // Movie branch: one unified lookup (TMDB first, grounded search fallback —
-  // see enrichMovie() server-side). title/year/director/poster are UI-facing
-  // and overwrite the filename-guessed values with the authoritative ones;
+  // Shared by runEnrich and runSelectCandidate: merge a resolved (or failed)
+  // lookup into movieInfo. title/year/director/poster are UI-facing and
+  // overwrite the filename-guessed values with the authoritative ones;
   // genre/era/tone are AI-facing keyword fields, never rendered. `notes`
   // stays untouched here — it is the user's own free-text field.
-  const runEnrich = useCallback(async () => {
-    const { title, year } = movieInfoRef.current;
-    const data = await enrich(title, year);
+  const applyEnrichResult = useCallback((data: EnrichResult | null) => {
     setMovieInfo((prev) => ({
       ...prev,
       posterUrl: data?.posterUrl ?? undefined,
@@ -271,43 +269,65 @@ export function useWizard(
       era: data?.found ? data.era : '',
       tone: data?.found ? data.tone : '',
     }));
-    // `data` (the just-awaited return value) disambiguates a confident match
-    // reliably even though `enrichStatus` read here is a possibly-stale
-    // render-time closure value (see nextScreenAfterUpload's doc comment) —
-    // enrichStatus is only used to distinguish 'ambiguous' from 'notFound',
-    // both of which route to the same place ('workPick'), so a stale read
-    // between those two never produces a wrong screen.
-    const matched = data !== null;
-    setAutoMatched(matched);
-    setWorkConfirmed(false);
-    setScreen(nextScreenAfterUpload(matched ? 'found' : enrichStatus));
-  }, [enrich, enrichStatus]);
+  }, []);
 
   // User picked one of several TMDB matches from the ambiguous-search
-  // candidate list (InfoStep) — resolve that specific work the same way
-  // runEnrich merges an auto-resolved one.
+  // candidate list (WorkPickStep, or runEnrich's own auto-pick below) —
+  // resolve that specific work and merge it in. Returns the resolved result
+  // so callers can tell a successful resolve from a failed one.
   const runSelectCandidate = useCallback(
     async (candidate: EnrichCandidate) => {
       const { title, year } = movieInfoRef.current;
       const data = await selectCandidate(candidate, title, year);
-      setMovieInfo((prev) => ({
-        ...prev,
-        posterUrl: data?.posterUrl ?? undefined,
-        title: data?.found && data.title ? data.title : prev.title,
-        year: data?.found && data.year ? data.year : prev.year,
-        director: data?.found ? (data.director ?? undefined) : undefined,
-        genre: data?.found ? data.genre : '',
-        era: data?.found ? data.era : '',
-        tone: data?.found ? data.tone : '',
-      }));
+      applyEnrichResult(data);
+      return data;
     },
-    [selectCandidate],
+    [selectCandidate, applyEnrichResult],
   );
+
+  // Movie branch: one unified lookup (TMDB first, grounded search fallback —
+  // see enrichMovie() server-side).
+  //
+  // A confident single match is confirmed inline on the settings screen
+  // ("'X'로 인식했어요. 맞나요?"), because a list of one asks the user nothing.
+  // An ambiguous search (several TMDB hits) auto-resolves its *first*
+  // candidate the same way and shows the exact same confirm banner — the
+  // full candidate list is never shown up front. Only when the user says
+  // "이 작품이 아니에요" (onChangeWork → goWorkPick) does the picker with every
+  // candidate appear; selectCandidate's preserveCandidatesOnFound keeps that
+  // list alive in useEnrich's state for exactly that moment. Nothing was
+  // found at all (or the auto-pick itself fails) is the only path that still
+  // lands on the picker directly.
+  const runEnrich = useCallback(async () => {
+    const { title, year } = movieInfoRef.current;
+    const { result, candidates } = await enrich(title, year);
+
+    if (result) {
+      applyEnrichResult(result);
+      setAutoMatched(true);
+      setWorkConfirmed(false);
+      setScreen('settings');
+      return;
+    }
+
+    if (candidates.length > 0) {
+      setSelectedIndex(0);
+      const picked = await runSelectCandidate(candidates[0]);
+      setAutoMatched(picked !== null);
+      setWorkConfirmed(false);
+      setScreen(picked !== null ? 'settings' : 'workPick');
+      return;
+    }
+
+    setAutoMatched(false);
+    setWorkConfirmed(false);
+    setScreen('workPick');
+  }, [enrich, applyEnrichResult, runSelectCandidate]);
 
   // Auto-analyze once per file: movie → web-search enrich + TMDB poster,
   // other → summarize. Guarded by refs so returning never re-triggers.
   useEffect(() => {
-    if (screen !== 'workPick') return;
+    if (screen !== POST_UPLOAD_SCREEN) return;
     if (contentType === null) return;
     if (contentType === 'movie') {
       if (analysis.completed && !enrichStartedRef.current) {
@@ -362,11 +382,6 @@ export function useWizard(
   };
 
   const handleFile = async (selected: File) => {
-    // Defensive: the upload screen locks the dropzone while contentType is
-    // null, so this should be unreachable, but never process a file dropped
-    // before a type is picked.
-    if (contentType === null) return;
-
     setUploading(true);
     setUploadingFileName(selected.name);
 
@@ -416,16 +431,11 @@ export function useWizard(
 
     setMovieInfo(EMPTY_MOVIE_INFO);
     resetAnalysis();
-    // Screen goes to 'settings' immediately, not to the picker: the handoff
-    // confirms an auto-matched work inline on the settings screen, and showing
-    // a candidate list first would ask the user a question we usually don't
-    // need to ask. The TMDB search and the other branch's summarize both run
-    // while settings is showing (it renders its own searching state), and
-    // runEnrich redirects to 'workPick' only when the match comes back
-    // ambiguous or empty — see nextScreenAfterUpload.
+    // Screen goes to 'settings' only when the user clicks 'Next' on the upload screen.
+    // The TMDB search and the other branch's summarize both run
+    // when settings is showing (it renders its own searching state).
     processFile(selected, doc);
     setUploading(false);
-    setScreen('settings');
   };
 
   // The actual translate work, entered only once consent is settled — either
@@ -448,6 +458,9 @@ export function useWizard(
       'meaning',
       undefined,
       resolvedCastSheet,
+      // Null only if the user somehow reached here without picking a type;
+      // the upload screen's dropzone stays locked until they do.
+      contentType ?? undefined,
     );
     // The balance moved either way: a success spent the credit, and a refusal
     // means our cached number was stale.
@@ -540,7 +553,7 @@ export function useWizard(
         setAutoMatched(false);
         setScreen('settings');
       })();
-    } else if (contentType === 'other') {
+    } else if (contentType !== null) {
       setMovieInfo((prev) => ({ ...prev, genre: otherType, tone: toneText }));
       setScreen('settings');
     }
@@ -604,6 +617,7 @@ export function useWizard(
     refusal,
     clearRefusal,
     jobId,
+    errorCreditSpent,
     totalLines,
     // Passed through from useEnrich.
     enrichStatus,

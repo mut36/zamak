@@ -1,4 +1,5 @@
 import type { TranslationErrorCode } from '../lib/translationErrors';
+import type { ContentProfileKey } from '../config/languages';
 import type { CastSheet } from './glossary';
 
 export interface MovieInfo {
@@ -20,8 +21,14 @@ export interface MovieInfo {
   tone?: string;
 }
 
-/** Content type chosen on the upload screen — drives the info-step branch. */
-export type ContentType = 'movie' | 'other';
+/**
+ * Content type chosen on the upload screen. Two consumers, one pick:
+ *  - the info step branches on it — `movie` runs TMDB enrich, the other two
+ *    run summarize (see useWizard);
+ *  - it *is* the subtitle profile key (`ContentProfileKey`, config/languages.ts),
+ *    so it also decides the reading-speed band the timing pass enforces.
+ */
+export type ContentType = ContentProfileKey;
 
 /** One downloadable rendering of the finished translation. */
 export interface DownloadOption {

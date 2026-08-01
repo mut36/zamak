@@ -210,6 +210,15 @@ export function useTranslation(
   /** The currently (or most recently) opened job's id, exposed so the
    *  completion screen and history can both refer to the same run. */
   const [jobId, setJobId] = useState<string | null>(null);
+  /**
+   * Whether the error currently in `state.error` cost the user a credit.
+   *
+   * Only true for a run that opened a job and then died before the completion
+   * screen. It is deliberately NOT derived from `jobId`: that id survives a
+   * finished run, so a later file-analysis failure — which spends nothing —
+   * would read as a spent credit and promise a refund we don't owe.
+   */
+  const [errorCreditSpent, setErrorCreditSpent] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   /** Parsed source document, kept for round-trip output at download time. */
   const docRef = useRef<SubtitleDoc | null>(null);
@@ -279,10 +288,16 @@ export function useTranslation(
     setState({ isTranslating: true, error: '' });
     setResult(null);
     setRefusal(null);
+    setErrorCreditSpent(false);
     const startedAt = Date.now();
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
+
+    // Flipped the moment the job opens, and read only from the catch below.
+    // A local rather than state, because the catch needs the value as it was
+    // at the point of failure, not after a re-render.
+    let creditSpent = false;
 
     try {
       const content = docRef.current?.srt || fileContent;
@@ -296,6 +311,7 @@ export function useTranslation(
       // file rather than once per chunk — is what makes a credit worth one
       // title, and it means a refusal costs nothing.
       const newJobId = await beginTranslationJob(blocks.length, model as AllowedModel);
+      creditSpent = true;
       setJobId(newJobId);
 
       // Concurrency comes from the tier, which is the one place the
@@ -642,6 +658,10 @@ export function useTranslation(
         return false;
       }
       console.error('[translate] Translation failed:', err);
+      // The job was already charged when it opened, so this failure cost the
+      // user a credit and they got nothing for it. The screen owes them the
+      // recovery the terms already promise — see COPY.error.creditNote.
+      setErrorCreditSpent(creditSpent);
       setState((prev) => ({
         ...prev,
         error: err instanceof Error ? err.message : msg.generalError,
@@ -677,6 +697,7 @@ export function useTranslation(
     setResult(null);
     setRefusal(null);
     setJobId(null);
+    setErrorCreditSpent(false);
   };
 
   return {
@@ -688,6 +709,7 @@ export function useTranslation(
     result,
     refusal,
     jobId,
+    errorCreditSpent,
     // Reading and parsing belong to the caller — it owns the upload screen and
     // the error slot that names the problem, and a file that fails to parse
     // should never leave that screen. This takes the parsed document and

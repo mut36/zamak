@@ -13,7 +13,7 @@ import { CopyrightModal } from './components/beta/CopyrightModal';
 import { FeedbackFollowup } from './components/beta/FeedbackFollowup';
 import { AppNav } from './components/beta/AppNav';
 import { SiteFooter } from './components/SiteFooter';
-import { useWizard } from './hooks/useWizard';
+import { useWizard, POST_UPLOAD_SCREEN } from './hooks/useWizard';
 import { useAuth } from './hooks/useAuth';
 import { useFeedbackFollowup } from './hooks/useFeedbackFollowup';
 import { isSupabaseConfigured } from './lib/supabase/env';
@@ -61,6 +61,7 @@ export default function Home() {
     handleTranslate,
     handleCancel,
     resetAll: resetWizard,
+    fileContent,
     error,
     analysis,
     translationProgress,
@@ -68,6 +69,7 @@ export default function Home() {
     refusal,
     clearRefusal,
     jobId,
+    errorCreditSpent,
     totalLines,
     enrichStatus,
     enrichCandidates,
@@ -86,6 +88,7 @@ export default function Home() {
     autoMatched,
     confirmWork,
     goWorkPick,
+    goScreen,
     model,
     setModel,
     showConsentModal,
@@ -199,8 +202,10 @@ export default function Home() {
             onContentType={setContentType}
             uploading={uploading}
             uploadingFileName={uploadingFileName}
+            fileName={fileContent ? uploadingFileName : undefined}
             error={uploadError}
             onFile={handleFile}
+            onNext={() => goScreen(POST_UPLOAD_SCREEN)}
           />
         )}
 
@@ -236,6 +241,20 @@ export default function Home() {
                 style={{ color: 'oklch(0.55 0.2 25)' }}
               >
                 {error}
+                {/* Only when the run had already opened a job — a failure
+                    before that (file analysis, an empty parse) cost nothing,
+                    and promising a refund there would be noise. */}
+                {errorCreditSpent && (
+                  <p className='mt-2 text-fineprint text-secondary'>
+                    {COPY.error.creditNote}{' '}
+                    <a
+                      href={`mailto:${COPY.footer.feedbackEmail}`}
+                      className='underline'
+                    >
+                      {COPY.footer.feedbackEmail}
+                    </a>
+                  </p>
+                )}
               </div>
             )}
             <TranslateSettingsStep
@@ -350,7 +369,12 @@ export default function Home() {
           )}
       </main>
 
-      <SiteFooter />
+      <SiteFooter
+        withBottomBar={
+          !refusal &&
+          (screen === 'upload' || screen === 'settings' || screen === 'workPick')
+        }
+      />
     </div>
   );
 }

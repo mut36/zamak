@@ -441,7 +441,11 @@ export const COPY = {
       `${recovered.toLocaleString()}줄 복구 · ${remaining.toLocaleString()}줄 남음`,
     reassure: '번역이 완료될 때까지 이 창을 열어두세요.',
     cancel: '취소',
-    cancelConfirm: '번역을 취소하시겠습니까?',
+    // 취소는 사용자의 선택이라 번역권이 그대로 소진된다(잡을 열 때 이미
+    // 차감됐고, 되돌리는 경로가 아직 없다 — docs/TODO.md "크레딧 환불 정책").
+    // 누른 뒤에 알게 되면 그건 사고라서, 확인창에서 미리 말한다.
+    cancelConfirm:
+      '번역을 취소하시겠습니까?\n\n이미 시작된 번역이라 번역권 1편은 사용된 것으로 처리됩니다.',
     stages: {
       context: '자막 맥락을 분석하는 중',
       glossary: '인물과 용어를 정리하는 중',
@@ -535,7 +539,6 @@ export const COPY = {
     linesSearchPlaceholder: '대사로 검색',
     linesEmpty: '검색 결과가 없습니다.',
     linesLoadFailed: '결과물을 불러오지 못해 이 단계는 건너뜁니다.',
-    linesSkip: '건너뛰기',
     commentTitle: '한 줄로 남겨주신다면',
     commentPlaceholder: '자유롭게 남겨주세요 (선택)',
     next: '다음',
@@ -597,12 +600,30 @@ export const COPY = {
 
   // 첫 번역 전에 한 번 받는 저작권 동의 모달. 닫기 없이 동의만 가능한
   // 필수 게이트라 취소 문구가 없다.
+  /**
+   * 첫 번역 앞에 서는 필수 게이트(`CopyrightModal`).
+   *
+   * **약관·개인정보처리방침 동의도 여기서 함께 받는다.** 원래 §1-11이 고른
+   * 상시 고지 세 지점(드롭존 아래 / 가입 CTA 아래 / 푸터) 중 앞의 둘은
+   * 2026-08-02 리디자인에서 화면을 정리하며 뺐다. 남은 푸터 링크만으로는
+   * browsewrap이라 효력이 약한데, 이 모달은 (a) 체크 없이는 못 지나가는
+   * clickwrap이고 (b) 동의 시점과 버전이 `copyright_consents`에 남는다 —
+   * 뺀 두 지점보다 오히려 강한 증거다. 처리방침의 "공개" 의무 자체는 푸터
+   * 링크가 계속 충족한다.
+   *
+   * 그래서 이 문구를 고치면 `COPYRIGHT_NOTICE_VERSION`(config/constants.ts)도
+   * 같이 올려야 한다 — 옛 문구에 한 동의는 새 문구에 대한 동의가 아니고,
+   * 버전이 존재하는 이유가 정확히 그것이다.
+   */
   copyright: {
     title: '시작하기 전에',
     body:
       'ZAMAK은 이용자가 적법하게 보유한 자막 파일의 번역만 지원합니다. ' +
       '업로드하는 파일에 대한 권리와 책임은 이용자에게 있습니다.',
-    checkbox: '저작권 안내를 확인했고, 이에 동의합니다',
+    /** 링크 문구는 `COPY.legal.terms`·`legal.privacy`를 그대로 쓴다 — 두 번
+     *  적으면 한쪽만 고쳐져 갈라진다(푸터·`/legal`이 같은 규칙). */
+    linksLabel: '전문 보기',
+    checkbox: '이용약관·개인정보처리방침 및 위 저작권 안내에 동의합니다',
     agree: '동의하고 시작하기',
     failed: '동의 내역 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.',
   },
@@ -616,11 +637,10 @@ export const COPY = {
     privacyHref: '/legal/privacy',
     backHome: '돌아가기',
     detail: '자세히',
-    // signup-wrap. 별도 체크박스보다 마찰이 적으면서, 가입이라는 능동적
-    // 행위에 결합되어 있어 단순 푸터 링크(browsewrap)보다 효력이 안정적이다.
-    consentPrefix: '계속하면 ',
-    consentAnd: ' 및 ',
-    consentSuffix: '에 동의하는 것으로 봅니다.',
+    // 여기 있던 signup-wrap 문구(`consentPrefix`/`consentAnd`/`consentSuffix`)는
+    // 2026-08-02에 지웠다. 랜딩의 가입 CTA 아래 노출 지점이 리디자인에서
+    // 빠지면서 읽는 곳이 없어졌고, 그 동의는 `COPY.copyright`의 모달이
+    // clickwrap으로 대신 받는다 — 그쪽 주석 참고.
   },
 
   notFound: {
@@ -633,5 +653,13 @@ export const COPY = {
     title: '문제가 발생했습니다',
     body: '일시적인 오류일 수 있습니다. 다시 시도해 주세요.',
     retry: '다시 시도',
+    /**
+     * 번역이 시작된 뒤 실패했을 때만 붙는다 — 그때는 잡이 이미 열려서
+     * 번역권이 나갔는데 사용자는 파일을 못 받았다. 약관이 이미 번역권 복구를
+     * 약속하고 있으므로(`app/legal/page.tsx`), 화면이 그걸 말하지 않는 쪽이
+     * 오히려 앞뒤가 안 맞는다. 자동 환불은 베타 범위 밖이라 지금은 사람이
+     * `supabase/comp-credit.sql`로 처리한다.
+     */
+    creditNote: '번역권은 복구해 드립니다. 아래 주소로 알려주세요 —',
   },
 } as const;

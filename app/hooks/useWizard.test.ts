@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  countBlocks,
-  exceedsCreditCap,
-  nextScreenAfterUpload,
-} from './useWizard';
+import { countBlocks, exceedsCreditCap } from './useWizard';
 import { MAX_BLOCKS_PER_CREDIT } from '../config/constants';
 
 /** N blocks of valid SRT, so countBlocks parses rather than guesses. */
@@ -37,25 +33,8 @@ describe('upload-time credit-cap guard', () => {
   });
 });
 
-describe('nextScreenAfterUpload', () => {
-  it('skips the picker when the search resolved to one confident match', () => {
-    // A confident match is confirmed inline on the settings screen
-    // ("'X'로 인식했어요. 맞나요?") — making the user pick from a list of one
-    // is a step that asks nothing.
-    expect(nextScreenAfterUpload('found')).toBe('settings');
-  });
-
-  it('shows the picker when the search was ambiguous', () => {
-    expect(nextScreenAfterUpload('ambiguous')).toBe('workPick');
-  });
-
-  it('shows the picker when nothing was found, so the user can search', () => {
-    expect(nextScreenAfterUpload('notFound')).toBe('workPick');
-  });
-
-  it('does not send a confident match to the picker just because candidates is empty', () => {
-    // useEnrich clears `candidates` to [] on 'found'. Branching on the array's
-    // length would route every auto-matched film into an empty picker.
-    expect(nextScreenAfterUpload('found')).not.toBe('workPick');
-  });
-});
+// runEnrich's auto-pick-first-candidate behavior (ambiguous search → resolve
+// candidates[0] → same confirm banner as a confident match, full list only
+// on "이 작품이 아니에요") lives in useWizard.ts and depends on the async
+// /api/enrich round-trip, so it isn't covered by a pure-function test here —
+// see runEnrich's doc comment for the routing rules it implements.

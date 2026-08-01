@@ -19,7 +19,9 @@ function requireTargetLang(targetLanguage: string): TargetLang {
 
 /**
  * One self-contained rules file per target language (written in that language).
- * Renders {{lineMaxChars}} from languages.ts.
+ * Renders {{lineMaxChars}} from languages.ts. Deliberately not per content
+ * profile: the profile decides how long a line stays on screen, not how long
+ * the line itself may be (docs/decisions.md §1-19).
  */
 async function buildTranslationRules(lang: TargetLang): Promise<string> {
   const template = await loadTranslationRules(lang.code);

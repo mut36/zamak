@@ -19,9 +19,12 @@ const F = COPY.footer;
  * 마이페이지 링크는 항상 노출되고, 비로그인 방문자는 `/mypage`가 알아서
  * 홈으로 돌려보낸다.
  */
-export function SiteFooter() {
+export function SiteFooter({ withBottomBar }: { withBottomBar?: boolean }) {
   return (
-    <footer className='site-footer'>
+    <footer
+      className='site-footer'
+      style={withBottomBar ? { paddingBottom: '130px' } : undefined}
+    >
       <div className='site-footer-top'>
         <div>
           <Wordmark className='lp-wordmark' />
