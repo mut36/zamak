@@ -328,6 +328,14 @@ Expected: FAIL — `Failed to resolve import "./easing"`
 
 `app/lib/easing.ts`:
 
+⚠️ **구현 중 발견·수정된 버그**: 아래 코드는 최초 초안(순수 `1 - Math.exp(...)`)에
+안전장치를 추가한 버전이다. `elapsedMs`가 극단적으로 크면(예: 1e12) IEEE 754
+배정밀도에서 `Math.exp(-매우_큰_수)`가 정확히 0으로 언더플로해 `progress`가
+정확히 1이 되고, 반환값이 `ceiling`과 **정확히 같아진다** — 천장 불가침이라는
+이 함수의 핵심 성질을 정확히 그 극단값에서 깬다. Task 2 구현 중 자체 테스트가
+이걸 잡아냈다. 고칠 것은 테스트가 아니라 구현이다 — `progress`를 1 미만으로
+명시적으로 클램프한다.
+
 ```ts
 /**
  * 천장을 향한 지수 이징 — **점근할 뿐 절대 도달하지 않는다.**
@@ -338,6 +346,11 @@ Expected: FAIL — `Failed to resolve import "./easing"`
  * 지키려던 성질이 바로 이것이다.
  *
  * τ는 `expectedMs`에서 갭의 ~95%를 지나도록 잡는다 (1 - e^(-3) ≈ 0.9502).
+ *
+ * `progress`를 1 미만으로 명시적으로 클램프한다 — 경과 시간이 아주 크면
+ * `Math.exp(-x)`가 부동소수점 언더플로로 정확히 0이 되어 progress가 정확히
+ * 1이 되고, 반환값이 ceiling과 정확히 같아진다(천장 불가침 위반). 실사용
+ * 범위(expectedMs는 초~분 단위)에서는 절대 발동하지 않는 안전장치다.
  */
 export function easeToward(
   from: number,
@@ -348,7 +361,8 @@ export function easeToward(
   if (ceiling <= from) return from;
   if (!(expectedMs > 0)) return from;
   const tau = expectedMs / 3;
-  const progress = 1 - Math.exp(-Math.max(0, elapsedMs) / tau);
+  const raw = 1 - Math.exp(-Math.max(0, elapsedMs) / tau);
+  const progress = Math.min(raw, 0.999999);
   return from + (ceiling - from) * progress;
 }
 ```
