@@ -144,11 +144,12 @@ skip 경로에서는 `movieInfo.title`이 빈 문자열이라, 현재 조건
 app/i18n/simpleCopy.ts                        §4 문자열, workPick.skip 추가
 app/components/beta/WorkPickStep.tsx          §3-1 썸네일 축소, §5-1 skip 버튼
 app/components/beta/TranslateSettingsStep.tsx §3-2 포스터 제거, §5-3 렌더 조건
+app/components/beta/workCard.ts        (신규) §5-3 shouldShowWorkCard 순수 함수
+app/components/beta/workCard.test.ts   (신규) §7 테스트
 app/globals.css                               §3-2 .poster 규칙 3개 제거
 app/hooks/useWizard.ts                        §5-2 skipWorkPick
-app/hooks/useWizard.test.ts                   §5-2 테스트
 app/page.tsx                                  onSkip 배선
-app/dev/preview/PreviewHarness.tsx            onSkip 배선
+app/dev/preview/PreviewHarness.tsx            onSkip 배선, settings:noWork 화면
 docs/decisions.md                             결정 기록 (포지셔닝 근거)
 docs/translation-pipeline.md                  §2-A 후보 UI 서술 + skip 경로
 ```
@@ -157,11 +158,19 @@ docs/translation-pipeline.md                  §2-A 후보 UI 서술 + skip 경�
 
 ## 7. 테스트
 
-- **`useWizard.test.ts`** — `skipWorkPick` 후 `screen === 'settings'`,
-  `workConfirmed === true`, `autoMatched === false`, `movieInfo.title === ''`.
-  그리고 skip이 `runSelectCandidate`(즉 `/api/enrich` 선택 모드)를 부르지 않는지.
-- **수동 확인** (Browser 도구, `PreviewHarness`) — 세 상태를 실제로 본다:
-  후보 여러 개 / 자동 매치 확정 / skip 직후 설정 화면.
+이 리포에는 `@testing-library/react`도 jsdom도 없다. `vitest`는 node 환경에서
+**순수 함수만** 돌린다 — `useWizard.test.ts`가 `countBlocks`/`exceedsCreditCap`만
+테스트하고, async 라우팅 동작은 순수 테스트로 커버하지 않는다고 그 파일이 직접
+적어 두었다. 훅 렌더 테스트를 도입하는 것은 이 작업의 범위가 아니다.
+
+- **`app/components/beta/workCard.test.ts`** (신규) — §5-3의 렌더 조건을
+  `shouldShowWorkCard()` 순수 함수로 추출해 테스트한다. skip 경로에서 빈 카드가
+  뜨는 실제 버그를 막는 것이 이 조건이므로, 여기가 테스트할 값어치가 있는 유일한
+  로직이다. 제목이 빈 문자열/공백일 때 false, 있을 때 true, 그리고 기존 세 조건
+  (`contentType`/`searching`/`needsConfirm`)의 회귀.
+- **수동 확인** (Browser 도구, `PreviewHarness`) — 상태 전이는 눈으로 본다.
+  기존 `workPick`/`settings`/`settings:confirm`에 더해 `settings:noWork`
+  화면을 추가한다(제목 없는 `movieInfo` → 확정 카드 없이 맥락 카드만).
 - **전체 검증** — `npx tsc --noEmit && npx eslint app && npx vitest run && npm run check:tokens`.
 
 포스터 크기와 카피 문자열 자체는 테스트하지 않는다. 시각 위계는 회귀
@@ -173,8 +182,9 @@ docs/translation-pipeline.md                  §2-A 후보 UI 서술 + skip 경�
 
 1. **포스터 위계 + 카피** — `simpleCopy.ts`, `WorkPickStep.tsx`,
    `TranslateSettingsStep.tsx`, `globals.css`
-2. **작품 정보 없이 번역 경로** — `useWizard.ts`, `useWizard.test.ts`,
-   `WorkPickStep.tsx`, `page.tsx`, `PreviewHarness.tsx`
+2. **작품 정보 없이 번역 경로** — `workCard.ts`, `workCard.test.ts`,
+   `TranslateSettingsStep.tsx`, `useWizard.ts`, `WorkPickStep.tsx`,
+   `page.tsx`, `PreviewHarness.tsx`
    (`workPick.skip` 문자열은 버튼과 함께 이 커밋에)
 3. **문서** — `decisions.md`, `translation-pipeline.md`
 
