@@ -600,9 +600,14 @@ export function useTranslation(
       });
 
       // 검증이 눈에 보이도록 최소 시간을 채운다. 고정 대기가 아니라 최소
-      // 보장이다 — 스윕이 더 걸렸으면 이미 지나가서 0이 된다.
+      // 보장이다. Math.max(1, ...)는 결과가 항상 setTimeout(매크로태스크)을
+      // 타게 만든다 — 0 이하를 그대로 넘기면 sleepUnlessAborted가
+      // Promise.resolve()(마이크로태스크)로 처리해 버려서, verify 작업이
+      // MIN_VERIFY_MS를 넘긴 드문 경우에 finalizing→done이 다시 한 tick에
+      // 묶일 수 있었다 — 이 계획이 고친 바로 그 버그가 조용히 되살아나는
+      // 경로였다.
       await sleepUnlessAborted(
-        MIN_VERIFY_MS - (Date.now() - verifyStartedAt),
+        Math.max(1, MIN_VERIFY_MS - (Date.now() - verifyStartedAt)),
         controller.signal,
       );
       if (controller.signal.aborted) {

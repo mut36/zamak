@@ -37,6 +37,10 @@ const c = COPY.progress;
 
 /** enrich에는 대기 상수가 없다 — 이징이 기댈 수 있는 최소한의 값. */
 const CONTEXT_EXPECTED_MS = 3_000;
+/** 스윕 소요의 대략적 상한 — 실측치가 아니라 "완료로 보이지 않게" 잡은 값.
+ *  recoverySweep의 실제 예산은 콜 수 기반(RECOVERY.BUDGET_RATIO)이라 ms
+ *  환산 실측이 없다. */
+const RECOVERY_EXPECTED_MS = 15_000;
 
 /**
  * Flat progress bar + stage checklist (context → [glossary] → translate →
@@ -65,6 +69,14 @@ export function ProgressStep({
   const stage = activeStage(floor, glossaryEnabled);
   const bands = bandsFor(glossaryEnabled);
 
+  // 스윕은 청크 콜 수 기준 예산이라(recoverySweep.ts) ms 실측이 없다. 2초용
+  // MIN_VERIFY_MS로 그대로 이징하면 몇 초 만에 99.9%에 닿고 나머지 스윕
+  // 시간(수십 초까지 갈 수 있다) 내내 완료처럼 멈춰 있는다 — 이 계획이
+  // 없애려던 바로 그 증상이 스윕 경로에서 재현된다. 그래서 스윕 중엔 천장을
+  // 100 밑(98)으로 낮추고, 더 긴(추정치일 뿐 실측 아님) 예상 시간을 쓴다.
+  const isRecovering = progress.stage === 'recovering';
+  const bandEnd = isRecovering ? 98 : bands[stage][1];
+
   // 밴드마다 이징이 기댈 시간이 다르다. translate는 실측 보정을 거친
   // estimatedRemainingMs(useTranslation), 나머지는 그 단계의 대기 상수.
   const expectedMs: Record<StageKey, number> = {
@@ -74,12 +86,12 @@ export function ProgressStep({
       progress.estimatedRemainingMs ||
       progress.totalEstimateMs ||
       estimateTranslationMs(DEFAULT_MODEL),
-    verify: MIN_VERIFY_MS,
+    verify: isRecovering ? RECOVERY_EXPECTED_MS : MIN_VERIFY_MS,
   };
 
   const percent = useEasedProgress({
     floor,
-    bandEnd: bands[stage][1],
+    bandEnd,
     expectedMs: expectedMs[stage],
     snap: progress.stage === 'done',
   });
@@ -87,11 +99,24 @@ export function ProgressStep({
   const views = stageViews(percent, glossaryEnabled);
   const title = c.stages[stage];
 
-  // expectedMs.translate는 이미 **남은** 시간이다(useTranslation이 실측 보정해
-  // 넣는다). 여기서 (1 - percent/100)을 다시 곱하면 이중으로 깎인다.
+  // percent는 실제 착지분과의 max이므로 절대 뒤로 가지 않고, totalEstimateMs는
+  // 이 런의 총 추정치로 finalizing/recovering 내내 고정이다(done에서만 0으로
+  // 리셋되는데 그땐 percent가 이미 100이라 무관) — 그래서 이 곱은 단조 감소만
+  // 한다. estimatedRemainingMs를 직접 읽으면 0으로 떨어졌다가(청크 착지 시점,
+  // finalizing 진입 시점) totalEstimateMs로 되튀는 순간이 있어 숫자가 거꾸로
+  //간다 — 그 버그를 피하려고 일부러 안 쓴다.
+  const totalMs = progress.totalEstimateMs || estimateTranslationMs(DEFAULT_MODEL);
   const remainingSec =
-    percent >= 100 ? 0 : Math.max(1, Math.round(expectedMs.translate / 1000));
-  const processedLines = Math.round((percent / 100) * totalLines);
+    percent >= 100
+      ? 0
+      : Math.max(1, Math.round((totalMs * (1 - percent / 100)) / 1000));
+  // 이징된 percent가 아니라 실제 청크 착지 비율로 낸다 — 시간으로 채워진 바
+  // 위치는 "크롤일 뿐 거짓말은 아니다"로 정당화되지만, 구체적인 줄 수는
+  // 반증 가능한 주장이라 실제로 돌아온 청크만큼만 말해야 한다.
+  const processedLines =
+    progress.totalChunks > 0
+      ? Math.round((progress.currentChunk / progress.totalChunks) * totalLines)
+      : 0;
 
   return (
     <div className='animate-zslide flex flex-col items-center w-full max-w-[520px] mx-auto'>

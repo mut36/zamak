@@ -45,6 +45,10 @@ export function useEasedProgress(input: {
   /** 이징의 기준점 — floor가 움직일 때마다 거기서 다시 출발한다. */
   const anchor = useRef<{ at: number; from: number }>({ at: 0, from: floor });
 
+  // expectedMs는 일부러 뺐다 — 실측 보정으로 남은 시간 추정이 바뀔 때마다
+  // (useTranslation의 onCompleted) 이징 속도만 바뀌어야지, 위치가 되감기며
+  // 버벅이면 안 된다. eslint-plugin-react-hooks의 exhaustive-deps 자동수정이
+  // 이 줄을 "고치면" 그 버벅임이 조용히 되살아난다.
   useEffect(() => {
     anchor.current = {
       at: performance.now(),

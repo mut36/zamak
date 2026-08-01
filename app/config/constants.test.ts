@@ -153,11 +153,12 @@ describe('chunkSizeForModel', () => {
 });
 
 describe('estimateTranslationMs', () => {
-  it('quotes 20s for flash and 3 minutes for pro', () => {
-    // Both are anchored to measured runs (experiment-log.md), and the landing
-    // copy quotes the same measurement (i18n/simpleCopy.ts). Moving either one
-    // here without re-checking the log and the copy puts the ring, the pitch
-    // and the measurement on different figures — the failure this pins.
+  it('quotes 20s for flash and 165s for pro as the blocks-unknown fallback', () => {
+    // These are the polling-loop-free fallback used only when block count
+    // isn't known yet — the progress bar and settings ETA both derive their
+    // real numbers from progressEstimate.ts instead (see its own tests).
+    // Anchored to measured runs (experiment-log.md) so the fallback stays a
+    // plausible ballpark rather than drifting stale.
     expect(estimateTranslationMs(FLASH_MODEL)).toBe(20_000);
     expect(estimateTranslationMs(PRO_MODEL)).toBe(165_000);
   });

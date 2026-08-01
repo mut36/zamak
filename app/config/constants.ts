@@ -484,7 +484,9 @@ export function estimateTranslationMs(model: string): number {
  * 검증 자체(`enforceTextRules` → `adjustSubtitleTiming` → `buildDownloads`)는
  * 수십 ms에 끝나서, 완료 화면으로 넘어가기 전에 한 프레임도 그려지지 않았다.
  * 사용자에게는 "타임코드 검증을 건너뛴 것"으로 보인다. 고정 대기가 아니라
- * **최소** 보장이다 — 회수 스윕이 더 걸리면 그만큼 더 보여준다.
+ * **최소** 보장이다 — 다만 회수 스윕은 이 타이머가 시작되기 *전에* 이미
+ * 끝나 있으므로(useTranslation.ts의 verifyStartedAt 참고), 스윕 시간이 이
+ * 값을 깎지는 않는다. 실사용에선 매 런마다 걸리는 고정 ~2초로 보면 된다.
  */
 export const MIN_VERIFY_MS = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_MIN_VERIFY_MS,
