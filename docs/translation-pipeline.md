@@ -24,7 +24,8 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   → /api/analyze         제목·연도 확정 (AUX 모델)
   → [영화] /api/enrich    TMDB + 그라운딩 → 제목/연도/감독/포스터 + 장르/배경/톤
     [기타] /api/summarize 자막 앞부분 요약 → notes
-  → (opt-in, 토글 ON시) /api/glossary  전체 자막 1회 스캔 → 글로사리+말투관계
+  → (opt-in) /api/glossary  전체 자막 1회 스캔 → 글로사리+말투관계
+              ⚠️ 베타에서는 GLOSSARY_UI_ENABLED=false라 이 줄 전체가 안 돈다 (§2-C)
   → WorkPickStep          후보 선택(영화) / 유형·톤 입력(예능·다큐)
   → TranslateSettingsStep 사람이 검토·수정 (+ 글로사리 카드, 켰다면)
   → /api/translation/begin  크레딧 1 차감 → jobId
@@ -125,6 +126,15 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   `constants.ts` `SUMMARY_SAMPLE_LINES`.
 
 ### 2-C. 글로사리·존대관계 추출 (opt-in, 모델·콘텐츠 유형 무관)
+
+> ⚠️ **2026-08-02 베타 오픈 기준 이 단계는 아예 돌지 않는다.**
+> `GLOSSARY_UI_ENABLED`(`app/config/constants.ts`)가 `false`라서 설정 화면에
+> 토글이 없고, `useCastSheet`의 `readStoredEnabled()`가 저장된 값까지 무시한다
+> (예전에 켜뒀던 브라우저가 끌 방법 없이 계속 도는 걸 막기 위해서다).
+> 따라서 아래 설명은 **플래그를 다시 켰을 때의 동작**이다 — 지금 프롬프트에는
+> `<glossary>`·`<speech_relations>` 태그가 어떤 경로로도 붙지 않는다.
+> 배경과 되살리는 순서: `decisions.md` §6-7, `docs/TODO.md`.
+
 - **코드**: `app/api/glossary/route.ts` → `app/lib/server/extractCastSheet.ts`
   (`extractCastSheet` → `fetchCastAnchors`(TMDB cast, best-effort) + 프로바이더
   분기(`GLOSSARY_PROVIDER`, 기본 `openai` → `openaiGenerateJson` Structured
