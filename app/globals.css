@@ -1763,6 +1763,46 @@ button:disabled {
     font-weight: 600;
     letter-spacing: -0.012em;
   }
+
+  /* "이용방법" 4단계 카드 — 벤토와 같은 반경·여백 토큰을 쓰되, 다크
+     `.lp-step`(속도 섹션)과 달리 밝은 배경 위에 놓인다. */
+  .lp-how-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+  }
+  .lp-how-card {
+    background: var(--surface);
+    border-radius: 22px;
+    padding: 28px 26px;
+    box-shadow: var(--shadow-card);
+  }
+  .lp-how-num {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-strong);
+    background: var(--accent-soft);
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+  .lp-how-title {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .lp-how-desc {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
   .lp-rule {
     display: flex;
     align-items: center;

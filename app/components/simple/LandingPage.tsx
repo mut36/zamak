@@ -167,6 +167,9 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
               보완 필요"). Tailwind 유틸리티로 처리 — 컴포넌트 레이어의 미디어
               쿼리는 같은 요소의 `flex` 유틸리티에 밀린다. */}
           <div className='hidden sm:flex items-center gap-1.5'>
+            <a href='#how' className='lp-navlink'>
+              {L.nav.how}
+            </a>
             <a href='#compare' className='lp-navlink'>
               {L.nav.compare}
             </a>
@@ -300,7 +303,40 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           </p>
         </header>
 
-        {/* ── 3. 번역 비교 ──────────────────────────────────────── */}
+        {/* ── 3. 이용 방법 ──────────────────────────────────────── */}
+        {/* "속도" 섹션(아래)이 "15초 동안 시스템이 하는 일"을 보여준다면,
+            여기는 "화면에서 사용자가 실제로 누르는 4단계"를 보여준다 —
+            같은 파이프라인을 다른 관점에서 두 번 판다. */}
+        <section
+          id='how'
+          className='lp-anchor bg-bg px-6 py-24'
+        >
+          <div className='max-w-[880px] mx-auto'>
+            <h2 className='lp-h2 text-center mb-2.5 reveal'>{L.how.title}</h2>
+            <p
+              className='lp-section-sub text-center max-w-[480px] mx-auto mb-10 break-keep reveal'
+              style={revealDelay(1)}
+            >
+              {L.how.sub}
+            </p>
+
+            <div className='lp-how-grid reveal' style={revealDelay(2)}>
+              {L.how.steps.map((step) => (
+                <div key={step.num} className='lp-how-card'>
+                  <span className='lp-how-num' aria-hidden>
+                    {step.num}
+                  </span>
+                  <div className='lp-how-title'>{step.title}</div>
+                  <p className='lp-how-desc break-keep whitespace-normal sm:whitespace-pre-line'>
+                    {step.desc}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── 4. 번역 비교 ──────────────────────────────────────── */}
         <section
           id='compare'
           className='lp-anchor bg-surface border-t border-border-subtle px-6 py-[90px]'
@@ -387,7 +423,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           </div>
         </section>
 
-        {/* ── 4. 속도 ───────────────────────────────────────────── */}
+        {/* ── 5. 속도 ───────────────────────────────────────────── */}
         <section
           id='speed'
           className='lp-anchor bg-ink-strong text-on-ink px-6 py-[100px]'
@@ -441,7 +477,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           </div>
         </section>
 
-        {/* ── 5. CPS 자동 조정 ──────────────────────────────────── */}
+        {/* ── 6. CPS 자동 조정 ──────────────────────────────────── */}
         <section id='cps' className='lp-anchor bg-bg px-6 py-24'>
           <div className='max-w-[880px] mx-auto'>
             <h2 className='lp-h2 mb-2.5 reveal'>{L.cps.title}</h2>
@@ -516,7 +552,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           </div>
         </section>
 
-        {/* ── 6. 기능 벤토 ──────────────────────────────────────── */}
+        {/* ── 7. 기능 벤토 ──────────────────────────────────────── */}
         <section className='bg-surface border-t border-border-subtle px-6 py-24'>
           <div className='max-w-[880px] mx-auto'>
             <h2 className='lp-h2 text-center max-w-full mx-auto mb-11 whitespace-normal sm:whitespace-pre-line reveal'>
@@ -594,7 +630,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           </div>
         </section>
 
-        {/* ── 7. 최종 CTA ───────────────────────────────────────── */}
+        {/* ── 8. 최종 CTA ───────────────────────────────────────── */}
         <section className='text-center px-6 pt-[110px] pb-[90px]'>
           <h2 className='lp-h2-final mb-3.5 whitespace-normal sm:whitespace-pre-line reveal'>
             {L.final.title}
@@ -624,7 +660,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
         </section>
       </main>
 
-      {/* ── 8. Footer ─────────────────────────────────────────── */}
+      {/* ── 9. Footer ─────────────────────────────────────────── */}
       {/* §1-11의 세 번째 노출 지점. 로그인 전 화면은 이 푸터가 유일한 약관
           경로다 — 로그인 후 셸에는 익명 방문자가 닿지 못한다. */}
       <SiteFooter />
