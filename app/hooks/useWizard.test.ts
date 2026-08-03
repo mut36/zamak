@@ -164,3 +164,26 @@ describe('inspectUpload: 거절은 아무것도 남기지 않는다', () => {
 // on "이 작품이 아니에요") lives in useWizard.ts and depends on the async
 // /api/enrich round-trip, so it isn't covered by a pure-function test here —
 // see runEnrich's doc comment for the routing rules it implements.
+
+/**
+ * 폰에서 자막 파일이 아예 안 골라지던 버그(`decisions.md` §1-22)의 회귀 방지.
+ *
+ * 드롭존의 `<input type=file>`에 `accept`가 있으면 iOS가 그 확장자를 UTI로
+ * 바꿔서 거는데 `.srt`·`.smi`·`.ass`는 등록된 UTI가 없어서, 파일 앱이 **모든
+ * 파일을 회색으로** 만든다. 걸러지는 게 아니라 업로드가 통째로 막힌다.
+ *
+ * "지원 포맷을 미리 걸러 주자"는 직관이 워낙 자연스러워서 언젠가 반드시 다시
+ * 붙는다. 그때 여기서 깨지라고 소스를 직접 읽어 고정한다 — 거르는 일은 위
+ * `inspectUpload` 테스트들이 지키고 있는 몫이다.
+ */
+describe('업로드 input은 accept를 걸지 않는다', () => {
+  it('UploadStep의 file input에 accept 속성이 없다', async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync(
+      new URL('../components/simple/UploadStep.tsx', import.meta.url),
+      'utf8',
+    );
+    const fileInput = source.slice(source.indexOf("type='file'"));
+    expect(fileInput).not.toMatch(/\baccept=/);
+  });
+});

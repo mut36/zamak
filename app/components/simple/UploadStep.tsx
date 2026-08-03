@@ -154,10 +154,18 @@ export function UploadStep({
           </>
         )}
 
+        {/* ⚠️ `accept`를 다시 붙이지 말 것 — 폰에서 자막을 아예 못 고르게 된다.
+            iOS는 `accept`의 확장자를 UTI로 바꿔서 거는데 `.srt`·`.smi`·`.ass`는
+            등록된 UTI가 없다. 그래서 파일 앱이 **모든 파일을 회색으로** 만들어
+            버린다 — 걸러주는 게 아니라 업로드 자체가 막힌다.
+
+            거르는 일은 `inspectUpload`가 이미 한다(확장자 → 파싱 → 타이밍 →
+            크기 순). 잘못 고른 파일은 드롭존 옆에 이유가 뜨므로, 데스크톱이
+            잃는 건 피커의 회색 처리뿐이고 모바일은 제품을 되찾는다.
+            `decisions.md` §1-22. */}
         <input
           ref={inputRef}
           type='file'
-          accept='.srt,.vtt,.smi,.sami,.ass,.ssa'
           className='hidden'
           onChange={(e) => {
             const file = e.target.files?.[0];
