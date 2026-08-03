@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { BRAND, SITE } from './lib/brand';
+import { BRAND, SITE, resolveSiteUrl } from './lib/brand';
 
 // Monospace for file names, timecodes, %, token counts, language codes.
 const jetbrainsMono = JetBrains_Mono({
@@ -12,24 +12,10 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 });
 
-function siteUrl(): URL {
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return new URL(process.env.NEXT_PUBLIC_SITE_URL);
-  }
-  if (process.env.VERCEL_ENV === 'production') {
-    return new URL(SITE.url);
-  }
-  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-    return new URL(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`);
-  }
-  if (process.env.VERCEL_URL) {
-    return new URL(`https://${process.env.VERCEL_URL}`);
-  }
-  return new URL('http://localhost:3000');
-}
-
 export const metadata: Metadata = {
-  metadataBase: siteUrl(),
+  // Shared with robots.ts and sitemap.ts — see resolveSiteUrl's note on why
+  // all three have to read one function.
+  metadataBase: resolveSiteUrl(),
   title: {
     default: SITE.title,
     template: `%s · ${SITE.name}`,

@@ -47,3 +47,34 @@ export const SITE = {
     'SRT·VTT·SMI·ASS를 올리고, AI는 대사만 한국어로 번역하며 코드가 타임코드를 다시 연결해 후속 자막의 연쇄 밀림을 막습니다. 다운로드는 SRT 또는 원본 형식(VTT).',
   locale: 'ko_KR',
 } as const;
+
+/**
+ * The origin every absolute URL we emit is built from — `metadataBase`, the
+ * sitemap's entries, and the sitemap reference in robots.txt.
+ *
+ * It lives here rather than in `layout.tsx` because those three must agree: a
+ * sitemap listing `zamak.app` while robots.txt is served from a preview
+ * deployment is the classic way to get a preview build indexed under the
+ * production domain.
+ *
+ * Order matters. `NEXT_PUBLIC_SITE_URL` wins because it is the one value we
+ * set on purpose; `VERCEL_ENV === 'production'` pins the apex so a production
+ * build never falls through to a generated `*.vercel.app` host; the rest are
+ * previews and local, where a wrong-but-reachable origin beats a right-but-
+ * unreachable one.
+ */
+export function resolveSiteUrl(): URL {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return new URL(process.env.NEXT_PUBLIC_SITE_URL);
+  }
+  if (process.env.VERCEL_ENV === 'production') {
+    return new URL(SITE.url);
+  }
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return new URL(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`);
+  }
+  if (process.env.VERCEL_URL) {
+    return new URL(`https://${process.env.VERCEL_URL}`);
+  }
+  return new URL('http://localhost:3000');
+}
