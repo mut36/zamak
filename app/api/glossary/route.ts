@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '../../lib/server/auth';
+import { enforceRateLimit } from '../../lib/server/rateLimit';
+import { reportServerError } from '../../lib/server/reportError';
 import { extractCastSheet } from '../../lib/server/extractCastSheet';
 import { EMPTY_CAST_SHEET } from '../../types/glossary';
 import { DEFAULT_TARGET_LANG } from '../../config/languages';
@@ -28,6 +30,12 @@ export async function POST(request: NextRequest) {
   const auth = await requireUser();
   if (!auth.ok) return auth.response;
 
+  // Its own, tighter bucket: a full-file scan through the glossary provider is
+  // the most expensive uncharged call we make, and the product asks for it
+  // once per file.
+  const limited = await enforceRateLimit('glossary');
+  if (!limited.ok) return limited.response;
+
   let body: GlossaryRequest;
   try {
     body = await request.json();
@@ -54,6 +62,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(sheet);
   } catch (error) {
     console.error('[glossary] request failed:', error);
+    // This route is the one place monitoring matters most, precisely because
+    // the caller is told nothing: an empty sheet is indistinguishable from a
+    // file with no proper nouns in it. Recorded with status 200 — that is
+    // what the user gets, and pretending otherwise would make the error table
+    // disagree with the access log.
+    await reportServerError({
+      userId: auth.user.id,
+      route: '/api/glossary',
+      error,
+      status: 200,
+      detail: { degraded: 'empty_sheet' },
+    });
     // Never a hard failure for the caller — an empty sheet degrades to
     // today's behavior instead of blocking the info step.
     return NextResponse.json(EMPTY_CAST_SHEET);

@@ -13,7 +13,7 @@ import {
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '0.27.2';
+export const APP_VERSION = '0.28.0';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
@@ -268,6 +268,39 @@ export const JOB_VALIDITY_MINUTES = readPositiveIntEnv(
   process.env.JOB_VALIDITY_MINUTES,
   60,
 );
+
+/**
+ * Per-user call ceilings for the routes that spend the server key **without
+ * charging a credit** — enrich (TMDB + grounded search), analyze, summarize,
+ * glossary. Credits gate translation; these four were gated by nothing but a
+ * login, so one signed-in script could run them forever on our bill.
+ *
+ * What this is NOT for: total load. `docs/tuning/gemini-limits.md` §7-2 puts
+ * concurrent capacity at 38-68 users against Gemini's own quota, well past a
+ * 30-person beta. The risk being closed here is a *single* user looping, which
+ * a total-capacity number says nothing about.
+ *
+ * The numbers are deliberately loose. One file's normal path is: analyze ×1,
+ * enrich ×1-3 (search, then maybe a candidate pick or two), summarize ×1,
+ * glossary ×1. A user translating back-to-back files never comes near 20/min,
+ * so a real user should never see a 429 — that is the design target, because a
+ * limit that fires on legitimate use gets raised until it means nothing.
+ *
+ * Glossary is lower because it is the expensive one (a full-file scan through
+ * an OpenAI call, `extractCastSheet.ts`) and is opt-in at one call per file.
+ *
+ * Buckets are shared per key: the three cheap routes are one bucket, so 20/min
+ * is the combined budget rather than 20 each. Keys must match the `p_bucket`
+ * values in `supabase/migrations/0011_rate_limits_and_errors.sql`.
+ */
+export const RATE_LIMITS = {
+  /** /api/analyze, /api/summarize, /api/enrich — flash-lite and TMDB. */
+  aux: { limit: 20, windowSeconds: 60 },
+  /** /api/glossary — full-file scan, opt-in, once per file. */
+  glossary: { limit: 5, windowSeconds: 60 },
+} as const;
+
+export type RateLimitBucket = keyof typeof RATE_LIMITS;
 
 /**
  * Auxiliary model for lightweight tasks (title/year analysis, web-search

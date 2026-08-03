@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '../../lib/server/auth';
+import { enforceRateLimit } from '../../lib/server/rateLimit';
+import { reportServerError } from '../../lib/server/reportError';
 import {
   enrichMovieById,
   searchMovie,
@@ -21,6 +23,12 @@ export async function POST(request: NextRequest) {
   // Signed-in only; no credit charged (see /api/analyze).
   const auth = await requireUser();
   if (!auth.ok) return auth.response;
+
+  // The costliest of the three uncharged routes — a TMDB lookup plus a
+  // grounded search call (enrichMovie.ts `extractKeywords`). Shares the `aux`
+  // budget with /api/analyze and /api/summarize.
+  const limited = await enforceRateLimit('aux');
+  if (!limited.ok) return limited.response;
 
   let body: { title?: string; year?: string; candidate?: unknown };
   try {
@@ -56,6 +64,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error('Enrichment failed:', error);
+    await reportServerError({
+      userId: auth.user.id,
+      route: '/api/enrich',
+      error,
+      status: 500,
+      // Which arm threw: candidate resolution or the search itself.
+      detail: { mode: body.candidate !== undefined ? 'select' : 'search' },
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Enrichment failed' },
       { status: 500 },

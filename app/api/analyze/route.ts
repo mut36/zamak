@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { composeAnalysisPrompt } from '../../lib/prompts/analysis';
 import { AUX_MODEL } from '../../config/constants';
 import { requireUser } from '../../lib/server/auth';
+import { enforceRateLimit } from '../../lib/server/rateLimit';
+import { reportServerError } from '../../lib/server/reportError';
 
 export const maxDuration = 30;
 
@@ -16,6 +18,12 @@ export async function POST(request: NextRequest) {
   // charging for metadata a user might discard would be indefensible.
   const auth = await requireUser();
   if (!auth.ok) return auth.response;
+
+  // Nothing else caps this route: no credit is spent, so a signed-in loop
+  // would run on our bill indefinitely. Shares the `aux` budget with
+  // /api/enrich and /api/summarize.
+  const limited = await enforceRateLimit('aux');
+  if (!limited.ok) return limited.response;
 
   // Server key only — callers never supply their own.
   const apiKey = process.env.GOOGLE_GENAI_API_KEY;
@@ -65,8 +73,15 @@ export async function POST(request: NextRequest) {
         title: typeof analysis.title === 'string' ? analysis.title : '',
         year: typeof analysis.year === 'string' ? analysis.year : '',
       });
-    } catch {
+    } catch (parseError) {
       console.error('Failed to parse analysis response:', result);
+      await reportServerError({
+        userId: auth.user.id,
+        route: '/api/analyze',
+        error: parseError,
+        status: 502,
+        detail: { stage: 'parse', model: AUX_MODEL },
+      });
       return NextResponse.json(
         { error: 'Failed to parse analysis response' },
         { status: 502 },
@@ -74,6 +89,13 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('Analysis failed:', error);
+    await reportServerError({
+      userId: auth.user.id,
+      route: '/api/analyze',
+      error,
+      status: 500,
+      detail: { model: AUX_MODEL },
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Analysis failed' },
       { status: 500 },

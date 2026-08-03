@@ -691,5 +691,16 @@ export const COPY = {
      * `supabase/comp-credit.sql`로 처리한다.
      */
     creditNote: '번역권은 복구해 드립니다. 아래 주소로 알려주세요 —',
+    /**
+     * 429 응답 본문에 담기는 문구(`app/lib/server/rateLimit.ts`). 서버 문자열이지만
+     * 화면이 그대로 받아 보여주므로 하드코딩하지 않고 여기 둔다.
+     *
+     * 번역권과 무관하다는 걸 굳이 말하는 이유: 사용자가 이 문구를 볼 만한
+     * 유일한 경로는 업로드 직후 메타데이터 단계이고, 그 단계는 크레딧을 쓰지
+     * 않는다(`/api/analyze`·`/api/enrich`·`/api/summarize`). 안 그러면
+     * "거절당했는데 번역권이 나갔나?"를 문의로 받게 된다.
+     */
+    rateLimited: (seconds: number) =>
+      `요청이 너무 잦습니다. ${seconds}초 뒤에 다시 시도해 주세요. 번역권은 사용되지 않았습니다.`,
   },
 } as const;

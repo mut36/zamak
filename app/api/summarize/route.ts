@@ -2,6 +2,8 @@ import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { AUX_MODEL, SUMMARY_SAMPLE_LINES } from '../../config/constants';
 import { requireUser } from '../../lib/server/auth';
+import { enforceRateLimit } from '../../lib/server/rateLimit';
+import { reportServerError } from '../../lib/server/reportError';
 
 export const maxDuration = 30;
 
@@ -29,6 +31,11 @@ export async function POST(request: NextRequest) {
   // Signed-in only; no credit charged (see /api/analyze).
   const auth = await requireUser();
   if (!auth.ok) return auth.response;
+
+  // No credit is spent here, so the login is the only other gate. Shares the
+  // `aux` budget with /api/analyze and /api/enrich.
+  const limited = await enforceRateLimit('aux');
+  if (!limited.ok) return limited.response;
 
   // Server key only — callers never supply their own.
   const apiKey = process.env.GOOGLE_GENAI_API_KEY;
@@ -68,6 +75,13 @@ ${sample}
     return NextResponse.json({ summary });
   } catch (error) {
     console.error('Summarize failed:', error);
+    await reportServerError({
+      userId: auth.user.id,
+      route: '/api/summarize',
+      error,
+      status: 500,
+      detail: { model: AUX_MODEL },
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Summarize failed' },
       { status: 500 },
