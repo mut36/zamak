@@ -50,34 +50,34 @@ export const COPY = {
 
     hero: {
       title: '전문 자막가의 규칙을 배운\nAI 자막 번역',
-      sub: '자막 파일을 올리기만 하세요.\n*한글 자막 표준 규칙*이 적용된 자연스러운 번역이 드라마 한 편 기준 *10초* 만에 완성됩니다.',
+      sub: '자막 파일을 올리기만 하세요.\n*한글 자막 표준 규칙*이 적용된 자연스러운 번역이 드라마 한 편 기준 *15초* 만에 완성됩니다.',
       secondaryCta: '번역 품질 비교하기',
       note: '실제 번역 결과 예시. 타임코드는 코드가 관리해 싱크가 밀리지 않습니다.',
       demoLabel: '번역 결과 예시',
       pairs: [
         {
           lang: 'EN',
-          tc: '00:41:07,220',
-          src: '"You’re telling me she just walked out? In the middle of the ceremony?"',
-          ko: '식 도중에 그냥 나가 버렸다고?',
-        },
-        {
-          lang: 'JA',
-          tc: '00:12:44,050',
-          src: '「そんなつもりじゃなかったんだ。信じてくれ。」',
-          ko: '그럴 생각은 없었어. 믿어 줘',
+          tc: '00:38:11,400',
+          src: 'Keep insisting.\nDripping hollows the stone.',
+          ko: '계속 밀어붙이게\n낙숫물이 바위를 뚫는다고 하잖나',
         },
         {
           lang: 'EN',
-          tc: '01:03:18,900',
-          src: '"Don’t you dare walk away from me right now."',
-          ko: '지금 나한테서 등 돌릴 생각 하지 마',
+          tc: '00:51:02,180',
+          src: 'Tell me about it.',
+          ko: '내 말이',
         },
         {
-          lang: 'FR',
-          tc: '00:27:55,410',
-          src: '« On ne voit bien qu’avec le cœur. »',
-          ko: '마음으로 봐야 제대로 보이는 법이야',
+          lang: 'EN',
+          tc: '00:29:47,300',
+          src: "I'm not saying it's your fault.\nI'm just saying somebody has to take responsibility.",
+          ko: '네 탓이라는 건 아니지만\n누군가는 책임을 져야지',
+        },
+        {
+          lang: 'EN',
+          tc: '00:19:33,000',
+          src: 'Like hell you are.',
+          ko: '꿈도 꾸지 마.',
         },
       ],
     },
@@ -87,53 +87,74 @@ export const COPY = {
       sub: '직접 비교해 보세요. 자막은 읽는 글이 아니라 듣는 말입니다.',
       tablistLabel: '번역 엔진 선택',
       sourceLabel: '원문 대사',
+      // 연속 2줄. CPS 태그는 각 줄 2.0초 노출 가정 시 **가장 빡센 줄** 기준 —
+      // `computeCps`와 같은 글자 수로 계산한다(공백 포함, 화자 대시 `- ` 포함).
+      //
+      // ⚠️ 대시를 빼고 세면 세 엔진 모두 정확히 1.0씩 낮게 나온다 — 2026-08-03
+      // 점검에서 12.0/15.0/8.5로 적혀 있던 게 그 오차였다. 대시는 화면에 실제로
+      // 찍히므로 세는 게 맞다. `simpleCopy.test.ts`가 이제 이 값을 대사에서
+      // 직접 계산해 대조하므로, 대사를 고치면 태그도 같이 고쳐야 통과한다.
       sourceLine:
-        '"You’re telling me she just walked out? In the middle of the ceremony?"',
-      sourceMeta: '00:41:07,220 → 00:41:09,850 · 2.6초 노출',
+        '- Who knows he\'s alive and free?\n- No one, not even his family.',
+      sourceMeta: '연속 대사 2줄 · 각 2.0초 노출',
       resultLabel: (engine: string) => `${engine}의 번역`,
       outro:
         'ZAMAK은 문장을 옮기지 않고 장면을 옮깁니다.\n화면에 떠 있는 시간 안에 읽히도록, 말투와 관계까지 그대로.',
       engines: [
         {
           name: '일반 번역기',
-          out: '"당신은 그녀가 그냥 걸어 나갔다고 나에게 말하고 있는 건가요? 의식 한가운데에서?"',
+          out: '- 그가 살아있고 자유롭다는 걸 누가 알겠어요?\n- 아무도 몰라요, 가족조차도요.',
           tags: [
-            { label: 'CPS 17.1 · 상한 초과', tone: 'red' },
+            { label: 'CPS 13.0 · 상한 초과', tone: 'red' },
             { label: '어색한 직역', tone: 'red' },
-            { label: '말투 불일치', tone: 'red' },
+            { label: '과잉 존댓말', tone: 'red' },
           ],
         },
         {
           name: '범용 AI 모델',
-          out: '"그녀가 식 중간에 그냥 나가버렸다고 말하는 거야?"',
+          out: '- 그가 살아 있고 자유의 몸이라는 걸 아는 사람이 있나?\n- 아무도. 가족조차 몰라.',
           tags: [
             { label: '문장은 자연스러움', tone: 'neutral' },
-            { label: 'CPS 10.3 · 권장 초과', tone: 'orange' },
+            // 16.0은 13.0(일반 번역기)보다 나쁜데 톤이 더 순하면 "왜 더 큰
+            // 숫자가 덜 경고인가"가 된다. 상한(12) 위반은 두 엔진 다 red로
+            // 통일하고, 이 엔진이 중간 등급이라는 건 나머지 두 태그가 진다.
+            { label: 'CPS 16.0 · 상한 초과', tone: 'red' },
             { label: '자막 규칙 미적용', tone: 'orange' },
           ],
         },
         {
           name: 'ZAMAK',
-          out: '"식 도중에 그냥 나가 버렸다고?"',
+          out: '- 생존과 석방 사실은 누가 알지?\n- 아무도요, 가족조차 모릅니다',
           tags: [
-            { label: 'CPS 6.5 충족', tone: 'green' },
-            { label: '표준 규칙 적용', tone: 'green' },
-            { label: '반문 뉘앙스 유지', tone: 'green' },
+            { label: 'CPS 9.5 충족', tone: 'green' },
+            { label: '핵심만 압축', tone: 'green' },
+            { label: '화자 말투 구분', tone: 'green' },
           ],
         },
       ],
     },
 
-    // 12초는 실측이다 — 라이트(flash) 모델, 461블록 드라마 한 편이 12.0초
-    // (`docs/tuning/experiment-log.md` 2026-07-28, 프로덕션 설정 그대로).
-    // 같은 로그의 1,874블록 장편은 17.8초라, 이 문구는 반드시 "드라마 한 편"
-    // 단서를 달고 쓴다. 단계 라벨을 시각(0:00…)이 아니라 번호로 둔 것도 같은
-    // 이유 — 중간 단계별 소요 시간은 실측한 적이 없다.
+    // 15초는 실측을 덮는 값이다 (`docs/tuning/experiment-log.md` 2026-08-03,
+    // 라이트(flash)·프로덕션 설정 그대로): 461블록 13.4초 · 1,124블록 14.8초.
+    //
+    // **벽시계는 자막 길이에 비례하지 않는다** — 이게 이 문구를 고르는 근거다.
+    // SERVER_CONCURRENCY=16 · SERVER_CHUNK_SIZE=100이라 1,600블록까지는 모든
+    // 청크가 한 웨이브에 동시에 나가고, 총시간은 곧 **최장 청크 하나**의 시간이
+    // 된다(위 두 런 모두 총시간 == 최장청크로 찍혔다). 블록이 2.4배가 돼도
+    // 시간은 10%만 늘어난 이유가 그것이다. 1,600블록을 넘으면 두 웨이브가 되어
+    // 17.8초까지 간다(같은 로그 2026-07-28, 1,874블록).
+    //
+    // 그래서 이전 값 12초는 쓰면 안 된다 — 7/28에 한 번 나온 최선값이라
+    // 같은 파일이 8/3에 13.4초로 재현되지 않았다. 히어로가 팔던 10초는 어떤
+    // 런도 찍은 적이 없다(`docs/decisions.md` §1-15).
+    //
+    // 단계 라벨을 시각(0:00…)이 아니라 번호로 둔 것도 같은 이유 — 중간
+    // 단계별 소요 시간은 실측한 적이 없다.
     speed: {
       titleTop: '드라마 한 편 번역에',
-      titleAccent: '12초.',
+      titleAccent: '15초.',
       body: '영상 파일은 필요 없습니다.\n자막 파일 하나만 올리면 언어 인식부터 규칙 적용,\n최종 파일 생성까지 한 번에',
-      note: '라이트 모델 · 461블록 드라마 한 편 실측 기준. 장편은 자막 길이에 따라 더 걸립니다.',
+      note: '라이트 모델 실측 기준 — 461블록 13.4초 · 1,124블록 14.8초. 자막이 1,600블록을 넘으면 조금 더 걸립니다.',
       steps: [
         {
           time: '01',
@@ -185,18 +206,18 @@ export const COPY = {
           name: '영화 · 드라마',
           value: '10',
           action: '너무 빨리 지나가는 대사는\n앞뒤 침묵만큼 노출을 넓힘',
-          lines: ['식 도중에 그냥', '나가 버렸다고?'],
-          tc: '00:41:07,220 → 00:41:09,850',
-          measured: 'CPS 6.1 ✓',
+          lines: ['생존과 석방 사실은', '누가 알지?'],
+          tc: '00:14:22,100 → 00:14:24,100',
+          measured: 'CPS 8.0 ✓',
         },
         {
           key: 'variety',
           name: '예능 · 유튜브',
           value: '8',
           action: '화면에 이미 읽을 게 많으니\n자막은 가장 여유 있게',
-          lines: ['아니 진짜 중간에 나갔다고?'],
+          lines: ['야 가족도 모른대'],
           tc: '00:03:12,000 → 00:03:14,000',
-          measured: 'CPS 7.5 ✓',
+          measured: 'CPS 4.5 ✓',
         },
         {
           key: 'talk',
@@ -392,7 +413,11 @@ export const COPY = {
     sectionQuality: '번역 품질',
     sectionAdvanced: '세부 조정 (선택)',
     liteName: '라이트',
-    liteDesc: '빠르고 정확한 기본 번역.\n10초면 다운로드까지 완료됩니다.',
+    // 랜딩 히어로·`COPY.landing.speed`와 같은 숫자를 써야 한다 — 첫 화면에서
+    // 약속한 시간을 설정 화면이 뒤집으면 그 자리에서 들킨다. 조건 단서
+    // ("드라마 한 편")도 같이 온다: 그게 없으면 크레딧 상한(2,000블록)짜리
+    // 파일에도 같은 약속을 하는 문구가 된다.
+    liteDesc: '빠르고 정확한 기본 번역.\n드라마 한 편 기준 15초면 완료됩니다.',
     proName: '프로',
     proDesc: '작품 맥락 분석과 인물명 일관성.\n후편집 시간을 줄이는 초벌 번역.',
     // "무료" is load-bearing for the beta: the credits are a gift, not a

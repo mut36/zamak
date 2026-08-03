@@ -245,14 +245,19 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
               <span className='lp-mono-lang'>{pair.lang} → KO</span>
             </div>
             <div className='flex flex-col gap-5 px-10 pt-11 pb-10 min-h-[150px]'>
-              <div className='lp-hero-src'>{pair.src}</div>
+              <div className='lp-hero-src whitespace-pre-line break-keep'>
+                {pair.src}
+              </div>
               <div className='flex flex-col gap-2'>
                 {heroWaiting ? (
                   <span className='lp-hero-wait' aria-hidden>
                     <span className='animate-zblink'>▋</span>
                   </span>
                 ) : (
-                  <span key={`ko${heroIdx}`} className='lp-hero-ko'>
+                  <span
+                    key={`ko${heroIdx}`}
+                    className='lp-hero-ko whitespace-pre-line break-keep'
+                  >
                     {pair.ko}
                   </span>
                 )}
@@ -301,7 +306,9 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
             >
               <div className='lp-card-source'>
                 <span className='lp-card-label'>{L.compare.sourceLabel}</span>
-                <p className='lp-line'>{L.compare.sourceLine}</p>
+                <p className='lp-line whitespace-pre-line break-keep'>
+                  {L.compare.sourceLine}
+                </p>
                 <span className='mono text-[11px] text-quaternary'>
                   {L.compare.sourceMeta}
                 </span>
@@ -317,7 +324,10 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                 <span className='lp-card-label'>
                   {L.compare.resultLabel(eng.name)}
                 </span>
-                <p key={`e${engine}`} className='lp-line lp-subin'>
+                <p
+                  key={`e${engine}`}
+                  className='lp-line lp-subin whitespace-pre-line break-keep'
+                >
                   {eng.out}
                 </p>
                 {/* 번역문(`.lp-subin`)이 다시 뜨는데 판정 태그만 즉시 교체되면
@@ -377,8 +387,9 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                 configured={configured}
                 className='lp-btn lp-btn-accent text-[15px] px-[26px] py-3'
               />
-              {/* 12초의 실측 조건을 문구 옆에 붙여 둔다 — 조건 없이 쓰면
-                  장편(17.8초)에 대해 거짓이 된다(COPY.landing.speed 주석). */}
+              {/* 15초의 실측 조건을 문구 옆에 붙여 둔다 — 조건 없이 쓰면
+                  두 웨이브로 넘어가는 파일(1,600블록 초과, 17.8초)에 대해
+                  거짓이 된다(COPY.landing.speed 주석). */}
               <p
                 className='mt-5 max-w-[400px] text-fineprint leading-[1.6] break-keep'
                 style={{ color: 'rgba(250,249,245,0.4)' }}
@@ -387,7 +398,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
               </p>
             </div>
 
-            {/* 이 목록은 내용 자체가 "12초 동안 무슨 일이 일어나는가"다. 한 행씩
+            {/* 이 목록은 내용 자체가 "15초 동안 무슨 일이 일어나는가"다. 한 행씩
                 차례로 올라오게 해서 경과 시간을 모션으로도 읽히게 한다. */}
             <ol className='flex flex-col list-none m-0 p-0'>
               {L.speed.steps.map((step, i) => (
