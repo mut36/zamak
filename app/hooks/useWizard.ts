@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation, type TranslationMessages } from './useTranslation';
 import { useEnrich, type EnrichCandidate, type EnrichResult } from './useEnrich';
 import { useCastSheet } from './useCastSheet';
-import { parseSrtBlocks } from '../lib/srt';
+import { parseBlockTiming, parseSrtBlocks } from '../lib/srt';
 import {
   BilingualSmiError,
   isSupportedSubtitleFilename,
@@ -55,6 +55,28 @@ export function exceedsCreditCap(blockCount: number): boolean {
 }
 
 /**
+ * Whether a parsed document contains at least one block with real SRT timing.
+ *
+ * `countBlocks` just counts blank-line-separated paragraphs — that matches
+ * the server's cap check on purpose (see above), but it means a .srt-named
+ * file whose content isn't actually subtitles (prose, a bare VTT header,
+ * garbage) still counts as N "blocks": `parseSrtBlocks` treats any non-blank
+ * paragraph as one, with no structural check. `countBlocks` alone would let
+ * that straight through to translate — a spent credit for nothing.
+ *
+ * Verified while adding this (2026-08-03): a genuinely *empty* block count
+ * turns out unreachable once `EmptySubtitleError` has already ruled out a
+ * blank document — `normalizeSrt` only trims, so any non-blank document
+ * survives as at least one non-blank paragraph. Checked this directly rather
+ * than assume it: every non-blank probe input (`"nonsense"`, a lone `WEBVTT`
+ * line, null bytes, zero-width space) parsed to exactly 1 block, never 0. The
+ * actual gap is **validity**, not count, so that's what this checks instead.
+ */
+function hasAnyValidTiming(srt: string): boolean {
+  return parseSrtBlocks(srt).some((block) => parseBlockTiming(block) !== null);
+}
+
+/**
  * A bilingual SAMI is the one failure with a fix the user can act on (upload a
  * single-language file), so it gets its own message. Everything else — an
  * unrecognized body, no cues, a decode failure — reads the same from here.
@@ -70,6 +92,7 @@ export type UploadRejection =
   | 'invalidFile'
   | 'bilingualSmi'
   | 'unreadable'
+  | 'noBlocks'
   | 'tooLarge';
 
 export type UploadInspection =
@@ -120,6 +143,19 @@ export async function inspectUpload(
   // are real API spend on a file we are about to refuse. Same parse the
   // server check uses, so the two can never disagree about the count.
   const blockCount = countBlocks(doc.srt);
+
+  // A .srt-named file whose body isn't actually subtitles (a VTT saved with
+  // the wrong extension, common from YouTube; a bare text file) parses
+  // without throwing and without ever being caught above — EmptySubtitleError
+  // only catches a fully blank/whitespace file, and every non-blank file
+  // survives as at least one "block" no matter how unstructured its content
+  // (see hasAnyValidTiming's doc comment). Neither of those checks notices
+  // that block has no real timing, so it reached translate: a spent credit
+  // for a file that produces nothing.
+  if (!hasAnyValidTiming(doc.srt)) {
+    return { ok: false, reason: 'noBlocks', message: messages.noBlocks };
+  }
+
   if (exceedsCreditCap(blockCount)) {
     return {
       ok: false,
@@ -143,6 +179,8 @@ export interface WizardMessages {
     bilingualSmi: string;
     unreadableFile: string;
     invalidFile: string;
+    /** 파싱은 됐지만 자막 블록이 0개일 때 — 확장자만 .srt인 다른 포맷 파일 등. */
+    noBlocks: string;
     /** (상한, 실제) — 크레딧 상한을 넘는 파일을 드롭존에서 돌려보낼 때. */
     tooLarge: (max: number, actual: number) => string;
   };

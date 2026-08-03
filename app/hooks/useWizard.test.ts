@@ -58,6 +58,7 @@ describe('inspectUpload: 거절은 아무것도 남기지 않는다', () => {
     bilingualSmi: 'BILINGUAL',
     unreadableFile: 'UNREADABLE',
     invalidFile: 'INVALID',
+    noBlocks: 'NO_BLOCKS',
     tooLarge: (max, actual) => `TOO_LARGE ${max} ${actual}`,
   };
 
@@ -81,6 +82,29 @@ describe('inspectUpload: 거절은 아무것도 남기지 않는다', () => {
     if (result.ok) return;
     expect(result.reason).toBe('unreadable');
     expect(result.message).toBe('UNREADABLE');
+  });
+
+  it('파싱은 되지만 블록이 0개면 noBlocks로 돌려보낸다', async () => {
+    // .srt 확장자인데 본문이 자막이 아닌 경우(유튜브 자막을 .srt로 저장한
+    // VTT 등) — 파서는 예외를 던지지 않고 그냥 0블록 문서를 돌려준다.
+    // EmptySubtitleError(위 테스트)는 완전히 빈 파일만 잡으므로 이건 별도
+    // 경로다. 2026-08-03에 이 테스트를 쓰다가 놓친 걸 발견했다.
+    const result = await inspectUpload(
+      file('not-actually-subtitles.srt', 'This is just prose, not a subtitle file.'),
+      messages,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('noBlocks');
+    expect(result.message).toBe('NO_BLOCKS');
+  });
+
+  it('블록 하나만 진짜 타임코드를 가져도 통과한다', async () => {
+    // 실제 자막 파일에도 깨진 큐 하나쯤은 섞여 있을 수 있다 — noBlocks는
+    // "이 파일이 통째로 자막이 아니다"를 잡는 것이지, 완벽함을 요구하지 않는다.
+    const mixed = `nonsense header line\n\n${srtWithBlocks(1)}`;
+    const result = await inspectUpload(file('mixed.srt', mixed), messages);
+    expect(result.ok).toBe(true);
   });
 
   it('크레딧 상한을 넘으면 실제 블록 수를 담아 돌려보낸다', async () => {
@@ -118,10 +142,11 @@ describe('inspectUpload: 거절은 아무것도 남기지 않는다', () => {
   it('거절된 검사는 문서를 들고 오지 않는다', async () => {
     // 이게 버그의 핵심이었다 — 거절 경로가 "쓸 수 있는 것"을 만들어 내면
     // handleFile이 그걸 발행할 여지가 다시 생긴다. 타입으로도 막혀 있지만,
-    // 셋 다 실제로 doc이 없는지 값으로도 고정한다.
+    // 넷 다 실제로 doc이 없는지 값으로도 고정한다.
     const rejected = await Promise.all([
       inspectUpload(file('movie.mp4', 'x'), messages),
       inspectUpload(file('empty.srt', '   '), messages),
+      inspectUpload(file('not-actually-subtitles.srt', 'just prose'), messages),
       inspectUpload(
         file('huge.srt', srtWithBlocks(MAX_BLOCKS_PER_CREDIT + 1)),
         messages,
