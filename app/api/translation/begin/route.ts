@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '../../../lib/supabase/server';
 import { requireUser } from '../../../lib/server/auth';
+import { reportServerError } from '../../../lib/server/reportError';
 import { ALLOWED_MODELS, MAX_BLOCKS_PER_CREDIT } from '../../../config/constants';
 
 /**
@@ -71,6 +72,15 @@ export async function POST(request: NextRequest) {
         { status: 402 },
       );
     }
+    // Anything that is not "you are out of credits" means the credit ledger
+    // itself refused, and the user is stopped at the start of a paid action.
+    await reportServerError({
+      userId: auth.user.id,
+      route: '/api/translation/begin',
+      error,
+      status: 500,
+      detail: { model, totalBlocks },
+    });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

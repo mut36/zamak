@@ -10,6 +10,7 @@ import {
 import { createTranslationStream } from '../../lib/server/sse';
 import { translateSubtitle } from '../../lib/server/translationService';
 import { requireUser } from '../../lib/server/auth';
+import { reportServerError } from '../../lib/server/reportError';
 import { isJobUsable } from '../../lib/server/translationJob';
 import { createClient } from '../../lib/supabase/server';
 import { classifyError } from '../../lib/translationErrors';
@@ -101,6 +102,20 @@ export async function POST(request: NextRequest) {
         : 500;
     const message =
       error instanceof Error ? error.message : 'Translation request failed';
+    // 400s are the caller getting the request wrong, not us failing — logging
+    // them would bury the ones we can act on. Model-call failures inside the
+    // stream are not reported here either: they already land in
+    // translation_chunk_usage with an error_code (0009), and a second, weaker
+    // copy of a fact we already have is how counts start disagreeing.
+    if (status === 500) {
+      await reportServerError({
+        userId: auth.user.id,
+        route: '/api/translate',
+        error,
+        status,
+        detail: { code: classifyError(error) },
+      });
+    }
     return NextResponse.json(
       { error: message, code: classifyError(error) },
       { status },

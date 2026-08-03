@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '../../../lib/supabase/server';
 import { requireUser } from '../../../lib/server/auth';
+import { reportServerError } from '../../../lib/server/reportError';
 
 /** A 2,000-block subtitle file is well under this; the cap only stops a
  *  pathological body from becoming a storage bill. Measured in UTF-16 code
@@ -86,6 +87,13 @@ export async function POST(request: NextRequest) {
     if (error.message.includes('job not found')) {
       return NextResponse.json({ error: 'job_not_found' }, { status: 403 });
     }
+    await reportServerError({
+      userId: auth.user.id,
+      route: '/api/translation/result',
+      error,
+      status: 500,
+      detail: { stage: 'record' },
+    });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -97,6 +105,16 @@ export async function POST(request: NextRequest) {
     });
 
   if (uploadError) {
+    // The sharpest one in this table: the credit is already spent and the row
+    // already claims a stored result, so a failure here is exactly the orphan
+    // the retention TODO warns about — and the user finds out 30 days later.
+    await reportServerError({
+      userId: auth.user.id,
+      route: '/api/translation/result',
+      error: uploadError,
+      status: 500,
+      detail: { stage: 'upload' },
+    });
     return NextResponse.json({ error: uploadError.message }, { status: 500 });
   }
 

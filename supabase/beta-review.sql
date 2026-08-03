@@ -4,9 +4,10 @@
 --   A. 번역 품질이 쓸 만한가       → 1·2·3·4번
 --   B. 돈을 낼 만한가              → 5·6번
 --   원가가 예상대로인가            → 7번
+--   조용히 실패하고 있지 않은가    → 8·9번 (0011)
 --
 -- ⚠️ **Supabase 대시보드 SQL Editor에서 실행할 것.** 모든 테이블이 RLS로
---    "본인 행만" 읽히게 돼 있어서(0005·0009 정책), 앱을 통해서는 이 집계가
+--    "본인 행만" 읽히게 돼 있어서(0005·0009·0011 정책), 앱을 통해서는 이 집계가
 --    구조적으로 불가능하다. 대시보드는 service role로 도므로 RLS를 우회한다.
 --
 -- 블록마다 독립이다. 통째로 실행하지 말고 보고 싶은 블록만 실행할 것.
@@ -212,4 +213,66 @@ select
   count(*) filter (where latency_ms > 240000)           as 이백사십초_초과_호출
 from public.translation_chunk_usage
 where ok
+group by 1;
+
+
+-- ══════════════════════════════════ 8. 서버 예외 — 아무도 신고하지 않은 실패 ═══
+-- `server_errors`(0011)는 여태 Vercel 로그에만 남던 서버 예외를 센다. 로그와
+-- 역할이 다르다는 걸 잊지 말 것 — 스택 전문은 여전히 Vercel에 있고, 여기 있는
+-- 건 "같은 게 반복되는가"다.
+--
+-- ⚠️ 로그인 이전에 터진 예외는 여기 없다(RLS상 user_id가 필요하다, 0011 주석).
+--    또 하나: 이 표가 조용하다고 해서 아무 일도 없는 게 아니다 — 배선된 라우트만
+--    쓴다. 지금 배선: analyze·summarize·enrich·glossary·translate(500만)·
+--    translation/begin·translation/result.
+
+-- 8-a. 무엇이 얼마나 자주 터지는가
+select
+  route                                          as 라우트,
+  kind                                           as 종류,
+  count(*)                                       as 건수,
+  count(distinct user_id)                        as 겪은_사람,
+  max(created_at)                                as 마지막,
+  -- 메시지는 대표 1건만. 같은 kind라도 문구가 갈리면 원인이 둘이라는 신호다.
+  (array_agg(message order by created_at desc))[1] as 최근_메시지
+from public.server_errors
+where created_at > now() - interval '7 days'
+group by 1, 2
+order by 3 desc;
+
+-- 8-b. 한 사람에게 몰려 있는가 — 몰려 있으면 버그가 아니라 그 사람의 파일이다
+select
+  user_id                                        as 유저,
+  count(*)                                       as 건수,
+  count(distinct route)                          as 라우트수,
+  min(created_at)                                as 처음,
+  max(created_at)                                as 마지막
+from public.server_errors
+where created_at > now() - interval '7 days'
+group by 1
+having count(*) > 2
+order by 2 desc;
+
+-- 8-c. 가장 아픈 것 — 크레딧을 쓴 뒤 결과물을 못 받은 경우
+-- (translation/result의 upload 단계 실패 = 유저는 30일 뒤에야 알게 된다)
+select
+  created_at                                     as 시각,
+  user_id                                        as 유저,
+  detail ->> 'stage'                             as 단계,
+  message                                        as 메시지
+from public.server_errors
+where route = '/api/translation/result'
+order by created_at desc;
+
+
+-- ═════════════════════════════════════ 9. 레이트 리밋 — 한도가 맞게 잡혔나 ═══
+-- 정상 사용자가 429를 보면 한도가 틀린 것이다(RATE_LIMITS 주석의 설계 목표).
+-- 고정 창이라 `hits`는 **마지막 창의** 값이지 누적이 아니다 — 한도를 넘긴
+-- 사람을 찾는 용도로만 읽을 것.
+select
+  bucket                                         as 버킷,
+  count(*)                                       as 유저수,
+  max(hits)                                      as 최근창_최대호출,
+  count(*) filter (where hits > 15)              as 열다섯회_초과_유저
+from public.api_rate_limits
 group by 1;
