@@ -6,8 +6,11 @@ import { COPY } from '../i18n/simpleCopy';
 import { SITE } from '../lib/brand';
 import { Contents, KeyPoint, LegalShell, Section } from './parts';
 
+// 브랜드명은 붙이지 않는다 — 루트 layout의 `title.template`(`%s · ZAMAK`)이
+// 이미 붙인다. 여기에 "| ZAMAK"을 같이 쓰면 "이용약관 | ZAMAK · ZAMAK"이 된다
+// (2026-08-03 프로덕션 빌드에서 실제로 그렇게 나가고 있었다).
 export const metadata = {
-  title: '이용약관 | ZAMAK',
+  title: '이용약관',
   description: 'ZAMAK 이용약관, 자막 저작권과 이용자 책임',
 };
 

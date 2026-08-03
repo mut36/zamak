@@ -89,6 +89,13 @@
       `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
       `NEXT_PUBLIC_SITE_URL` 다섯 개다(글로사리가 OFF라 `OPENAI_API_KEY`도
       지금은 불필요, `ANTHROPIC_API_KEY`는 하네스 전용).
+- [ ] **모바일 탭 타깃이 37~38px** — iOS HIG 권장 44px, Android 48dp 미달이다
+      (2026-08-03 실측, 375×812). 대상: 히어로/네비 CTA, 비교 섹션 탭 3개,
+      CPS 프로필 탭 3개. 푸터 링크는 19px지만 텍스트 링크라 관행 범위.
+      **오늘 안 고친 이유**: 버튼 높이를 올리면 랜딩 전체 리듬이 밀려서
+      디자인 재조정이 따라온다. 오탭이 실제로 관측되면 그때 볼 것.
+      가로 스크롤 넘침은 없음(375px에서 `scrollWidth == clientWidth`), 레이아웃
+      자체는 정상.
 
 ### 정식 오픈 시: 가입 크레딧 복귀 — SQL 작성 완료, **실행만 남음** (2026-07-31 갱신)
 

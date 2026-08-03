@@ -10,6 +10,14 @@
  * Nothing had re-derived this file when the CSS tokens moved, so the OG/
  * Twitter share card and (until today) `apple-icon.tsx` were rendering in a
  * palette that doesn't exist anywhere else in the live product.
+ *
+ * ⚠️ **The `rgba()` entries are not safe inside a Satori gradient.** Satori
+ * (the next/og renderer) drops the alpha channel on gradient color stops and
+ * paints the stop fully opaque — measured 2026-08-03: an `--accent-wash`
+ * (8% yellow) midpoint came out as rgb(255,211,14), i.e. neat #ffd400. The
+ * old palette hid this because its `accentSoft` was an *opaque* pale green.
+ * Pre-blend against the backdrop and use a hex literal there instead (see
+ * `opengraph-image.tsx`'s WASH). Solid-fill and text colors are unaffected.
  */
 export const BRAND = {
   bg: '#f5f5f7', // --bg
