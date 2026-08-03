@@ -1489,10 +1489,35 @@ button:disabled {
     color: var(--accent);
     letter-spacing: 0.08em;
   }
+  /* 대사 4개가 겹쳐 사는 한 칸. 칸 높이는 곧 가장 긴 대사의 높이이고,
+     순환은 그 안에서 누가 보이느냐만 바꾼다 — 카드 바깥은 미동도 없다. */
+  .lp-hero-body {
+    display: grid;
+  }
+  .lp-hero-pair {
+    grid-area: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    /* 쉬는 대사는 자리를 지킨 채 숨는다. display:none으로 바꾸면 높이
+       고정이 통째로 무너진다. */
+    visibility: hidden;
+  }
+  .lp-hero-pair.is-on {
+    visibility: visible;
+  }
   .lp-hero-src {
     font-size: 15px;
     color: rgba(255, 255, 255, 0.4);
     line-height: 1.5;
+  }
+  /* ko와 대기 커서도 같은 칸에 겹친다 — 커서가 ko를 대신하면 활성 대사가
+     가장 긴 대사일 때 500ms 동안 카드가 내려앉는다. */
+  .lp-hero-ko-slot {
+    display: grid;
+  }
+  .lp-hero-ko-slot > * {
+    grid-area: 1 / 1;
   }
   .lp-hero-ko {
     color: #fff;
@@ -1500,13 +1525,25 @@ button:disabled {
     font-weight: 600;
     letter-spacing: -0.012em;
     line-height: 1.4;
+  }
+  /* 등장 애니메이션은 리마운트(key)가 아니라 클래스가 켠다 — 겹쳐 쌓은
+     노드는 순환해도 살아 있기 때문이다. 대기가 끝나 `.is-waiting`이
+     빠지는 순간 animation 속성이 none→zsubin으로 바뀌며 다시 돈다. */
+  .lp-hero-pair.is-on:not(.is-waiting) .lp-hero-ko {
     animation: zsubin 0.45s var(--ease-apple);
+  }
+  .lp-hero-pair.is-waiting .lp-hero-ko {
+    visibility: hidden;
   }
   .lp-hero-wait {
     color: var(--accent);
     font-size: 24px;
     font-weight: 600;
     line-height: 1.4;
+    visibility: hidden;
+  }
+  .lp-hero-pair.is-waiting .lp-hero-wait {
+    visibility: visible;
   }
   .lp-hero-track {
     height: 3px;

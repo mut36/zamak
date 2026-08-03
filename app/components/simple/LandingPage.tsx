@@ -244,24 +244,40 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
               <span className='lp-mono-tc'>{pair.tc}</span>
               <span className='lp-mono-lang'>{pair.lang} → KO</span>
             </div>
-            <div className='flex flex-col gap-5 px-10 pt-11 pb-10 min-h-[150px]'>
-              <div className='lp-hero-src whitespace-pre-line break-keep'>
-                {pair.src}
-              </div>
-              <div className='flex flex-col gap-2'>
-                {heroWaiting ? (
-                  <span className='lp-hero-wait' aria-hidden>
-                    <span className='animate-zblink'>▋</span>
-                  </span>
-                ) : (
-                  <span
-                    key={`ko${heroIdx}`}
-                    className='lp-hero-ko whitespace-pre-line break-keep'
+            {/* 대사 4개를 한 그리드 칸에 겹쳐 쌓는다 — 카드 높이가 늘 '가장
+                긴 대사' 기준으로 고정되어, 3.8초마다 순환해도 아래 섹션이
+                밀리지 않는다. 쉬는 대사는 `display:none`이 아니라
+                `visibility:hidden`이라 자리를 계속 차지한다: 그게 이 구조의
+                전부이고, 대사를 하나 더 넣어도 높이는 알아서 맞는다.
+                (모바일 375px에서 210↔299px, 3.8초마다 89px씩 페이지 전체가
+                뛰던 버그 — `decisions.md` §1-20.)
+
+                대기 커서도 ko를 치우고 들어서는 게 아니라 같은 칸에
+                겹친다. 치우면 활성 대사가 가장 긴 대사일 때 500ms 동안
+                카드가 주저앉는다. */}
+            <div className='lp-hero-body px-10 pt-11 pb-10'>
+              {L.hero.pairs.map((p, i) => {
+                const on = i === heroIdx;
+                return (
+                  <div
+                    key={p.tc}
+                    className={`lp-hero-pair${on ? ' is-on' : ''}${on && heroWaiting ? ' is-waiting' : ''}`}
+                    aria-hidden={!on}
                   >
-                    {pair.ko}
-                  </span>
-                )}
-              </div>
+                    <div className='lp-hero-src whitespace-pre-line break-keep'>
+                      {p.src}
+                    </div>
+                    <div className='lp-hero-ko-slot'>
+                      <span className='lp-hero-ko whitespace-pre-line break-keep'>
+                        {p.ko}
+                      </span>
+                      <span className='lp-hero-wait' aria-hidden>
+                        <span className='animate-zblink'>▋</span>
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             <div className='lp-hero-track'>
               <div
