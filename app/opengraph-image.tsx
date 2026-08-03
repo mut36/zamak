@@ -54,7 +54,10 @@ export default async function OpenGraphImage() {
             <div
               style={{
                 position: 'absolute',
-                inset: 0,
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
                 borderRadius: 12,
                 background: BRAND.accent,
                 transform: 'rotate(45deg) scale(0.64)',
@@ -63,7 +66,10 @@ export default async function OpenGraphImage() {
             <div
               style={{
                 position: 'absolute',
-                inset: 0,
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
                 borderRadius: 12,
                 background: BRAND.ink,
                 opacity: 0.88,

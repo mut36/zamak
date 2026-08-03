@@ -1831,3 +1831,51 @@ workPick"으로 갈라지면서 상태 하나만으로는 다음 화면을 못 �
 설정 화면의 렌더 조건과 `readStoredEnabled()`의 앞단. 꺼져 있으면 저장된 값을
 무시하므로 끈 건 정말 꺼진다. 저장값 자체는 지우지 않는다: 다시 켤 때 각자의
 선택이 그대로 돌아온다.
+
+### 6-8. 파비콘을 새 마크로 교체하다가 `lib/brand.ts`가 통째로 낡아 있던 걸 발견했다 (2026-08-03)
+
+**요청**: 대표가 새 파비콘(`icon.svg`, `apple-icon.svg`)을 전달하며 메타정보도
+다시 확인해 달라고 함. 새 파비콘은 검은 잉크 + 노란 포인트 배색의 괄호 모티프
+(`[  ]`, 가운데 노란 칩) — 헤더의 실제 워드마크(`public/brand/zamak-logo.png`,
+검정+노란 점)와 같은 계열이다.
+
+**교체**: `app/icon.svg` 내용 교체. `apple-icon`은 Next 정적 파일 컨벤션상
+`.svg`를 못 받는다(`jpg`/`jpeg`/`png`만) — 받은 SVG를 `sharp`로 180×180 PNG로
+래스터화해 `app/apple-icon.png`로 넣고, 기존 동적 생성기 `apple-icon.tsx`(옛
+다이아몬드 마크, ImageResponse)는 지웠다.
+
+**그러다 `app/lib/brand.ts`가 완전히 낡아 있는 걸 발견했다.** 이 파일의 `BRAND`
+상수는 주석에 "Simple theme tokens in globals.css를 따른다"고 적혀 있었는데,
+실제 `globals.css`의 `:root`(헤더 주석: "ZAMAK Design Tokens ... Black +
+yellow-point brand ... No blue", 출처 `design_handoff_zamak_brand`)는 이미
+검정+노랑 배색으로 넘어가 있었다. `BRAND`는 옛 크림색+초록(`bg #FAF8F4`,
+`accent #3A9B72`) 그대로였다 — 어느 시점에 CSS 토큰이 바뀌었는데 이 파일만
+안 따라간 것. 이 상수를 쓰는 곳은 OG 이미지(`opengraph-image.tsx`, `twitter
+-image.tsx`가 재수출)와 방금 지운 옛 `apple-icon.tsx`뿐이라, **공유 링크로 사이트를
+보는 사람에게만 보이는** 자리다 — 실제 화면(헤더 로고, 버튼, 전부 CSS 변수 참조)은
+문제없이 새 배색이었다. 아무도 공유 미리보기를 눈으로 확인한 적이 없어서 안
+걸렸던 것으로 보인다.
+
+`BRAND`를 `globals.css` 값으로 다시 맞췄다(`bg`→`--bg`, `ink`→`--ink-strong`,
+`accent`→`--accent` 등). 고치면서 OG 이미지를 실제로 렌더링해 보니 **마크 자체가
+안 보였다** — `position: 'absolute', inset: 0`을 쓴 두 div가 Satori(next/og
+렌더러)에서 크기 0으로 접혔다. `inset` shorthand가 지원 안 되는 것으로 보인다.
+`top/left/right/bottom: 0`으로 풀어쓰니 바로 나타났다. 색 문제와 무관한 별개
+버그였고, 언제부터 안 보였는지는 알 수 없다 — 공유 미리보기라 아무도 안 봤다.
+
+**같은 자리에서 메타 설명(`SITE.description`)의 "7개 도착어"도 정정했다.**
+`languages.ts`의 `TARGET_LANGS`는 7개 항목이 `enabled: true`지만, 마법사엔
+`setTargetLang`을 실제로 호출하는 UI가 없다 — `DEFAULT_TARGET_LANG`('ko')에
+고정이다(CLAUDE.md: "도착어는 한국어만 활성"). `simpleCopy.ts`의 랜딩 문구는
+이미 이런 종류의 과장을 걸러내는 회귀 테스트가 있지만(§1-15), 이 문자열은
+`lib/brand.ts`에 따로 있어서 그 스윕 밖이었다. "SRT · 7개 도착어" → "한국어로
+번역 ... 다운로드는 SRT 또는 원본 형식(VTT)"로 — 후자는 실제 지원 범위(VTT만
+왕복 writer가 있음, `docs/TODO.md`)와도 맞춘 것이다.
+
+`viewport.themeColor`도 같이 봤다 — 실제 배경과 무관한 제네릭 회색(`#f5f5f7`는
+공교롭게도 `--bg`와 값이 같았으니 그대로 두고, `BRAND.bg`를 참조하도록만 바꿔
+이후 토큰이 다시 갈라지지 않게 했다.
+
+**남은 것 — 의도적으로 안 건드림**: OG 카드의 마크는 이제 배색은 맞지만
+모양은 여전히 옛 다이아몬드(회전한 사각형 두 개)다. 새 파비콘의 괄호+칩 모양으로
+다시 그리는 건 색상값 교정보다 큰 작업이라 이번 스코프 밖으로 남긴다.

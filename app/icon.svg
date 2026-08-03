@@ -1,18 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <!-- Soft warm background so the mark reads on light browser chrome -->
-  <rect width="32" height="32" rx="8" fill="#FAF8F4"/>
-  <!-- Alloy motif: two overlapping rounded diamonds (matches .mark) -->
-  <g transform="translate(16 16)">
-    <rect
-      x="-7.5" y="-7.5" width="15" height="15" rx="2.4"
-      fill="#3A9B72"
-      transform="rotate(45)"
-    />
-    <rect
-      x="-5.5" y="-5.5" width="15" height="15" rx="2.4"
-      fill="#3F3B35"
-      fill-opacity="0.88"
-      transform="rotate(45) translate(2.2 2.2)"
-    />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none">
+
+  <rect width="32" height="32" rx="4.5" fill="#FAF9F5"></rect>
+  <rect x="0.6" y="0.6" width="30.8" height="30.8" rx="4.1" stroke="#161614" stroke-opacity="0.14" stroke-width="1.2"></rect>
+  <g fill="#161614">
+    <rect x="5.6" y="8" width="2.8" height="16"></rect>
+    <rect x="5.6" y="8" width="6.4" height="2.8"></rect>
+    <rect x="5.6" y="21.2" width="6.4" height="2.8"></rect>
+    <rect x="23.6" y="8" width="2.8" height="16"></rect>
+    <rect x="20" y="8" width="6.4" height="2.8"></rect>
+    <rect x="20" y="21.2" width="6.4" height="2.8"></rect>
   </g>
+  <rect x="13" y="13" width="6" height="6" rx="1" fill="#FFD400"></rect>
 </svg>

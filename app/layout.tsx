@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { SITE } from './lib/brand';
+import { BRAND, SITE } from './lib/brand';
 
 // Monospace for file names, timecodes, %, token counts, language codes.
 const jetbrainsMono = JetBrains_Mono({
@@ -66,9 +66,18 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // Was a hardcoded '#f5f5f7' — that number happened to already equal the
+  // real page background (globals.css `--bg`), just not on purpose: `BRAND`
+  // (this file's supposed mirror of that token) had drifted to a stale cream
+  // color no longer used anywhere live (see lib/brand.ts's 2026-08-03 note).
+  // Routing through BRAND.bg now means fixing the token in one place keeps
+  // this in sync instead of being a second hardcoded copy that can re-drift.
+  // No real dark theme exists (no site-wide prefers-color-scheme switch;
+  // `colorScheme: 'light'` below tells the UA not to force one), so both
+  // entries use the one real background.
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f5f5f7' },
-    { media: '(prefers-color-scheme: dark)', color: '#f5f5f7' },
+    { media: '(prefers-color-scheme: light)', color: BRAND.bg },
+    { media: '(prefers-color-scheme: dark)', color: BRAND.bg },
   ],
   colorScheme: 'light',
 };
