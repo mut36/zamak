@@ -190,10 +190,15 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
       <main>
         {/* ── 2. Hero ───────────────────────────────────────────── */}
         <header className='animate-zrise flex flex-col items-center text-center px-6 pt-[clamp(56px,9vh,88px)] pb-[90px]'>
-          <h1 className='lp-h1 mb-[18px] whitespace-pre-line'>
+          {/* 카피의 `\n`은 데스크톱 폭에 맞춰 손으로 넣은 것이라, 좁은
+              화면에서는 그 줄이 다시 접히며 '배운' 같은 한 단어짜리 고아
+              줄을 만든다. 640px 아래에서는 `\n`을 공백으로 풀고
+              `text-balance`에 줄 나누기를 맡긴다 — 자막 예시(`.lp-hero-*`,
+              `.lp-line`)는 줄 나눔 자체가 내용이므로 여기서 제외다. */}
+          <h1 className='lp-h1 mb-[18px] whitespace-normal sm:whitespace-pre-line'>
             {L.hero.title}
           </h1>
-          <p className='lp-hero-sub mb-[34px] max-w-full break-keep whitespace-pre-line'>
+          <p className='lp-hero-sub mb-[34px] max-w-full break-keep whitespace-normal sm:whitespace-pre-line'>
             {L.hero.sub.split('*').map((part, i) =>
               i % 2 === 1 ? (
                 <span
@@ -255,7 +260,11 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                 대기 커서도 ko를 치우고 들어서는 게 아니라 같은 칸에
                 겹친다. 치우면 활성 대사가 가장 긴 대사일 때 500ms 동안
                 카드가 주저앉는다. */}
-            <div className='lp-hero-body px-10 pt-11 pb-10'>
+            {/* 좁은 화면에서 좌우 40px는 본문 폭을 232px까지 깎아 2줄짜리
+                자막을 3줄로 접는다 — 자막 예시에서 줄 수는 곧 내용이므로
+                패딩부터 양보한다. (Tailwind 유틸리티가 컴포넌트 레이어를
+                이기므로 미디어 쿼리가 아니라 여기 있어야 한다.) */}
+            <div className='lp-hero-body px-5 sm:px-10 pt-8 sm:pt-11 pb-8 sm:pb-10'>
               {L.hero.pairs.map((p, i) => {
                 const on = i === heroIdx;
                 return (
@@ -286,7 +295,9 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
               />
             </div>
           </div>
-          <p className='mt-4 text-[12.5px] text-quaternary'>{L.hero.note}</p>
+          <p className='mt-4 text-[12.5px] text-quaternary break-keep text-pretty'>
+            {L.hero.note}
+          </p>
         </header>
 
         {/* ── 3. 번역 비교 ──────────────────────────────────────── */}
@@ -368,7 +379,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
             </div>
 
             <p
-              className='mt-7 mx-auto max-w-full text-center text-sm text-tertiary leading-[1.6] break-keep whitespace-pre-line reveal'
+              className='mt-7 mx-auto max-w-full text-center text-sm text-tertiary leading-[1.6] break-keep whitespace-normal sm:whitespace-pre-line reveal'
               style={revealDelay(4)}
             >
               {L.compare.outro}
@@ -391,7 +402,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                 </span>
               </h2>
               <p
-                className='mb-7 text-[16px] leading-[1.6] max-w-full break-keep whitespace-pre-line'
+                className='mb-7 text-[16px] leading-[1.6] max-w-full break-keep whitespace-normal sm:whitespace-pre-line'
                 style={{ color: 'rgba(250,249,245,0.6)' }}
               >
                 {L.speed.body}
@@ -435,7 +446,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           <div className='max-w-[880px] mx-auto'>
             <h2 className='lp-h2 mb-2.5 reveal'>{L.cps.title}</h2>
             <p
-              className='lp-section-sub max-w-full mb-9 leading-[1.55] break-keep whitespace-pre-line reveal'
+              className='lp-section-sub max-w-full mb-9 leading-[1.55] break-keep whitespace-normal sm:whitespace-pre-line reveal'
               style={revealDelay(1)}
             >
               {L.cps.sub}
@@ -482,7 +493,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                     </div>
                     <div className='lp-spec'>
                       <span>{L.cps.actionLabel}</span>
-                      <b className='break-keep whitespace-pre-line'>{cps.action}</b>
+                      <b className='break-keep whitespace-normal sm:whitespace-pre-line'>{cps.action}</b>
                     </div>
                   </div>
                 </div>
@@ -508,7 +519,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
         {/* ── 6. 기능 벤토 ──────────────────────────────────────── */}
         <section className='bg-surface border-t border-border-subtle px-6 py-24'>
           <div className='max-w-[880px] mx-auto'>
-            <h2 className='lp-h2 text-center max-w-full mx-auto mb-11 whitespace-pre-line reveal'>
+            <h2 className='lp-h2 text-center max-w-full mx-auto mb-11 whitespace-normal sm:whitespace-pre-line reveal'>
               {L.features.title}
             </h2>
 
@@ -518,7 +529,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                   <div className='text-[19px] font-semibold tracking-[-0.012em] mb-2'>
                     {L.features.rules.title}
                   </div>
-                  <p className='m-0 text-[14.5px] text-secondary leading-[1.6] break-keep whitespace-pre-line'>
+                  <p className='m-0 text-[14.5px] text-secondary leading-[1.6] break-keep whitespace-normal sm:whitespace-pre-line'>
                     {L.features.rules.body}
                   </p>
                 </div>
@@ -544,7 +555,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                     {L.features.formats.title}
                   </div>
                   <p
-                    className='m-0 text-sm leading-[1.6] flex-1 break-keep whitespace-pre-line'
+                    className='m-0 text-sm leading-[1.6] flex-1 break-keep whitespace-normal sm:whitespace-pre-line'
                     style={{ color: 'rgba(250,249,245,0.55)' }}
                   >
                     {L.features.formats.body}
@@ -585,7 +596,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
 
         {/* ── 7. 최종 CTA ───────────────────────────────────────── */}
         <section className='text-center px-6 pt-[110px] pb-[90px]'>
-          <h2 className='lp-h2-final mb-3.5 whitespace-pre-line reveal'>
+          <h2 className='lp-h2-final mb-3.5 whitespace-normal sm:whitespace-pre-line reveal'>
             {L.final.title}
           </h2>
           <p className='lp-section-sub mb-8 break-keep reveal' style={revealDelay(1)}>

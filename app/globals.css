@@ -1379,7 +1379,20 @@ button:disabled {
     opacity: 1;
   }
 
-  /* Headlines — the landing's own scale. */
+  /* Headlines — the landing's own scale.
+
+     `word-break: keep-all` + `text-wrap: balance`는 네 클래스가 공유한다.
+     한국어는 어절 안에서 끊기면 읽는 리듬이 깨지고(keep-all), 그렇게 묶어
+     놓으면 마지막 줄에 한 어절만 남는 고아 줄이 잘 생긴다(balance가 줄
+     길이를 고르게 맞춰 없앤다). JSX마다 `break-keep`을 붙이는 것보다
+     여기 한 번이 낫다 — 새 헤딩이 생겨도 저절로 따라온다. */
+  .lp-h1,
+  .lp-h2,
+  .lp-h2-dark,
+  .lp-h2-final {
+    word-break: keep-all;
+    text-wrap: balance;
+  }
   .lp-h1 {
     margin: 0;
     font-size: clamp(38px, 5.4vw, 58px);
@@ -1410,6 +1423,13 @@ button:disabled {
     letter-spacing: -0.02em;
     line-height: 1.12;
     color: var(--ink);
+  }
+  /* 도입 문단들. 헤딩과 같은 이유로 `balance` — 두세 줄짜리라 마지막 줄에
+     "말입니다." 한 어절만 남는 일이 잦다(모바일 실측). `pretty`는 긴 본문의
+     마지막 줄만 손보므로 이 길이에서는 `balance`가 맞다. */
+  .lp-hero-sub,
+  .lp-section-sub {
+    text-wrap: balance;
   }
   .lp-hero-sub {
     margin: 0;
@@ -1895,6 +1915,69 @@ button:disabled {
     font-weight: 600;
     letter-spacing: 0.1em;
     color: var(--text-tertiary);
+  }
+
+  /* ── 랜딩 · 모바일 (≤640px) ─────────────────────────────────
+     여기까지 랜딩에는 미디어 쿼리가 **하나도** 없었고 `clamp()`만으로
+     버텼다. 그런데 clamp의 하한(예: `.lp-h1` 38px)이 데스크톱 감각으로
+     잡혀 있어서, 375px에서는 하한에 닿은 채로 폭만 모자랐다 — 실측 14곳이
+     의도한 줄 수를 넘겼다(`decisions.md` §1-21).
+
+     nav 링크 숨김(`sm:flex`)과 히어로 카드 패딩은 Tailwind 유틸리티가
+     컴포넌트 레이어를 이기므로 JSX에 있다. 여기 있는 건 컴포넌트 클래스가
+     스스로 정한 값들뿐이다.
+
+     이 블록은 레이어 **안**에 둔다 — 밖에 두면 Tailwind 유틸리티까지
+     이겨서, 화면마다 다른 규칙이 조용히 뒤집힌다.
+
+     조건이 `max-width: 640px`이 아니라 Tailwind `sm:`(min-width: 40rem)의
+     **정확한 여집합**인 이유: 640px에서는 둘 다 참이라 "모바일 글자 크기 +
+     데스크톱 줄바꿈"이 1px 폭으로 생기고, `max-width: 39.99rem`으로 피하면
+     이번엔 그 사이가 어디에도 안 걸리는 틈이 된다. 여집합은 겹치지도
+     비지도 않는다. */
+  @media not all and (min-width: 40rem) {
+    .lp-h1 {
+      font-size: clamp(27px, 7.6vw, 38px);
+    }
+    .lp-h2,
+    .lp-h2-dark,
+    .lp-h2-final {
+      font-size: clamp(23px, 6.4vw, 30px);
+    }
+    .lp-section-sub {
+      font-size: 15.5px;
+    }
+    /* 자막 예시는 폭을 더 못 늘리니 글자를 줄인다. 산문과 달리 여기서는
+       줄 수 자체가 파는 내용이라("2줄 상한"), 접히면 문구가 거짓이 된다. */
+    .lp-hero-ko,
+    .lp-hero-wait {
+      font-size: 18px;
+    }
+    .lp-hero-src {
+      font-size: 13.5px;
+    }
+    .lp-line {
+      font-size: 15px;
+    }
+    /* 세 칸 가로 배치는 좁은 화면에서 각 칸을 96px로 만들어 '한 줄에
+       스물여덟 글자가 넘어가는 긴 자막'을 3줄로 접었다 — 줄 길이를
+       말하는 문구가 줄 길이 때문에 안 읽히는 꼴이라 세로로 쌓는다. */
+    .lp-rule {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+    }
+    .lp-rule-arrow {
+      transform: rotate(90deg);
+      align-self: center;
+    }
+    /* 타임코드와 CPS 판정을 224px 한 줄에 마주 보게 두면 둘 다 반으로
+       접힌다 — 갈라진 타임코드는 타임코드로 안 읽히므로 위아래로 나눈다. */
+    .lp-preview-meta {
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
   }
 }
 
