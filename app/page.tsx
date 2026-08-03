@@ -56,11 +56,11 @@ export default function Home() {
     uploadError,
     uploading,
     uploadingFileName,
+    loadedFileName,
     handleFile,
     handleTranslate,
     handleCancel,
     resetAll: resetWizard,
-    fileContent,
     error,
     analysis,
     translationProgress,
@@ -199,7 +199,7 @@ export default function Home() {
             onContentType={setContentType}
             uploading={uploading}
             uploadingFileName={uploadingFileName}
-            fileName={fileContent ? uploadingFileName : undefined}
+            fileName={loadedFileName || undefined}
             error={uploadError}
             onFile={handleFile}
             onNext={() => goScreen(POST_UPLOAD_SCREEN)}
@@ -209,7 +209,7 @@ export default function Home() {
         {!refusal && screen === 'workPick' && (
           <WorkPickStep
             contentType={contentType ?? 'movie'}
-            fileName={uploadingFileName}
+            fileName={loadedFileName}
             candidates={enrichCandidates}
             selectedIndex={selectedIndex}
             onSelect={setSelectedIndex}

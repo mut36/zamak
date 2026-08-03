@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { countBlocks, exceedsCreditCap } from './useWizard';
+import {
+  countBlocks,
+  exceedsCreditCap,
+  inspectUpload,
+  type WizardMessages,
+} from './useWizard';
 import { MAX_BLOCKS_PER_CREDIT } from '../config/constants';
 
 /** N blocks of valid SRT, so countBlocks parses rather than guesses. */
@@ -30,6 +35,102 @@ describe('upload-time credit-cap guard', () => {
     // disagree about which files are too large.
     expect(countBlocks(srtWithBlocks(3))).toBe(3);
     expect(countBlocks('')).toBe(0);
+  });
+});
+
+/**
+ * The replace-upload bug: upload a good file A, hit "다른 파일 선택", pick a
+ * file B that gets refused — the screen showed **B's name plus "업로드 완료"**
+ * with the Next button live, but the content behind it was still A. Pressing
+ * translate spent a credit translating A while the user was looking at B.
+ *
+ * The cause was ordering, not validation: `handleFile` published the file name
+ * before running the checks, and none of the three early returns took it back.
+ * `inspectUpload` exists so there is nothing to take back — it decides without
+ * writing, and `handleFile` cannot publish a name until it returns ok.
+ *
+ * These tests pin the two halves of that contract: every refusal path is
+ * reachable and reports itself, and an accepted file comes back with the parsed
+ * document (the only thing that may then be published).
+ */
+describe('inspectUpload: 거절은 아무것도 남기지 않는다', () => {
+  const messages: WizardMessages['upload'] = {
+    bilingualSmi: 'BILINGUAL',
+    unreadableFile: 'UNREADABLE',
+    invalidFile: 'INVALID',
+    tooLarge: (max, actual) => `TOO_LARGE ${max} ${actual}`,
+  };
+
+  const file = (name: string, body: string) =>
+    new File([body], name, { type: 'text/plain' });
+
+  it('확장자가 아니면 파싱조차 하지 않고 돌려보낸다', async () => {
+    // 자막이 아닌 파일에 디코드 비용을 쓰지 않는다 — 순서가 근거다.
+    const result = await inspectUpload(file('movie.mp4', 'not a subtitle'), messages);
+    expect(result).toEqual({
+      ok: false,
+      reason: 'invalidFile',
+      message: 'INVALID',
+    });
+  });
+
+  it('파싱이 실패하면 unreadable로 돌려보낸다', async () => {
+    // 자막이 하나도 없는 파일(EmptySubtitleError)이 이 경로의 대표 사례다.
+    const result = await inspectUpload(file('empty.srt', '   '), messages);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('unreadable');
+    expect(result.message).toBe('UNREADABLE');
+  });
+
+  it('크레딧 상한을 넘으면 실제 블록 수를 담아 돌려보낸다', async () => {
+    const over = MAX_BLOCKS_PER_CREDIT + 1;
+    const result = await inspectUpload(
+      file('huge.srt', srtWithBlocks(over)),
+      messages,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('tooLarge');
+    // 사용자에게 "얼마나 넘었는지"를 보여줄 수 있어야 한다.
+    expect(result.message).toBe(`TOO_LARGE ${MAX_BLOCKS_PER_CREDIT} ${over}`);
+  });
+
+  it('통과한 파일은 파싱된 문서를 들고 돌아온다', async () => {
+    const result = await inspectUpload(
+      file('good.srt', srtWithBlocks(3)),
+      messages,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // handleFile이 loadedFileName을 세우는 유일한 근거가 이 doc이다.
+    expect(countBlocks(result.doc.srt)).toBe(3);
+  });
+
+  it('경계(정확히 상한)는 통과한다 — 서버와 같은 부등호', async () => {
+    const result = await inspectUpload(
+      file('exact.srt', srtWithBlocks(MAX_BLOCKS_PER_CREDIT)),
+      messages,
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('거절된 검사는 문서를 들고 오지 않는다', async () => {
+    // 이게 버그의 핵심이었다 — 거절 경로가 "쓸 수 있는 것"을 만들어 내면
+    // handleFile이 그걸 발행할 여지가 다시 생긴다. 타입으로도 막혀 있지만,
+    // 셋 다 실제로 doc이 없는지 값으로도 고정한다.
+    const rejected = await Promise.all([
+      inspectUpload(file('movie.mp4', 'x'), messages),
+      inspectUpload(file('empty.srt', '   '), messages),
+      inspectUpload(
+        file('huge.srt', srtWithBlocks(MAX_BLOCKS_PER_CREDIT + 1)),
+        messages,
+      ),
+    ]);
+    for (const result of rejected) {
+      expect(result.ok).toBe(false);
+      expect(result).not.toHaveProperty('doc');
+    }
   });
 });
 

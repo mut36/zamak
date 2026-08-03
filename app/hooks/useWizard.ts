@@ -65,6 +65,72 @@ function uploadErrorMessage(err: unknown, messages: WizardMessages['upload']): s
     : messages.unreadableFile;
 }
 
+/** Why an upload was turned away, in the shape `recordEvent` wants. */
+export type UploadRejection =
+  | 'invalidFile'
+  | 'bilingualSmi'
+  | 'unreadable'
+  | 'tooLarge';
+
+export type UploadInspection =
+  | { ok: true; doc: Awaited<ReturnType<typeof loadSubtitleFile>> }
+  | { ok: false; reason: UploadRejection; message: string };
+
+/**
+ * The whole accept/reject decision for a dropped file, with no state in it.
+ *
+ * Pulled out of `handleFile` because the cascade used to be interleaved with
+ * `setState` calls, and that is exactly how the replace-upload bug got in: the
+ * file name was published *before* the checks ran, and none of the three early
+ * returns took it back. The screen then showed the rejected file's name over
+ * the previous file's content, with the Next button still live — so the user
+ * pressed translate on B and paid a credit to translate A.
+ *
+ * With the decision separated from the writes, a rejection has nothing to undo:
+ * `handleFile` cannot publish anything until this returns `ok`. The three
+ * refusal paths and the boundary they sit on are pinned in useWizard.test.ts.
+ *
+ * Order matters and is not arbitrary — filename before parse before size, so
+ * we never spend a decode on a file the extension already disqualifies, and
+ * never count blocks on a document that failed to parse.
+ */
+export async function inspectUpload(
+  selected: File,
+  messages: WizardMessages['upload'],
+): Promise<UploadInspection> {
+  if (!isSupportedSubtitleFilename(selected.name)) {
+    return { ok: false, reason: 'invalidFile', message: messages.invalidFile };
+  }
+
+  let doc: Awaited<ReturnType<typeof loadSubtitleFile>>;
+  try {
+    doc = await loadSubtitleFile(selected);
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err instanceof BilingualSmiError ? 'bilingualSmi' : 'unreadable',
+      message: uploadErrorMessage(err, messages),
+    };
+  }
+
+  // Size check belongs HERE, not at translate time. /api/translation/begin
+  // enforces MAX_BLOCKS_PER_CREDIT too (that check is the billing defense and
+  // stays), but by then the settings screen has already fired enrich,
+  // summarize and — if the toggle is on — a full glossary extraction. Those
+  // are real API spend on a file we are about to refuse. Same parse the
+  // server check uses, so the two can never disagree about the count.
+  const blockCount = countBlocks(doc.srt);
+  if (exceedsCreditCap(blockCount)) {
+    return {
+      ok: false,
+      reason: 'tooLarge',
+      message: messages.tooLarge(MAX_BLOCKS_PER_CREDIT, blockCount),
+    };
+  }
+
+  return { ok: true, doc };
+}
+
 /**
  * Every user-facing string the wizard needs, passed in rather than imported
  * from COPY — same convention useTranslation follows, so the hook stays
@@ -118,8 +184,21 @@ export interface WizardState {
    *  screen switches to 'settings' — see handleFile), so the upload screen
    *  can show a "reading…" state instead of looking stuck. */
   uploading: boolean;
-  /** Name of the file being read, for the "reading…" message. */
+  /**
+   * Name of the file being read *right now*, for the "reading…" message.
+   *
+   * Not the loaded file — a rejected upload leaves its name here. Anything
+   * that means "the file we are going to translate" must read
+   * `loadedFileName` instead; conflating the two is what let a rejected
+   * replace-upload put file B's name on file A's content.
+   */
   uploadingFileName: string;
+  /**
+   * Name of the file whose content is in `fileContent` — empty until one
+   * parses successfully, and unchanged by a rejected upload. This is the name
+   * every screen should show.
+   */
+  loadedFileName: string;
   summarizing: boolean;
   /** True once the work has been confirmed (explicitly or via the banner). */
   workConfirmed: boolean;
@@ -171,6 +250,7 @@ export function useWizard(
   const [uploadError, setUploadError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadingFileName, setUploadingFileName] = useState('');
+  const [loadedFileName, setLoadedFileName] = useState('');
   const [summarizing, setSummarizing] = useState(false);
   const [workConfirmed, setWorkConfirmed] = useState(false);
   const [autoMatched, setAutoMatched] = useState(false);
@@ -382,59 +462,41 @@ export function useWizard(
   };
 
   const handleFile = async (selected: File) => {
+    // `uploadingFileName` is only ever the file being read right now — it
+    // drives the "reading…" line and nothing else. Naming the file the user
+    // just dropped is safe here precisely because no other screen reads it.
     setUploading(true);
     setUploadingFileName(selected.name);
-
-    if (!isSupportedSubtitleFilename(selected.name)) {
-      setUploadError(messages.upload.invalidFile);
-      setUploading(false);
-      void recordEvent('upload_rejected', {
-        reason: 'invalidFile',
-        format: fileExtension(selected.name),
-      });
-      return;
-    }
-    setUploadError('');
 
     // Parsing is awaited here rather than inside the hook so a file we can't
     // use never leaves this screen: the error belongs next to the dropzone,
     // not on the info step behind a spinner.
-    let doc;
-    try {
-      doc = await loadSubtitleFile(selected);
-    } catch (err) {
-      setUploadError(uploadErrorMessage(err, messages.upload));
+    const inspected = await inspectUpload(selected, messages.upload);
+
+    if (!inspected.ok) {
+      setUploadError(inspected.message);
       setUploading(false);
       void recordEvent('upload_rejected', {
-        reason: err instanceof BilingualSmiError ? 'bilingualSmi' : 'unreadable',
+        reason: inspected.reason,
         format: fileExtension(selected.name),
       });
+      // Deliberately leaves `loadedFileName` and `fileContent` alone. On a
+      // replace-upload they still describe the previous, still-usable file,
+      // and that is what the screen goes back to showing.
       return;
     }
 
-    // Size check belongs HERE, not at translate time. /api/translation/begin
-    // enforces MAX_BLOCKS_PER_CREDIT too (that check is the billing defense and
-    // stays), but by then the settings screen has already fired enrich,
-    // summarize and — if the toggle is on — a full glossary extraction. Those
-    // are real API spend on a file we are about to refuse. Same parse the
-    // server check uses, so the two can never disagree about the count.
-    const blockCount = countBlocks(doc.srt);
-    if (exceedsCreditCap(blockCount)) {
-      setUploadError(messages.upload.tooLarge(MAX_BLOCKS_PER_CREDIT, blockCount));
-      setUploading(false);
-      void recordEvent('upload_rejected', {
-        reason: 'tooLarge',
-        format: fileExtension(selected.name),
-      });
-      return;
-    }
-
+    setUploadError('');
     setMovieInfo(EMPTY_MOVIE_INFO);
     resetAnalysis();
+    // Only now does the file become "the loaded one". This assignment and
+    // processFile below must stay together — `loadedFileName` names whatever
+    // is in `fileContent`, and the upload screen trusts that pairing.
+    setLoadedFileName(selected.name);
     // Screen goes to 'settings' only when the user clicks 'Next' on the upload screen.
     // The TMDB search and the other branch's summarize both run
     // when settings is showing (it renders its own searching state).
-    processFile(selected, doc);
+    processFile(selected, inspected.doc);
     setUploading(false);
   };
 
@@ -512,6 +574,7 @@ export function useWizard(
     setUploadError('');
     setUploading(false);
     setUploadingFileName('');
+    setLoadedFileName('');
     setContentType(null);
     setWorkConfirmed(false);
     setAutoMatched(false);
@@ -575,6 +638,7 @@ export function useWizard(
     uploadError,
     uploading,
     uploadingFileName,
+    loadedFileName,
     summarizing,
     workConfirmed,
     autoMatched,
