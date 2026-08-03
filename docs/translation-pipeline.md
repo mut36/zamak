@@ -516,6 +516,35 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   되므로 모든 경로가 fire-and-forget이고 실패를 삼킨다. 미측정은 `null`로
   남는다 — "실패 0건"과 "측정 못 함"은 반대되는 사실이라 `0`으로 뭉개지 않는다.
 
+### 12. 가드레일 — 레이트 리밋 · 서버 예외 기록 (2026-08-03)
+- **레이트 리밋**: 위 §1·§2-A·§2-B·§2-C의 네 라우트(`/api/analyze`·`/api/enrich`·
+  `/api/summarize`·`/api/glossary`)는 **크레딧을 안 쓰면서 실제 API 비용을 낸다.**
+  그래서 `requireUser()` 바로 뒤에 `enforceRateLimit(버킷)`
+  (`app/lib/server/rateLimit.ts`)이 붙는다. 한도는 `constants.ts`의 `RATE_LIMITS`
+  — 앞의 셋이 `aux` 버킷을 **합산해서** 분당 20회, 글로사리는 자기 버킷으로
+  분당 5회. 카운터는 Postgres(`consume_rate_limit`, `0011`)에 있다. 서버리스라
+  프로세스 메모리로는 인스턴스마다 따로 세어 가드가 되지 않는다.
+  거절은 429 + `Retry-After` + `COPY.error.rateLimited`.
+  **번역 경로(§4~§9)에는 안 붙는다** — 거기는 크레딧이 이미 상한이다.
+- **fail-open**: RPC가 실패하면 통과시킨다(`requireUser()`의 fail-closed와 반대).
+  근거는 `rateLimit.ts`의 주석에 있다 — 이 가드가 막는 건 이미 인증된 한 사람의
+  반복 호출이고, DB 블립 때문에 전원의 업로드가 죽는 쪽이 더 나쁘다.
+- **서버 예외 기록**: `reportServerError()`(`app/lib/server/reportError.ts`)가
+  `server_errors`(0011)에 라우트·예외명·메시지(500자 절단)·상태·평평한 detail만
+  남긴다. `console.error`는 그대로 두고 **추가로** 쌓는 것이다 — 스택 전문은
+  Vercel 로그, 이 표는 "같은 게 반복되는가". 조회는 `supabase/beta-review.sql` §8.
+- **배선된 곳**: analyze(파싱 실패 포함) · summarize · enrich · glossary ·
+  `/api/translate`(500만 — 400은 호출자 잘못이고, 모델 호출 실패는 이미
+  `translation_chunk_usage`에 error_code로 남아 중복이다) ·
+  `/api/translation/begin` · `/api/translation/result`(record·upload 두 단계).
+- **glossary가 특히 중요한 이유**: 이 라우트는 실패해도 빈 시트를 200으로 돌려준다
+  (§2-C). 화면상 "고유명사가 없는 파일"과 구분이 안 되므로, 기록이 없으면 조용히
+  꺼진 채로 베타가 끝난다. 단, `extractCastSheet` **안에서** 삼켜지는 폴백
+  (키 없음·파싱 실패)은 라우트까지 안 올라오므로 여전히 기록되지 않는다.
+- **불변식**: §11과 같다 — 자막 텍스트는 이 두 표 어디에도 들어가지 않는다.
+  `detail`에 프롬프트·요청 본문·대사를 넣지 말 것. 기록 실패는 삼킨다(예외를
+  처리하다 두 번째 예외가 나면 안 된다).
+
 ---
 
 ## 증상 → 고칠 곳 (빠른 인덱스)
@@ -527,6 +556,8 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 올린 형식으로 받는 버튼이 안 뜬다 | `SubtitleDoc.roundTrip` — writer가 있는 포맷만 뜬다(현재 VTT). `document.ts`의 `WRITERS` — §10 |
 | 받은 파일에서 스타일·헤더가 사라졌다 | splice가 아니라 SRT 폴백으로 내려갔을 가능성. `buildDownloads`의 콘솔 경고 확인 — §10 |
 | 번역문에 원문 언어가 섞여 있다(SMI) | `resolveTrack` (`smi.ts`) — 트랙 2개 이상이면 업로드에서 거절되어야 한다 — §0 |
+| "요청이 너무 잦습니다"(429)가 정상 사용 중에 뜬다 | 한도가 잘못 잡힌 것이다 — `constants.ts` `RATE_LIMITS` — §12. 어느 유저가 얼마나 쳤는지는 `beta-review.sql` §9 |
+| 서버가 조용히 실패하는 것 같다 | `server_errors` — `beta-review.sql` §8. 라우트가 §12의 배선 목록에 있는지 먼저 확인 |
 | 제목/연도가 파일명에서 잘못 뽑힘 | `content_analysis.txt`, `metadataInference.ts` |
 | 감독/포스터 안 뜸·틀림 | `tmdb.ts` (`searchCandidates`/`lookupById`), `enrichMovie.ts` (`buildGroundedPrompt`) |
 | 재검색해도 계속 다른(엉뚱한) 작품이 나옴 | `tmdb.ts` (`searchCandidates` 정렬), `enrichMovie.ts` (`searchMovie`의 후보 임계값), `WorkPickStep.tsx` (`CandidateCard`) — §2-A "후보가 여러 개일 때" |

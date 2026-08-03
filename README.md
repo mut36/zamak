@@ -126,6 +126,12 @@ npx tsc --noEmit && npx eslint app && npx vitest run && npm run check:tokens
    `/api/feedback/pending`)가 전부 조용히 실패한다(계측 실패가 번역을 깨면
    안 된다는 원칙대로 fire-and-forget이라 사용자에게는 안 보이지만, 계측
    자체는 안 쌓인다).
+7. `supabase/migrations/0011_rate_limits_and_errors.sql` — 유저당 레이트 리밋
+   (`api_rate_limits` + `consume_rate_limit()`)과 서버 예외 기록(`server_errors`).
+   **실행 전에도 앱은 정상 동작한다** — 레이트 리밋은 RPC가 없으면 통과시키고
+   (fail-open, `app/lib/server/rateLimit.ts`의 근거 참조), 예외 기록은
+   실패를 삼킨다. 즉 안 돌리면 가드와 모니터링만 조용히 없는 상태다.
+   (`0010_signup_credit_revert.sql`은 정식 오픈 시점 항목이라 이것과 순서 무관.)
 
 **마이그레이션과 배포는 붙여서 합니다.** `0004`는 기존 `begin_translation_job(integer)`과
 5인자 `settle_order`를 **drop하고** 새 시그니처로 다시 만듭니다. 이 앱은 Next.js 한 벌이
@@ -237,8 +243,7 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 | `NEXT_PUBLIC_SITE_URL` | `https://zamak.app` (프로덕션) | OG·메타 `metadataBase`용 캐논 오리진. 없으면 프로덕션에서 `SITE.url`, 프리뷰는 Vercel URL |
 | `NEXT_PUBLIC_MAX_BLOCKS_PER_CREDIT` | 2000 | 크레딧 1개가 커버하는 자막 블록 수 |
 | `JOB_VALIDITY_MINUTES` | 60 | 결제된 job이 유효한 시간 |
-| `TOSS_SECRET_KEY` | — | 결제 승인용 시크릿 키 (서버 전용). 없으면 결제 라우트만 닫히고 번역은 그대로 동작 |
-| `NEXT_PUBLIC_TOSS_CLIENT_KEY` | — | 결제창을 여는 클라이언트 키. 브라우저에 노출되며 그래도 안전 — 이 키로는 승인을 못 함 |
+| `TOSS_SECRET_KEY` / `NEXT_PUBLIC_TOSS_CLIENT_KEY` | — | **main에서는 안 읽습니다.** 결제 코드가 `feature/payments`에 있어, 그 브랜치에서 작업할 때만 필요합니다 |
 | `GLOSSARY_PROVIDER` | `openai` | 글로사리·존대관계 추출 프로바이더 (`openai`\|`gemini`). 기본은 OpenAI(GPT-5.6-luna, `decisions.md` §2-14). Gemini로 롤백하려면 `gemini` + 아래 `GLOSSARY_MODEL`을 Gemini 모델명으로 |
 | `GLOSSARY_MODEL` | `gpt-5.6-luna` (`GLOSSARY_PROVIDER=gemini`이면 `gemini-3.6-flash`) | 글로사리·존대관계 추출(opt-in, InfoStep 토글) 모델. 파일당 1회. 1,100블록 기준 예전 Gemini flash+MEDIUM에서 ~130원 관측 — 무시할 수준은 아님 |
 | `GLOSSARY_THINKING_LEVEL` | `MEDIUM` | **Gemini 경로 전용.** OpenAI 경로에서는 무시. `MINIMAL`\|`LOW`\|`MEDIUM`\|`HIGH` |
@@ -294,9 +299,8 @@ app/
 │   ├── analyze/route.ts        # 파일명/자막 샘플 → 제목·연도 (로그인 필요)
 │   ├── credits/route.ts        # 잔액 조회
 │   ├── enrich/route.ts         # TMDB 우선 조회, 미스 시 Google Search 폴백 (로그인 필요)
-│   ├── payments/prepare/       # 팩 → 주문 생성 (가격을 서버가 확정)
-│   ├── payments/confirm/       # Toss successUrl — 승인 + 크레딧 지급 (멱등)
-│   ├── payments/fail/          # Toss failUrl — 주문 종료
+│   ├── events/route.ts         # 퍼널 이벤트 기록 (beta_events)
+│   ├── glossary/route.ts       # 등장인물·용어 시트 추출 (opt-in, 로그인 필요)
 │   ├── summarize/route.ts      # 영화 아닌 영상의 내용 요약 (로그인 필요)
 │   ├── translation/begin/      # 크레딧 1개 차감 + job 생성
 │   └── translate/route.ts      # 청크 번역, SSE (job 검증)
@@ -351,13 +355,18 @@ scripts/chunk-model.mjs         # 청크 크기 계산기
    → DoneStep                     명시적 다운로드
         └── emitInOriginalFormat   원본 형식으로 되돌리기 (원본에 대사만 치환)
 
-[크레딧 소진 / 헤더의 잔액 클릭]
-   → PurchaseStep                팩 선택
-        ├── /api/payments/prepare   가격 확정 → orders 행 → orderId
-        ├── 토스 결제창             카드·간편결제 (가상계좌 없음)
-        └── /api/payments/confirm   승인 → settle_order → 크레딧 지급 (멱등)
-             → /?purchase=done       배너 + 잔액 갱신
+[크레딧 소진]
+   → 소진 화면                    베타에는 결제창이 없다 — 대기자 등록(/api/waitlist)
+                                  으로 받고, 충전은 supabase/comp-credit.sql로
+                                  수동 지급한다. 결제 경로는 feature/payments.
 ```
+
+크레딧을 안 쓰는 세 라우트(`/api/analyze`·`/api/enrich`·`/api/summarize`)와 `/api/glossary`는
+**유저당 레이트 리밋** 뒤에 있습니다 — 로그인 외에 아무 상한이 없으면 한 사람이 스크립트로
+우리 API 비용을 무한히 쓸 수 있기 때문입니다. 한도는 `constants.ts`의 `RATE_LIMITS`
+(cheap 3종 합산 분당 20회, 글로사리 분당 5회), 카운터는 Postgres
+(`consume_rate_limit`, `0011_rate_limits_and_errors.sql`)에 있습니다. 서버리스라
+프로세스 메모리 카운터는 인스턴스마다 따로 세서 가드가 못 됩니다.
 
 ## Deploy
 
@@ -368,7 +377,23 @@ npm run build
 vercel deploy
 ```
 
-Vercel Project Settings → Environment Variables에 `TMDB_API_KEY`, `GOOGLE_GENAI_API_KEY`, `OPENAI_API_KEY`(글로사리 토글 ON 시), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL=https://zamak.app`, `TOSS_SECRET_KEY`, `NEXT_PUBLIC_TOSS_CLIENT_KEY`를 추가합니다.
+Vercel Project Settings → Environment Variables에 **다섯 개**를 추가합니다. 베타(main)가 실제로 요구하는 전부입니다:
+
+| 변수 | 값 |
+|---|---|
+| `GOOGLE_GENAI_API_KEY` | analyze·enrich·summarize·translate 네 라우트가 전부 이 키로 동작 |
+| `TMDB_API_KEY` | 작품 정보 조회 |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon 키 |
+| `NEXT_PUBLIC_SITE_URL` | `https://zamak.app` |
+
+넣지 **않는** 것들과 이유:
+
+- `TOSS_SECRET_KEY`·`NEXT_PUBLIC_TOSS_CLIENT_KEY` — 결제 코드가 `feature/payments`에 있어 main에는 읽는 쪽이 없습니다.
+- `OPENAI_API_KEY` — 글로사리 전용인데 `GLOSSARY_UI_ENABLED`가 `false`라 지금은 호출 경로가 없습니다. 토글을 다시 켤 때 같이 추가하세요.
+- `ANTHROPIC_API_KEY` — 로컬 실험 하네스(`scripts/`) 전용. 프로덕션 라우트는 안 씁니다.
+
+⚠️ `NEXT_PUBLIC_SITE_URL`은 **프로덕션 환경에만** 설정합니다. 프리뷰에도 걸면 프리뷰 배포가 자기 sitemap·canonical을 프로덕션 도메인으로 광고하게 됩니다(`app/lib/brand.ts` `resolveSiteUrl`).
 
 Domains에 `zamak.app`과 `www.zamak.app`을 연결하고, Supabase Redirect URLs에
 `https://zamak.app/auth/callback`과 `https://www.zamak.app/auth/callback`을 등록해야

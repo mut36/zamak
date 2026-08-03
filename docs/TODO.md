@@ -60,35 +60,58 @@
 오픈은 막지 않지만 베타 기간에 닫을 것들. 같은 점검에서 나온 랜딩 수치 4건과
 교체 업로드 버그는 0.27.0에서 고쳤다(위 항목·`decisions.md` §1-15 개정).
 
-- [ ] **레이트 리밋이 한 곳도 없다** — 크레딧이 번역은 막지만 `/api/enrich`
-      (TMDB+그라운딩)·`/api/analyze`·`/api/summarize`는 **크레딧을 안 쓰면서
-      실제 API 비용**을 낸다. 로그인만 하면 무제한이다.
-      ⚠️ **2026-08-03 재확인**: "30명이 동시에 몰려 Gemini 한도에 걸린다"는
-      쪽 위험은 낮다 — `gemini-limits.md` §2-1 정정(flash가 flash-lite와
-      동일 스펙으로 확인, RPM 10,000/TPM 10M) 이후 §7-2 재계산상 동시
-      38~68명까지 버틴다. 그래도 이 항목이 없어지는 건 아니다 — 남는 위험은
-      **총량이 아니라 개별 유저의 무한 반복 호출**이다(예: 한 사람이
-      enrich/analyze를 스크립트로 수백 번 돌리는 경우). 유저당 분당 N회
-      정도의 싸구려 가드로 충분하다.
-- [ ] **에러 모니터링이 없다** — 서버 에러는 Vercel 로그에만 남는다. 베타
-      기간엔 로그를 직접 봐야 하고, 유저가 말해 주지 않으면 실패를 모른다.
-      `beta_events`(0009)에 클라이언트 이벤트는 쌓이지만 서버 예외는 안 쌓인다.
-- [ ] **`app/robots.ts`·`app/sitemap.ts`가 없다** — 메타는 `index: true`라
-      크롤링은 열려 있다. **베타 기간에 색인을 원하는지 먼저 정할 것** — 원치
-      않으면 `robots.ts`로 막는 게 맞고, 원하면 사이트맵을 추가하는 게 맞다.
-      지금은 둘 다 아닌 어중간한 상태다.
+- [x] ~~**레이트 리밋이 한 곳도 없다**~~ — 붙임 (2026-08-03, 0.28.0). 진단대로
+      **총량이 아니라 개인**을 막는 가드다. `enforceRateLimit()`
+      (`app/lib/server/rateLimit.ts`)이 `requireUser()` 바로 뒤에서 돌고,
+      대상은 크레딧을 안 쓰는 넷 — analyze·enrich·summarize(합산 20/분) +
+      glossary(5/분, `constants.ts` `RATE_LIMITS`). 카운터는 Postgres
+      (`consume_rate_limit`, `0011`) — 서버리스라 메모리 카운터는 인스턴스마다
+      따로 세서 가드가 안 된다. **fail-open**이고 그 이유는 `rateLimit.ts`
+      주석과 `decisions.md` §6-10에 있다.
+      ⚠️ **한도 검증은 실사용이 해야 한다** — 정상 사용자가 429를 보면 한도가
+      틀린 것이다. `beta-review.sql` §9로 확인할 것.
+      <details><summary>원 기록 (2026-08-03)</summary>
+      "30명이 동시에 몰려 Gemini 한도에 걸린다"는 쪽 위험은 낮다 —
+      `gemini-limits.md` §2-1 정정(flash가 flash-lite와 동일 스펙으로 확인,
+      RPM 10,000/TPM 10M) 이후 §7-2 재계산상 동시 38~68명까지 버틴다. 남는
+      위험은 **개별 유저의 무한 반복 호출**이다.
+      </details>
+- [x] ~~**에러 모니터링이 없다**~~ — 붙임 (2026-08-03, 0.28.0).
+      `reportServerError()`(`app/lib/server/reportError.ts`) → `server_errors`
+      (`0011`), 조회는 `beta-review.sql` §8. `console.error`는 그대로 두고
+      **추가로** 쌓는다 — 스택 전문은 Vercel 로그고, 이 표는 "같은 게
+      반복되는가"다. 배선: analyze·summarize·enrich·glossary·translate(500만)·
+      translation/begin·translation/result.
+      ⚠️ **아직 안 보이는 두 곳**(고치려면 service-role 키나 서비스 계층
+      신원 전달이 필요해 범위 밖):
+      ① 로그인 **이전**에 터진 예외 — RLS가 `user_id`를 요구한다.
+      ② `extractCastSheet` **안에서** 삼켜지는 폴백(키 없음·파싱 실패) —
+      라우트 catch까지 안 올라온다.
+- [x] ~~**`app/robots.ts`·`app/sitemap.ts`가 없다**~~ — 둘 다 추가 (2026-08-03,
+      0.28.0). **대표 결정: 색인을 연다.** 문제는 열려 있던 게 아니라
+      어중간했던 것이다(메타는 `index: true`인데 robots도 sitemap도 없어서,
+      크롤러가 우연히 걸어 들어간 것만 색인되는 상태). robots는
+      `/api/`·`/auth/`·`/mypage`·`/dev/`만 막고, sitemap은 공개 3페이지를
+      명시 목록으로 적었다(파일시스템 유도 안 함 — 나중에 추가되는 페이지가
+      저절로 광고되면 안 된다). `lastModified`는 근거가 없어 비웠다.
+      `layout.tsx`의 `siteUrl()`은 `brand.ts`의 `resolveSiteUrl()`로 이동 —
+      셋이 같은 오리진을 말해야 한다. 근거는 `decisions.md` §6-10.
+      ⚠️ **`NEXT_PUBLIC_SITE_URL`을 프리뷰 환경에 걸지 말 것** — 프리뷰가
+      프로덕션 도메인으로 자기 사이트맵을 광고하게 된다.
 - [ ] **`samples/subtitles/short-smoke.srt`가 0바이트** — 빠른 스모크용 샘플이
       죽어 있어 하네스를 461블록짜리로만 돌리게 된다.
 - [ ] **`drama-episode.srt`가 자기 역할과 반대다** — README는 "영화보다 대사가
       촘촘한 케이스"로 고르라는데 실제 파일은 8.2블록/분으로 `full-movie.srt`
       (11.9블록/분)보다 **성기다**. p95를 잡으라고 둔 샘플이 평균 아래라
       밀도 관련 실측이 전부 낙관적으로 나온다. 대사가 촘촘한 1화로 교체할 것.
-- [ ] **README §371 배포 환경변수 목록이 낡았다** — `TOSS_SECRET_KEY`·
-      `NEXT_PUBLIC_TOSS_CLIENT_KEY`가 아직 있는데 결제는 `feature/payments`로
-      빠졌다. 베타에 실제로 필요한 건 `GOOGLE_GENAI_API_KEY`, `TMDB_API_KEY`,
-      `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-      `NEXT_PUBLIC_SITE_URL` 다섯 개다(글로사리가 OFF라 `OPENAI_API_KEY`도
-      지금은 불필요, `ANTHROPIC_API_KEY`는 하네스 전용).
+- [x] ~~**README §371 배포 환경변수 목록이 낡았다**~~ — 고침 (2026-08-03,
+      0.28.0). 적힌 대로 다섯 개짜리 표로 바꾸고, **빼는 것마다 이유를 같이
+      적었다** — 목록만 고치면 다음 사람이 "OPENAI는 왜 없지" 하고 도로 넣는다.
+      같은 범위에서 TODO에 없던 것 둘도 함께 고쳤다: 프로젝트 구조 트리의
+      `payments/*` 세 줄(→ 실제로 있는 `events`·`glossary`), 아키텍처
+      다이어그램의 `PurchaseStep`/토스 결제창 블록(→ 대기자 등록 + 수동 지급).
+      환경변수 표의 `TOSS_*` 두 행은 "main에서는 안 읽는다"로 남겼다 —
+      지우면 `feature/payments`에서 작업할 때 다시 찾아야 한다.
 - [ ] **모바일 탭 타깃이 37~38px** — iOS HIG 권장 44px, Android 48dp 미달이다
       (2026-08-03 실측, 375×812). 대상: 히어로/네비 CTA, 비교 섹션 탭 3개,
       CPS 프로필 탭 3개. 푸터 링크는 19px지만 텍스트 링크라 관행 범위.
