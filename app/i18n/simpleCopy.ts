@@ -654,6 +654,11 @@ export const COPY = {
     thanks: '의견을 남겨주셔서 감사합니다. 서비스 개선에 큰 도움이 됩니다.',
     close: '닫기',
     failed: '저장에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+    eventNote: (hasKakao: boolean) =>
+      hasKakao
+        ? '라이트 번역권 1개를 더 드렸어요. 더 자세한 의견은 오픈카톡이나 이메일로 남겨주시면 프로 번역권으로 보답할게요. (가입할 때 쓴 이메일을 꼭 남겨주세요)'
+        : '라이트 번역권 1개를 더 드렸어요. 더 자세한 의견은 이메일로 남겨주시면 프로 번역권으로 보답할게요. (가입할 때 쓴 이메일을 꼭 남겨주세요)',
+    kakaoLink: '오픈카톡으로 의견 남기기',
   },
 
   // 내 번역(/mypage) — 번역권 잔여 + 지난 번역 기록.
@@ -685,6 +690,11 @@ export const COPY = {
     home: '홈',
     mypage: '마이페이지',
     copyright: '© 2026 ZAMAK. All rights reserved.',
+    eventBadge: (hasKakao: boolean) =>
+      hasKakao
+        ? '피드백 이벤트: 오픈카톡·이메일로 의견 주시면 번역권을 더 드려요.'
+        : '피드백 이벤트: 이메일로 의견 주시면 번역권을 더 드려요.',
+    kakaoLink: '오픈카톡 문의',
   },
 
   /**

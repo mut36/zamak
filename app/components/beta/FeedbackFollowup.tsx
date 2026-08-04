@@ -8,6 +8,7 @@ import {
 } from '../../lib/client/feedback';
 import { parseSrtBlocks, readBlockIndex } from '../../lib/srt';
 import { COPY } from '../../i18n/simpleCopy';
+import { KAKAO_OPEN_CHAT_URL } from '../../config/constants';
 
 const c = COPY.feedbackFollowup;
 
@@ -158,6 +159,19 @@ export function FeedbackFollowup({ item, onDone }: FeedbackFollowupProps) {
         {submitStatus === 'sent' ? (
           <div className='text-center py-4'>
             <p className='text-body text-nav'>{c.thanks}</p>
+            <p className='mt-2 text-caption text-secondary'>
+              {c.eventNote(Boolean(KAKAO_OPEN_CHAT_URL))}
+            </p>
+            {KAKAO_OPEN_CHAT_URL && (
+              <a
+                href={KAKAO_OPEN_CHAT_URL}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='mt-2 inline-block text-caption underline text-nav'
+              >
+                {c.kakaoLink}
+              </a>
+            )}
             <button
               type='button'
               className='btn btn-ghost btn-block mt-5'
