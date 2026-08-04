@@ -95,3 +95,44 @@ join auth.users u on u.id = j.user_id
 where u.email = 'YOUR_EMAIL_HERE'
 order by j.created_at desc
 limit 20;
+
+
+-- ═══════════════ 피드백 이벤트: 카톡·이메일 문의 → 프로 1개 (2026-08) ═══
+--
+-- 오픈카톡이나 hello@mut36.com으로 의견을 남긴 사람에게 프로 번역권 1개.
+-- 인앱 피드백(별점/후속설문)은 `/api/feedback`이 자동 지급하므로(0012의
+-- grant_event_credit) 이 섹션은 그 경로를 안 타는 카톡·이메일 문의 전용이다.
+--
+-- 위 콤프 지급 섹션과 달리 event_grants(0012)에 기록을 남긴다 — 이벤트
+-- 보상은 "1인 1회"가 지켜져야 하므로, 이미 받은 사람은 아래 insert가 0행으로
+-- 끝나고 update도 안 돈다. 실수로 두 번 실행해도 두 번째부터는 아무 일도
+-- 안 일어난다(콤프 섹션의 "더하기라 두 번 눌러도 안전"과 다르게, 여기는
+-- 애초에 두 번째 실행이 무해가 아니라 무동작이다).
+--
+-- 사용법: 'YOUR_EMAIL_HERE'를 문의자가 남긴 가입 이메일로 치환 후 전체 실행.
+
+with target as (
+  select id from auth.users where email = 'YOUR_EMAIL_HERE'
+),
+grant_attempt as (
+  insert into public.event_grants (user_id, event_code)
+  select id, 'feedback_reward_kakao_email' from target
+  on conflict (user_id, event_code) do nothing
+  returning user_id
+)
+update public.credits
+   set pro_balance = pro_balance + 1,
+       updated_at  = now()
+ where user_id in (select user_id from grant_attempt);
+
+-- 확인: granted_at이 채워져 있으면 지급된 것(이번 실행이든 이전 실행이든).
+-- 행 자체가 없으면 이메일이 안 맞는 것이다.
+select
+  u.email,
+  eg.granted_at,
+  c.pro_balance
+from auth.users u
+left join public.event_grants eg
+  on eg.user_id = u.id and eg.event_code = 'feedback_reward_kakao_email'
+left join public.credits c on c.user_id = u.id
+where u.email = 'YOUR_EMAIL_HERE';
