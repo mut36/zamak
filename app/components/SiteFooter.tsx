@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { APP_VERSION } from '../config/constants';
+import { APP_VERSION, KAKAO_OPEN_CHAT_URL } from '../config/constants';
 import { COPY } from '../i18n/simpleCopy';
 import { Wordmark } from './Wordmark';
 import { SellerInfoToggle } from './SellerInfoToggle';
@@ -29,6 +29,9 @@ export function SiteFooter({ withBottomBar }: { withBottomBar?: boolean }) {
         <div>
           <Wordmark className='lp-wordmark' />
           <p className='site-footer-tagline'>{F.tagline}</p>
+          <p className='site-footer-tagline'>
+            {F.eventBadge(Boolean(KAKAO_OPEN_CHAT_URL))}
+          </p>
         </div>
 
         <nav className='site-footer-links'>
@@ -37,6 +40,11 @@ export function SiteFooter({ withBottomBar }: { withBottomBar?: boolean }) {
             <Link href='/'>{F.home}</Link>
             <Link href='/mypage'>{F.mypage}</Link>
             <a href={`mailto:${F.feedbackEmail}`}>{F.feedback}</a>
+            {KAKAO_OPEN_CHAT_URL && (
+              <a href={KAKAO_OPEN_CHAT_URL} target='_blank' rel='noopener noreferrer'>
+                {F.kakaoLink}
+              </a>
+            )}
           </div>
           <div>
             <p className='site-footer-group'>{F.policyGroup}</p>
