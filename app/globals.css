@@ -712,6 +712,33 @@ button:disabled {
     color: var(--text-secondary);
   }
 
+  /* 번역 품질 라벨 옆 "?" 팝오버 토글 — `.seller-toggle-btn`(푸터)과 같은
+     크롬리스 텍스트 버튼 패턴. */
+  .plan-info-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-tertiary);
+    font-size: var(--fs-fineprint);
+    font-weight: 500;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .plan-info-toggle:hover {
+    color: var(--text-secondary);
+  }
+  .plan-info-toggle svg {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.2s;
+  }
+  .plan-info-toggle[aria-expanded='true'] svg {
+    transform: rotate(180deg);
+  }
+
   /* Target-language row — chromeless "detected → target" flow, no card.
      Muted source label → arrow → prominent target pill. */
   .langflow {
@@ -1802,6 +1829,66 @@ button:disabled {
     font-size: 13.5px;
     line-height: 1.6;
     color: var(--text-secondary);
+  }
+
+  /* 라이트 vs 프로 비교 — 카드 2장 + `.lp-spec` 표. `.lp-spec`은 CPS
+     섹션과 같은 클래스라 label:value 리듬이 페이지 전체에서 반복된다. */
+  .lp-plan-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+  }
+  .lp-plan-card {
+    background: var(--surface);
+    border-radius: 22px;
+    padding: 30px 32px;
+    box-shadow: var(--shadow-card);
+  }
+  .lp-plan-name {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.012em;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .lp-plan-time {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .lp-plan-timenote {
+    font-size: 12px;
+    color: var(--text-quaternary);
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+  .lp-plan-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border-subtle);
+  }
+  /* `.lp-spec`(CPS 섹션)처럼 좌우로 나란히 두지 않는다 — "이럴 때"·"맥락
+     반영" 값은 문장 길이라 좁은 오른쪽 칸에서 오른쪽 정렬 2줄이 되면
+     들쭉날쭉해 읽기 어렵다(실측: 프로 카드 158px 칸에서 3행 모두 2줄).
+     라벨을 위에, 값을 왼쪽 정렬로 아래에 둔다 — 길이가 얼마든 안전하다. */
+  .lp-plan-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .lp-plan-row-label {
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+  .lp-plan-row-value {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.45;
   }
   .lp-rule {
     display: flex;

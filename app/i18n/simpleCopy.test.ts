@@ -152,6 +152,7 @@ describe('COPY: 속도 문구가 한 숫자로 통일돼 있다', () => {
     '랜딩 히어로': COPY.landing.hero.sub,
     '랜딩 속도 섹션': COPY.landing.speed.titleAccent,
     '설정 라이트 카드': COPY.settings.liteDesc,
+    '라이트·프로 비교(COPY.plans)': COPY.plans.lite.time,
   };
 
   it('세 자리가 모두 같은 초를 판다', () => {
@@ -189,5 +190,66 @@ describe('COPY: 속도 문구가 한 숫자로 통일돼 있다', () => {
     );
     const sold = seconds(COPY.landing.speed.titleAccent)[0] * 1000;
     expect(TRANSLATION_ESTIMATE_MS[FLASH_MODEL]).toBeGreaterThan(sold);
+  });
+});
+
+/**
+ * `COPY.plans`는 랜딩의 "라이트 vs 프로" 섹션과 설정 화면의 "?" 팝오버가
+ * 공유하는 단일 소스다(decisions.md §1-23). 두 소비처가 같은 객체를
+ * 참조하는지, 그리고 `time`이 `timeNote`에 적힌 실측 초를 실제로 반올림한
+ * 값인지를 검증한다 — 프로의 "2분 41초"는 사람이 암산해 적은 값이라
+ * 손으로 고칠 때 틀리기 쉽다.
+ */
+describe('COPY.plans — 라이트·프로 비교가 랜딩과 설정 화면에서 갈라지지 않는다', () => {
+  /** timeNote의 "…161.4초…"에서 초 단위 숫자만 뽑는다. */
+  function measuredSeconds(text: string): number {
+    const m = text.match(/(\d+(?:\.\d+)?)초/);
+    expect(m, `timeNote에 실측 초가 없다: ${text}`).not.toBeNull();
+    return Number(m![1]);
+  }
+
+  it('라이트: time이 timeNote의 최악값(1,124블록 14.8초)을 덮는다', () => {
+    // 461블록 13.4초 / 1,124블록 14.8초 두 숫자가 timeNote에 있다 — 파는
+    // time은 더 나쁜 쪽보다 짧으면 안 된다(위 속도 섹션과 같은 이유).
+    const secs = [...COPY.plans.lite.timeNote.matchAll(/(\d+(?:\.\d+)?)초/g)].map(
+      (m) => Number(m[1]),
+    );
+    expect(measuredSeconds(COPY.plans.lite.time)).toBeGreaterThanOrEqual(
+      Math.max(...secs),
+    );
+  });
+
+  it('프로: time이 timeNote의 초를 분:초로 정확히 옮긴 것이다', () => {
+    const total = measuredSeconds(COPY.plans.pro.timeNote); // 161.4
+    const min = Math.floor(total / 60);
+    const sec = Math.round(total % 60);
+    expect(COPY.plans.pro.time).toBe(`약 ${min}분 ${sec}초`);
+  });
+
+  it('rows의 키마다 라이트·프로 둘 다 값이 있다 — 표에 빈 칸이 없다', () => {
+    for (const row of COPY.plans.rows) {
+      expect(
+        COPY.plans.lite[row.key as keyof typeof COPY.plans.lite],
+        `라이트에 ${row.key} 없음`,
+      ).toBeTruthy();
+      expect(
+        COPY.plans.pro[row.key as keyof typeof COPY.plans.pro],
+        `프로에 ${row.key} 없음`,
+      ).toBeTruthy();
+    }
+  });
+
+  it('랜딩과 설정 화면 둘 다 COPY.plans를 직접 참조한다 — 복사한 사본이 아니다', async () => {
+    const fs = await import('node:fs/promises');
+    const landing = await fs.readFile(
+      new URL('../components/simple/LandingPage.tsx', import.meta.url),
+      'utf-8',
+    );
+    const settings = await fs.readFile(
+      new URL('../components/beta/TranslateSettingsStep.tsx', import.meta.url),
+      'utf-8',
+    );
+    expect(landing).toMatch(/COPY\.plans/);
+    expect(settings).toMatch(/COPY\.plans/);
   });
 });

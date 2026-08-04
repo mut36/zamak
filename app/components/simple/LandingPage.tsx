@@ -13,6 +13,7 @@ interface Props {
 }
 
 const L = COPY.landing;
+const PLANS = COPY.plans;
 
 /** 히어로 데모 순환 주기 / 번역문이 뜨기 전 대기 시간 (핸드오프 명세값). */
 const HERO_CYCLE_MS = 3800;
@@ -552,7 +553,45 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           </div>
         </section>
 
-        {/* ── 7. 기능 벤토 ──────────────────────────────────────── */}
+        {/* ── 7. 라이트 vs 프로 ─────────────────────────────────── */}
+        {/* 설정 화면의 "?" 팝오버(`TranslateSettingsStep`)와 같은
+            `COPY.plans`를 읽는다 — 여기서 갈라지면 랜딩이 약속한 시간과
+            설정 화면이 보여주는 시간이 서로 다른 숫자가 된다. */}
+        <section className='bg-surface border-t border-border-subtle px-6 py-24'>
+          <div className='max-w-[880px] mx-auto'>
+            <h2 className='lp-h2 text-center mb-2.5 reveal'>{PLANS.title}</h2>
+            <p
+              className='lp-section-sub text-center max-w-[480px] mx-auto mb-10 break-keep reveal'
+              style={revealDelay(1)}
+            >
+              {PLANS.sub}
+            </p>
+
+            <div className='lp-plan-grid reveal' style={revealDelay(2)}>
+              {[PLANS.lite, PLANS.pro].map((plan) => (
+                <div key={plan.name} className='lp-plan-card'>
+                  <div className='lp-plan-name'>{plan.name}</div>
+                  <div className='lp-plan-time'>{plan.time}</div>
+                  <p className='lp-plan-timenote break-keep'>{plan.timeNote}</p>
+                  <div className='lp-plan-rows'>
+                    {PLANS.rows
+                      .filter((row) => row.key !== 'time')
+                      .map((row) => (
+                        <div key={row.key} className='lp-plan-row'>
+                          <span className='lp-plan-row-label'>{row.label}</span>
+                          <span className='lp-plan-row-value break-keep'>
+                            {plan[row.key as keyof typeof plan]}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── 8. 기능 벤토 ──────────────────────────────────────── */}
         <section className='bg-surface border-t border-border-subtle px-6 py-24'>
           <div className='max-w-[880px] mx-auto'>
             <h2 className='lp-h2 text-center max-w-full mx-auto mb-11 whitespace-normal sm:whitespace-pre-line reveal'>
@@ -630,7 +669,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           </div>
         </section>
 
-        {/* ── 8. 최종 CTA ───────────────────────────────────────── */}
+        {/* ── 9. 최종 CTA ───────────────────────────────────────── */}
         <section className='text-center px-6 pt-[110px] pb-[90px]'>
           <h2 className='lp-h2-final mb-3.5 whitespace-normal sm:whitespace-pre-line reveal'>
             {L.final.title}
@@ -660,7 +699,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
         </section>
       </main>
 
-      {/* ── 9. Footer ─────────────────────────────────────────── */}
+      {/* ── 10. Footer ────────────────────────────────────────── */}
       {/* §1-11의 세 번째 노출 지점. 로그인 전 화면은 이 푸터가 유일한 약관
           경로다 — 로그인 후 셸에는 익명 방문자가 닿지 못한다. */}
       <SiteFooter />

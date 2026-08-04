@@ -1,6 +1,7 @@
 'use client';
 
-import { PencilIcon, SpinnerIcon } from '../icons';
+import { useState } from 'react';
+import { ChevronDownIcon, PencilIcon, SpinnerIcon } from '../icons';
 import { StepBreadcrumb } from '../StepBreadcrumb';
 import { CastSheetCard } from '../simple/CastSheetCard';
 import type { CastSheetStatus } from '../../hooks/useCastSheet';
@@ -80,6 +81,8 @@ export function TranslateSettingsStep({
     [FLASH_MODEL]: credits?.lite ?? 0,
     [PRO_MODEL]: credits?.pro ?? 0,
   } as const;
+  const [showPlanInfo, setShowPlanInfo] = useState(false);
+  const plans = COPY.plans;
 
   return (
     <>
@@ -229,9 +232,56 @@ export function TranslateSettingsStep({
         <p className='text-fineprint text-secondary mt-3'>{c.contextHint}</p>
       </div>
 
-      <p className='qlabel'>{c.sectionQuality}</p>
+      {/* 랜딩의 "라이트 vs 프로" 섹션과 같은 `COPY.plans`를 읽는 팝오버.
+          두 화면이 서로 다른 시간을 약속하는 일이 없도록 소스를 하나로
+          묶었다 — `decisions.md` §1-23. */}
+      <div className='flex items-center justify-between'>
+        <p className='qlabel !mb-0'>{c.sectionQuality}</p>
+        <button
+          type='button'
+          onClick={() => setShowPlanInfo((v) => !v)}
+          aria-expanded={showPlanInfo}
+          className='plan-info-toggle'
+        >
+          {c.plansInfoToggle}
+          <ChevronDownIcon />
+        </button>
+      </div>
 
-      <div className='grid grid-cols-2 gap-[14px] mb-[14px]'>
+      {showPlanInfo && (
+        <div className='card animate-fade-slide-up p-[14px_16px] mb-[10px] overflow-x-auto'>
+          <table className='w-full text-caption-sm border-collapse'>
+            <thead>
+              <tr>
+                <th className='text-left font-medium text-tertiary pb-2 pr-2'> </th>
+                <th className='text-left font-semibold text-ink pb-2 pr-2'>
+                  {plans.lite.name}
+                </th>
+                <th className='text-left font-semibold text-ink pb-2'>
+                  {plans.pro.name}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {plans.rows.map((row) => (
+                <tr key={row.key} className='border-t border-border-subtle'>
+                  <td className='py-2 pr-2 text-tertiary whitespace-nowrap'>
+                    {row.label}
+                  </td>
+                  <td className='py-2 pr-2 text-ink break-keep'>
+                    {plans.lite[row.key as keyof typeof plans.lite]}
+                  </td>
+                  <td className='py-2 text-ink break-keep'>
+                    {plans.pro[row.key as keyof typeof plans.pro]}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className='grid grid-cols-2 gap-[14px] mb-[14px] mt-[10px]'>
         {CARDS.map((card) => {
           const left = cardCredits[card.model];
           const selected = model === card.model;

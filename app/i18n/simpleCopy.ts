@@ -431,6 +431,47 @@ export const COPY = {
     },
   },
 
+  // 랜딩의 라이트·프로 비교 섹션과 설정 화면의 "?" 팝오버가 같이 읽는
+  // 단일 소스. 여기서 갈라지면 랜딩이 약속한 것과 설정 화면이 보여주는
+  // 것이 서로 다른 숫자를 말하게 된다 — `simpleCopy.test.ts`가 두 소비처
+  // 모두 이 객체를 참조하는지 확인한다.
+  //
+  // 시간 수치는 `docs/tuning/experiment-log.md`의 실측이다(둘 다
+  // "프로덕션 설정 그대로"): 라이트는 랜딩 속도 섹션과 같은 근거
+  // (461블록 13.4초 · 1,124블록 14.8초), 프로는 2026-07-31 장편
+  // 타임아웃 실측(1,124블록, PRO_THINKING_LEVEL=HIGH·PRO_CHUNK_SIZE=250,
+  // 총 161.4초). 크레딧 표기는 `docs/decisions.md` §1-4 — 요청이 아니라
+  // **파일 1편** 단위 차감이라 청크 수와 무관하게 항상 1편이다.
+  plans: {
+    title: '라이트 vs 프로',
+    sub: '적용하는 규칙은 같습니다. 다른 건 속도와 맥락 분석입니다.',
+    lite: {
+      name: '라이트',
+      time: '약 15초',
+      timeNote: '드라마 한 편(461블록) 기준 실측 13.4초 · 1,124블록 기준 14.8초.',
+      quality: '빠르고 정확한 기본 번역',
+      context: '작품 맥락 분석 없음',
+      bestFor: '일반 자막, 빠른 초벌',
+      credit: '라이트 번역권 1편',
+    },
+    pro: {
+      name: '프로',
+      time: '약 2분 41초',
+      timeNote: '장편(1,124블록) 기준 실측 161.4초.',
+      quality: '작품 맥락 분석 + 인물명 일관성',
+      context: '장르 · 시대 · 톤을 더 깊이 반영',
+      bestFor: '인물 관계가 복잡한 작품, 후편집 시간을 줄이고 싶을 때',
+      credit: '프로 번역권 1편',
+    },
+    rows: [
+      { key: 'time', label: '예상 소요' },
+      { key: 'quality', label: '번역 품질' },
+      { key: 'context', label: '맥락 반영' },
+      { key: 'bestFor', label: '이럴 때' },
+      { key: 'credit', label: '차감' },
+    ],
+  },
+
   settings: {
     title: '번역 설정',
     subtitleAuto: '원본 언어 자동 인식 → 한국어',
@@ -451,6 +492,8 @@ export const COPY = {
     // Section labels above each group of settings (design_handoff_zamak_brand).
     sectionWork: '작품 정보',
     sectionQuality: '번역 품질',
+    // "?" 팝오버 — `COPY.plans`(랜딩 비교 섹션과 공유)를 표로 보여준다.
+    plansInfoToggle: '자세히 비교',
     sectionAdvanced: '세부 조정 (선택)',
     liteName: '라이트',
     // 랜딩 히어로·`COPY.landing.speed`와 같은 숫자를 써야 한다 — 첫 화면에서
