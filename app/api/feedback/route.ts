@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '../../lib/supabase/server';
 import { requireUser } from '../../lib/server/auth';
+import { FEEDBACK_EVENT_CODE_INAPP } from '../../config/constants';
 
 /** Max stored comment length. Longer input is truncated, not rejected — a
  *  rejected rating is a lost signal, and the signal is the point. */
@@ -121,6 +122,21 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // 별점(rating)이든 후속설문 응답(usability)이든, 실제 피드백을 남긴
+  // 최초 제출에 한해 라이트 1개를 준다. dismiss 단독 호출(나중에 버튼)은
+  // 대상이 아니다. 지급이 실패해도 피드백은 이미 저장됐으므로 라우트는
+  // 그대로 성공을 반환한다 — app/api/feedback/pending/route.ts의 기존
+  // "실패해도 사용자 화면은 안 깨진다" 패턴과 동일하다.
+  if (hasRating || usability) {
+    const { error: grantError } = await supabase.rpc('grant_event_credit', {
+      p_event_code: FEEDBACK_EVENT_CODE_INAPP,
+      p_kind: 'lite',
+    });
+    if (grantError) {
+      console.warn('[feedback] event credit grant failed:', grantError.message);
+    }
   }
 
   return NextResponse.json({ ok: true });
