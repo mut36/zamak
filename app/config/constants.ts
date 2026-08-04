@@ -13,7 +13,7 @@ import {
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.3.0';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
@@ -694,3 +694,19 @@ const SOURCE_LANG_CODE_SET = new Set<string>(SOURCE_LANG_CODES);
 export function isSourceLangCode(token: string): boolean {
   return SOURCE_LANG_CODE_SET.has(token.toLowerCase());
 }
+
+/**
+ * 피드백 리워드 이벤트(2026-08)의 인앱 지급 코드. `event_grants.event_code`와
+ * `grant_event_credit` 호출(`/api/feedback`)이 이 문자열로 일치해야 한다 —
+ * 오탈자는 곧 이중 지급이나 무지급 버그다. 카톡·이메일 쪽 코드
+ * ('feedback_reward_kakao_email')는 코드에서 안 읽으므로(수동 지급이라
+ * `supabase/comp-credit.sql`에만 리터럴로 있음) 여기 두지 않는다.
+ */
+export const FEEDBACK_EVENT_CODE_INAPP = 'feedback_reward_inapp';
+
+/**
+ * 오픈카톡 채널 URL. 채널이 아직 없어 빈 문자열이 기본값이다 — 이 값이
+ * 비어 있으면 푸터·피드백 완료 화면 모두 카톡 관련 UI를 렌더링하지 않는다.
+ * 채널 생성 후 이 리터럴만 채우면 두 화면에 동시에 반영된다.
+ */
+export const KAKAO_OPEN_CHAT_URL = '';
