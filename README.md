@@ -69,6 +69,15 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 
 ```
 
+**개발용 프로젝트는 배포용과 별개입니다.** `.env.local`은 로컬 전용
+Supabase 프로젝트를 가리키고, 실제 서비스는 [Deploy](#deploy)의 Vercel
+환경변수가 가리키는 별도 프로젝트를 씁니다 — 같은 프로젝트가 아닙니다.
+그래서 **새 마이그레이션은 두 프로젝트 모두에 실행**해야 합니다: 개발용에
+안 돌리면 로컬 `npm run dev`에서 새 테이블·함수가 "없음"으로 보이고,
+배포용에 안 돌리면 실제 서비스가 그 상태입니다. 둘 중 하나만 실행하고
+잊기 쉬우니, 마이그레이션 파일을 커밋할 때 두 프로젝트 SQL Editor에 각각
+붙여넣었는지 체크리스트처럼 확인하세요.
+
 토스페이먼츠 키는 main에 필요 없습니다 — 결제 코드가 `feature/payments`에 있습니다.
 
 개발 서버 실행:
@@ -134,8 +143,9 @@ npx tsc --noEmit && npx eslint app && npx vitest run && npm run check:tokens
    (`0010_signup_credit_revert.sql`은 정식 오픈 시점 항목이라 이것과 순서 무관.)
 
 **마이그레이션과 배포는 붙여서 합니다.** `0004`는 기존 `begin_translation_job(integer)`과
-5인자 `settle_order`를 **drop하고** 새 시그니처로 다시 만듭니다. 이 앱은 Next.js 한 벌이
-Supabase 한 개를 보는 구조라 블루/그린도, 버전 핀도 없습니다 — 그래서 순서가 어느 쪽이든
+5인자 `settle_order`를 **drop하고** 새 시그니처로 다시 만듭니다. 배포용 Next.js는
+배포용 Supabase 프로젝트 한 개만 보는 구조라(개발용과는 별개 프로젝트 —
+[Installation](#installation) 참조) 블루/그린도, 버전 핀도 없습니다 — 그래서 순서가 어느 쪽이든
 그 사이에는 살아 있는 코드가 없는 함수를 호출하는 구간이 생깁니다(마이그레이션 먼저면
 구코드가 옛 시그니처를 못 찾고, 배포 먼저면 신코드가 새 시그니처를 못 찾습니다).
 1인 운영이므로 **트래픽이 적은 시간에 마이그레이션 실행 → 곧바로 배포**로 몇 분짜리
