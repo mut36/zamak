@@ -684,9 +684,36 @@ export const LANG_SUFFIX: Record<string, string> = {
  * from being treated as languages.
  */
 export const SOURCE_LANG_CODES = [
-  'en', 'ko', 'ja', 'zh', 'es', 'fr', 'de', 'it', 'pt', 'ru',
-  'nl', 'sv', 'no', 'da', 'fi', 'pl', 'cs', 'tr', 'ar', 'hi',
-  'th', 'vi', 'id', 'el', 'he', 'ro', 'hu', 'bg', 'hr', 'sr',
+  'en',
+  'ko',
+  'ja',
+  'zh',
+  'es',
+  'fr',
+  'de',
+  'it',
+  'pt',
+  'ru',
+  'nl',
+  'sv',
+  'no',
+  'da',
+  'fi',
+  'pl',
+  'cs',
+  'tr',
+  'ar',
+  'hi',
+  'th',
+  'vi',
+  'id',
+  'el',
+  'he',
+  'ro',
+  'hu',
+  'bg',
+  'hr',
+  'sr',
 ] as const;
 
 const SOURCE_LANG_CODE_SET = new Set<string>(SOURCE_LANG_CODES);
@@ -709,4 +736,4 @@ export const FEEDBACK_EVENT_CODE_INAPP = 'feedback_reward_inapp';
  * 비어 있으면 푸터·피드백 완료 화면 모두 카톡 관련 UI를 렌더링하지 않는다.
  * 채널 생성 후 이 리터럴만 채우면 두 화면에 동시에 반영된다.
  */
-export const KAKAO_OPEN_CHAT_URL = '';
+export const KAKAO_OPEN_CHAT_URL = 'http://pf.kakao.com/_xlkXBX';
