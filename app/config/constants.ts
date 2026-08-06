@@ -13,7 +13,7 @@ import {
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '1.4.0';
+export const APP_VERSION = '1.4.1';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
@@ -256,6 +256,16 @@ export const MAX_BLOCKS_PER_CREDIT = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_MAX_BLOCKS_PER_CREDIT,
   2000,
 );
+
+/**
+ * 무제한 테스터(`public.unlimited_testers`, 0013)의 잔액 칩에 띄울 숫자.
+ *
+ * 그 계정은 차감이 DB에서 면제되므로 실제 잔액은 0에 머문다. 그대로 두면 UI가
+ * "0편 남음"을 빨갛게 띄우고(TranslateSettingsStep), 번역은 되는데 화면은
+ * 소진됐다고 말하는 상태가 된다. 표시용 값일 뿐 어떤 한도도 아니다 — 이 숫자를
+ * 다 쓴다고 무언가 막히지 않는다.
+ */
+export const UNLIMITED_CREDIT_DISPLAY = 999;
 
 /**
  * How long a paid-for job stays usable, in minutes.

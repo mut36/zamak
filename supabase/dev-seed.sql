@@ -13,6 +13,12 @@
 -- 안전장치: 치환을 깜빡하고 실행해도 아무 일도 일어나지 않는다.
 -- 'YOUR_EMAIL_HERE'와 일치하는 계정이 없으면 서브쿼리가 NULL이 되어 어떤 행도
 -- 매칭되지 않는다. 1번(조회)만 결과를 낸다.
+--
+-- ⚠️ 2026-08-06 정정 — 2·3·4번은 그 전까지 **deprecated된 `balance` 컬럼**을
+--    건드리고 있었다. 0004(티어제) 이후 차감도 조회도 `lite_balance`/
+--    `pro_balance`만 보므로, 옛 버전으로 충전하면 화면 숫자도 안 변하고 번역도
+--    못 했다(comp-credit.sql이 8-02에 같은 이유로 고쳐졌는데 이 파일은 남아
+--    있었다). 아래는 두 컬럼을 직접 다룬다.
 
 
 -- ═══════════════════════════════════════════════════════════════ 1. 현황 ═══
@@ -21,26 +27,30 @@
 
 select
   u.email,
-  coalesce(c.balance, 0) as balance,
-  count(j.id)            as jobs_opened,
-  max(j.created_at)      as last_job,
-  u.created_at           as signed_up
+  coalesce(c.lite_balance, 0) as lite,
+  coalesce(c.pro_balance, 0)  as pro,
+  (t.user_id is not null)     as unlimited,
+  count(j.id)                 as jobs_opened,
+  max(j.created_at)           as last_job,
+  u.created_at                as signed_up
 from auth.users u
-left join public.credits c          on c.user_id = u.id
-left join public.translation_jobs j on j.user_id = u.id
-group by u.id, u.email, c.balance, u.created_at
+left join public.credits c           on c.user_id = u.id
+left join public.unlimited_testers t on t.user_id = u.id
+left join public.translation_jobs j  on j.user_id = u.id
+group by u.id, u.email, c.lite_balance, c.pro_balance, t.user_id, u.created_at
 order by u.created_at desc;
 
 
 -- ═════════════════════════════════════════════════════════════ 2. 충전 ═══
--- 반복 테스트용. THINKING_LEVEL 비교처럼 번역을 여러 번 돌려야 할 때 쓴다.
+-- 일회성 테스트용. 반복 테스트라면 충전 대신 7번(무제한 등록)을 쓴다.
 -- 번역 1회 = 크레딧 1개다.
 --
 -- 0행이 갱신되면 credits 행 자체가 없다는 뜻 → 3번을 먼저 실행할 것.
 
 update public.credits
-   set balance    = 10,
-       updated_at = now()
+   set lite_balance = 10,
+       pro_balance  = 10,
+       updated_at   = now()
  where user_id = (select id from auth.users where email = 'YOUR_EMAIL_HERE');
 
 
@@ -48,9 +58,11 @@ update public.credits
 -- 가입 트리거(on_auth_user_created)는 0001_credits.sql을 적용한 *뒤에* 가입한
 -- 계정에만 걸린다. 마이그레이션 전에 로그인해서 "번역권 0편"으로 보이는 계정은
 -- credits 행이 아예 없고, 그러면 2번 update가 0행을 갱신하며 조용히 지나간다.
+--
+-- 지급량은 0004의 가입 트리거와 같게 맞춘다(라이트 3, 프로 1).
 
-insert into public.credits (user_id, balance)
-select id, 1
+insert into public.credits (user_id, balance, lite_balance, pro_balance)
+select id, 0, 3, 1
   from auth.users
  where email = 'YOUR_EMAIL_HERE'
     on conflict (user_id) do nothing;
@@ -58,10 +70,14 @@ select id, 1
 
 -- ════════════════════════════════════════════════ 4. 페이월 테스트 ═══
 -- 잔액을 0으로 만들어 402 insufficient_credits 경로와 "준비 중" 화면을 확인한다.
+--
+-- 무제한으로 등록된 계정(7번)에는 효과가 없다 — 차감 자체가 면제라 0편이어도
+-- 번역이 열린다. 페이월을 보려면 7번의 회수 블록을 먼저 실행할 것.
 
 update public.credits
-   set balance    = 0,
-       updated_at = now()
+   set lite_balance = 0,
+       pro_balance  = 0,
+       updated_at   = now()
  where user_id = (select id from auth.users where email = 'YOUR_EMAIL_HERE');
 
 
@@ -91,3 +107,32 @@ limit 20;
 
 delete from public.translation_jobs
  where user_id = (select id from auth.users where email = 'YOUR_EMAIL_HERE');
+
+
+-- ═══════════════════════════════════════════ 7. 무제한 테스터 등록/회수 ═══
+-- 0013_unlimited_testers.sql이 만든 allowlist. 등록된 계정은
+-- begin_translation_job이 차감을 건너뛴다 — 잔액은 0에 머물지만 번역은 계속
+-- 열리고, job 행·메트릭·히스토리는 실사용과 똑같이 쌓인다. /api/credits는 이
+-- 계정에 UNLIMITED_CREDIT_DISPLAY(999)를 표시용으로 돌려준다.
+--
+-- ⚠️ 이 블록은 dev-seed의 나머지와 달리 **배포용 DB에 실행해도 되는** 유일한
+--    블록이다. 배포된 베타에 로그인해서 테스트하려면 오히려 거기 있어야 한다.
+--    단 대상은 운영자 계정으로 한정할 것 — 여기 들어간 계정은 매출 없이 번역을
+--    무한히 돌릴 수 있다.
+
+-- 등록
+insert into public.unlimited_testers (user_id, note)
+select id, '운영자 테스트 계정'
+  from auth.users
+ where email = 'YOUR_EMAIL_HERE'
+    on conflict (user_id) do nothing;
+
+-- 회수 (페이월·소진 화면을 테스트하려면 먼저 이걸 실행)
+delete from public.unlimited_testers
+ where user_id = (select id from auth.users where email = 'YOUR_EMAIL_HERE');
+
+-- 현재 등록된 계정 전체
+select u.email, t.note, t.created_at
+  from public.unlimited_testers t
+  join auth.users u on u.id = t.user_id
+ order by t.created_at;

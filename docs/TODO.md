@@ -34,6 +34,19 @@
 
 - [ ] 개발용 프로젝트 SQL Editor에 `0012_event_grants.sql` 실행
 
+### 무제한 테스터 allowlist — 두 프로젝트에 마이그레이션 실행 (2026-08-06)
+
+`supabase/migrations/0013_unlimited_testers.sql`은 코드에만 있고 아직 어느
+DB에도 실행되지 않았다. 실행 전까지는 `/api/credits`의 조회가 조용히 실패하며
+일반 계정으로 취급되고(화면은 그대로 동작), 차감 면제도 당연히 안 걸린다.
+
+배경은 `docs/decisions.md` §6-11. 등록/회수 SQL은 `supabase/dev-seed.sql` 7번.
+
+- [ ] 배포용 프로젝트(`eqfa...`) SQL Editor에 `0013` 실행 → dev-seed 7번 등록
+- [ ] 개발용 프로젝트(`m...`) SQL Editor에 `0013` 실행 → dev-seed 7번 등록
+- [ ] 등록 후 실제로 번역을 두 번 돌려 잔액이 안 줄고 히스토리엔 두 건이
+      쌓이는지 확인
+
 ### 베타 오픈 당일 남긴 것 (2026-08-02)
 
 오픈 직전 전체 점검에서 나온 것 중, 오픈을 막지는 않지만 베타 기간 안에 닫아야
