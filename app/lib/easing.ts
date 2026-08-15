@@ -40,3 +40,28 @@ export function easeToward(
   const progress = Math.min(raw, 0.999999);
   return from + (ceiling - from) * progress;
 }
+
+/**
+ * 이미 일어난 진행(floor)이 뛸 때, 점프 대신 짧게 미끄러지는 값.
+ *
+ * `easeToward`와 반대로 **목표에 정확히 도달한다.** floor는 추정이 아니라
+ * 실제로 착지한 청크가 만든 값이라 점근할 이유가 없다 — 바꾸는 건 도달
+ * 여부가 아니라 도달하는 모양이다.
+ *
+ * 이게 필요한 이유: Pro 1,124블록 런은 청크 5개가 전부 한 웨이브라
+ * `onCompleted`가 끝에 몰려서 불린다. floor를 즉시 반영하면 바가 한 번에
+ * 뛴다 — 사용자에겐 "확 구십몇 프로로 점프"로 보인다.
+ *
+ * 목표가 시작점보다 낮으면 시작점을 돌려준다. 바는 뒤로 가지 않는다.
+ */
+export function catchupValue(
+  from: number,
+  to: number,
+  elapsedMs: number,
+  catchupMs: number,
+): number {
+  if (to <= from) return from;
+  if (!(catchupMs > 0)) return to;
+  const progress = Math.min(1, Math.max(0, elapsedMs) / catchupMs);
+  return from + (to - from) * progress;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { easeToward } from './easing';
+import { catchupValue, easeToward } from './easing';
 
 describe('easeToward', () => {
   it('천장에 절대 도달하지 않는다 — 이게 바가 거짓말하지 않는 이유다', () => {
@@ -68,5 +68,36 @@ describe('easeToward', () => {
     for (const elapsed of [0, 1_000, 100_000, 1e12]) {
       expect(easeToward(95, 100, elapsed, 2_000)).toBeLessThan(100);
     }
+  });
+});
+
+describe('catchupValue', () => {
+  it('시작점에서 출발해 목표에 정확히 도달한다', () => {
+    // easeToward와 달리 여기선 도달해야 한다 — floor는 이미 일어난 실제
+    // 진행이라 "점근"할 이유가 없다. 점프를 눈에 보이는 이동으로 바꿀 뿐이다.
+    expect(catchupValue(80, 91, 0, 400)).toBe(80);
+    expect(catchupValue(80, 91, 400, 400)).toBe(91);
+  });
+
+  it('중간에서 선형이다', () => {
+    expect(catchupValue(80, 90, 200, 400)).toBeCloseTo(85, 6);
+    expect(catchupValue(0, 100, 100, 400)).toBeCloseTo(25, 6);
+  });
+
+  it('시간이 지나도 목표를 넘지 않는다', () => {
+    expect(catchupValue(80, 91, 10_000, 400)).toBe(91);
+  });
+
+  it('경과가 음수여도 시작점 아래로 안 간다', () => {
+    expect(catchupValue(80, 91, -100, 400)).toBe(80);
+  });
+
+  it('catchupMs가 0이나 음수면 즉시 목표를 준다 — 0으로 나누지 않는다', () => {
+    expect(catchupValue(80, 91, 0, 0)).toBe(91);
+    expect(catchupValue(80, 91, 0, -1)).toBe(91);
+  });
+
+  it('목표가 시작점보다 낮으면 시작점을 지킨다 — 단조성', () => {
+    expect(catchupValue(91, 80, 200, 400)).toBe(91);
   });
 });
