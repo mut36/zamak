@@ -546,7 +546,8 @@ export function useTranslation(
         textRuleReport.ellipsisNormalized > 0 ||
         textRuleReport.linesMerged > 0 ||
         textRuleReport.trailingPunctuationStripped > 0 ||
-        textRuleReport.linesJoined > 0
+        textRuleReport.linesJoined > 0 ||
+        textRuleReport.midLinePeriodsToCommas > 0
       ) {
         console.log('[translate] text rule enforcement', textRuleReport);
       }

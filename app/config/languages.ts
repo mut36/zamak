@@ -101,6 +101,20 @@ export interface TargetLang {
    */
   trailingPunctuation: string;
   /**
+   * How a finished subtitle spells an ellipsis.
+   *
+   * Korean ships `...` by product decision (2026-08-15). This departs from the
+   * reference guide, which asks for the single U+2026 glyph
+   * (`docs/standards/netflix-korean-subtitles.md` §I.4) — the departure is
+   * deliberate and recorded in `docs/decisions.md`, so a future reader finds
+   * the reason instead of "fixing" it back. Every other target keeps `…`.
+   *
+   * enforceTextRules normalizes to `…` internally regardless, and only spells
+   * it this way as the last step: a line ending in `...` would otherwise lose
+   * a dot to the trailing-period strip.
+   */
+  ellipsis: '…' | '...';
+  /**
    * Reading-speed band per content profile. See docs/tuning/reading-speed.md —
    * Korean is measured, the rest are derived from public style guides and want
    * re-measuring, so they use one shape for all three profiles until someone
@@ -132,6 +146,7 @@ export const TARGET_LANGS: TargetLang[] = [
     lineMaxChars: 25,
     formality: { formal: '존댓말', informal: '반말', mixed: '혼용' },
     trailingPunctuation: '.,',
+    ellipsis: '...',
     // 유도는 docs/tuning/reading-speed.md §3. 예능이 가장 느긋하고(화면에 이미
     // 읽을 것이 많다), 강연·토크가 가장 촘촘하다(말이 끊이지 않아 노출을 넓히면
     // 다음 대사를 밀어낸다). 영화는 프로필 도입 전의 한국어 밴드 그대로 —
@@ -151,6 +166,7 @@ export const TARGET_LANGS: TargetLang[] = [
     lineMaxChars: 42,
     formality: null,
     trailingPunctuation: '',
+    ellipsis: '…',
     shapes: uniformShapes(LATIN_SHAPE),
   },
   {
@@ -166,6 +182,7 @@ export const TARGET_LANGS: TargetLang[] = [
       mixed: '혼용',
     },
     trailingPunctuation: '.,。、',
+    ellipsis: '…',
     shapes: uniformShapes({ target: 8, hardMax: 9 }),
   },
   {
@@ -177,6 +194,7 @@ export const TARGET_LANGS: TargetLang[] = [
     lineMaxChars: 42,
     formality: T_V_AXIS('usted', 'tú'),
     trailingPunctuation: '',
+    ellipsis: '…',
     shapes: uniformShapes(LATIN_SHAPE),
   },
   {
@@ -188,6 +206,7 @@ export const TARGET_LANGS: TargetLang[] = [
     lineMaxChars: 42,
     formality: T_V_AXIS('vous', 'tu'),
     trailingPunctuation: '',
+    ellipsis: '…',
     shapes: uniformShapes(LATIN_SHAPE),
   },
   {
@@ -199,6 +218,7 @@ export const TARGET_LANGS: TargetLang[] = [
     lineMaxChars: 18,
     formality: null,
     trailingPunctuation: '.,。，',
+    ellipsis: '…',
     shapes: uniformShapes({ target: 8, hardMax: 9 }),
   },
   {
@@ -210,6 +230,7 @@ export const TARGET_LANGS: TargetLang[] = [
     lineMaxChars: 42,
     formality: T_V_AXIS('Sie', 'du'),
     trailingPunctuation: '',
+    ellipsis: '…',
     shapes: uniformShapes(LATIN_SHAPE),
   },
 ];

@@ -241,9 +241,23 @@ export interface TextRuleReport {
   trailingPunctuationStripped: number;
   /** Blocks whose two lines were folded into one because they fit. */
   linesJoined: number;
+  /** Mid-line sentence periods rewritten as commas (house standard §I.13). */
+  midLinePeriodsToCommas: number;
+  /** Lines carrying two speakers that were split one-per-line (§I.6). */
+  speakerLinesSplit: number;
 }
 
 const ELLIPSIS_RUN = /\.{2,}/g;
+
+/**
+ * Characters that may close a line after its sentence punctuation — a quote
+ * mark, in any of the shapes a translation can produce.
+ *
+ * The punctuation strip has to see past these for the same reason it has to
+ * see past `</i>`: in `"이길 방법은 딱 하나뿐이야."` the line does not end with
+ * the period, it ends with the quote, so an end-anchored pattern never fires.
+ */
+const CLOSERS = `["'”’」』]`;
 
 /**
  * Sentence-final punctuation at the end of a line's *text* — any run of
@@ -260,10 +274,96 @@ const ELLIPSIS_RUN = /\.{2,}/g;
  */
 function trailingPunctuationPattern(chars: string): RegExp {
   const escaped = chars.replace(/[\\\]^-]/g, '\\$&');
-  return new RegExp(`[${escaped}]\\s*((?:</[^>]+>\\s*)*)$`);
+  return new RegExp(`[${escaped}]\\s*((?:(?:</[^>]+>|${CLOSERS})\\s*)*)$`);
 }
 
+/**
+ * A period that ends one sentence while another follows on the same line.
+ *
+ * The house standard is explicit here — two sentences inside one subtitle are
+ * joined with a comma, not a period (`docs/standards/netflix-korean-subtitles.md`
+ * §I.13, which lists "사랑해. 그게 내가 / 하고 싶은 말이었어" as wrong and the
+ * comma form as right). The trailing strip never saw these because it only
+ * looks at the end of a line, so `압니다. 결혼식에…` shipped as written.
+ *
+ * Anchored on a Hangul syllable so it cannot touch a decimal (`3.5`) or a
+ * Latin abbreviation (`Mr. Smith`, `U.S. 정부`), neither of which is a sentence
+ * boundary. Ellipsis normalization runs first, so `…` is already one character
+ * and never matches.
+ */
+const MID_LINE_PERIOD = /([가-힣])\.(\s+)(?![-–—]\s)(?=\S)/g;
+
+/**
+ * A line carrying both speakers of a dual-speaker subtitle.
+ *
+ * The house standard is one speaker per line (§I.6: "하이픈 + 공백(`- `)을 쓰고,
+ * 한 줄에 한 화자만"), but the model sometimes emits `- 네. - 올해 가룟 유다에`
+ * as a single line and lets the wrap fall wherever the budget lands — which
+ * puts the second speaker's dash mid-line and breaks their sentence in half.
+ *
+ * Group 1 is the first speaker, group 2 the second. The leading dash is
+ * required, so a hyphen inside ordinary text ("3 - 4개") is never a match:
+ * only a line that already declares itself dual-speaker can be split.
+ */
+const DUAL_SPEAKER_LINE = /^((?:<[^>]+>\s*)*-\s.+?)\s+(-\s.+)$/;
+
+/**
+ * Korean sentence-final endings, for the join rule below.
+ *
+ * A period is the reliable signal that a line closes a sentence, but the model
+ * is asked not to write one, so most sentence boundaries reach us bare:
+ * "제겐 영광입니다 / 더 잘해드리고 싶지만…" has nothing to key on but the 입니다.
+ * Korean predicates end the sentence, so the final syllable carries it.
+ *
+ * Deliberately a short, high-precision set. Being wrong in one direction just
+ * leaves a subtitle on two lines, which is always valid; being wrong the other
+ * way crams two sentences onto one line, which is the defect being fixed. So
+ * ambiguous endings (자 in 감자, 나 in 하나, 라 in 하늘라) are left out — a
+ * missed fold costs nothing, a wrong fold costs a line.
+ */
+const KOREAN_SENTENCE_FINAL = /[다요죠까네군]$/;
+
 const MARKUP_TAG = /<(\/?)([a-zA-Z][^\s>/]*)[^>]*?(\/?)>/g;
+
+/**
+ * The line closes a sentence — checked before the trailing strip runs, because
+ * the strip is what destroys the evidence.
+ *
+ * Trailing markup and a closing quote are skipped so `말했어요."</i>` still
+ * reads as sentence-final.
+ */
+const SENTENCE_END = new RegExp(
+  `[.?!…]\\s*(?:(?:</[^>]+>|${CLOSERS})\\s*)*$`,
+);
+
+/** Trailing markup and quotes removed, so the last real character shows. */
+function lastTextCharacter(line: string): string {
+  return line
+    .replace(new RegExp(`(?:</?[^>]+>|${CLOSERS}|\\s)+$`), '')
+    .slice(-1);
+}
+
+/**
+ * The line finishes a sentence — by its punctuation, or by its final syllable
+ * when the punctuation was never written.
+ */
+function endsASentence(line: string): boolean {
+  return (
+    SENTENCE_END.test(line) || KOREAN_SENTENCE_FINAL.test(lastTextCharacter(line))
+  );
+}
+
+/**
+ * The line opens a quotation.
+ *
+ * Quoted speech is its own unit, so the break in front of it is a real one:
+ * `내게 말했어 / "이길 방법은 딱 하나뿐이야"` reads as attribution then quote,
+ * while folding it flat buries the seam. The standard allows either shape
+ * (§I.11 lists both as acceptable) and this is the one we take.
+ */
+function opensAQuote(line: string): boolean {
+  return /^\s*(?:<[^>]+>\s*)*["'“‘「『]/.test(line);
+}
 
 /** Visible characters — markup does not occupy space on screen. */
 function visibleLength(line: string): number {
@@ -343,6 +443,12 @@ export interface TextRuleOptions {
  * on one is arithmetic, not judgment, so it belongs here rather than in the
  * prompt. Where to break a line that genuinely overflows still does not.
  *
+ * That fold stops at a sentence boundary. "내 아내와 / 딸" is one phrase broken
+ * for no reason; "DVD 버전을 추천합니다 / 화질이 더 좋거든요" is two sentences, and
+ * the break is the best one available even though the text would fit on a
+ * single line. The boundary is read before the trailing strip, since stripping
+ * the period is what would hide it.
+ *
  * Malformed blocks (no parseable timing) pass through untouched, same as
  * adjustSubtitleTiming — there's no reliable body to rewrite.
  */
@@ -359,6 +465,8 @@ export function enforceTextRules(
     linesMerged: 0,
     trailingPunctuationStripped: 0,
     linesJoined: 0,
+    midLinePeriodsToCommas: 0,
+    speakerLinesSplit: 0,
   };
 
   const rewritten = parseSrtBlocks(srt).map((raw) => {
@@ -374,10 +482,35 @@ export function enforceTextRules(
       }),
     );
 
+    // Before the 2-line cap, so a speaker split that produces a third line is
+    // folded back into the second speaker's own line rather than left over.
+    bodyLines = bodyLines.flatMap((line) => {
+      const dual = DUAL_SPEAKER_LINE.exec(line);
+      if (!dual) return [line];
+      report.speakerLinesSplit++;
+      return [dual[1].trimEnd(), dual[2]];
+    });
+
     if (bodyLines.length > 2) {
       report.linesMerged += bodyLines.length - 2;
       bodyLines = [bodyLines[0], bodyLines.slice(1).join(' ')];
     }
+
+    // Only for languages that drop the sentence period at all — the comma
+    // convention is the other half of the same house rule, so a target that
+    // keeps its periods keeps them here too.
+    if (trailingPunctuation.includes('.')) {
+      bodyLines = bodyLines.map((line) =>
+        line.replace(MID_LINE_PERIOD, (_match, syllable, gap) => {
+          report.midLinePeriodsToCommas++;
+          return `${syllable},${gap}`;
+        }),
+      );
+    }
+
+    // Read now, while the periods are still there for the strip to remove.
+    const opensOnASentenceEnd =
+      bodyLines.length === 2 && endsASentence(bodyLines[0]);
 
     if (trailingPattern) {
       bodyLines = bodyLines.map((line) => {
@@ -398,6 +531,8 @@ export function enforceTextRules(
       const joined = `${bodyLines[0].trim()} ${bodyLines[1].trim()}`;
       if (
         visibleLength(joined) <= options.lineMaxChars &&
+        !opensOnASentenceEnd &&
+        !opensAQuote(bodyLines[1]) &&
         !isSpeakerLine(bodyLines[0]) &&
         !isSpeakerLine(bodyLines[1]) &&
         hasBalancedTags(joined)

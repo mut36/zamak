@@ -322,7 +322,7 @@ writeFileSync(
     `- **모델이 바꾼 것: ${modelChanges.length}블록** ` +
       `= FORMAT ${modelChanges.length - rewrites.length} / ⚠ REWRITE ${rewrites.length}` +
       ` (그중 압축했다고 보고한 것 ${rewrites.length - unadmitted.length})`,
-    `- 코드가 바꾼 것: 줄접기 ${textRuleReport.linesJoined} · 문장부호 ${textRuleReport.trailingPunctuationStripped} · 3줄초과 ${textRuleReport.linesMerged}`,
+    `- 코드가 바꾼 것: 줄접기 ${textRuleReport.linesJoined} · 줄끝부호 ${textRuleReport.trailingPunctuationStripped} · 줄중간마침표→쉼표 ${textRuleReport.midLinePeriodsToCommas} · 3줄초과 ${textRuleReport.linesMerged}`,
     `- 둘을 합친 최종 변경: ${changes.length}블록`,
     '',
     `- 모델에게 실제로 일이 있었던 블록(원본이 ${LANG.lineMaxChars}자 초과): **${sourceOverLong.length}**`,
@@ -355,7 +355,7 @@ console.log(
     `모델 변경 ${modelChanges.length} ` +
       `(FORMAT ${modelChanges.length - rewrites.length} / ⚠ REWRITE ${rewrites.length}, ` +
       `보고되지 않은 REWRITE ${unadmitted.length})`,
-    `코드 변경 줄접기 ${textRuleReport.linesJoined} / 문장부호 ${textRuleReport.trailingPunctuationStripped} · 최종 변경 ${changes.length}`,
+    `코드 변경 줄접기 ${textRuleReport.linesJoined} / 줄끝부호 ${textRuleReport.trailingPunctuationStripped} / 마침표→쉼표 ${textRuleReport.midLinePeriodsToCommas} · 최종 변경 ${changes.length}`,
     `${LANG.lineMaxChars}자 초과 잔존 ${overLong.length} · API실패 ${apiFailures} · ${seconds.toFixed(1)}s`,
     `→ ${srtPath}`,
     `→ ${reportPath}`,

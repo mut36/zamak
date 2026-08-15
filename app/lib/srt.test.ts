@@ -797,6 +797,140 @@ describe('enforceTextRules', () => {
     expect(report.linesJoined).toBe(1);
   });
 
+  it('rewrites a mid-line sentence period as a comma', () => {
+    // 기준 문서 §I.13: "사랑해. 그게 내가" (X) → "사랑해, 그게 내가" (O).
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n압니다. 결혼식에 관한 영화를\n작업 중인데 아주 열심이죠';
+    const { content, report } = enforceTextRules(srt, {
+      trailingPunctuation: '.,',
+      lineMaxChars: 25,
+    });
+    expect(content).toBe(
+      '1\n00:00:00,000 --> 00:00:01,000\n압니다, 결혼식에 관한 영화를\n작업 중인데 아주 열심이죠',
+    );
+    expect(report.midLinePeriodsToCommas).toBe(1);
+  });
+
+  it('leaves a decimal point and a Latin abbreviation alone', () => {
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n3.5초 남았어\n\n' +
+      '2\n00:00:02,000 --> 00:00:03,000\nMr. 스미스를 찾아';
+    const { content, report } = enforceTextRules(srt, {
+      trailingPunctuation: '.,',
+    });
+    expect(content).toBe(srt);
+    expect(report.midLinePeriodsToCommas).toBe(0);
+  });
+
+  it('keeps mid-line periods for a language whose convention keeps them', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\nI know. That was the point';
+    const { content, report } = enforceTextRules(srt, {
+      trailingPunctuation: '',
+    });
+    expect(content).toBe(srt);
+    expect(report.midLinePeriodsToCommas).toBe(0);
+  });
+
+  it('refuses to join two sentences even when they fit on one line', () => {
+    // 24 visible chars joined, so arithmetic alone would fold it — but the
+    // break sits on a sentence boundary, which is a reason to keep it.
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\nDVD 버전을 추천합니다.\n화질이 더 좋거든요';
+    const { content, report } = enforceTextRules(srt, {
+      trailingPunctuation: '.,',
+      lineMaxChars: 25,
+    });
+    expect(content).toBe(
+      '1\n00:00:00,000 --> 00:00:01,000\nDVD 버전을 추천합니다\n화질이 더 좋거든요',
+    );
+    expect(report.linesJoined).toBe(0);
+    expect(report.trailingPunctuationStripped).toBe(1);
+  });
+
+  it('refuses to join across a question mark or an ellipsis', () => {
+    for (const mark of ['?', '…']) {
+      const srt = `1\n00:00:00,000 --> 00:00:01,000\n어디 가${mark}\n난 몰라`;
+      expect(enforceTextRules(srt, { lineMaxChars: 25 }).content).toBe(srt);
+    }
+  });
+
+  it('sees the sentence end through a closing quote and tag', () => {
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n<i>"형은 스타가 됐어."</i>\n<i>늘 그랬죠</i>';
+    const { report } = enforceTextRules(srt, {
+      trailingPunctuation: '.,',
+      lineMaxChars: 25,
+    });
+    expect(report.linesJoined).toBe(0);
+  });
+
+  it('still joins when the first line ends mid-sentence', () => {
+    // A trailing comma is not a sentence end, so this one still folds.
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n가나다라마바사아자차카타파,\n하가나다라마바사아자차';
+    const { report } = enforceTextRules(srt, {
+      trailingPunctuation: '.,',
+      lineMaxChars: 25,
+    });
+    expect(report.linesJoined).toBe(1);
+  });
+
+  it('splits a line carrying both speakers, one per line', () => {
+    // 기준 문서 §I.6: 한 줄에 한 화자만.
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n- 네. - 올해 가룟 유다에\n대한 영화를 만들었지…';
+    const { content, report } = enforceTextRules(srt, {
+      trailingPunctuation: '.,',
+      lineMaxChars: 25,
+    });
+    expect(content).toBe(
+      '1\n00:00:00,000 --> 00:00:01,000\n- 네\n- 올해 가룟 유다에 대한 영화를 만들었지…',
+    );
+    expect(report.speakerLinesSplit).toBe(1);
+  });
+
+  it('does not treat a hyphen inside ordinary text as a speaker mark', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n오후 3 - 4시에 만나';
+    const { content, report } = enforceTextRules(srt, { lineMaxChars: 25 });
+    expect(content).toBe(srt);
+    expect(report.speakerLinesSplit).toBe(0);
+  });
+
+  it('strips a period hiding behind a closing quote', () => {
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n내게 말했어\n"이길 방법은 딱 하나뿐이야."';
+    const { content, report } = enforceTextRules(srt, {
+      trailingPunctuation: '.,',
+      lineMaxChars: 25,
+    });
+    expect(content).toBe(
+      '1\n00:00:00,000 --> 00:00:01,000\n내게 말했어\n"이길 방법은 딱 하나뿐이야"',
+    );
+    expect(report.trailingPunctuationStripped).toBe(1);
+  });
+
+  it('refuses to join when the first line ends a sentence without a period', () => {
+    // "제겐 영광입니다" carries no punctuation at all — the 다 is the only signal.
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n제겐 영광입니다\n더 잘해드리고 싶지만…';
+    const { content, report } = enforceTextRules(srt, {
+      trailingPunctuation: '.,',
+      lineMaxChars: 25,
+    });
+    expect(content).toBe(srt);
+    expect(report.linesJoined).toBe(0);
+  });
+
+  it('still folds a phrase broken mid-sentence', () => {
+    // 와 is a particle, not a sentence ending, so this one is still one phrase.
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n내 아내와\n딸';
+    const { report } = enforceTextRules(srt, {
+      trailingPunctuation: '.,',
+      lineMaxChars: 25,
+    });
+    expect(report.linesJoined).toBe(1);
+  });
+
   it('folds a 3-line block all the way to one line when it fits', () => {
     const srt = '1\n00:00:00,000 --> 00:00:01,000\n내\n아내와\n딸';
     const { content, report } = enforceTextRules(srt, { lineMaxChars: 25 });
