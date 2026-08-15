@@ -207,6 +207,7 @@ export function PreviewHarness() {
             enrichDone
             glossaryEnabled={castSheetOn}
             glossaryDone
+            model={DEFAULT_MODEL}
           />
         )}
 

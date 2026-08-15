@@ -1,21 +1,20 @@
 'use client';
 
+import { useState } from 'react';
 import type { TranslationProgress } from '../../types/translation';
 import { StepBreadcrumb } from '../StepBreadcrumb';
 import { COPY } from '../../i18n/simpleCopy';
-import {
-  DEFAULT_MODEL,
-  GLOSSARY_WAIT_MS,
-  MIN_VERIFY_MS,
-  estimateTranslationMs,
-} from '../../config/constants';
+import { GLOSSARY_WAIT_MS, MIN_VERIFY_MS } from '../../config/constants';
+import { estimateRunMsFromBlocks } from '../../lib/progressEstimate';
 import { useEasedProgress } from '../../hooks/useEasedProgress';
 import {
   activeStage,
-  bandsFor,
+  bandsForRun,
   overallPercent,
+  stageOrderForRun,
   stageViews,
   type StageKey,
+  type StageWeights,
 } from '../../lib/progressStages';
 
 interface ProgressStepProps {
@@ -31,6 +30,9 @@ interface ProgressStepProps {
   glossaryEnabled: boolean;
   /** False only while the cast-sheet extraction is still in flight. */
   glossaryDone: boolean;
+  /** 이 런의 모델. 밴드 폭과 남은 시간 추정에 쓴다 — totalEstimateMs가
+   *  첫 청크 요청 전까지 0이라 그것만으로는 Pro/flash를 구분할 수 없다. */
+  model: string;
 }
 
 const c = COPY.progress;
@@ -46,12 +48,12 @@ const RECOVERY_EXPECTED_MS = 15_000;
  * Flat progress bar + stage checklist (context → [glossary] → translate →
  * verify).
  *
- * 바가 그리는 값은 `max(실제 청크 착지분, 밴드 끝을 향한 지수 이징)`이다
+ * 바가 그리는 값은 `max(floor를 향한 캐치업, 밴드 끝을 향한 이징)`이다
  * (`useEasedProgress`). 실제 진행만 쓰면 계단으로 튀고 — Pro는 한 웨이브라
  * 142초 동안 아예 멈춰 있다 — 시간만 쓰면 거짓말이 된다.
  *
- * 글로사리를 끈 런에서는 그 단계가 목록에서 사라지고, 15–25 구간은 context가
- * 흡수한다 (`bandsFor`).
+ * 안 도는 단계(예: 글로사리 OFF)는 목록에서 사라지고 그 폭을 도는 단계가
+ * 흡수한다 (`bandsForRun`).
  */
 export function ProgressStep({
   progress,
@@ -60,32 +62,64 @@ export function ProgressStep({
   enrichDone,
   glossaryEnabled,
   glossaryDone,
+  model,
 }: ProgressStepProps) {
+  // 밴드는 런 시작에 한 번 계산하고 **얼린다.** estimatedRemainingMs는 실측
+  // 보정으로 계속 바뀌는데, 밴드가 그때마다 움직이면 이미 지난 구간의 경계가
+  // 이동해 바가 뒤로 간다. useState의 lazy initializer는 첫 렌더에만 실행되니
+  // 이 얼림에 딱 맞는다 — ref의 렌더 중 읽기(react-hooks/refs)를 피하면서도
+  // 같은 효과를 낸다.
+  //
+  // translate weight를 totalEstimateMs가 아니라 estimateRunMsFromBlocks로
+  // 잡는 것도 같은 이유다 — totalEstimateMs는 첫 청크 요청 전까지 0이고
+  // (useTranslation.ts에서 설정된다), 글로사리 대기가 걸리면 최대
+  // GLOSSARY_WAIT_MS 동안 0이다. 그 사이에 얼리면 Pro 런이 flash 폭을 갖는다.
+  const [frozen] = useState<{
+    bands: Record<StageKey, [number, number]>;
+    order: StageKey[];
+  }>(() => {
+    const weights: StageWeights = {
+      context: enrichDone ? 0 : CONTEXT_EXPECTED_MS,
+      glossary: glossaryEnabled && !glossaryDone ? GLOSSARY_WAIT_MS : 0,
+      translate: estimateRunMsFromBlocks(Math.max(1, totalLines), model),
+      verify: MIN_VERIFY_MS,
+    };
+    return {
+      bands: bandsForRun(weights),
+      order: stageOrderForRun(weights),
+    };
+  });
+  const { bands, order } = frozen;
+
   const floor = overallPercent(progress, {
     enrichDone,
     glossaryEnabled,
     glossaryDone,
+    bands,
   });
-  const stage = activeStage(floor, glossaryEnabled);
-  const bands = bandsFor(glossaryEnabled);
+  const stage = activeStage(floor, bands, order);
 
   // 스윕은 청크 콜 수 기준 예산이라(recoverySweep.ts) ms 실측이 없다. 2초용
-  // MIN_VERIFY_MS로 그대로 이징하면 몇 초 만에 99.9%에 닿고 나머지 스윕
-  // 시간(수십 초까지 갈 수 있다) 내내 완료처럼 멈춰 있는다 — 이 계획이
-  // 없애려던 바로 그 증상이 스윕 경로에서 재현된다. 그래서 스윕 중엔 천장을
-  // 100 밑(98)으로 낮추고, 더 긴(추정치일 뿐 실측 아님) 예상 시간을 쓴다.
+  // MIN_VERIFY_MS로 그대로 이징하면 몇 초 만에 밴드 끝에 닿고 나머지 스윕
+  // 시간(수십 초까지 갈 수 있다) 내내 완료처럼 멈춰 있는다. 그래서 스윕 중엔
+  // 천장을 밴드 끝 밑으로 낮추고, 더 긴(추정치일 뿐 실측 아님) 예상 시간을
+  // 쓴다. verify 폭이 최소 5%p라(progressStages.ts) 이 2%p는 항상 밴드 안이다.
   const isRecovering = progress.stage === 'recovering';
-  const bandEnd = isRecovering ? 98 : bands[stage][1];
+  const bandEnd = isRecovering ? bands.verify[1] - 2 : bands[stage][1];
 
   // 밴드마다 이징이 기댈 시간이 다르다. translate는 실측 보정을 거친
   // estimatedRemainingMs(useTranslation), 나머지는 그 단계의 대기 상수.
+  const blockEstimateMs = estimateRunMsFromBlocks(
+    Math.max(1, totalLines),
+    model,
+  );
   const expectedMs: Record<StageKey, number> = {
     context: CONTEXT_EXPECTED_MS,
     glossary: GLOSSARY_WAIT_MS,
     translate:
       progress.estimatedRemainingMs ||
       progress.totalEstimateMs ||
-      estimateTranslationMs(DEFAULT_MODEL),
+      blockEstimateMs,
     verify: isRecovering ? RECOVERY_EXPECTED_MS : MIN_VERIFY_MS,
   };
 
@@ -96,7 +130,7 @@ export function ProgressStep({
     snap: progress.stage === 'done',
   });
 
-  const views = stageViews(percent, glossaryEnabled);
+  const views = stageViews(percent, bands, order);
   const title = c.stages[stage];
 
   // percent는 실제 착지분과의 max이므로 절대 뒤로 가지 않고, totalEstimateMs는
@@ -105,7 +139,7 @@ export function ProgressStep({
   // 한다. estimatedRemainingMs를 직접 읽으면 0으로 떨어졌다가(청크 착지 시점,
   // finalizing 진입 시점) totalEstimateMs로 되튀는 순간이 있어 숫자가 거꾸로
   //간다 — 그 버그를 피하려고 일부러 안 쓴다.
-  const totalMs = progress.totalEstimateMs || estimateTranslationMs(DEFAULT_MODEL);
+  const totalMs = progress.totalEstimateMs || blockEstimateMs;
   const remainingSec =
     percent >= 100
       ? 0
