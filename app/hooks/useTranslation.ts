@@ -537,12 +537,16 @@ export function useTranslation(
       // CPS measures it.
       const { content: ruleEnforced, report: textRuleReport } = enforceTextRules(
         sweptContent,
-        { trailingPunctuation: resolveTargetLang(targetLang).trailingPunctuation },
+        {
+          trailingPunctuation: resolveTargetLang(targetLang).trailingPunctuation,
+          lineMaxChars: resolveTargetLang(targetLang).lineMaxChars,
+        },
       );
       if (
         textRuleReport.ellipsisNormalized > 0 ||
         textRuleReport.linesMerged > 0 ||
-        textRuleReport.trailingPunctuationStripped > 0
+        textRuleReport.trailingPunctuationStripped > 0 ||
+        textRuleReport.linesJoined > 0
       ) {
         console.log('[translate] text rule enforcement', textRuleReport);
       }

@@ -239,6 +239,8 @@ export interface TextRuleReport {
   linesMerged: number;
   /** Lines that had sentence-final punctuation removed. */
   trailingPunctuationStripped: number;
+  /** Blocks whose two lines were folded into one because they fit. */
+  linesJoined: number;
 }
 
 const ELLIPSIS_RUN = /\.{2,}/g;
@@ -261,6 +263,46 @@ function trailingPunctuationPattern(chars: string): RegExp {
   return new RegExp(`[${escaped}]\\s*((?:</[^>]+>\\s*)*)$`);
 }
 
+const MARKUP_TAG = /<(\/?)([a-zA-Z][^\s>/]*)[^>]*?(\/?)>/g;
+
+/** Visible characters — markup does not occupy space on screen. */
+function visibleLength(line: string): number {
+  return line.replace(MARKUP_TAG, '').trim().length;
+}
+
+/**
+ * Every opening tag closed, in order, within this one string.
+ *
+ * Joining two lines is only safe when the result is balanced. Players differ
+ * on what an unclosed `<i>` means at a line boundary — several end the italic
+ * there — so folding `<i>속삭이며` and `그가 말했다` into one line would silently
+ * extend the italic over text that was not italic before. `<i>속삭이며` +
+ * `그가 말했다</i>` is the opposite case: the pair only completes once joined,
+ * and the covered text is identical either way.
+ */
+function hasBalancedTags(line: string): boolean {
+  const open: string[] = [];
+  for (const match of line.matchAll(MARKUP_TAG)) {
+    const [, closing, name, selfClosing] = match;
+    if (selfClosing) continue;
+    if (closing) {
+      if (open.pop() !== name.toLowerCase()) return false;
+    } else {
+      open.push(name.toLowerCase());
+    }
+  }
+  return open.length === 0;
+}
+
+/**
+ * A two-speaker line (`- 어디 가?` / `- 몰라`), which stays two lines however
+ * short it is — the dash is only readable as speaker separation when the lines
+ * are apart. Leading markup is skipped so `<i>- 몰라</i>` still counts.
+ */
+function isSpeakerLine(line: string): boolean {
+  return /^\s*(?:<[^>]+>\s*)*-\s/.test(line);
+}
+
 export interface TextRuleOptions {
   /**
    * Sentence-final characters to strip (TargetLang.trailingPunctuation).
@@ -268,6 +310,12 @@ export interface TextRuleOptions {
    * subtitling practice — skips the strip entirely.
    */
   trailingPunctuation?: string;
+  /**
+   * Per-line character budget (TargetLang.lineMaxChars). Enables the join
+   * below; omitted means no join at all, so a caller that has no language in
+   * hand keeps the old behaviour.
+   */
+  lineMaxChars?: number;
 }
 
 /**
@@ -288,6 +336,13 @@ export interface TextRuleOptions {
  * a trailing-off ellipsis for a sentence-ending period — after normalization
  * there is no longer a bare "." to match at the end of one.
  *
+ * The 2-line cap has a mirror image, enabled by `lineMaxChars`: a block split
+ * over two lines that would fit on one gets folded back. The model inherits
+ * the source's line breaks and keeps them even when the target text got much
+ * shorter — "내 아내와 / 딸" for seven characters — and whether two lines fit
+ * on one is arithmetic, not judgment, so it belongs here rather than in the
+ * prompt. Where to break a line that genuinely overflows still does not.
+ *
  * Malformed blocks (no parseable timing) pass through untouched, same as
  * adjustSubtitleTiming — there's no reliable body to rewrite.
  */
@@ -303,6 +358,7 @@ export function enforceTextRules(
     ellipsisNormalized: 0,
     linesMerged: 0,
     trailingPunctuationStripped: 0,
+    linesJoined: 0,
   };
 
   const rewritten = parseSrtBlocks(srt).map((raw) => {
@@ -333,6 +389,22 @@ export function enforceTextRules(
           markup.trimEnd(),
         );
       });
+    }
+
+    // Last, so the budget is measured on the text that actually ships: the
+    // strip above can free the very character that was pushing the join over
+    // the limit.
+    if (options.lineMaxChars !== undefined && bodyLines.length === 2) {
+      const joined = `${bodyLines[0].trim()} ${bodyLines[1].trim()}`;
+      if (
+        visibleLength(joined) <= options.lineMaxChars &&
+        !isSpeakerLine(bodyLines[0]) &&
+        !isSpeakerLine(bodyLines[1]) &&
+        hasBalancedTags(joined)
+      ) {
+        report.linesJoined++;
+        bodyLines = [joined];
+      }
     }
 
     return [lines[0], lines[1], ...bodyLines].join('\n');

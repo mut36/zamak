@@ -343,6 +343,7 @@ async function runVariant(
 
   const { content: ruleEnforced } = enforceTextRules(sweptContent, {
     trailingPunctuation: resolveTargetLang(P.lang).trailingPunctuation,
+    lineMaxChars: resolveTargetLang(P.lang).lineMaxChars,
   });
   const translatedFinal = adjustSubtitleTiming(ruleEnforced, {
     ...getReadingSpeed(P.lang),

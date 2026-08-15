@@ -723,6 +723,88 @@ describe('enforceTextRules', () => {
     expect(report.linesMerged).toBe(1);
   });
 
+  it('joins two lines that fit on one', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n내 아내와\n딸';
+    const { content, report } = enforceTextRules(srt, { lineMaxChars: 25 });
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\n내 아내와 딸');
+    expect(report.linesJoined).toBe(1);
+  });
+
+  it('leaves two lines apart when joining would overflow', () => {
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n지금 생각하면 심장이 쿵 내려앉지만\n그만한 가치가 있었어요';
+    const { content, report } = enforceTextRules(srt, { lineMaxChars: 25 });
+    expect(content).toBe(srt);
+    expect(report.linesJoined).toBe(0);
+  });
+
+  it('does not join without a lineMaxChars budget', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n내 아내와\n딸';
+    const { content, report } = enforceTextRules(srt);
+    expect(content).toBe(srt);
+    expect(report.linesJoined).toBe(0);
+  });
+
+  it('keeps a two-speaker block on two lines however short it is', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n- 어디 가?\n- 몰라';
+    const { content, report } = enforceTextRules(srt, { lineMaxChars: 25 });
+    expect(content).toBe(srt);
+    expect(report.linesJoined).toBe(0);
+  });
+
+  it('keeps a two-speaker block apart even when the dash is inside markup', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n<i>- 어디 가?</i>\n<i>- 몰라</i>';
+    expect(enforceTextRules(srt, { lineMaxChars: 25 }).content).toBe(srt);
+  });
+
+  it('joins a tag pair that only completes once the lines are together', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n<i>살아남은 벨로키오\n남매들은</i>';
+    const { content, report } = enforceTextRules(srt, { lineMaxChars: 25 });
+    expect(content).toBe(
+      '1\n00:00:00,000 --> 00:00:01,000\n<i>살아남은 벨로키오 남매들은</i>',
+    );
+    expect(report.linesJoined).toBe(1);
+  });
+
+  it('refuses to join when the joined line would leave a tag unclosed', () => {
+    // Several players end an unclosed italic at the line break, so folding
+    // these together would newly italicize the second line.
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n<i>속삭이며\n그가 말했다';
+    const { content, report } = enforceTextRules(srt, { lineMaxChars: 25 });
+    expect(content).toBe(srt);
+    expect(report.linesJoined).toBe(0);
+  });
+
+  it('measures the budget on visible characters, not markup', () => {
+    // 20 visible chars wrapped in tags that would push a naive count past 25.
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n<i>정확히 뭘 하고 싶은지\n나도 몰랐다</i>';
+    const { report } = enforceTextRules(srt, { lineMaxChars: 25 });
+    expect(report.linesJoined).toBe(1);
+  });
+
+  it('measures the budget after the punctuation strip frees a character', () => {
+    // 25 visible chars once the trailing comma goes; 26 with it.
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n가나다라마바사아자차카타파,\n하가나다라마바사아자차';
+    const { content, report } = enforceTextRules(srt, {
+      trailingPunctuation: '.,',
+      lineMaxChars: 25,
+    });
+    expect(content).toBe(
+      '1\n00:00:00,000 --> 00:00:01,000\n가나다라마바사아자차카타파 하가나다라마바사아자차',
+    );
+    expect(report.linesJoined).toBe(1);
+  });
+
+  it('folds a 3-line block all the way to one line when it fits', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n내\n아내와\n딸';
+    const { content, report } = enforceTextRules(srt, { lineMaxChars: 25 });
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\n내 아내와 딸');
+    expect(report.linesMerged).toBe(1);
+    expect(report.linesJoined).toBe(1);
+  });
+
   it('strips the CJK full-width stops for a language that configures them', () => {
     const srt = '1\n00:00:00,000 --> 00:00:01,000\nそこにいるのか。';
     const { content, report } = enforceTextRules(srt, {
