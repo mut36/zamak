@@ -309,6 +309,7 @@ export default function Home() {
             enrichDone={ENRICH_ALWAYS_DONE}
             glossaryEnabled={castSheet.enabled}
             glossaryDone={castSheet.status !== 'extracting'}
+            model={model}
           />
         )}
 
