@@ -23,27 +23,28 @@
 형식이라 "오픈카톡"이라는 카피 명칭과 정확히 일치하는지는 미확인 —
 의도한 채널 형태가 맞는지 확인할 것.
 
-### 피드백 리워드 이벤트 — 개발용 Supabase에 마이그레이션 반영 (2026-08-04)
+### ~~피드백 리워드 이벤트 — 개발용 Supabase에 마이그레이션 반영~~ — 해결 (2026-08-04 기록, 2026-08-06 확인)
 
-`supabase/migrations/0012_event_grants.sql`을 배포용 프로젝트에만 실행했다
-(`docs/decisions.md` §1-27, `README.md` "개발용 프로젝트는 배포용과
-별개입니다" 참고). 개발용 프로젝트(`m...`)엔 아직 없어서 로컬
-`npm run dev`로는 자동 지급이 동작하지 않는다 — 로컬 확인이 필요해지면
-같은 파일을 개발용 SQL Editor에도 붙여넣어 실행할 것. 급하지 않음(로컬
-테스트 전용 문제, 실서비스와 무관).
+`supabase/migrations/0012_event_grants.sql`이 개발용 프로젝트(`m...`)에도
+반영돼 있음을 확인했다(2026-08-06) — anon key로 비인증 REST 호출 시
+`event_grants` 테이블 조회가 200 `[]`, `grant_event_credit()` RPC가
+`"not authenticated"`(28000)를 반환했다(함수가 없으면 나올 수 없는 응답).
+언제 실행됐는지 기록은 없으나 현재는 두 프로젝트 모두 반영된 상태다.
 
-- [ ] 개발용 프로젝트 SQL Editor에 `0012_event_grants.sql` 실행
+- [x] ~~개발용 프로젝트 SQL Editor에 `0012_event_grants.sql` 실행~~ — 완료 확인 (2026-08-06)
 
 ### 무제한 테스터 allowlist — 두 프로젝트에 마이그레이션 실행 (2026-08-06)
 
-`supabase/migrations/0013_unlimited_testers.sql`은 코드에만 있고 아직 어느
-DB에도 실행되지 않았다. 실행 전까지는 `/api/credits`의 조회가 조용히 실패하며
-일반 계정으로 취급되고(화면은 그대로 동작), 차감 면제도 당연히 안 걸린다.
+~~`supabase/migrations/0013_unlimited_testers.sql`은 코드에만 있고 아직 어느
+DB에도 실행되지 않았다~~ — **마이그레이션 실행은 두 프로젝트 모두 완료**
+(2026-08-06, 대표 확인). 개발용은 REST로 `unlimited_testers` 테이블 존재를
+직접 확인했다(anon key 비인증 조회 200 `[]`). 남은 건 실제 allowlist 등록과
+동작 검증뿐.
 
 배경은 `docs/decisions.md` §6-11. 등록/회수 SQL은 `supabase/dev-seed.sql` 7번.
 
-- [ ] 배포용 프로젝트(`eqfa...`) SQL Editor에 `0013` 실행 → dev-seed 7번 등록
-- [ ] 개발용 프로젝트(`m...`) SQL Editor에 `0013` 실행 → dev-seed 7번 등록
+- [x] ~~배포용(`eqfa...`)·개발용(`m...`) SQL Editor에 `0013` 실행~~ — 완료 (2026-08-06)
+- [ ] 두 프로젝트 모두 dev-seed 7번으로 테스트 계정 allowlist 등록
 - [ ] 등록 후 실제로 번역을 두 번 돌려 잔액이 안 줄고 히스토리엔 두 건이
       쌓이는지 확인
 
@@ -336,6 +337,10 @@ git worktree add /Users/jian/projects/zamak-worktrees/payments feature/payments
   관계가 바뀌면 항목이 둘로 쪼개지고, 청크는 자기 블록 범위와 겹치는 항목만 본다.
   TMDB cast를 이름 앵커로 쓰는 방안도 함께 반영(`tmdb.ts` `TmdbCastMember`). 상세는
   `docs/decisions.md` §2-9.
+- [ ] **Flash로 1차 번역 + Pro로 1회 검수 패스 테스트** (2026-08-06) — 본 번역은
+  저렴한 flash로 돌리고, 완료된 결과를 Pro 엔진에 한 번 더 통과시켜 오역·규칙
+  위반을 검수·교정하는 2단계 파이프라인이 실익 있는지 실험. Pro 단독 대비
+  비용·품질 트레이드오프 측정 필요. 미착수.
 
 ## 고급 번역 (길이 예산)
 

@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { COPY } from '../../i18n/simpleCopy';
+import { fitVars } from '../../utils/fitText';
 import { useScrollReveal } from '../../hooks/useScrollReveal';
 import { BrandMark } from '../BrandMark';
+import { HowItWorksDemo } from './HowItWorksDemo';
 import { SiteFooter } from '../SiteFooter';
 
 interface Props {
@@ -193,16 +195,24 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
 
       <main>
         {/* ── 2. Hero ───────────────────────────────────────────── */}
-        <header className='animate-zrise flex flex-col items-center text-center px-6 pt-[clamp(56px,9vh,88px)] pb-[90px]'>
-          {/* 카피의 `\n`은 데스크톱 폭에 맞춰 손으로 넣은 것이라, 좁은
-              화면에서는 그 줄이 다시 접히며 '배운' 같은 한 단어짜리 고아
-              줄을 만든다. 640px 아래에서는 `\n`을 공백으로 풀고
-              `text-balance`에 줄 나누기를 맡긴다 — 자막 예시(`.lp-hero-*`,
-              `.lp-line`)는 줄 나눔 자체가 내용이므로 여기서 제외다. */}
-          <h1 className='lp-h1 mb-[18px] whitespace-normal sm:whitespace-pre-line'>
-            {L.hero.title}
+        <header className='lp-fit-ctx animate-zrise flex flex-col items-center text-center px-6 pt-[clamp(56px,9vh,88px)] pb-[90px]'>
+          {/* 카피의 `\n`은 데스크톱 폭에 맞춰 손으로 넣은 것이다. 예전에는
+              640px 아래에서 그걸 공백으로 풀었는데, 그러면 폰에서 문장 리듬이
+              통째로 사라졌다. 지금은 `.lp-fit`이 폭에 맞춰 글자를 줄여
+              줄바꿈을 지키고, 하한에 닿아서야 브라우저 줄바꿈에 넘긴다
+              (`app/utils/fitText.ts`, `docs/decisions.md` §1-21).
+
+              브랜드 조각(`titleBrand`)과 끝 온점은 `\n` 계산에 넣지 않는다 —
+              마지막 줄에 붙는 짧은 꼬리라 가장 긴 줄을 바꾸지 않는다. */}
+          <h1 className='lp-h1 lp-fit mb-[18px]' style={fitVars(L.hero.title)}>
+            {L.hero.title}{' '}
+            <span className='mono'>{L.hero.titleBrand}</span>
+            <span style={{ color: 'var(--accent)' }}>.</span>
           </h1>
-          <p className='lp-hero-sub mb-[34px] max-w-full break-keep whitespace-normal sm:whitespace-pre-line'>
+          <p
+            className='lp-hero-sub lp-fit mb-[34px] max-w-full break-keep'
+            style={fitVars(L.hero.sub)}
+          >
             {L.hero.sub.split('*').map((part, i) =>
               i % 2 === 1 ? (
                 <span
@@ -312,7 +322,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           id='how'
           className='lp-anchor bg-bg px-6 py-24'
         >
-          <div className='max-w-[880px] mx-auto'>
+          <div className='lp-fit-ctx max-w-[880px] mx-auto'>
             <h2 className='lp-h2 text-center mb-2.5 reveal'>{L.how.title}</h2>
             <p
               className='lp-section-sub text-center max-w-[480px] mx-auto mb-10 break-keep reveal'
@@ -321,18 +331,11 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
               {L.how.sub}
             </p>
 
-            <div className='lp-how-grid reveal' style={revealDelay(2)}>
-              {L.how.steps.map((step) => (
-                <div key={step.num} className='lp-how-card'>
-                  <span className='lp-how-num' aria-hidden>
-                    {step.num}
-                  </span>
-                  <div className='lp-how-title'>{step.title}</div>
-                  <p className='lp-how-desc break-keep whitespace-normal sm:whitespace-pre-line'>
-                    {step.desc}
-                  </p>
-                </div>
-              ))}
+            {/* 리빌은 데모 바깥 래퍼가 맡는다 — 데모는 단계마다 내부 노드를
+                갈아 끼우므로, 새로 태어난 노드가 `.is-visible` 없이 투명한 채
+                굳는 걸 막는다(CPS 카드와 같은 처리). */}
+            <div className='reveal' style={revealDelay(2)}>
+              <HowItWorksDemo onSignIn={onSignIn} configured={configured} />
             </div>
           </div>
         </section>
@@ -342,7 +345,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           id='compare'
           className='lp-anchor bg-surface border-t border-border-subtle px-6 py-[90px]'
         >
-          <div className='max-w-[880px] mx-auto'>
+          <div className='lp-fit-ctx max-w-[880px] mx-auto'>
             <h2 className='lp-h2 text-center mb-2.5 reveal'>{L.compare.title}</h2>
             <p
               className='lp-section-sub text-center max-w-[480px] mx-auto mb-10 break-keep reveal'
@@ -416,8 +419,8 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
             </div>
 
             <p
-              className='mt-7 mx-auto max-w-full text-center text-sm text-tertiary leading-[1.6] break-keep whitespace-normal sm:whitespace-pre-line reveal'
-              style={revealDelay(4)}
+              className='lp-fit lp-fit-prose mt-7 mx-auto max-w-full text-center text-tertiary leading-[1.6] break-keep reveal'
+              style={fitVars(L.compare.outro, revealDelay(4))}
             >
               {L.compare.outro}
             </p>
@@ -430,7 +433,8 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           className='lp-anchor bg-ink-strong text-on-ink px-6 py-[100px]'
         >
           <div className='max-w-[880px] mx-auto grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-14 items-center'>
-            <div className='reveal'>
+            {/* 본문이 쓸 수 있는 폭은 880px가 아니라 이 왼쪽 칸이다. */}
+            <div className='lp-fit-ctx reveal'>
               <h2 className='lp-h2-dark mb-4'>
                 {L.speed.titleTop}
                 <br />
@@ -439,8 +443,8 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                 </span>
               </h2>
               <p
-                className='mb-7 text-[16px] leading-[1.6] max-w-full break-keep whitespace-normal sm:whitespace-pre-line'
-                style={{ color: 'rgba(250,249,245,0.6)' }}
+                className='lp-fit lp-fit-body mb-7 leading-[1.6] max-w-full break-keep'
+                style={fitVars(L.speed.body, { color: 'rgba(250,249,245,0.6)' })}
               >
                 {L.speed.body}
               </p>
@@ -480,11 +484,11 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
 
         {/* ── 6. CPS 자동 조정 ──────────────────────────────────── */}
         <section id='cps' className='lp-anchor bg-bg px-6 py-24'>
-          <div className='max-w-[880px] mx-auto'>
+          <div className='lp-fit-ctx max-w-[880px] mx-auto'>
             <h2 className='lp-h2 mb-2.5 reveal'>{L.cps.title}</h2>
             <p
-              className='lp-section-sub max-w-full mb-9 leading-[1.55] break-keep whitespace-normal sm:whitespace-pre-line reveal'
-              style={revealDelay(1)}
+              className='lp-section-sub lp-fit max-w-full mb-9 leading-[1.55] break-keep reveal'
+              style={fitVars(L.cps.sub, revealDelay(1))}
             >
               {L.cps.sub}
             </p>
@@ -513,7 +517,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                 aria-labelledby={`cps-tab-${profile}`}
                 className='lp-cps-card'
               >
-                <div className='flex flex-col gap-[18px]'>
+                <div className='lp-fit-ctx flex flex-col gap-[18px]'>
                   <div>
                     <div className='text-caption font-semibold text-tertiary mb-1.5'>
                       {L.cps.speedLabel}
@@ -530,7 +534,12 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                     </div>
                     <div className='lp-spec'>
                       <span>{L.cps.actionLabel}</span>
-                      <b className='break-keep whitespace-normal sm:whitespace-pre-line'>{cps.action}</b>
+                      <b
+                        className='lp-fit lp-fit-small break-keep'
+                        style={fitVars(cps.action)}
+                      >
+                        {cps.action}
+                      </b>
                     </div>
                   </div>
                 </div>
@@ -550,6 +559,15 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                 </div>
               </div>
             </div>
+
+            {/* 속도 섹션의 실측 각주와 같은 자리·같은 크기 — 파는 숫자 바로
+                밑에 그 숫자의 근거를 붙이는 규칙을 페이지에서 반복한다. */}
+            <p
+              className='mt-5 text-fineprint text-quaternary leading-[1.6] break-keep text-pretty reveal'
+              style={revealDelay(4)}
+            >
+              {L.cps.note}
+            </p>
           </div>
         </section>
 
@@ -558,7 +576,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
             `COPY.plans`를 읽는다 — 여기서 갈라지면 랜딩이 약속한 시간과
             설정 화면이 보여주는 시간이 서로 다른 숫자가 된다. */}
         <section className='bg-surface border-t border-border-subtle px-6 py-24'>
-          <div className='max-w-[880px] mx-auto'>
+          <div className='lp-fit-ctx max-w-[880px] mx-auto'>
             <h2 className='lp-h2 text-center mb-2.5 reveal'>{PLANS.title}</h2>
             <p
               className='lp-section-sub text-center max-w-[480px] mx-auto mb-10 break-keep reveal'
@@ -593,18 +611,25 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
 
         {/* ── 8. 기능 벤토 ──────────────────────────────────────── */}
         <section className='bg-surface border-t border-border-subtle px-6 py-24'>
-          <div className='max-w-[880px] mx-auto'>
-            <h2 className='lp-h2 text-center max-w-full mx-auto mb-11 whitespace-normal sm:whitespace-pre-line reveal'>
+          <div className='lp-fit-ctx max-w-[880px] mx-auto'>
+            <h2
+              className='lp-h2 lp-fit text-center max-w-full mx-auto mb-11 reveal'
+              style={fitVars(L.features.title)}
+            >
               {L.features.title}
             </h2>
 
             <div className='flex flex-col gap-[18px]'>
               <div className='lp-bento-wide reveal' style={revealDelay(1)}>
-                <div>
+                {/* 본문 폭은 벤토 전체가 아니라 이 왼쪽 칸이다. */}
+                <div className='lp-fit-ctx'>
                   <div className='text-[19px] font-semibold tracking-[-0.012em] mb-2'>
                     {L.features.rules.title}
                   </div>
-                  <p className='m-0 text-[14.5px] text-secondary leading-[1.6] break-keep whitespace-normal sm:whitespace-pre-line'>
+                  <p
+                    className='lp-fit lp-fit-prose m-0 text-secondary leading-[1.6] break-keep'
+                    style={fitVars(L.features.rules.body)}
+                  >
                     {L.features.rules.body}
                   </p>
                 </div>
@@ -623,15 +648,17 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
 
               <div className='grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-[18px]'>
                 <div
-                  className='lp-bento-card lp-bento-ink reveal'
+                  className='lp-bento-card lp-bento-ink lp-fit-ctx reveal'
                   style={revealDelay(2)}
                 >
                   <div className='lp-bento-title'>
                     {L.features.formats.title}
                   </div>
                   <p
-                    className='m-0 text-sm leading-[1.6] flex-1 break-keep whitespace-normal sm:whitespace-pre-line'
-                    style={{ color: 'rgba(250,249,245,0.55)' }}
+                    className='lp-fit lp-fit-prose m-0 leading-[1.6] flex-1 break-keep'
+                    style={fitVars(L.features.formats.body, {
+                      color: 'rgba(250,249,245,0.55)',
+                    })}
                   >
                     {L.features.formats.body}
                   </p>
@@ -645,15 +672,17 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                 </div>
 
                 <div
-                  className='lp-bento-card lp-bento-accent reveal'
+                  className='lp-bento-card lp-bento-accent lp-fit-ctx reveal'
                   style={revealDelay(3)}
                 >
                   <div className='lp-bento-title'>
                     {L.features.languages.title}
                   </div>
                   <p
-                    className='m-0 text-sm leading-[1.6] flex-1 break-keep'
-                    style={{ color: 'rgba(22,22,20,0.65)' }}
+                    className='lp-fit lp-fit-prose m-0 leading-[1.6] flex-1 break-keep'
+                    style={fitVars(L.features.languages.body, {
+                      color: 'rgba(22,22,20,0.65)',
+                    })}
                   >
                     {L.features.languages.body}
                   </p>
@@ -670,8 +699,11 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
         </section>
 
         {/* ── 9. 최종 CTA ───────────────────────────────────────── */}
-        <section className='text-center px-6 pt-[110px] pb-[90px]'>
-          <h2 className='lp-h2-final mb-3.5 whitespace-normal sm:whitespace-pre-line reveal'>
+        <section className='lp-fit-ctx text-center px-6 pt-[110px] pb-[90px]'>
+          <h2
+            className='lp-h2-final lp-fit mb-3.5 reveal'
+            style={fitVars(L.final.title)}
+          >
             {L.final.title}
           </h2>
           <p className='lp-section-sub mb-8 break-keep reveal' style={revealDelay(1)}>

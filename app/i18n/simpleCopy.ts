@@ -49,9 +49,19 @@ export const COPY = {
       cps: '자막 규칙',
     },
 
+    // 여기 `\n`은 **모든 폭에서 지켜진다**. 예전에는 640px 아래에서 공백으로
+    // 풀었는데(`whitespace-normal sm:whitespace-pre-line`), 그러면 손으로 잡은
+    // 문장 리듬이 폰에서 통째로 사라졌다. 지금은 `.lp-fit`이 "가용 폭 ÷ 가장
+    // 긴 줄의 폭"으로 글자 크기를 줄여 줄바꿈을 버티게 하고, 더 줄이면 못 읽는
+    // 하한에 닿아서야 브라우저 줄바꿈에 넘긴다(`docs/decisions.md` §1-21).
+    //
+    // 그러니 `\n`은 여전히 **의도한 자리에만** 넣을 것 — 넣는 만큼 그 요소의
+    // 최소 글자 크기가 작아진다. 한 줄이 길수록 더 작아진다.
     hero: {
-      title: '전문 자막가의 규칙을 배운\nAI 자막 번역',
-      sub: '자막 파일을 올리기만 하세요.\n*한글 자막 표준 규칙*이 적용된 자연스러운 번역이 드라마 한 편 기준 *15초* 만에 완성됩니다.',
+      // `titleBrand`·끝 온점은 LandingPage가 Wordmark와 같이 mono·accent로 붙인다.
+      title: '자막은 읽는 게 아니라 보는 거니까, \n영상에 감기는',
+      titleBrand: 'ZAMAK',
+      sub: '따로 감수할 필요가 없습니다.\n *OTT 표준 규칙*에 맞춘 완성형 자막을 단 *15초* 만에 받아보세요.',
       secondaryCta: '번역 품질 비교하기',
       note: '실제 번역 결과 예시. 타임코드는 코드가 관리해 싱크가 밀리지 않습니다.',
       demoLabel: '번역 결과 예시',
@@ -92,7 +102,7 @@ export const COPY = {
     // 이 문구도 같은 커밋에서 고칠 것.
     how: {
       title: '이렇게 사용합니다.',
-      sub: '영상 없이 자막 파일 하나로 끝납니다.',
+      sub: '읽지 말고 직접 해보세요. 영상 없이 자막 파일 하나로 끝납니다.',
       steps: [
         {
           num: '1',
@@ -117,8 +127,54 @@ export const COPY = {
       ],
     },
 
+    // "이용 방법" 섹션의 조작 가능한 데모(`HowItWorksDemo`). 위 `how.steps`가
+    // 설명하는 4단계를 사용자가 직접 통과하게 만든 것이라, **단계 수와 순서는
+    // `how.steps`와 1:1이어야 한다**(컴포넌트가 인덱스로 맞물린다).
+    //
+    // 품질 카드의 이름·시간은 여기 적지 않고 `COPY.plans`에서 읽는다 — 랜딩
+    // 비교표·설정 화면과 같은 숫자를 말해야 하므로(§1-4 위 주석).
+    //
+    // 4단계 결과 대사는 여기 없다 — `HowItWorksDemo`가 `compare.engines`의
+    // ZAMAK 항목에서 직접 읽는다. 데모에서만 따로 지어내면 같은 페이지가 두
+    // 개의 "우리 번역"을 파는 꼴이 되고 CPS 숫자가 조용히 갈라지므로, 아예
+    // 복사본을 두지 않는 쪽을 택했다.
+    howDemo: {
+      /** 전체 데모의 접근성 레이블 + 모션 최소화 안내. */
+      label: '4단계 체험 데모',
+      /** 마우스/키보드. 터치 기기에서는 `tapHint`로 바꿔 단다. */
+      dragHint: '끌어다 놓아 보세요',
+      tapHint: '눌러서 올려보세요',
+      file: {
+        name: 'Interstellar.2014.EN.srt',
+        meta: '1,124줄 · 영어',
+      },
+      dropLabel: '자막 파일을 여기에',
+      dropActive: '놓으면 시작합니다',
+      work: {
+        question: '이 작품이 맞으신가요?',
+        title: '인터스텔라',
+        meta: '2014 · SF · 크리스토퍼 놀란',
+        yes: '네, 맞습니다',
+      },
+      quality: {
+        question: '번역 품질을 골라 주세요',
+      },
+      progress: {
+        label: '번역하는 중',
+        /** 진행 바 아래를 지나가는 단계 문구. 속도 섹션의 4단계와 같은 일. */
+        stages: ['언어 감지', '작품 맥락 반영', '자막 규칙 적용', '파일 생성'],
+      },
+      done: {
+        label: '번역 완료',
+        tc: '00:14:22,100 → 00:14:24,100',
+        download: '자막 내려받기',
+        note: '체험용 데모입니다. 실제 파일은 로그인 후 받을 수 있어요.',
+        restart: '다시 해보기',
+      },
+    },
+
     compare: {
-      title: '같은 대사, 다른 번역.',
+      title: '같은 원문, 완전히 다른 몰입감.',
       sub: '직접 비교해 보세요. 자막은 읽는 글이 아니라 듣는 말입니다.',
       tablistLabel: '번역 엔진 선택',
       sourceLabel: '원문 대사',
@@ -130,11 +186,11 @@ export const COPY = {
       // 찍히므로 세는 게 맞다. `simpleCopy.test.ts`가 이제 이 값을 대사에서
       // 직접 계산해 대조하므로, 대사를 고치면 태그도 같이 고쳐야 통과한다.
       sourceLine:
-        '- Who knows he\'s alive and free?\n- No one, not even his family.',
+        "- Who knows he's alive and free?\n- No one, not even his family.",
       sourceMeta: '연속 대사 2줄 · 각 2.0초 노출',
       resultLabel: (engine: string) => `${engine}의 번역`,
       outro:
-        'ZAMAK은 문장을 옮기지 않고 장면을 옮깁니다.\n화면에 떠 있는 시간 안에 읽히도록, 말투와 관계까지 그대로.',
+        'ZAMAK은 문장을 옮기지 않고 장면을 옮깁니다.\n화면에 떠 있는 시간, 인물 간의 관계와 말투까지 모두 고려해 번역한 자막을 경험해보세요.',
       engines: [
         {
           name: '일반 번역기',
@@ -186,10 +242,10 @@ export const COPY = {
     // 단계 라벨을 시각(0:00…)이 아니라 번호로 둔 것도 같은 이유 — 중간
     // 단계별 소요 시간은 실측한 적이 없다.
     speed: {
-      titleTop: '드라마 한 편 번역에',
-      titleAccent: '15초.',
-      body: '영상 파일은 필요 없습니다.\n자막 파일 하나만 올리면 언어 인식부터 규칙 적용,\n최종 파일 생성까지 한 번에',
-      note: '라이트 모델 실측 기준 — 461블록 13.4초 · 1,124블록 14.8초. 자막이 1,600블록을 넘으면 조금 더 걸립니다.',
+      titleTop: '완벽한 자막을 얻기까지 걸리는 시간, ',
+      titleAccent: '단 15초.',
+      body: '무거운 영상 파일은 필요 없습니다.\n텍스트 자막 하나만 올리면\n언어 감지, 자막 규칙 적용, 최종 포맷 생성까지 한 번에',
+      note: '라이트 모델 실측 기준 — 461줄 13.4초 · 1,124줄 14.8초.',
       steps: [
         {
           time: '01',
@@ -227,14 +283,20 @@ export const COPY = {
     // 표가 바뀌면 여기도 같은 커밋에서 고칠 것 — 어긋나면
     // `simpleCopy.test.ts`가 잡는다.
     cps: {
-      title: '영상마다 읽는 속도가 다릅니다.',
-      sub: 'ZAMAK은 CPS(초당 글자 수)를 계산해 영상 종류에 맞는 읽기 속도를 자동으로 맞춥니다.\n화면에 뜬 시간 안에 다 읽히도록.',
+      title: '장르가 다르면, 자막의 템포도 달라야 하니까.',
+      sub: '대사가 빠른 예능과 진중한 다큐멘터리의 자막은 달라야 합니다.\n영상 종류에 맞는 최적의 초당 글자 수(CPS)를 계산해,\n화면이 넘어가기 전 자막을 모두 읽을 수 있도록 완벽한 템포를 찾아냅니다.',
       tablistLabel: '영상 종류 선택',
       speedLabel: '권장 읽기 속도',
       unit: 'CPS',
       lineCountLabel: '줄 수',
       lineCountValue: '최대 2줄',
       actionLabel: 'ZAMAK이 하는 일',
+      // ⚠️ "넷플릭스 규칙을 적용한다"고 단정하지 않는다. Netflix 한국어 가이드의
+      // 읽기 속도는 성인 ≤12 CPS 하나뿐인데(`docs/standards/
+      // netflix-korean-gap-review.md` I.15), ZAMAK은 프로필별로 그보다 빡세게
+      // (영화 hardMax 12 · 예능 11) 또는 느슨하게(강연 15) 잡는다. 그래서
+      // "따른다"가 아니라 "기준으로 삼고 종류에 맞게 조정한다"가 참이다.
+      note: '읽기 속도 기준은 Netflix 한국어 자막 가이드(성인 최대 12 CPS)를 바탕으로, 영상 종류에 맞게 조정합니다.',
       profiles: [
         {
           key: 'movie',
@@ -267,10 +329,10 @@ export const COPY = {
     },
 
     features: {
-      title: '전문 자막가의 규칙을\n그대로 배웠습니다.',
+      title: '표준 자막 규칙,\n번거로운 편집 없이 한 번에',
       rules: {
         title: '한글 자막 표준 규칙 적용',
-        body: '방송·OTT에서 쓰는 표기 규칙을 그대로 따릅니다.\n말줄임표, 문장 끝 마침표, 두 줄 분할까지 감수 없이 바로 쓸 수 있는 상태로 제공합니다.',
+        body: '스물여덟 자가 넘어가는 긴 문장의 자연스러운 분할부터\n마침표 제거 등 까다로운 표기 규칙을 알아서 적용해 드립니다.\n사용 중인 포맷(.srt, .vtt, .ass 등) 그대로 작업하세요.',
         rows: [
           { before: '세 줄로 쏟아진 자막', after: '두 줄로 병합' },
           { before: '오 마이 갓...', after: '세상에…' },
@@ -293,9 +355,9 @@ export const COPY = {
     },
 
     final: {
-      title: '자막 하나 올려 보면\n바로 알게 됩니다.',
+      title: '백문이 불여일견\n지금 바로 첫 파일을 번역해 보세요',
       sub: '가입 후 첫 파일 무료',
-      badge: '비공개 베타 운영 중',
+      badge: '베타 운영 중',
     },
   },
 
@@ -316,7 +378,8 @@ export const COPY = {
     waitlistLabel: '결제 오픈 대기자 등록',
     emailPlaceholder: '이메일 주소',
     join: '등록',
-    joined: '대기자로 등록되었습니다. 결제 기능이 오픈되면 메일로 알려드릴게요.',
+    joined:
+      '대기자로 등록되었습니다. 결제 기능이 오픈되면 메일로 알려드릴게요.',
     joinFailed: '등록에 실패했습니다. 이메일 주소를 다시 확인해 주세요.',
     goHistory: '지난 번역 다시 받기',
     back: '설정으로 돌아가기',
@@ -360,7 +423,8 @@ export const COPY = {
   info: {
     // movie branch
     movieTitle: '이 작품이 맞으신가요?',
-    movieSubtitle: 'AI가 파일을 분석했습니다. 정보가 다르다면 알맞게 수정해 주세요.',
+    movieSubtitle:
+      'AI가 파일을 분석했습니다. 정보가 다르다면 알맞게 수정해 주세요.',
     analyzing: '파일을 분석하고 있습니다…',
     searching: '작품 정보를 검색하고 있습니다…',
     detectedBadge: 'AI 자동 검색 완료',
@@ -369,7 +433,8 @@ export const COPY = {
     posterEmpty: '포스터 없음',
     // Shown when TMDB has several equally-plausible matches (common title,
     // remake) and there's no reason to auto-pick one.
-    ambiguousHint: '검색 결과가 여러 개 있습니다. 찾으시는 작품을 선택해 주세요.',
+    ambiguousHint:
+      '검색 결과가 여러 개 있습니다. 찾으시는 작품을 선택해 주세요.',
     mediaTypeMovie: '영화',
     mediaTypeTv: '드라마',
     labelTitle: '제목',
@@ -394,7 +459,8 @@ export const COPY = {
     notesHint: '번역에 참고할 내용을 자유롭게 적어주세요.',
     // other branch
     otherTitle: '어떤 영상인가요?',
-    otherSubtitle: '영상 앞부분을 읽고 내용을 요약했습니다. 번역의 맥락을 파악하는 데 사용됩니다.',
+    otherSubtitle:
+      '영상 앞부분을 읽고 내용을 요약했습니다. 번역의 맥락을 파악하는 데 사용됩니다.',
     summarizing: '내용을 요약하고 있습니다…',
     summaryBadge: 'AI 내용 요약 완료',
     otherNotesLabel: '참고할 내용 · 선택',
@@ -448,7 +514,8 @@ export const COPY = {
     lite: {
       name: '라이트',
       time: '약 15초',
-      timeNote: '드라마 한 편(461블록) 기준 실측 13.4초 · 1,124블록 기준 14.8초.',
+      timeNote:
+        '드라마 한 편(461블록) 기준 실측 13.4초 · 1,124블록 기준 14.8초.',
       quality: '빠르고 정확한 기본 번역',
       context: '작품 맥락 분석 없음',
       bestFor: '일반 자막, 빠른 초벌',
@@ -476,7 +543,8 @@ export const COPY = {
     title: '번역 설정',
     subtitleAuto: '원본 언어 자동 인식 → 한국어',
     confirmBadge: '확인 필요',
-    confirmQuestion: (work: string) => `'${work}'(으)로 인식했습니다. 맞으신가요?`,
+    confirmQuestion: (work: string) =>
+      `'${work}'(으)로 인식했습니다. 맞으신가요?`,
     confirmHint: '다른 작품이라면 다시 선택해 주세요',
     confirmYes: '네, 맞습니다',
     confirmNo: '아닙니다',
@@ -488,7 +556,8 @@ export const COPY = {
     toneLabel: '톤앤매너',
     tonePlaceholder: '예: 고전적이고 절제된 어투, 심리극',
     contextEditable: '(수정 가능)',
-    contextHint: '번역에 그대로 반영됩니다. 비워 두시면 자막 내용만으로 판단합니다.',
+    contextHint:
+      '번역에 그대로 반영됩니다. 비워 두시면 자막 내용만으로 판단합니다.',
     // Section labels above each group of settings (design_handoff_zamak_brand).
     sectionWork: '작품 정보',
     sectionQuality: '번역 품질',
@@ -525,7 +594,8 @@ export const COPY = {
     searchClose: '검색 닫기',
     searchPlaceholder: '작품 제목을 검색하세요',
     // enrich()는 제목+연도만 받는다. 감독으로 찾아준다고 쓰면 못 지키는 약속이 된다.
-    searchHint: '제목으로 다시 검색해 드립니다. 작품을 찾지 못해도 번역은 계속 진행할 수 있습니다.',
+    searchHint:
+      '제목으로 다시 검색해 드립니다. 작품을 찾지 못해도 번역은 계속 진행할 수 있습니다.',
     confirm: '이 작품으로 계속',
     otherTypeLabel: '콘텐츠 유형',
     otherTypes: ['유튜브', '강연·인터뷰', '브이로그', '기타'],
@@ -568,9 +638,11 @@ export const COPY = {
   // parameter rather than importing COPY, so the hook stays locale-agnostic —
   // but this is the only place they are actually written.
   translateErrors: {
-    serverError: (status: number) => `서버에 문제가 발생했습니다. (오류 ${status})`,
+    serverError: (status: number) =>
+      `서버에 문제가 발생했습니다. (오류 ${status})`,
     noResponse: '번역 결과를 받지 못했습니다. 다시 시도해 주세요.',
-    emptyFile: '자막 블록을 찾지 못했습니다. 올바른 자막 파일인지 확인해 주세요.',
+    emptyFile:
+      '자막 블록을 찾지 못했습니다. 올바른 자막 파일인지 확인해 주세요.',
     generalError: '번역 중 문제가 발생했습니다. 다시 시도해 주세요.',
   },
 
@@ -605,7 +677,8 @@ export const COPY = {
     feedbackTitle: '이번 번역은 어떠셨나요?',
     feedbackPlaceholder: '자유롭게 남겨주세요 (선택)',
     feedbackSend: '보내기',
-    feedbackThanks: '의견을 남겨주셔서 감사합니다. 서비스 개선에 큰 도움이 됩니다.',
+    feedbackThanks:
+      '의견을 남겨주셔서 감사합니다. 서비스 개선에 큰 도움이 됩니다.',
     feedbackFailed: '의견 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.',
     // Lines still holding their original text in the downloaded file, after
     // the recovery sweep has already retried them. Counted per line, not per
@@ -625,7 +698,8 @@ export const COPY = {
   // 대상·시점은 서버(pending_feedback_job)가 정한다.
   feedbackFollowup: {
     title: '지난 번역은 어떠셨나요?',
-    subtitle: (filename: string) => `${filename} 파일을 실제로 사용해 보셨나요?`,
+    subtitle: (filename: string) =>
+      `${filename} 파일을 실제로 사용해 보셨나요?`,
     usability: {
       'as-is': '그대로 사용했어요',
       'minor-edits': '조금 수정해서 사용했어요',

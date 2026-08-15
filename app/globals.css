@@ -1470,6 +1470,91 @@ button:disabled {
     color: var(--text-secondary);
     line-height: 1.5;
   }
+
+  /* ── 손으로 넣은 줄바꿈을 폭이 줄어도 지키는 장치 ──────────────────
+     카피의 `\n`은 데스크톱 폭에 맞춰 손으로 넣은 것이다. 예전에는 640px
+     아래에서 그걸 공백으로 풀었는데(`sm:whitespace-pre-line`), 그러면 폰에서
+     문장 리듬이 통째로 사라지고 그 사이 구간에서는 `\n`이 살아 있는 채로 줄이
+     또 접혀 고아 줄이 생겼다.
+
+     그래서 줄바꿈을 풀지 않고 **글자를 줄인다**. 한글 글자폭이 대략 1em이라
+     한 줄을 통째로 넣는 데 필요한 크기는 `가용 폭 ÷ 그 줄의 폭(em)`이고, 그
+     "줄의 폭"은 JSX가 재서 `--fit`으로 넘긴다(`app/utils/fitText.ts`).
+
+     하한(`--fit-min`)에 닿으면 멈춘다 — 못 읽는 크기까지 가느니 거기서부터는
+     브라우저 줄바꿈에 맡긴다. 그때도 `word-break: keep-all`과
+     `text-wrap: balance`가 강제 줄바꿈 구간마다 따로 걸려 고아 줄을 줄인다.
+     (`docs/decisions.md` §1-21)
+
+     `100cqw`는 가장 가까운 `.lp-fit-ctx`(= 그 텍스트가 실제로 쓸 수 있는 폭)를
+     가리킨다. 컨테이너가 없으면 뷰포트로 떨어지므로, 안 붙여도 망가지지는
+     않고 계산만 헐거워진다. */
+  .lp-fit {
+    white-space: pre-line;
+    font-size: clamp(
+      var(--fit-min),
+      calc(100cqw * var(--fit-scale, 1) / var(--fit, 1)),
+      var(--fit-max)
+    );
+  }
+  /* 컨테이너 전체를 못 쓰는 요소는 쓸 수 있는 만큼만 알려 준다. CPS 카드의
+     '하는 일' 값은 `.lp-spec b`의 `max-width: 60%`가 상한이다. */
+  .lp-spec b.lp-fit {
+    --fit-scale: 0.6;
+  }
+  .lp-fit-ctx {
+    container-type: inline-size;
+  }
+  /* 요소별 크기 범위. 상한은 원래 데스크톱 크기 그대로고, 하한은 아래
+     `@media not all and (min-width: 40rem)`의 모바일 크기보다 두어 px 낮게
+     잡았다 — 그만큼 줄바꿈을 더 오래 버티되, 그 밑으로는 안 내려간다.
+     `.lp-fit`을 단 요소는 그 모바일 블록에서 제외된다(거기 `:not(.lp-fit)`). */
+  .lp-h1.lp-fit {
+    --fit-min: 24px;
+    --fit-max: 58px;
+  }
+  .lp-h2.lp-fit {
+    --fit-min: 21px;
+    --fit-max: 40px;
+  }
+  .lp-h2-dark.lp-fit {
+    --fit-min: 21px;
+    --fit-max: 42px;
+  }
+  .lp-h2-final.lp-fit {
+    --fit-min: 21px;
+    --fit-max: 44px;
+  }
+  /* 히어로 부제·섹션 도입부는 한 줄이 30em을 넘어 폰에서는 어차피 접힌다.
+     그럴 바엔 하한을 모바일 본문 크기(15.5~16px)로 올려 둔다 — 접히는 건
+     못 막아도 작아지기까지 할 이유는 없다. */
+  .lp-hero-sub.lp-fit {
+    --fit-min: 16px;
+    --fit-max: 19px;
+  }
+  .lp-section-sub.lp-fit {
+    --fit-min: 15.5px;
+    --fit-max: 17px;
+  }
+  /* 클래스 없이 Tailwind로만 꾸민 산문들(속도 본문, 비교 아웃트로, 벤토
+     본문, CPS 카드의 '하는 일'). 크기 범위만 여기서 준다. */
+  .lp-fit-body {
+    --fit-min: 13px;
+    --fit-max: 16px;
+  }
+  /* 벤토 본문·비교 아웃트로처럼 한 줄이 길어 폰에서 어차피 접히는 산문.
+     하한을 원래 크기 가까이 둔다 — 접히는데 작아지기까지 하면 손해만 본다. */
+  .lp-fit-prose {
+    --fit-min: 13.5px;
+    --fit-max: 14.5px;
+  }
+  /* CPS 카드의 '하는 일'처럼 줄이 짧아 끝까지 버틸 수 있는 값. 하한을 낮게
+     둘수록 손으로 잡은 줄바꿈이 더 오래 산다. */
+  .lp-fit-small {
+    --fit-min: 12.5px;
+    --fit-max: 14.5px;
+  }
+
   /* Anchored sections must clear the 56px sticky nav. */
   .lp-anchor {
     scroll-margin-top: 56px;
@@ -1791,44 +1876,375 @@ button:disabled {
     letter-spacing: -0.012em;
   }
 
-  /* "이용방법" 4단계 카드 — 벤토와 같은 반경·여백 토큰을 쓰되, 다크
-     `.lp-step`(속도 섹션)과 달리 밝은 배경 위에 놓인다. */
-  .lp-how-grid {
+  /* "이용 방법" — 읽는 4단계가 아니라 직접 통과하는 4단계
+     (`HowItWorksDemo`). 왼쪽은 설명 스테퍼, 오른쪽은 실제로 만지는 무대다.
+     설명을 지우지 않은 건 데모를 안 만지는 방문자(와 크롤러)에게도 이 섹션이
+     읽혀야 하기 때문. */
+  .lp-demo {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 18px;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    gap: 32px;
+    align-items: start;
   }
-  .lp-how-card {
+  @media (max-width: 860px) {
+    .lp-demo {
+      grid-template-columns: 1fr;
+      gap: 22px;
+    }
+    /* 좁은 화면에서는 만질 것을 먼저 준다 — 설명은 그 아래로 내린다. */
+    .lp-demo-stage {
+      order: -1;
+    }
+  }
+
+  .lp-demo-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  /* 비활성 단계는 opacity로 죽이지 않는다 — 본문 대비가 같이 무너진다.
+     활성 표시는 배경·번호 색이 지고, 글자는 색 등급만 한 칸 오간다. */
+  .lp-demo-step {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    gap: 13px;
+    padding: 13px 15px;
+    border-radius: 16px;
+    background: transparent;
+    box-shadow: none;
+    transition:
+      background 0.3s var(--ease-apple),
+      box-shadow 0.3s var(--ease-apple);
+  }
+  .lp-demo-step.is-on {
     background: var(--surface);
-    border-radius: 22px;
-    padding: 28px 26px;
     box-shadow: var(--shadow-card);
   }
-  .lp-how-num {
+  .lp-demo-step-num {
     font-family: var(--mono);
     font-size: 13px;
     font-weight: 600;
     color: var(--ink-strong);
-    background: var(--accent-soft);
+    background: var(--fill-hover);
     width: 26px;
     height: 26px;
     border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 16px;
+    transition: background 0.3s var(--ease-apple);
   }
-  .lp-how-title {
-    font-size: 16px;
+  .lp-demo-step.is-done .lp-demo-step-num {
+    background: var(--accent-soft);
+  }
+  .lp-demo-step.is-on .lp-demo-step-num {
+    background: var(--accent);
+  }
+  .lp-demo-step-title {
+    font-size: 15.5px;
     font-weight: 600;
     letter-spacing: -0.01em;
     color: var(--ink);
-    margin-bottom: 8px;
+    margin-bottom: 4px;
   }
-  .lp-how-desc {
+  .lp-demo-step-desc {
+    margin: 0;
     font-size: 13.5px;
     line-height: 1.6;
+    color: var(--text-tertiary);
+    word-break: keep-all;
+    text-wrap: pretty;
+    transition: color 0.3s var(--ease-apple);
+  }
+  .lp-demo-step.is-on .lp-demo-step-desc {
     color: var(--text-secondary);
+  }
+
+  /* 무대 높이는 가장 큰 단계에 고정한다 — 단계를 넘길 때마다 아래 섹션이
+     밀려 올라오면 데모가 아니라 버그로 읽힌다(히어로 카드와 같은 이유,
+     `docs/decisions.md` §1-20). */
+  .lp-demo-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 348px;
+    padding: 28px 24px;
+    border-radius: 22px;
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .lp-demo-drop-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+  }
+  /* `touch-action: none`이 없으면 터치로 칩을 끄는 동안 페이지가 같이
+     스크롤된다 — 포인터 이벤트 드래그의 필수 조건. */
+  .lp-demo-file {
+    position: relative;
+    z-index: 2;
+    touch-action: none;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 11px 15px;
+    border-radius: 12px;
+    background: var(--bg);
+    border: 1px solid var(--border-chip);
+    box-shadow: var(--shadow-card);
+    cursor: grab;
+    text-align: left;
+    transition:
+      transform 0.34s var(--ease-apple),
+      box-shadow 0.2s;
+  }
+  .lp-demo-file:hover {
+    box-shadow: var(--shadow-hover);
+  }
+  .lp-demo-file.is-dragging {
+    cursor: grabbing;
+    z-index: 3;
+    box-shadow: var(--shadow-drop-hover);
+    /* 손가락을 그대로 따라와야 하므로 이동에는 transition을 걸지 않는다.
+       놓는 순간 클래스가 빠지며 위의 0.34s가 스프링백을 그린다. */
+    transition: box-shadow 0.2s;
+  }
+  .lp-demo-file-name {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .lp-demo-file-meta {
+    font-size: 11.5px;
+    color: var(--text-quaternary);
+  }
+  /* 가만히 두면 아무도 이걸 끌 수 있는 줄 모른다 — 드롭존 쪽으로 한 번씩
+     밀어 보이는 게 이 섹션의 유일한 자동 모션이다. */
+  @keyframes lp-demo-nudge {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+    }
+    72% {
+      transform: translateY(7px);
+    }
+    84% {
+      transform: translateY(2px);
+    }
+  }
+  .lp-demo-file-hint {
+    animation: lp-demo-nudge 3.2s var(--ease-apple) infinite;
+  }
+  /* 애니메이션은 인라인 transform보다 세다. 끄는 동안은 확실히 죽인다. */
+  .lp-demo-file-hint.is-dragging {
+    animation: none;
+  }
+
+  .lp-demo-drop {
+    width: 100%;
+    max-width: 320px;
+    min-height: 128px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1.5px dashed var(--border-step);
+    border-radius: 18px;
+    transition:
+      border-color 0.2s,
+      background 0.2s,
+      transform 0.2s var(--ease-apple);
+  }
+  .lp-demo-drop.is-hot {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    transform: scale(1.03);
+  }
+  .lp-demo-drop-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .lp-demo-drop-hint {
+    font-size: 12.5px;
+    color: var(--text-tertiary);
+  }
+
+  .lp-demo-panel {
+    width: 100%;
+    max-width: 340px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    text-align: center;
+    animation: zsubin 0.35s var(--ease-apple);
+  }
+  .lp-demo-q {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--ink);
+    word-break: keep-all;
+  }
+  .lp-demo-work {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    width: 100%;
+    padding: 13px;
+    border-radius: 14px;
+    background: var(--bg);
+    text-align: left;
+  }
+  .lp-demo-poster {
+    width: 40px;
+    height: 58px;
+    flex: none;
+    border-radius: 6px;
+    background: linear-gradient(160deg, var(--ink-strong), var(--text-tertiary));
+  }
+  .lp-demo-work-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .lp-demo-work-meta {
+    font-size: 12.5px;
+    color: var(--text-tertiary);
+  }
+
+  .lp-demo-plans {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+  }
+  .lp-demo-plan {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 15px 12px;
+    border-radius: 14px;
+    border: 1px solid var(--border-card);
+    background: var(--surface);
+    transition:
+      border-color 0.2s,
+      background 0.2s,
+      transform 0.15s var(--ease-apple);
+  }
+  .lp-demo-plan:hover {
+    border-color: var(--ink-strong);
+  }
+  .lp-demo-plan:active {
+    transform: scale(0.98);
+  }
+  .lp-demo-plan-name {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .lp-demo-plan-time {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+
+  .lp-demo-track {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--fill-hover);
+    overflow: hidden;
+  }
+  .lp-demo-fill {
+    height: 100%;
+    background: var(--accent);
+  }
+  .lp-demo-runstage {
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+
+  .lp-demo-result {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    padding: 18px 16px;
+    border-radius: 16px;
+    background: var(--bg);
+  }
+  .lp-demo-result-tc {
+    font-size: 11px;
+    color: var(--text-quaternary);
+  }
+  .lp-demo-result-src {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    text-decoration: line-through;
+  }
+  .lp-demo-result-ko {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    word-break: keep-all;
+  }
+
+  .lp-demo-done-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+  .lp-demo-action {
+    padding: 11px 20px;
+    border-radius: var(--r-input);
+    background: var(--ink-strong);
+    color: var(--on-ink);
+    font-size: 14px;
+    font-weight: 600;
+    transition:
+      opacity 0.15s,
+      transform 0.15s var(--ease-apple);
+  }
+  .lp-demo-action:hover:not(:disabled) {
+    opacity: 0.88;
+  }
+  .lp-demo-action:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  .lp-demo-action:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .lp-demo-restart {
+    padding: 11px 16px;
+    border-radius: var(--r-input);
+    font-size: 14px;
+    color: var(--text-secondary);
+    transition: background 0.2s;
+  }
+  .lp-demo-restart:hover {
+    background: var(--fill-hover);
+  }
+  .lp-demo-note {
+    margin: 0;
+    font-size: var(--fs-fineprint);
+    line-height: 1.5;
+    color: var(--text-quaternary);
+    word-break: keep-all;
+    text-wrap: pretty;
   }
 
   /* 라이트 vs 프로 비교 — 카드 2장 + `.lp-spec` 표. `.lp-spec`은 CPS
@@ -2061,17 +2477,21 @@ button:disabled {
      **정확한 여집합**인 이유: 640px에서는 둘 다 참이라 "모바일 글자 크기 +
      데스크톱 줄바꿈"이 1px 폭으로 생기고, `max-width: 39.99rem`으로 피하면
      이번엔 그 사이가 어디에도 안 걸리는 틈이 된다. 여집합은 겹치지도
-     비지도 않는다. */
+     비지도 않는다.
+
+     `:not(.lp-fit)`인 이유: `.lp-fit`을 단 요소는 크기를 자기 폭에서 스스로
+     계산하고(손으로 넣은 줄바꿈을 지키려고), 하한도 `--fit-min`이 이미 갖고
+     있다. 여기서 한 번 더 덮으면 그 계산이 모바일에서만 조용히 무효가 된다. */
   @media not all and (min-width: 40rem) {
-    .lp-h1 {
+    .lp-h1:not(.lp-fit) {
       font-size: clamp(27px, 7.6vw, 38px);
     }
-    .lp-h2,
-    .lp-h2-dark,
-    .lp-h2-final {
+    .lp-h2:not(.lp-fit),
+    .lp-h2-dark:not(.lp-fit),
+    .lp-h2-final:not(.lp-fit) {
       font-size: clamp(23px, 6.4vw, 30px);
     }
-    .lp-section-sub {
+    .lp-section-sub:not(.lp-fit) {
       font-size: 15.5px;
     }
     /* 자막 예시는 폭을 더 못 늘리니 글자를 줄인다. 산문과 달리 여기서는
@@ -2215,6 +2635,8 @@ button:disabled {
   .animate-zrise,
   .lp-hero-ko,
   .lp-subin,
+  .lp-demo-file-hint,
+  .lp-demo-panel,
   .lp-cps-card,
   .done-title,
   .done-section,

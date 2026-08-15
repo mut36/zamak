@@ -124,7 +124,7 @@ delete from public.translation_jobs
 insert into public.unlimited_testers (user_id, note)
 select id, '운영자 테스트 계정'
   from auth.users
- where email = 'YOUR_EMAIL_HERE'
+ where email = 'hello@mut36.com'
     on conflict (user_id) do nothing;
 
 -- 회수 (페이월·소진 화면을 테스트하려면 먼저 이걸 실행)
