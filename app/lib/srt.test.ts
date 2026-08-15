@@ -623,6 +623,33 @@ describe('enforceTextRules', () => {
     expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\n그리고');
   });
 
+  it('strips punctuation that sits behind a closing tag', () => {
+    // Narration is italicized, so the line ends in `</i>` and the comma is not
+    // last. Anchoring the strip at the true line end let every such line keep
+    // its punctuation — 28 of them in one real feature.
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n<i>2016년 12월 16일,</i>';
+    const { content, report } = enforceTextRules(srt);
+    expect(content).toBe(
+      '1\n00:00:00,000 --> 00:00:01,000\n<i>2016년 12월 16일</i>',
+    );
+    expect(report.trailingPunctuationStripped).toBe(1);
+  });
+
+  it('strips punctuation behind a run of nested closing tags', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n<i><b>그리고,</b></i>';
+    const { content } = enforceTextRules(srt);
+    expect(content).toBe(
+      '1\n00:00:00,000 --> 00:00:01,000\n<i><b>그리고</b></i>',
+    );
+  });
+
+  it('leaves a tagged line whose text needs no strip untouched', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n<i>합동 생일 파티를 열었다</i>';
+    const { content, report } = enforceTextRules(srt);
+    expect(content).toBe(srt);
+    expect(report.trailingPunctuationStripped).toBe(0);
+  });
+
   it('does not mistake a normalized ellipsis for a trailing period', () => {
     // After normalization the line ends in "…", not ".", so the punctuation
     // strip must leave it alone.

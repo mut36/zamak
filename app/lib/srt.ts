@@ -243,10 +243,22 @@ export interface TextRuleReport {
 
 const ELLIPSIS_RUN = /\.{2,}/g;
 
-/** Escapes the configured characters for use inside a character class. */
+/**
+ * Sentence-final punctuation at the end of a line's *text* — any run of
+ * closing markup tags is allowed to sit after it, and comes back in group 1.
+ *
+ * The anchor used to be a plain `[.,]\s*$`, which missed every italicized
+ * line: narration is written `<i>2016년 12월 16일,</i>`, so what ends the line
+ * is `</i>`, not the comma. Measured on a real feature (Marx può aspettare,
+ * 1126 blocks) the leak was entirely inside markup — 28 lines kept their
+ * period or comma, every one of them a tag-closing line, while not a single
+ * untagged line did.
+ *
+ * The characters themselves are escaped for use inside a character class.
+ */
 function trailingPunctuationPattern(chars: string): RegExp {
   const escaped = chars.replace(/[\\\]^-]/g, '\\$&');
-  return new RegExp(`[${escaped}]\\s*$`);
+  return new RegExp(`[${escaped}]\\s*((?:</[^>]+>\\s*)*)$`);
 }
 
 export interface TextRuleOptions {
@@ -315,7 +327,11 @@ export function enforceTextRules(
       bodyLines = bodyLines.map((line) => {
         if (!trailingPattern.test(line)) return line;
         report.trailingPunctuationStripped++;
-        return line.replace(trailingPattern, '');
+        // Group 1 is the closing markup that followed the punctuation; it goes
+        // back exactly as it was so the tag range is untouched.
+        return line.replace(trailingPattern, (_match, markup: string) =>
+          markup.trimEnd(),
+        );
       });
     }
 
