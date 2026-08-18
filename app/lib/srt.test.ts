@@ -659,6 +659,49 @@ describe('enforceTextRules', () => {
     expect(report.trailingPunctuationStripped).toBe(0);
   });
 
+  it('keeps the internal "…" spelling when no ellipsis option is given', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n글쎄...';
+    const { content } = enforceTextRules(srt, {});
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\n글쎄…');
+  });
+
+  it('respells the normalized ellipsis to the target language\'s form', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n음... 글쎄';
+    const { content } = enforceTextRules(srt, { ellipsis: '...' });
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\n음... 글쎄');
+  });
+
+  it('respells an ellipsis that was already "…" in the source, not just normalized ones', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n글쎄…';
+    const { content } = enforceTextRules(srt, { ellipsis: '...' });
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\n글쎄...');
+  });
+
+  it('measures the line-join budget against the single-character "…", not the respelled form', () => {
+    // "내 아내와" + " " + "딸…" is 8 visible characters either way — but if the
+    // join measured against the 3-character "..." spelling instead of the
+    // internal 1-character "…", a line sitting right at the budget could be
+    // wrongly refused. lineMaxChars=8 only fits with the 1-character count.
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n내 아내와\n딸...';
+    const { content } = enforceTextRules(srt, {
+      lineMaxChars: 8,
+      ellipsis: '...',
+    });
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\n내 아내와 딸...');
+  });
+
+  it('does not let the respelled ellipsis reintroduce a trailing-period strip', () => {
+    // Respelling happens after the trailing-punctuation strip, so a Korean
+    // line ending in the respelled "..." must not have its last dot eaten.
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n글쎄...';
+    const { content, report } = enforceTextRules(srt, {
+      trailingPunctuation: '.,',
+      ellipsis: '...',
+    });
+    expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\n글쎄...');
+    expect(report.trailingPunctuationStripped).toBe(0);
+  });
+
   it('leaves a compliant single line untouched', () => {
     const srt = '1\n00:00:00,000 --> 00:00:01,000\n괜찮아';
     expect(enforceTextRules(srt).content).toBe(srt);

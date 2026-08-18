@@ -416,6 +416,14 @@ export interface TextRuleOptions {
    * hand keeps the old behaviour.
    */
   lineMaxChars?: number;
+  /**
+   * How the target language spells a finished ellipsis (TargetLang.ellipsis).
+   * Omitted keeps the internal `…` — every rule above (width measurement,
+   * trailing-punctuation strip, sentence-boundary detection) is written
+   * against the single character, so this is applied last, after all of them
+   * have already run.
+   */
+  ellipsis?: string;
 }
 
 /**
@@ -434,7 +442,11 @@ export interface TextRuleOptions {
  *
  * Ellipsis runs to "…" first, so the punctuation strip below never mistakes
  * a trailing-off ellipsis for a sentence-ending period — after normalization
- * there is no longer a bare "." to match at the end of one.
+ * there is no longer a bare "." to match at the end of one. `options.ellipsis`
+ * (TargetLang.ellipsis) then respells that single "…" into whatever the
+ * target language ships, as the very last step — after width measurement and
+ * the trailing-punctuation strip, both of which are written against the
+ * one-character form and would misfire against a multi-character spelling.
  *
  * The 2-line cap has a mirror image, enabled by `lineMaxChars`: a block split
  * over two lines that would fit on one gets folded back. The model inherits
@@ -540,6 +552,11 @@ export function enforceTextRules(
         report.linesJoined++;
         bodyLines = [joined];
       }
+    }
+
+    const ellipsisSpelling = options.ellipsis;
+    if (ellipsisSpelling && ellipsisSpelling !== '…') {
+      bodyLines = bodyLines.map((line) => line.split('…').join(ellipsisSpelling));
     }
 
     return [lines[0], lines[1], ...bodyLines].join('\n');

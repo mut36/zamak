@@ -540,6 +540,7 @@ export function useTranslation(
         {
           trailingPunctuation: resolveTargetLang(targetLang).trailingPunctuation,
           lineMaxChars: resolveTargetLang(targetLang).lineMaxChars,
+          ellipsis: resolveTargetLang(targetLang).ellipsis,
         },
       );
       if (

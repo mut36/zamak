@@ -257,6 +257,7 @@ const { content: polished, report: textRuleReport } = enforceTextRules(
   {
     trailingPunctuation: LANG.trailingPunctuation,
     lineMaxChars: LANG.lineMaxChars,
+    ellipsis: LANG.ellipsis,
   },
 );
 

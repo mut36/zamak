@@ -103,15 +103,15 @@ export interface TargetLang {
   /**
    * How a finished subtitle spells an ellipsis.
    *
-   * Korean ships `...` by product decision (2026-08-15). This departs from the
+   * Korean ships `...` by product decision (2026-08-18). This departs from the
    * reference guide, which asks for the single U+2026 glyph
    * (`docs/standards/netflix-korean-subtitles.md` §I.4) — the departure is
    * deliberate and recorded in `docs/decisions.md`, so a future reader finds
    * the reason instead of "fixing" it back. Every other target keeps `…`.
    *
    * enforceTextRules normalizes to `…` internally regardless, and only spells
-   * it this way as the last step: a line ending in `...` would otherwise lose
-   * a dot to the trailing-period strip.
+   * it this way as the last step (via `TextRuleOptions.ellipsis`): a line
+   * ending in `...` would otherwise lose a dot to the trailing-period strip.
    */
   ellipsis: '…' | '...';
   /**
