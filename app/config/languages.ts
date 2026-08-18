@@ -103,11 +103,11 @@ export interface TargetLang {
   /**
    * How a finished subtitle spells an ellipsis.
    *
-   * Korean ships `...` by product decision (2026-08-18). This departs from the
-   * reference guide, which asks for the single U+2026 glyph
-   * (`docs/standards/netflix-korean-subtitles.md` §I.4) — the departure is
-   * deliberate and recorded in `docs/decisions.md`, so a future reader finds
-   * the reason instead of "fixing" it back. Every other target keeps `…`.
+   * Every target currently ships the single U+2026 glyph `…`, per the
+   * reference guide (`docs/standards/netflix-korean-subtitles.md` §I.4).
+   * Korean briefly shipped `...` instead; that was reversed the same day
+   * (`docs/decisions.md` §6-13), so the axis is here and live but no language
+   * uses the other value yet.
    *
    * enforceTextRules normalizes to `…` internally regardless, and only spells
    * it this way as the last step (via `TextRuleOptions.ellipsis`): a line
@@ -146,7 +146,7 @@ export const TARGET_LANGS: TargetLang[] = [
     lineMaxChars: 25,
     formality: { formal: '존댓말', informal: '반말', mixed: '혼용' },
     trailingPunctuation: '.,',
-    ellipsis: '...',
+    ellipsis: '…',
     // 유도는 docs/tuning/reading-speed.md §3. 예능이 가장 느긋하고(화면에 이미
     // 읽을 것이 많다), 강연·토크가 가장 촘촘하다(말이 끊이지 않아 노출을 넓히면
     // 다음 대사를 밀어낸다). 영화는 프로필 도입 전의 한국어 밴드 그대로 —
