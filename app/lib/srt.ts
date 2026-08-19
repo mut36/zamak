@@ -366,7 +366,7 @@ function opensAQuote(line: string): boolean {
 }
 
 /** Visible characters — markup does not occupy space on screen. */
-function visibleLength(line: string): number {
+export function visibleLength(line: string): number {
   return line.replace(MARKUP_TAG, '').trim().length;
 }
 
