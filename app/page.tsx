@@ -1,7 +1,23 @@
+import type { Metadata } from 'next';
 import { WizardApp } from './components/beta/WizardApp';
 import { LandingPage } from './components/simple/LandingPage';
 import { isSupabaseConfigured } from './lib/supabase/env';
 import { createClient } from './lib/supabase/server';
+
+/**
+ * Self-referencing canonical. Google reported `/` as "duplicate without a
+ * user-selected canonical" (2026-08-19) because it had found both `zamak.app`
+ * and `www.zamak.app` and we had never said which one counts — `metadataBase`
+ * alone emits no `<link rel="canonical">`.
+ *
+ * Declared per page rather than once in the root layout on purpose: a layout
+ * canonical is one typo away from pointing every route at `/`, and the same
+ * argument already governs `sitemap.ts`'s hand-written list. `app/seo.test.ts`
+ * pins these against that list so the two cannot drift.
+ */
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+};
 
 /**
  * `/` is two pages wearing one URL: the marketing landing for strangers, the
