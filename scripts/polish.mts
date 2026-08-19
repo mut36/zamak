@@ -34,6 +34,7 @@ import {
   TRANSLATION_MODEL,
   chunkSizeForModel,
 } from '../app/config/constants';
+import { bodiesByIndex, letterSignature, visibleLength } from './harness/blocks';
 
 // ---------- parameters ----------------------------------------------------
 
@@ -110,23 +111,6 @@ function splitReply(reply: string): { body: string; compressed: number[] } {
 
 // ---------- scoring -------------------------------------------------------
 
-const MARKUP_TAG = /<[^>]+>/g;
-
-/**
- * The letters, and nothing else. Two bodies with the same signature differ
- * only in whitespace, line breaks and punctuation — i.e. in exactly the ways a
- * format-only pass is allowed to differ. Anything else is the model rewriting.
- */
-function letterSignature(body: string): string {
-  return body
-    .replace(MARKUP_TAG, '')
-    .replace(/[\s.,!?…"'“”‘’·:;\-–—()[\]]/g, '');
-}
-
-function visibleLength(line: string): number {
-  return line.replace(MARKUP_TAG, '').trim().length;
-}
-
 type Verdict = 'FORMAT' | 'REWRITE';
 
 interface Change {
@@ -136,17 +120,6 @@ interface Change {
   verdict: Verdict;
   /** The model said it compressed this one, so REWRITE is expected here. */
   admitted: boolean;
-}
-
-/** Body text of each block, keyed by sequence number. */
-function bodiesByIndex(srt: string): Map<number, string> {
-  const bodies = new Map<number, string>();
-  for (const block of parseSrtBlocks(srt)) {
-    const lines = block.split('\n');
-    const seq = Number(lines[0]?.trim());
-    if (Number.isInteger(seq)) bodies.set(seq, lines.slice(2).join('\n'));
-  }
-  return bodies;
 }
 
 // ---------- run -----------------------------------------------------------
