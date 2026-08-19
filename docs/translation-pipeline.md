@@ -509,13 +509,14 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   임의 지점(예: 중간 공백)에서 자르면 어색한 줄바꿈을 강제로 만들 위험이 더 크다.
   AI는 `|`로 **끊을 지점만 지정**하고 실제 줄바꿈은 코드가 수행한다. 코드의 2줄 상한은
   "AI가 `|`를 두 개 이상 넣었을 때의 안전망"이다.
-  **한국어 규칙 2에는 두 개의 수가 있다**(2026-08-18): 권장선 **16자**(Netflix 한국어
-  기준, 공백·문장부호 포함)와 강제선 **`lineMaxChars` 25자**. 16자는 프롬프트에만
-  있는 권유라 코드는 모른다 — `enforceTextRules`의 접기(`linesJoined`)도, 다른
-  어떤 단계도 16자를 강제하지 않는다. **그래서 모델이 17~25자를 두 줄로 나누면
-  코드가 도로 한 줄로 접는다** — 권장선은 "번역문을 짧게 쓰라"는 압력이지 줄 수를
-  정하는 값이 아니다. 16자를 실제로 강제하고 싶으면 `languages.ts`의
-  `lineMaxChars`를 내리는 것이 유일한 자리다.
+  **한국어 규칙 2에는 두 개의 수가 있다**: 권장선 **16자**(Netflix 한국어 기준,
+  공백·문장부호 포함, 프롬프트에만 존재)와 강제선 **`lineMaxChars` 19자**
+  (= 16 + 3, `languages.ts`). 16자는 코드가 모르는 권유이므로 "번역문을 짧게
+  쓰라"는 압력일 뿐 줄 수를 정하지 않는다. 실제로 나뉘는 지점은 19자다.
+  **접기(`linesJoined`)도 같은 19자로 판정**하므로, 접은 결과가 프롬프트라면
+  나눠야 했을 줄이 되는 일은 없다 — 한 상수가 분할 트리거와 접기 예산을 겸한다.
+  19자를 고른 근거(압축 필요 블록 4.9%→0.9%)와 ⚠️ 측정에 쓴 샘플이 전문가 자막이
+  아니라 **우리 이전 출력**이라는 점은 `decisions.md` §2-6.
 - **스타일 태그 위치·의미 유지**(`translation_rules_<code>.txt` 규칙 6)는 스코프에서
   제외: 출력만 보고 고칠 수 있는 말줄임표·2줄 상한과 달리, 원본 블록과 번역 블록을
   태그 단위로 비교해야 판단이 서서 성격이 다르다 — 검토는 했으나(`decisions.md`
@@ -627,8 +628,8 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 존댓말/반말·인물 말투가 안 맞음(말투 축이 있는 언어) | 먼저 TranslateSettingsStep의 "등장인물·용어 일관성" 토글을 켜봤는지 확인(§2-C, 기본 OFF) — 켰다면 `cast_sheet_extraction.txt` 또는 `CastSheetCard`에서 직접 관계 수정. 안 켰거나 그래도 안 맞으면 `translation_rules_ko.txt`, (cinematic) `cinematic_translation_philosophy_ko.txt`, `TranslateSettingsStep`에서 사람이 톤 입력 |
 | 같은 이름이 청크마다 다르게 번역됨(표기 흔들림) | TranslateSettingsStep 토글을 켜지 않았으면 그게 원인(§2-C, 기본 OFF). 켰는데도 흔들리면 `extractCastSheet.ts` `sanitizeCastSheet`(환각 필터로 그 이름이 버려졌을 수 있음) 또는 `CastSheetCard`에서 직접 추가 |
 | 감정/뉘앙스가 밋밋함 | `cinematic_translation_philosophy_ko.txt` (+ 스타일을 cinematic로) |
-| 줄이 25자 넘는데 안 나뉨(의미 단위 줄바꿈) | `translation_rules_ko.txt` 규칙 2 — AI가 `|`로 끊을 지점만 지정, 실제 줄바꿈은 코드. 끊을 위치 판단은 프롬프트로만 유도(§9.7 스코프 밖) |
-| 줄이 16자를 넘음 | 정상 — 16자는 규칙 2의 **권장선**일 뿐 강제선이 아니다(강제선은 `lineMaxChars` 25자). 실제로 못 넘게 하려면 `languages.ts`의 `lineMaxChars`를 내려야 한다 — §9.7 |
+| 줄이 19자 넘는데 안 나뉨(의미 단위 줄바꿈) | `translation_rules_ko.txt` 규칙 2 — AI가 `|`로 끊을 지점만 지정, 실제 줄바꿈은 코드. 끊을 위치 판단은 프롬프트로만 유도(§9.7 스코프 밖) |
+| 줄이 16자를 넘음 | 19자까지는 정상 — 16자는 규칙 2의 **권장선**이고 강제선은 `lineMaxChars` **19자**다(§9.7, `decisions.md` §2-6). 19자를 넘으면 그때가 규칙 2 위반 |
 | 마침표·쉼표가 줄 끝에 남아 있음 / 3줄 이상 나옴 / `...`가 `…`로 안 바뀜 | `srt.ts` (`enforceTextRules`) — 이 셋은 코드가 강제하므로 재발하면 버그. `decisions.md` §2-8 — §9.7 |
 | 말줄임표 표기를 도착어별로 바꾸고 싶음 | `languages.ts`의 그 언어 행 `ellipsis` 한 줄. 배선(`TextRuleOptions.ellipsis`)은 언어 중립이라 코드는 안 건드려도 된다 — §9.7, `decisions.md` §6-13 |
 | 한 줄 안에 문장 마침표가 남아 있음 (`압니다. 결혼식에`) | `srt.ts` (`enforceTextRules`의 `midLinePeriodsToCommas`) — 한글 음절 뒤 `.`만 쉼표로 바꾼다. 소수·라틴 약어는 정상. `trailingPunctuation`에 `.`가 없는 도착어는 안 고친다 — §9.7 |

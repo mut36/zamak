@@ -85,11 +85,19 @@ export interface TargetLang {
   /** Korean name of the language, injected as the prompt's 목표 언어. */
   promptLabel: string;
   /**
-   * Per-line character budget the model is asked to respect. CJK glyphs carry
-   * far more meaning per character than Latin ones, hence ~25 vs ~42. This is
-   * deliberately **not** part of the content profile: a shorter line changes
-   * the translation itself (more splitting and compression), where the profile
-   * is only meant to change how long a finished line stays on screen.
+   * Per-line character budget, in visible characters (spaces and punctuation
+   * count; markup does not). CJK glyphs carry far more meaning per character
+   * than Latin ones, hence ~19 vs ~42. This is deliberately **not** part of
+   * the content profile: a shorter line changes the translation itself (more
+   * splitting and compression), where the profile is only meant to change how
+   * long a finished line stays on screen.
+   *
+   * Two consumers, one number. The prompt renders it as the hard trigger
+   * ("넘으면 반드시 `|`로 나눠"), and enforceTextRules measures the same budget
+   * when folding a gratuitously split block back onto one line — so a fold can
+   * never produce a line the prompt would have had to split. Korean pairs it
+   * with a softer 16-char recommendation that lives only in the prompt
+   * (`translation_rules_ko.txt` 규칙 2); see decisions.md §2-6.
    */
   lineMaxChars: number;
   formality: FormalityAxis | null;
@@ -143,7 +151,7 @@ export const TARGET_LANGS: TargetLang[] = [
     mono: 'KO',
     enabled: true,
     promptLabel: '한국어',
-    lineMaxChars: 25,
+    lineMaxChars: 19,
     formality: { formal: '존댓말', informal: '반말', mixed: '혼용' },
     trailingPunctuation: '.,',
     ellipsis: '…',
