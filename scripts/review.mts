@@ -143,12 +143,36 @@ function cpsViolations(srt: string): Set<number> {
   return over;
 }
 
+/**
+ * How much shorter the review made a block, as a fraction of the original.
+ *
+ * Compression is a legitimate fix (rule 2 asks for it on over-long lines), but
+ * a *large* drop is how text loss looks from the outside: in the first full run
+ * the model returned only the second line of a two-line subtitle twice, silently
+ * deleting the first. Nothing else caught it — the discarded halves held no
+ * numbers and no Latin words, so the tamper check saw a clean rewording.
+ */
+function shrinkRatio(before: string, after: string): number {
+  const from = visibleLength(before.replace(/\n/g, ''));
+  if (from === 0) return 0;
+  return 1 - visibleLength(after.replace(/\n/g, '')) / from;
+}
+
+/**
+ * Losing this share of a block's characters is treated as suspected text loss.
+ * A genuine compression of an over-long line trims a few characters; dropping a
+ * line of a two-line subtitle halves it. 0.4 sits between the two.
+ */
+const SHRINK_ALARM = 0.4;
+
 interface Change {
   index: number;
   before: string;
   after: string;
   /** Numbers or Latin words differ — the model broke a promise it was given. */
   tampered: boolean;
+  /** Lost {SHRINK_ALARM} or more of its characters — suspected dropped line. */
+  shrunk: boolean;
   beforeOverLong: boolean;
   afterOverLong: boolean;
 }
@@ -272,6 +296,7 @@ function collectChanges(target: Map<number, string>): Change[] {
       before: beforeBody,
       after: afterBody,
       tampered: factSignature(beforeBody) !== factSignature(afterBody),
+      shrunk: shrinkRatio(beforeBody, afterBody) >= SHRINK_ALARM,
       beforeOverLong: isOverLong(beforeBody),
       afterOverLong: isOverLong(afterBody),
     });
@@ -284,6 +309,9 @@ const modelChanges = collectChanges(fromModel);
 /** What ships, model and mechanical rules together. */
 const changes = collectChanges(after);
 const tampered = modelChanges.filter((c) => c.tampered);
+const shrunk = modelChanges.filter((c) => c.shrunk);
+/** Either alarm — these are the blocks a human must read first. */
+const suspect = modelChanges.filter((c) => c.tampered || c.shrunk);
 
 const scored = before.size - unscored.size;
 const overLongBefore = [...before].filter(([, body]) => isOverLong(body));
@@ -306,6 +334,7 @@ writeFileSync(srtPath, reviewed);
 function diffEntry(c: Change): string[] {
   const flags = [
     c.tampered ? '⚠숫자·고유명사 변조' : '',
+    c.shrunk ? '⚠텍스트 유실 의심' : '',
     c.beforeOverLong && !c.afterOverLong ? `자수 해소` : '',
     !c.beforeOverLong && c.afterOverLong ? '⚠자수 초과 발생' : '',
   ].filter(Boolean);
@@ -346,7 +375,7 @@ writeFileSync(
     '',
     `- 모델이 내보낸 블록 ${emitted} → 그중 **실제로 달라진 것 ${modelChanges.length}** ` +
       `(${scored > 0 ? ((modelChanges.length / scored) * 100).toFixed(1) : '0'}%)`,
-    `- ⚠ **숫자·고유명사 변조 ${tampered.length}건**`,
+    `- ⚠ **숫자·고유명사 변조 ${tampered.length}건** · ⚠ **텍스트 유실 의심 ${shrunk.length}건** (글자 ${SHRINK_ALARM * 100}% 이상 감소)`,
     `- 코드가 바꾼 것: 줄접기 ${textRuleReport.linesJoined} · 줄끝부호 ${textRuleReport.trailingPunctuationStripped} · 마침표→쉼표 ${textRuleReport.midLinePeriodsToCommas} · 3줄초과 ${textRuleReport.linesMerged} · 화자분리 ${textRuleReport.speakerLinesSplit}`,
     `- 둘을 합친 최종 변경: ${changes.length}블록`,
     '',
@@ -360,8 +389,10 @@ writeFileSync(
     '**출력이 희소한 패스라 "고침 0"은 실패가 아니라 고칠 게 없었다는 뜻이다.**',
     '모델이 안 내보낸 번호는 1차 번역이 그대로 남는다 — 그게 이 설계의 안전 폴백이다.',
     '',
-    '**⚠ 숫자·고유명사 변조 = 원문 없이 다듬을 때의 핵심 위험이 실제로 터진 자리.**',
-    '0이 아니면 프로덕션 배선 전에 프롬프트부터 고칠 것.',
+    '**⚠ 두 경보 = 원문 없이 다듬을 때의 핵심 위험이 실제로 터진 자리.**',
+    '변조는 모델이 숫자·고유명사를 건드린 것, 유실 의심은 두 줄짜리 자막의 한 줄을',
+    '통째로 버린 것(2026-08-19 첫 전편 런에서 2건 관측). 0이 아니면 프로덕션 배선',
+    '전에 프롬프트부터 고칠 것.',
     '',
     '**개선인지 개악인지는 아래 diff를 사람이 읽어서 판정한다.** 기계는 형식과 비용만 잰다.',
     '',
@@ -369,10 +400,10 @@ writeFileSync(
     '',
     '## 모델이 바꾼 블록',
     '',
-    ...(tampered.length > 0
-      ? ['### ⚠ 변조 의심부터', '', ...tampered.flatMap(diffEntry), '### 나머지', '']
+    ...(suspect.length > 0
+      ? ['### ⚠ 의심 블록부터', '', ...suspect.flatMap(diffEntry), '### 나머지', '']
       : []),
-    ...modelChanges.filter((c) => !c.tampered).flatMap(diffEntry),
+    ...modelChanges.filter((c) => !c.tampered && !c.shrunk).flatMap(diffEntry),
   ].join('\n'),
 );
 
@@ -380,7 +411,7 @@ console.log(
   [
     '',
     `블록 ${before.size} (채점 ${scored}) · 모델 내보냄 ${emitted} → 실제 변경 ${modelChanges.length}`,
-    `⚠ 숫자·고유명사 변조 ${tampered.length}`,
+    `⚠ 숫자·고유명사 변조 ${tampered.length} · ⚠ 텍스트 유실 의심 ${shrunk.length}`,
     `${LANG.lineMaxChars}자 초과 ${overLongBefore.length} → ${overLongAfter.length} · CPS 위반 ${cpsBefore.size} → ${cpsAfter.size}`,
     `비용 ${krw.toFixed(0)}원 (블록당 ${krwPerBlock.toFixed(3)}원) · flash 1차와 합쳐 ${(0.23 + krwPerBlock).toFixed(3)}원/블록 vs Pro 단독 1.34원`,
     `API실패 ${apiFailures} · ${seconds.toFixed(1)}s`,
