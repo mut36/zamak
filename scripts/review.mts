@@ -86,6 +86,18 @@ const P = {
   /** Pro pricing per 1M tokens (docs/tuning/cost-per-block.md §1). */
   pin: Number(args.pin ?? 2.0),
   pout: Number(args.pout ?? 12.0),
+  /**
+   * What pass 1 actually cost, in KRW per block, so the report can add the two
+   * stages up. There is no safe default: it depends on the model, the thinking
+   * level and the prompt the pass-1 run used, and the number that matters is
+   * the one from *the very run being reviewed* — its `summary.md` prints the
+   * USD total, so this is (USD × 1688 ÷ 블록수).
+   *
+   * It was briefly hardcoded to 0.23 (the flash figure in cost-per-block.md)
+   * and that quietly understated the total by 20%, because the run actually fed
+   * in here had cost 0.287. A number from a different run is not this run's cost.
+   */
+  passOne: args.passOne === undefined ? null : Number(args.passOne),
 };
 
 const P_CHUNK = Number(args.chunk ?? chunkSizeForModel(P.model));
@@ -399,8 +411,10 @@ writeFileSync(
     '',
     `- 입력 ${usageTotal.prompt.toLocaleString()} · thinking ${usageTotal.thoughts.toLocaleString()} · 출력 ${usageTotal.output.toLocaleString()} 토큰`,
     `- $${usd.toFixed(4)} = **${krw.toFixed(0)}원** · **블록당 ${krwPerBlock.toFixed(3)}원**`,
-    `- 비교 기준(\`tuning/cost-per-block.md\`): flash 1차 0.23원/블록 · Pro 단독 1.34원/블록`,
-    `- → **1차(flash) + 이 검수 = ${(0.23 + krwPerBlock).toFixed(3)}원/블록**`,
+    `- 비교 기준(\`tuning/cost-per-block.md\`): Pro 단독 1.335원/블록`,
+    P.passOne === null
+      ? '- 2단계 합계는 `passOne=<1차 원/블록>`을 넘겨야 계산된다 — 하드코딩하면 다른 런의 숫자를 이 런의 비용으로 적게 된다'
+      : `- 1차 ${P.passOne}원/블록 → **2단계 합계 ${(P.passOne + krwPerBlock).toFixed(3)}원/블록 = Pro 단독의 ${(((P.passOne + krwPerBlock) / 1.335) * 100).toFixed(0)}%**`,
     '',
     '## 모델이 한 일',
     '',
@@ -444,7 +458,10 @@ console.log(
     `블록 ${before.size} (채점 ${scored}) · 모델 내보냄 ${emitted} → 실제 변경 ${modelChanges.length}`,
     `⚠ 숫자·고유명사 변조 ${tampered.length} · ⚠ 텍스트 유실 의심 ${shrunk.length}`,
     `${LANG.lineMaxChars}자 초과 ${overLongBefore.length} → ${overLongAfter.length} · CPS 위반 ${cpsBefore.size} → ${cpsAfter.size}`,
-    `비용 ${krw.toFixed(0)}원 (블록당 ${krwPerBlock.toFixed(3)}원) · flash 1차와 합쳐 ${(0.23 + krwPerBlock).toFixed(3)}원/블록 vs Pro 단독 1.34원`,
+    `비용 ${krw.toFixed(0)}원 (블록당 ${krwPerBlock.toFixed(3)}원)` +
+      (P.passOne === null
+        ? ' · 2단계 합계는 passOne= 필요'
+        : ` · 1차와 합쳐 ${(P.passOne + krwPerBlock).toFixed(3)}원/블록 vs Pro 단독 1.335원`),
     `API실패 ${apiFailures} · 게으름 재요청 ${lazyRetries} · ${seconds.toFixed(1)}s`,
     `→ ${srtPath}`,
     `→ ${reportPath}`,
