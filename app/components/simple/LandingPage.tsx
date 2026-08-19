@@ -2,17 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { COPY } from '../../i18n/simpleCopy';
+import { useAuth } from '../../hooks/useAuth';
+import { isSupabaseConfigured } from '../../lib/supabase/env';
 import { fitVars } from '../../utils/fitText';
 import { useScrollReveal } from '../../hooks/useScrollReveal';
 import { BrandMark } from '../BrandMark';
 import { HowItWorksDemo } from './HowItWorksDemo';
 import { SiteFooter } from '../SiteFooter';
-
-interface Props {
-  onSignIn: () => void;
-  error: string;
-  configured: boolean;
-}
 
 const L = COPY.landing;
 const PLANS = COPY.plans;
@@ -124,7 +120,29 @@ function Segmented({
   );
 }
 
-export function LandingPage({ onSignIn, error, configured }: Props) {
+/**
+ * The anonymous `/`. Takes no props: `app/page.tsx` is a server component now
+ * and cannot hand a client component an `onSignIn` function, so sign-in and
+ * the OAuth error banner are owned here — this file is already `'use client'`,
+ * which is where both belonged anyway.
+ */
+export function LandingPage() {
+  const { signIn } = useAuth();
+  const configured = isSupabaseConfigured;
+
+  // OAuth is the one round-trip that leaves the app and reports back through a
+  // query param. Read it once, then clean the URL so a refresh does not
+  // re-show a stale banner. `window.location` rather than `useSearchParams`
+  // on purpose — the hook would drag a Suspense boundary in for a value only
+  // ever present on a redirect back.
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).get('auth_error')) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setError(COPY.auth.failed);
+    window.history.replaceState({}, '', window.location.pathname);
+  }, []);
+
   // 히어로 데모: 4개 대사를 순환하며, 전환 시 옐로 커서로 500ms 대기했다가
   // 번역문이 뜬다. prefers-reduced-motion이면 타이머를 아예 시작하지 않는다.
   const [heroIdx, setHeroIdx] = useState(0);
@@ -186,7 +204,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           </div>
           <Cta
             location='nav'
-            onSignIn={onSignIn}
+            onSignIn={signIn}
             configured={configured}
             className='lp-btn lp-btn-ink text-[13px] px-4 py-2 rounded-[10px]'
           />
@@ -234,7 +252,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           <div className='flex flex-wrap items-center justify-center gap-3'>
             <Cta
               location='hero'
-              onSignIn={onSignIn}
+              onSignIn={signIn}
               configured={configured}
               className='lp-btn lp-btn-ink text-[16px] px-[30px] py-[14px]'
             />
@@ -335,7 +353,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
                 갈아 끼우므로, 새로 태어난 노드가 `.is-visible` 없이 투명한 채
                 굳는 걸 막는다(CPS 카드와 같은 처리). */}
             <div className='reveal' style={revealDelay(2)}>
-              <HowItWorksDemo onSignIn={onSignIn} configured={configured} />
+              <HowItWorksDemo onSignIn={signIn} configured={configured} />
             </div>
           </div>
         </section>
@@ -451,7 +469,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
               {/* 다크 섹션에서만 옐로 버튼을 쓴다. */}
               <Cta
                 location='speed'
-                onSignIn={onSignIn}
+                onSignIn={signIn}
                 configured={configured}
                 className='lp-btn lp-btn-accent text-[15px] px-[26px] py-3'
               />
@@ -714,7 +732,7 @@ export function LandingPage({ onSignIn, error, configured }: Props) {
           <div className='reveal' style={revealDelay(2)}>
             <Cta
               location='footer'
-              onSignIn={onSignIn}
+              onSignIn={signIn}
               configured={configured}
               className='lp-btn lp-btn-ink text-[16px] px-8 py-[14px]'
             />

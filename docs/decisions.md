@@ -2413,3 +2413,57 @@ ETA와 **같은 함수**다. 이전엔 `DEFAULT_MODEL` 폴백을 써서 Pro 런�
 
 설계 문서: `docs/superpowers/specs/2026-08-15-progress-ui-v2-design.md`
 계획 문서: `docs/superpowers/plans/2026-08-15-progress-ui-v2.md`
+
+<!-- 6-13·6-14는 이 브랜치에 없다. 색인이 비어 있는 걸 먼저 막으려고 이
+     핫픽스만 따로 뽑아 배포했고(2026-08-19), 두 항목은 `/polish`·ellipsis
+     코드와 함께 main이 따라잡을 때 들어온다. 번호는 위치가 아니라 식별자라
+     당겨 쓰지 않는다. -->
+
+### 6-15. `/`를 서버 컴포넌트로 승격 — 랜딩이 색인에 아예 없었다 (2026-08-19)
+
+§6-10에서 크롤링을 열고 robots·sitemap을 붙였는데, 정작 검색에 잡히는 게
+없었다. 확인해보니 `robots.txt`(200)·`sitemap.xml`(200)·메타태그는 전부
+정상이었고 **본문이 없었다.** 프로덕션 HTML에서 태그를 벗기면 남는 텍스트가
+`<title>` 한 줄뿐이었다.
+
+범인은 `app/page.tsx`의 이 세 줄이었다:
+
+```
+if (authLoading) {
+  return <div className='min-h-screen' aria-busy='true' />;
+}
+```
+
+`useAuth`의 `loading` 초기값이 `isSupabaseConfigured`(=true)라 **서버 렌더는
+항상 이 분기**였다. `LandingPage.tsx` 740줄 — 우리가 가진 유일한 마케팅
+카피 — 는 브라우저가 `getUser()`를 끝낸 뒤에만 존재했고, 크롤러는 그 렌더를
+돌리지 않는다.
+
+**`'use client'`는 범인이 아니다.** Next는 클라이언트 컴포넌트도 HTML로
+찍어준다. 문제는 그 앞의 빈 early return이었다. 그래서 고친 것도 "랜딩을
+서버 컴포넌트로 다시 쓰기"가 아니라 **판정을 서버로 올리기**다:
+
+- `page.tsx` = 서버 컴포넌트. 쿠키로 세션을 읽어 `<WizardApp />` 또는
+  `<LandingPage />`를 고른다. 새 인프라 없음 — `lib/supabase/server.ts`의
+  `createServerClient`를 그대로 쓴다.
+- 로그인 이후 트리는 `components/beta/WizardApp.tsx`로 이동(순수 이동).
+  여기 도달했다는 건 세션이 있다는 뜻이므로 `useWizard`/`useFeedbackFollowup`의
+  `signedIn`은 `!!user`가 아니라 리터럴 `true`다 — 클라이언트 재확인을
+  기다리지 않는다.
+- `LandingPage`는 props를 받지 않는다. 서버 컴포넌트는 함수를 못 넘기므로
+  `onSignIn`·`auth_error` 배너를 랜딩이 직접 소유한다(어차피 `'use client'`다).
+
+**대가**: 쿠키를 읽으므로 `/`가 동적 렌더링이 된다. 랜딩에 방문자별 콘텐츠가
+없으니 캐시 손실이 아깝지만, 색인이 안 되는 것보다 낫고 — 덤으로 **깜빡임이
+사라졌다**. 종전에는 로그인 유저도 blank → 앱 순서로 떴다.
+
+측정(로컬, 같은 커밋 전후): 서빙 HTML 40.7KB / 본문 텍스트 약 5,470자,
+`h1` 1개 + `h2` 7개. 종전에는 14.6KB / 본문 0자.
+
+⚠️ `app/landing-ssr.test.tsx`가 두 가지를 못 박는다 — 랜딩이 브라우저 없이
+마크업을 내는가, 그리고 `page.tsx`가 여전히 서버 컴포넌트인가. 후자가 없으면
+랜딩만 검사하는 테스트는 이 회귀를 그대로 통과시킨다.
+
+**아직 남은 것**: 색인 요청(Search Console·네이버 서치어드바이저 등록과
+사이트맵 제출)은 계정 작업이라 코드 밖이다. 이 배포 이후에 해야 한다 —
+빈 페이지 상태로 첫 평가를 받으면 안 된다.
