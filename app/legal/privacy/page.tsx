@@ -9,6 +9,8 @@ export const metadata = {
   title: '개인정보처리방침',
   description:
     'ZAMAK이 수집하는 개인정보, 이용 목적, 보관 기간, 처리위탁과 국외 이전 안내',
+  // Self-referencing — see the note in app/page.tsx.
+  alternates: { canonical: '/legal/privacy' },
 };
 
 /**

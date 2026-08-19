@@ -68,3 +68,48 @@ describe('robots', () => {
     expect(sitemapUrl.origin).toBe(new URL(sitemap()[0].url).origin);
   });
 });
+
+/**
+ * The pair that has to agree.
+ *
+ * Google refused to index `/` on 2026-08-19 with "duplicate without a
+ * user-selected canonical": it had found `www.zamak.app` as well as the apex
+ * and we shipped no `<link rel="canonical">` at all. The fix is a
+ * self-referencing canonical on each public page — and the failure mode of
+ * *that* fix is a canonical that quietly names a different URL than the
+ * sitemap does, which is a worse signal than having none.
+ *
+ * So: the canonicals and the sitemap are asserted to be the same set of paths.
+ * Adding a public page means touching both, and forgetting either one fails
+ * here.
+ */
+describe('canonical URLs', () => {
+  const canonicalOf = (m: { alternates?: { canonical?: unknown } }) =>
+    String(m.alternates?.canonical);
+
+  it('every sitemap page declares a self-referencing canonical', async () => {
+    const pages = Object.fromEntries(
+      await Promise.all(
+        [
+          ['/', import('./page')],
+          ['/legal', import('./legal/page')],
+          ['/legal/privacy', import('./legal/privacy/page')],
+        ].map(async ([path, mod]) => [
+          path as string,
+          canonicalOf((await (mod as Promise<{ metadata: object }>)).metadata),
+        ]),
+      ),
+    );
+
+    for (const [path, canonical] of Object.entries(pages)) {
+      expect(canonical, `${path} canonical`).toBe(path);
+    }
+  });
+
+  it('covers exactly the sitemap, no more and no less', async () => {
+    const declared = ['/', '/legal', '/legal/privacy'];
+    expect(sitemap().map((e) => new URL(e.url).pathname).sort()).toEqual(
+      [...declared].sort(),
+    );
+  });
+});

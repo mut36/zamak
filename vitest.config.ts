@@ -9,5 +9,15 @@ export default defineConfig({
       '**/dist/**',
       '**/.claude/worktrees/**',
     ],
+    alias: {
+      // `server-only` throws on import outside a React Server Component, which
+      // is exactly its job — but it also stops a test from importing a server
+      // page just to read its exported `metadata` (app/seo.test.ts does, to
+      // check the canonicals). The guard protects the bundle, not the suite.
+      'server-only': new URL(
+        './test/stubs/server-only.ts',
+        import.meta.url,
+      ).pathname,
+    },
   },
 });

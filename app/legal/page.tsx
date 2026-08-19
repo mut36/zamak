@@ -12,6 +12,8 @@ import { Contents, KeyPoint, LegalShell, Section } from './parts';
 export const metadata = {
   title: '이용약관',
   description: 'ZAMAK 이용약관, 자막 저작권과 이용자 책임',
+  // Self-referencing — see the note in app/page.tsx.
+  alternates: { canonical: '/legal' },
 };
 
 /**
