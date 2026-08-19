@@ -545,7 +545,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 1 | 업로드 → 정규 SRT + `SubtitleDoc` | 코드 | `app/lib/subtitles/` |
 | 2 | 1차 `enforceTextRules` | 코드 | `app/lib/srt.ts` |
 | 3 | 상한 초과 블록 수집 | 코드 | `collectOverLongBlocks` (`app/lib/polish.ts`) |
-| 4 | **초과 0건이면 AI 건너뜀** | — | `usePolish` |
+| 4 | **초과 0건이면 AI 건너뜀** | — | `applySubtitleRules` (`app/lib/polish.ts`) |
 | 5 | 초과분만 한 요청으로 전송 | 서버 | `/api/polish` → `polishService` |
 | 6 | 번호로 제자리 교체 | 코드 | `spliceBlocks` (`app/lib/polish.ts`) |
 | 7 | 2차 `enforceTextRules` | 코드 | AI 결과에 2줄 상한·접기·마침표 재적용 |
@@ -561,6 +561,12 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 번호·타임코드째 뽑아 이어 붙이면 그게 곧 유효한 청크이고, 모르는 번호 버리기·빠진
 번호 폴백·`|` 분리·모델 타임스탬프 불신이 전부 공짜로 따라온다. `polish.ts`가 새로
 하는 일은 뽑기(3)와 되돌리기(6)뿐이다.
+
+2~7은 `applySubtitleRules` 한 함수에 있다 — 훅(`usePolish`)은 파일 읽기·거절
+처리·화면 상태만 맡는다. 파이프라인을 순수 함수로 뽑아 둔 이유는 `useWizard`가
+`countBlocks`·`exceedsCreditCap`을 뽑아 둔 이유와 같다: **초과 0건이면 모델을 안
+부른다**는 성질이 이 기능의 경제성이므로 렌더 없이 검증되어야 한다. 그래서 모델
+호출을 인자로 주입받는다 — 호출 여부가 곧 비용이고, `polish.test.ts`가 그걸 센다.
 
 **청크 분할은 서버가 한다**(`POLISH_CHUNK_SIZE`). 클라이언트가 한 요청에 다 보내는
 이유는 레이트 리밋이 요청 단위로 세기 때문 — 청크마다 쪼갰다면 "하루 5회"가 파일
