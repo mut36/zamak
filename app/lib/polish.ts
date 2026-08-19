@@ -1,9 +1,12 @@
 import {
+  enforceTextRules,
   parseBlockTiming,
   parseSrtBlocks,
   readBlockIndex,
   visibleLength,
+  type TextRuleReport,
 } from './srt';
+import type { TargetLang } from '../config/languages';
 
 export interface OverLongCollection {
   /**
@@ -74,4 +77,89 @@ export function spliceBlocks(fullSrt: string, rebuiltSubset: string): string {
       return replacements.get(index) ?? raw;
     })
     .join('\n\n');
+}
+
+export interface PolishSummary extends TextRuleReport {
+  /** 상한을 넘었다가 실제로 해소된 블록 수. */
+  linesSplit: number;
+  /** 상한을 넘었는데 끝내 안 나뉜 블록 수(청크 실패 등). */
+  unsplitLines: number;
+}
+
+export interface PolishOutcome {
+  content: string;
+  summary: PolishSummary;
+}
+
+function addReports(a: TextRuleReport, b: TextRuleReport): TextRuleReport {
+  return {
+    ellipsisNormalized: a.ellipsisNormalized + b.ellipsisNormalized,
+    linesMerged: a.linesMerged + b.linesMerged,
+    trailingPunctuationStripped:
+      a.trailingPunctuationStripped + b.trailingPunctuationStripped,
+    linesJoined: a.linesJoined + b.linesJoined,
+    midLinePeriodsToCommas: a.midLinePeriodsToCommas + b.midLinePeriodsToCommas,
+    speakerLinesSplit: a.speakerLinesSplit + b.speakerLinesSplit,
+  };
+}
+
+/**
+ * `/polish`의 파이프라인 전체 — 파일 입출력과 상태를 뺀 순수한 부분.
+ *
+ * 훅에서 뽑아낸 이유는 `useWizard`가 `countBlocks`·`exceedsCreditCap`을 뽑아낸
+ * 이유와 같다: 여기 담긴 판단들은 렌더 없이 검증할 수 있어야 한다. 특히
+ * **초과가 0건이면 `splitLongLines`를 아예 안 부른다**는 성질은 이 기능을 무료로
+ * 낼 수 있는 근거이므로 테스트가 지켜야 한다.
+ *
+ * `splitLongLines`를 주입받는 것은 그 성질을 관찰 가능하게 만들기 위해서다 —
+ * 호출 여부가 곧 비용이다.
+ *
+ * **타임코드를 읽지도 쓰지도 않는다.** `adjustSubtitleTiming`은 이 흐름에 없다.
+ */
+export async function applySubtitleRules(
+  srt: string,
+  lang: TargetLang,
+  splitLongLines: (subset: string) => Promise<string>,
+): Promise<PolishOutcome> {
+  const ruleOptions = {
+    trailingPunctuation: lang.trailingPunctuation,
+    lineMaxChars: lang.lineMaxChars,
+    ellipsis: lang.ellipsis,
+  };
+
+  // 1차 — 코드가 결정적으로 처리하는 전부.
+  const first = enforceTextRules(srt, ruleOptions);
+
+  const { subset, indices } = collectOverLongBlocks(
+    first.content,
+    lang.lineMaxChars,
+  );
+
+  // 초과가 없으면 모델을 부르지 않는다. ZAMAK이 번역한 자막을 다시 넣으면
+  // 대개 이 경로이고, 그때 이 기능은 비용 0에 즉시 끝난다.
+  let merged = first.content;
+  if (indices.length > 0) {
+    merged = spliceBlocks(first.content, await splitLongLines(subset));
+  }
+
+  // 2차 — 모델이 나눈 결과에 2줄 상한·접기·마침표를 다시 적용.
+  const second = enforceTextRules(merged, ruleOptions);
+
+  // 남은 초과는 **최종 결과물**에서 센다. 2차가 마침표를 떼며 상한 아래로
+  // 내려오는 블록이 있어, 병합 직후에 세면 성공을 과소 집계한다.
+  const unsplitLines = collectOverLongBlocks(
+    second.content,
+    lang.lineMaxChars,
+  ).indices.length;
+
+  return {
+    content: second.content,
+    summary: {
+      ...addReports(first.report, second.report),
+      // 2차의 3줄→2줄 병합이 새로 긴 줄을 만들 수 있어 unsplitLines가 원래 초과
+      // 수를 넘길 수 있다. 요약에 음수가 뜨는 것보다 0이 정직하다.
+      linesSplit: Math.max(0, indices.length - unsplitLines),
+      unsplitLines,
+    },
+  };
 }

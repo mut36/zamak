@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { collectOverLongBlocks, spliceBlocks } from './polish';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  applySubtitleRules,
+  collectOverLongBlocks,
+  spliceBlocks,
+} from './polish';
 import { parseSrtBlocks } from './srt';
+import { resolveTargetLang } from '../config/languages';
 
 const block = (n: number, body: string) =>
   `${n}\n00:00:0${n},000 --> 00:00:0${n},900\n${body}`;
@@ -96,5 +101,78 @@ describe('spliceBlocks', () => {
     expect(blocks[0]).toContain('하나 바뀜');
     expect(blocks[1]).toContain('둘');
     expect(blocks[2]).toContain('셋 바뀜');
+  });
+});
+
+describe('applySubtitleRules', () => {
+  const ko = resolveTargetLang('ko');
+  const never = async () => {
+    throw new Error('모델을 부르면 안 되는 경로다');
+  };
+
+  it('상한 초과가 없으면 모델을 아예 부르지 않는다', async () => {
+    // 이 기능을 무료로 낼 수 있는 근거다 — ZAMAK이 번역한 자막을 다시 넣으면
+    // 대개 이 경로이고, 그때 비용은 0이다.
+    const split = vi.fn(never);
+    const srt = [block(1, '짧은 줄'), block(2, '이것도 짧다')].join('\n\n');
+
+    const { summary } = await applySubtitleRules(srt, ko, split);
+
+    expect(split).not.toHaveBeenCalled();
+    expect(summary.linesSplit).toBe(0);
+    expect(summary.unsplitLines).toBe(0);
+  });
+
+  it('초과가 있으면 그 블록만 담아 모델에 넘긴다', async () => {
+    const long = '스무 글자가 넘어가는 아주 기다란 자막 한 줄';
+    const srt = [block(1, '짧다'), block(2, long)].join('\n\n');
+    const split = vi.fn(async (subset: string) => {
+      // 받은 건 초과 블록 하나뿐이어야 한다.
+      expect(parseSrtBlocks(subset)).toHaveLength(1);
+      expect(subset).toContain('00:00:02,000');
+      return block(2, '스무 글자가 넘어가는\n아주 기다란 자막 한 줄');
+    });
+
+    const { content, summary } = await applySubtitleRules(srt, ko, split);
+
+    expect(split).toHaveBeenCalledOnce();
+    expect(summary.linesSplit).toBe(1);
+    expect(summary.unsplitLines).toBe(0);
+    expect(parseSrtBlocks(content)).toHaveLength(2);
+  });
+
+  it('모델이 못 나눈 블록은 unsplitLines로 정직하게 센다', async () => {
+    const long = '스무 글자가 넘어가는 아주 기다란 자막 한 줄';
+    const srt = block(1, long);
+    // 청크가 실패해 원문이 그대로 돌아온 경우.
+    const { summary } = await applySubtitleRules(srt, ko, async () => srt);
+
+    expect(summary.unsplitLines).toBe(1);
+    expect(summary.linesSplit).toBe(0);
+  });
+
+  it('1차와 2차 규칙 리포트를 합산한다', async () => {
+    // 1차에서 마침표 하나, 2차에서 모델이 새로 만든 마침표 하나.
+    const long = '스무 글자가 넘어가는 아주 기다란 자막입니다.';
+    const srt = [block(1, '안녕하세요.'), block(2, long)].join('\n\n');
+
+    const { summary } = await applySubtitleRules(srt, ko, async () =>
+      block(2, '스무 글자가 넘어가는|아주 기다란 자막입니다.'),
+    );
+
+    // 1차: 1번 블록 + 2번 블록 = 2건, 2차: 모델 출력의 마침표 1건.
+    expect(summary.trailingPunctuationStripped).toBeGreaterThanOrEqual(3);
+  });
+
+  it('타임코드를 바꾸지 않는다', async () => {
+    const long = '스무 글자가 넘어가는 아주 기다란 자막 한 줄';
+    const srt = [block(1, '짧다'), block(2, long)].join('\n\n');
+
+    const { content } = await applySubtitleRules(srt, ko, async () =>
+      block(2, '스무 글자가|넘어가는 자막'),
+    );
+
+    expect(content).toContain('00:00:01,000 --> 00:00:01,900');
+    expect(content).toContain('00:00:02,000 --> 00:00:02,900');
   });
 });
