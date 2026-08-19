@@ -90,6 +90,24 @@ const P = {
 
 const P_CHUNK = Number(args.chunk ?? chunkSizeForModel(P.model));
 
+/**
+ * Thinking tokens below which a reply is treated as the model having skipped
+ * the chunk rather than having found nothing to fix.
+ *
+ * Two full runs each had one chunk come back `thinking=0 · output=1 (NONE)`,
+ * and they were *different* chunks — the 2nd run's silent chunk was the very
+ * range where the 1st run found 15 fixes (docs/tuning/review-pass.md §10). So
+ * a zero-thought NONE is laziness, not a clean stretch, and sparse output has
+ * no other way to tell the two apart: a legitimate NONE and a skipped chunk are
+ * byte-identical.
+ *
+ * Pro never reports zero thoughts when it actually works — even at LOW
+ * (docs/decisions.md §2-4-1), and the working chunks measured 923–7,968. The
+ * signal only separates cleanly on that model, so the guard is off by default
+ * elsewhere. `minThinking=0` disables it.
+ */
+const P_MIN_THINKING = Number(args.minThinking ?? (P.model === PRO_MODEL ? 1 : 0));
+
 /** Actual billed amount ÷ computed USD, verified on two card charges. */
 const KRW_PER_USD = 1688;
 
@@ -206,6 +224,8 @@ console.log(
 
 const startedAt = Date.now();
 let apiFailures = 0;
+/** Replies rejected as skipped work and re-requested (see P_MIN_THINKING). */
+let lazyRetries = 0;
 /** Blocks in a chunk the model never answered for — excluded from the score. */
 const unscored = new Set<number>();
 /** How many blocks the model chose to emit, before checking whether they differ. */
@@ -235,6 +255,17 @@ const reviewedChunks = await runOrderedPool<string, string>({
         usageTotal.cached += generated.usage.cached;
         usageTotal.thoughts += generated.usage.thoughts;
         usageTotal.output += generated.usage.output;
+
+        // The chunk was skipped, not reviewed — ask again rather than bank a
+        // silent pass. The retry is billed, but it lands only on the chunks
+        // that did nothing, so the cost rides on the failure rate.
+        if (generated.usage.thoughts < P_MIN_THINKING && attempt < ATTEMPTS) {
+          lazyRetries++;
+          console.log(
+            `  chunk ${index + 1} attempt ${attempt}/${ATTEMPTS} thinking=${generated.usage.thoughts} — 건너뛴 것으로 보고 재요청`,
+          );
+          continue;
+        }
 
         const body = generated.text.replace(NONE_LINE, '').trim();
         // A reply of NONE leaves nothing to reassemble, and the reassembler
@@ -361,7 +392,7 @@ writeFileSync(
     '',
     `- 1차 번역: \`${P.translated}\`${P.source ? ` · 원문: \`${P.source}\`` : ''}`,
     `- 검수 모델: \`${P.model}\` · thinking \`${thinkingLevelForModel(P.model)}\` · 청크 ${P_CHUNK}`,
-    `- 블록 ${before.size}개(청크 ${sourceChunks.length}) · ${seconds.toFixed(1)}s · API실패 ${apiFailures}`,
+    `- 블록 ${before.size}개(청크 ${sourceChunks.length}) · ${seconds.toFixed(1)}s · API실패 ${apiFailures} · 게으름 재요청 ${lazyRetries}회 (thinking < ${P_MIN_THINKING})`,
     `- **채점 대상 ${scored}블록** (모델이 답하지 않은 ${unscored.size}블록은 제외 — 1차 폴백이라 모델을 평가할 수 없다)`,
     '',
     '## 비용',
@@ -414,7 +445,7 @@ console.log(
     `⚠ 숫자·고유명사 변조 ${tampered.length} · ⚠ 텍스트 유실 의심 ${shrunk.length}`,
     `${LANG.lineMaxChars}자 초과 ${overLongBefore.length} → ${overLongAfter.length} · CPS 위반 ${cpsBefore.size} → ${cpsAfter.size}`,
     `비용 ${krw.toFixed(0)}원 (블록당 ${krwPerBlock.toFixed(3)}원) · flash 1차와 합쳐 ${(0.23 + krwPerBlock).toFixed(3)}원/블록 vs Pro 단독 1.34원`,
-    `API실패 ${apiFailures} · ${seconds.toFixed(1)}s`,
+    `API실패 ${apiFailures} · 게으름 재요청 ${lazyRetries} · ${seconds.toFixed(1)}s`,
     `→ ${srtPath}`,
     `→ ${reportPath}`,
   ].join('\n'),

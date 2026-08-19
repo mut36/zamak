@@ -238,9 +238,14 @@ prompts/common/line_split_ko.txt  분할 전용 프롬프트
 ### 프롬프트를 새로 만드는 이유
 
 `translation_rules_ko.txt`를 재사용하면 번역 지시(의역·존댓말·태그 보존)까지
-딸려온다. 필요한 것은 규칙 2의 분할 조항 하나뿐이라 별도 파일이 훨씬 작고,
-`npm run check:tokens` 예산에도 정직하게 잡힌다. 프로덕션 경로이므로
-`scripts/prompts/`가 아니라 `prompts/` 아래에 둔다.
+딸려온다. 필요한 것은 규칙 2의 분할 조항 하나뿐이라 별도 파일이 훨씬 작다.
+프로덕션 경로이므로 `scripts/prompts/`(하네스 전용)가 아니라 `prompts/` 아래에
+둔다 — `loadPromptFile`이 `prompts/`에서만 읽기 때문에 이건 취향이 아니라 요건이다.
+
+⚠️ 정정: 초안에는 "`npm run check:tokens` 예산에 잡힌다"고 적었으나 **틀렸다.**
+`check:tokens`는 CSS 디자인 토큰(`var(--x)`) 검사이고 프롬프트와 무관하다.
+`scripts/polish.mts`의 머리 주석도 같은 오해를 담고 있다(별건이라 이번엔 안 고친다).
+**프롬프트 크기를 재는 자동 가드는 현재 없다.**
 
 ## 13. 문서 갱신 의무
 
