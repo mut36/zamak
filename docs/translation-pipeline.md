@@ -340,6 +340,11 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
     이득이 없이 비용만 늘었다는 게 §2-15에서 확인됨 — MEDIUM을 굳이 쓸 이유는 없음
   - **엄격 모드**(출력 검증+재시도+블록단위 재번역) → `translationService.ts`,
     `TRANSLATION_STRICT_MODE=true`로 켬(기본 off, 비용 폭탄 위험 있어 신중히)
+  - **2단계(번역 + 검수) 실험** → 프로덕션엔 **아직 없다.** 1차 번역 위에 모델을
+    한 번 더 태우는 검수 패스는 하네스(`npm run review`,
+    `scripts/review.mts` + `scripts/prompts/review_ko.txt`)로만 존재한다.
+    비용은 Pro 단독의 53%로 통과했지만 검수가 자막 한 줄을 버리는 사고가 나서
+    배선을 보류 중 — 실측과 판정은 `docs/tuning/review-pass.md`
 
 ### 9. 타임코드 재조립
 - **코드**: **`app/lib/srt.ts` (`reassembleTranslatedChunk`, `indexTranslatedBodies`,

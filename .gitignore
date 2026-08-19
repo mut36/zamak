@@ -49,3 +49,4 @@ next-env.d.ts
 # prompt A/B output — contains translated third-party subtitles
 /.harness
 /.polish
+/.review

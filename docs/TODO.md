@@ -337,10 +337,19 @@ git worktree add /Users/jian/projects/zamak-worktrees/payments feature/payments
   관계가 바뀌면 항목이 둘로 쪼개지고, 청크는 자기 블록 범위와 겹치는 항목만 본다.
   TMDB cast를 이름 앵커로 쓰는 방안도 함께 반영(`tmdb.ts` `TmdbCastMember`). 상세는
   `docs/decisions.md` §2-9.
-- [ ] **Flash로 1차 번역 + Pro로 1회 검수 패스 테스트** (2026-08-06) — 본 번역은
-  저렴한 flash로 돌리고, 완료된 결과를 Pro 엔진에 한 번 더 통과시켜 오역·규칙
-  위반을 검수·교정하는 2단계 파이프라인이 실익 있는지 실험. Pro 단독 대비
-  비용·품질 트레이드오프 측정 필요. 미착수.
+- [ ] **Flash로 1차 번역 + Pro로 1회 검수 패스** — **하네스와 1차 실측 완료
+  (2026-08-19), 판정 보류.** `npm run review`(`scripts/review.mts`)가 1차 번역
+  SRT를 받아 검수 패스를 태우고 비용·형식 지표·사람용 3열 diff를 낸다. 설계는
+  `docs/superpowers/specs/2026-08-19-review-pass-harness-design.md`, 결과는
+  **`docs/tuning/review-pass.md`**.
+  - **비용은 통과**: flash+검수 0.712원/블록 = Pro 단독(1.335)의 **53%**.
+    "바뀐 블록만 출력"이 먹혀 출력 토큰이 번역의 1/23(871개)로 떨어졌다.
+  - **품질은 불합격**: 검수가 **두 줄짜리 자막의 첫 줄을 통째로 버린 사고 2건**.
+    대신 flash가 낸 오타·문법 오류 7건(`아버라니`→`아버지라니` 등)은 원문 없이도
+    잡아냈다 — 이 패스만이 잡을 수 있는 부류다.
+  - **다음**: ① 유실 금지를 못박은 프롬프트로 재측정(안 잡히면 방향을 닫는다)
+    ② thinking HIGH 대조 — 검수 비용의 대부분이 thinking이라 여기서 가설이
+    뒤집힐 수 있다 ③ 청크 하나가 `NONE`으로 통째로 논 건(§5) 재현 확인.
 
 ## 고급 번역 (길이 예산)
 

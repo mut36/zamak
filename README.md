@@ -94,6 +94,25 @@ npm run dev
 npx tsc --noEmit && npx eslint app && npx vitest run && npm run check:tokens
 ```
 
+#### 실험 하네스 (실제 API 비용이 나갑니다)
+
+로그인·크레딧·dev 서버 없이 프로덕션 코드를 직접 불러 자막 한 편을 돌리는
+CLI들입니다. 산출물은 각자의 점(dot) 디렉터리에 쌓입니다.
+
+| 명령 | 무엇을 재나 |
+|---|---|
+| `npm run harness` | 1차 번역 — 프롬프트·모델 A/B, 토큰·시간·비용 (`scripts/prompt-ab.mts`) |
+| `npm run polish` | 형식 교정 — 번역된 자막의 줄바꿈만 손보게 하고 재작성을 위반으로 채점 |
+| `npm run review` | **검수 패스** — 1차 번역 위에 모델 1회 검수. 결과는 [`docs/tuning/review-pass.md`](docs/tuning/review-pass.md) |
+| `npm run glossary` | 글로사리·존대관계 추출의 프로바이더 비교 |
+
+`review`는 `harness`의 산출물을 입력으로 받는 체인입니다:
+
+```bash
+npm run harness -- file=samples/subtitles/full-movie.srt variants=meaning
+npm run review -- translated=.harness/<런>/meaning.srt source=samples/subtitles/full-movie.srt
+```
+
 `check:tokens`는 디자인 토큰 가드입니다. CSS 커스텀 프로퍼티는 오타가 나도
 빌드가 통과하므로(`var(--typo)`는 에러 없이 선언만 버려짐) tsc·eslint·vitest 중
 무엇도 못 잡습니다. 이 스크립트가 `app/globals.css`의 정의 집합과 `app/` 전체의
