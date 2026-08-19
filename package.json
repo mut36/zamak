@@ -12,7 +12,8 @@
     "harness": "node --import ./scripts/harness/loader.mjs --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/prompt-ab.mts",
     "glossary": "node --import ./scripts/harness/loader.mjs --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/glossary-ab.mts",
     "polish": "node --import ./scripts/harness/loader.mjs --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/polish.mts",
-    "review": "node --import ./scripts/harness/loader.mjs --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/review.mts"
+    "review": "node --import ./scripts/harness/loader.mjs --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/review.mts",
+    "compare": "node --import ./scripts/harness/loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/compare.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
