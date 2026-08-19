@@ -361,6 +361,37 @@ export const COPY = {
     },
   },
 
+  // 규칙 적용 페이지(/polish). 번역 없이 표기 규칙만 적용하는 경로 —
+  // **타임코드는 건드리지 않는다**(specs/2026-08-19-polish-page-design.md §5).
+  // 카피에서 그 약속을 명시하는 이유: 남의 자막을 자동으로 고쳐주는 기능이라
+  // "뭘 안 건드리는지"가 신뢰의 핵심이다.
+  polish: {
+    navLink: '규칙 적용',
+    title: '자막 규칙 적용',
+    sub: '이미 번역된 한국어 자막을 방송 표기 규칙에 맞게 다듬어 드립니다.\n번역은 하지 않고, 타임코드도 손대지 않습니다.',
+    dropButton: '자막 파일 선택',
+    dropFormats: '지원 포맷: .srt, .vtt, .ass, .smi',
+    working: '규칙을 적용하는 중…',
+    doneTitle: '규칙을 적용했습니다',
+    /** 요약 한 줄. 0인 항목은 호출부가 걸러낸다. */
+    summary: (parts: string[]) => parts.join(' · '),
+    countSplit: (n: number) => `긴 줄 ${n}개 분할`,
+    countPunctuation: (n: number) => `문장부호 ${n}개 정리`,
+    countMerged: (n: number) => `${n}줄 병합`,
+    countEllipsis: (n: number) => `말줄임표 ${n}개 통일`,
+    countJoined: (n: number) => `${n}개 한 줄로 병합`,
+    countSpeaker: (n: number) => `화자 ${n}개 분리`,
+    unsplit: (n: number) => `${n}개 자막은 나누지 못했습니다`,
+    nothingToDo: '고칠 것이 없었습니다. 이미 규칙에 맞는 자막입니다.',
+    download: '내려받기',
+    downloadAs: (extension: string) => `.${extension}로 내려받기`,
+    startOver: '다른 파일 올리기',
+    limitReached:
+      '오늘 사용할 수 있는 횟수를 모두 썼습니다. 내일 다시 시도해 주세요.',
+    tooLarge: '파일이 너무 큽니다. 더 짧은 자막으로 시도해 주세요.',
+    failed: '규칙 적용에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+  },
+
   credits: {
     tooLargeTitle: '파일 용량이 너무 큽니다',
     tooLargeBody: (max: number, actual: number) =>
