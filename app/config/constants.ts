@@ -265,6 +265,16 @@ export const MAX_BLOCKS_PER_CREDIT = readPositiveIntEnv(
  * 소진됐다고 말하는 상태가 된다. 표시용 값일 뿐 어떤 한도도 아니다 — 이 숫자를
  * 다 쓴다고 무언가 막히지 않는다.
  */
+/**
+ * `/api/polish`가 한 번에 모델에 보내는 블록 수.
+ *
+ * 번역(`SERVER_CHUNK_SIZE`)보다 작게 잡는다: 입력이 이미 한국어라 블록당 토큰이
+ * 무겁고 출력도 한국어다. 대부분의 파일은 상한 초과가 3.8%뿐이라 청크 하나로
+ * 끝나지만, 줄바꿈이 아예 없는 자막(자동 생성물에 흔하다)은 전 블록이 초과라
+ * 여기서 갈린다.
+ */
+export const POLISH_CHUNK_SIZE = 150;
+
 export const UNLIMITED_CREDIT_DISPLAY = 999;
 
 /**
@@ -308,6 +318,15 @@ export const RATE_LIMITS = {
   aux: { limit: 20, windowSeconds: 60 },
   /** /api/glossary — full-file scan, opt-in, once per file. */
   glossary: { limit: 5, windowSeconds: 60 },
+  /**
+   * /api/polish — 규칙 적용. 크레딧을 안 쓰므로 **이 한도가 유일한 천장이다**
+   * (/api/translate는 job의 크레딧 검사가 그 역할을 한다).
+   *
+   * 창이 하루인 것은 단위가 "호출"이 아니라 "파일"이기 때문이다 — 클라이언트가
+   * 초과 줄을 **한 요청에** 담아 보내고 청크 분할은 서버가 안에서 한다. 청크마다
+   * 요청을 쪼갰다면 하루 5회가 파일 한두 개로 줄었을 것이다.
+   */
+  polish: { limit: 5, windowSeconds: 86_400 },
 } as const;
 
 export type RateLimitBucket = keyof typeof RATE_LIMITS;

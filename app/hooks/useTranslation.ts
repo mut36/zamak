@@ -9,21 +9,16 @@ import {
   JobRefusedError,
 } from '../lib/client/translationJob';
 import { saveResult } from '../lib/client/history';
+import { buildDownloads } from '../lib/downloads';
 import { sendRunMetrics } from '../lib/client/metrics';
 import {
   adjustSubtitleTiming,
-  buildOutputFilename,
   chunkSrtBlocksAtGaps,
   enforceTextRules,
   parseSrtBlocks,
   readBlockIndex,
 } from '../lib/srt';
-import {
-  emitInOriginalFormat,
-  formatExtension,
-  subtitleMime,
-  type SubtitleDoc,
-} from '../lib/subtitles';
+import type { SubtitleDoc } from '../lib/subtitles';
 import {
   computeSweepBudget,
   countTranslatableLeftovers,
@@ -32,7 +27,6 @@ import {
 import { runOrderedPool } from '../lib/client/concurrency';
 import { computeRetryBudget } from '../lib/translationErrors';
 import type {
-  DownloadOption,
   MovieInfo,
   TranslationStyle,
   TranslationProgress,
@@ -130,37 +124,6 @@ async function analyzeContent(
  * its document can be rebuilt. A writer that throws must not cost the user a
  * finished translation, so it degrades to the SRT-only list.
  */
-function buildDownloads(
-  doc: SubtitleDoc | null,
-  originalName: string,
-  targetLang: string,
-  translatedSrt: string,
-): DownloadOption[] {
-  const asSrt: DownloadOption = {
-    extension: 'srt',
-    filename: buildOutputFilename(originalName, targetLang, 'srt'),
-    content: translatedSrt,
-    mime: subtitleMime('srt'),
-  };
-  if (!doc || doc.format === 'srt' || !doc.roundTrip) return [asSrt];
-
-  try {
-    const extension = formatExtension(doc.format);
-    return [
-      {
-        extension,
-        filename: buildOutputFilename(originalName, targetLang, extension),
-        content: emitInOriginalFormat(doc, translatedSrt),
-        mime: subtitleMime(doc.format),
-      },
-      asSrt,
-    ];
-  } catch (err) {
-    console.error('[translate] round-trip failed, offering SRT only', err);
-    return [asSrt];
-  }
-}
-
 /**
  * `ms`만큼 기다리되, 사용자가 취소하면 즉시 깨어난다. 검증 단계 최소 노출이
  * 취소를 삼키면 안 되기 때문에 필요하다.

@@ -29,6 +29,13 @@ export function AppNav({ credits, onHome }: AppNavProps) {
           )}
 
           <Link
+            href='/polish'
+            className='text-caption text-nav hover:bg-[var(--fill-hover)] rounded-[var(--r-btn)] px-3 py-1.5 transition'
+          >
+            {COPY.polish.navLink}
+          </Link>
+
+          <Link
             href='/mypage'
             className='text-caption text-nav hover:bg-[var(--fill-hover)] rounded-[var(--r-btn)] px-3 py-1.5 transition'
           >

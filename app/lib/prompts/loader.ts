@@ -47,6 +47,18 @@ export function loadTranslationRules(
   return loadPromptFile(`common/translation_rules_${language}${suffix}.txt`);
 }
 
+/**
+ * 줄바꿈 전용 규칙 (`/api/polish`). 번역 규칙과 따로 두는 이유는
+ * `translation_rules_*`를 재사용하면 의역·존댓말·태그 보존 같은 번역 지시가
+ * 통째로 딸려오기 때문이다 — 이 경로가 필요한 것은 분할 조항 하나뿐이다.
+ * `{{lineMaxChars}}` 자리는 호출부가 languages.ts에서 렌더한다.
+ */
+export function loadLineSplitRules(
+  language: TargetLangCode,
+): Promise<string> {
+  return loadPromptFile(`common/line_split_${language}.txt`);
+}
+
 export function loadTranslationPhilosophy(
   style: 'meaning' | 'cinematic',
 ): Promise<string> {

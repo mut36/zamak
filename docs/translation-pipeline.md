@@ -534,6 +534,42 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   `TextRuleReport`로 반환하고 `useTranslation.ts`가 콘솔에 로그만 남긴다 — 화면에
   보여주거나 하네스(`prompt-ab.mts`)에 집계하는 건 아직 안 함(향후 §9.6처럼 확장 가능).
 
+### 9.8. 번역 없이 규칙만 적용하는 경로 (`/polish`, 2026-08-19)
+
+§9.7의 규칙 엔진을 **번역 파이프라인 밖에서** 쓰는 두 번째 경로. 이미 한국어인
+자막을 받아 표기 규칙만 적용해 돌려준다. 설계 전문은
+`docs/superpowers/specs/2026-08-19-polish-page-design.md`.
+
+| # | 단계 | 담당 | 파일 |
+|---|---|---|---|
+| 1 | 업로드 → 정규 SRT + `SubtitleDoc` | 코드 | `app/lib/subtitles/` |
+| 2 | 1차 `enforceTextRules` | 코드 | `app/lib/srt.ts` |
+| 3 | 상한 초과 블록 수집 | 코드 | `collectOverLongBlocks` (`app/lib/polish.ts`) |
+| 4 | **초과 0건이면 AI 건너뜀** | — | `usePolish` |
+| 5 | 초과분만 한 요청으로 전송 | 서버 | `/api/polish` → `polishService` |
+| 6 | 번호로 제자리 교체 | 코드 | `spliceBlocks` (`app/lib/polish.ts`) |
+| 7 | 2차 `enforceTextRules` | 코드 | AI 결과에 2줄 상한·접기·마침표 재적용 |
+| 8 | `buildDownloads` | 코드 | `app/lib/downloads.ts` |
+
+**타임코드를 읽지도 쓰지도 않는다.** `adjustSubtitleTiming`(§9.5)을 부르지 않으므로
+타임스탬프를 건드리는 코드가 이 경로에 하나도 없다 — 번역 경로의 "밀리지 않는다"보다
+센 "바뀌지 않는다"가 성립한다. 대신 CPS 조정도 안 되며, 그래서 업로드 화면에
+콘텐츠 유형 선택이 없다.
+
+**병합을 새로 안 짰다.** `reassembleTranslatedChunk`(§9)를 그대로 쓴다 — 그 함수는
+위치가 아니라 **번호로** 대조하므로 청크가 연속일 필요가 없다. 초과 블록만 원본
+번호·타임코드째 뽑아 이어 붙이면 그게 곧 유효한 청크이고, 모르는 번호 버리기·빠진
+번호 폴백·`|` 분리·모델 타임스탬프 불신이 전부 공짜로 따라온다. `polish.ts`가 새로
+하는 일은 뽑기(3)와 되돌리기(6)뿐이다.
+
+**청크 분할은 서버가 한다**(`POLISH_CHUNK_SIZE`). 클라이언트가 한 요청에 다 보내는
+이유는 레이트 리밋이 요청 단위로 세기 때문 — 청크마다 쪼갰다면 "하루 5회"가 파일
+한두 개로 줄었을 것이다.
+
+**한도가 유일한 천장이다.** 크레딧을 안 쓰므로 `/api/translate`의 job 검사에 해당하는
+가드가 없다. `RATE_LIMITS.polish`(하루 5회, §12의 `api_rate_limits` 재사용)가 그
+자리를 메운다 — 편의 기능이 아니라 보안 요소다.
+
 ### 10. 조립 & 다운로드
 - **코드**: `useTranslation`(청크 결과 합치기 + §9.7 텍스트 규칙 강제 + §9.5 조정 +
   §9.6 재시도/폴백 집계 + `buildDownloads`), `app/lib/subtitles/document.ts`
@@ -644,6 +680,9 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 자막 본문에 `|`가 그대로 보임 | 재조립을 안 거친 산출물이거나(하네스 원본 등) `|`가 두 개 이상이라 2줄 상한에 걸린 경우 → `srt.ts` `indexTranslatedBodies`, `enforceTextRules` |
 | 블록이 합쳐져 나옴(한 자막에 두 자막 내용) | 한 번호 = 한 줄 위반이라 블록 수 불일치로 잡힌다. 규칙 1·2를 확인하고, 재발하면 `decisions.md` §2-1 (3)의 실측 절차대로 하네스로 재현 |
 | 이웃 자막 본문에 `[N me]` 같은 깨진 마커가 끼어 있고 그 번호는 원문 폴백 | 모델이 마커 안에 잡텍스트를 섞음 → `srt.ts` `MARKER_LINE`이 `[숫자…]`를 흡수함(`decisions.md` §2-1·§2-3-3). 재발 시 정규식·`srt.test.ts` 회귀 확인 |
+| /polish가 긴 줄을 안 나눔 | 먼저 초과 줄이 실제로 있는지 확인 — 19자 이하면 AI를 안 부르는 게 정상이다(§9.8의 4번). 있는데도 그대로면 `prompts/common/line_split_ko.txt` 또는 청크 실패 → 응답의 `failedChunks`, 완료 화면의 "N개 자막은 나누지 못했습니다" |
+| /polish에서 "오늘 사용할 수 있는 횟수를 모두 썼습니다" | 정상 — `RATE_LIMITS.polish`(하루 5회). 크레딧을 안 쓰는 라우트라 이 한도가 유일한 천장이다 — §9.8 |
+| /polish 결과의 타임코드가 원본과 다름 | **버그다.** 이 경로에는 타임스탬프를 쓰는 코드가 없다(§9.8) — `spliceBlocks`나 포맷 어댑터(`app/lib/subtitles/`)를 의심할 것 |
 | 자막이 밀림(번호 재배열) | 청크 크기 ↓ `constants.ts` `SERVER_CHUNK_SIZE` (**≥300 금지**), 재조립 `srt.ts`. 조절 절차는 위 §5 |
 | 특정 구간에서 자막이 대거 미번역(원문 그대로) | 대사 자체가 숫자인 장면(카운트다운 등) → `srt.ts` `[N]` 표식(§7·§9, `decisions.md` §2-1)이 이미 방지함. 그래도 재발하면 그 청크의 `matched`/`unmatched` 로그 확인 |
 | 청크가 대화 중간을 자름 | `srt.ts` (`chunkSrtBlocksAtGaps` 파라미터) |
