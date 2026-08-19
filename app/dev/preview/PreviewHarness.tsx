@@ -132,9 +132,9 @@ export function PreviewHarness() {
             : 'w-full max-w-[840px] mx-auto px-5 sm:px-10 pt-4 sm:pt-16 pb-20'
         }
       >
-        {screen === 'landing' && (
-          <LandingPage onSignIn={noop} error='' configured />
-        )}
+        {/* Props gone: the landing owns its own sign-in and error banner
+            now (LandingPage.tsx), so the harness just mounts it. */}
+        {screen === 'landing' && <LandingPage />}
 
         {(screen === 'upload' || screen === 'upload:uploading') && (
           <UploadStep
