@@ -373,15 +373,17 @@ export const COPY = {
     dropFormats: '지원 포맷: .srt, .vtt, .ass, .smi',
     working: '규칙을 적용하는 중…',
     doneTitle: '규칙을 적용했습니다',
-    /** 요약 한 줄. 0인 항목은 호출부가 걸러낸다. */
-    summary: (parts: string[]) => parts.join(' · '),
-    countSplit: (n: number) => `긴 줄 ${n}개 분할`,
-    countPunctuation: (n: number) => `문장부호 ${n}개 정리`,
-    countMerged: (n: number) => `${n}줄 병합`,
-    countEllipsis: (n: number) => `말줄임표 ${n}개 통일`,
-    countJoined: (n: number) => `${n}개 한 줄로 병합`,
-    countSpeaker: (n: number) => `화자 ${n}개 분리`,
-    unsplit: (n: number) => `${n}개 자막은 나누지 못했습니다`,
+    // 요약은 **행동할 수 있는 것에만 숫자를 붙인다.** 마침표를 12개 뗐는지
+    // 13개 뗐는지는 아무도 안 궁금하고, 그런 숫자가 섞이면 정작 중요한
+    // "몇 개를 나눴나"가 묻힌다. 또 `enforceTextRules`의 report는 항목마다
+    // 세는 단위가 다르므로(linesMerged는 줄, linesJoined는 자막) 자막 단위로
+    // 셀 수 있는 것만 숫자를 보여주고 나머지는 뭉뚱그린다 — 단위를 섞어
+    // 보여주면 읽는 사람이 같은 걸 센다고 오해한다(2026-08-19 사용자 피드백).
+    splitLine: (n: number) => `긴 자막 ${n}개를 두 줄로 나눴습니다`,
+    joinedLine: (n: number) =>
+      `두 줄로 나뉘어 있던 짧은 자막 ${n}개는 한 줄로 합쳤습니다`,
+    tidiedLine:
+      '그 밖에 문장 끝 마침표, 말줄임표 표기, 세 줄 넘는 자막도 규칙에 맞게 정리했습니다',
     nothingToDo: '고칠 것이 없었습니다. 이미 규칙에 맞는 자막입니다.',
     download: '내려받기',
     downloadAs: (extension: string) => `.${extension}로 내려받기`,

@@ -11,20 +11,30 @@ interface PolishDoneStepProps {
   onStartOver: () => void;
 }
 
-/** 0인 항목은 문장에서 빠진다 — "0개 병합"은 정보가 아니라 소음이다. */
-function summaryParts(summary: PolishSummary): string[] {
+/**
+ * 무슨 일이 일어났는지 사람 말로 적는다.
+ *
+ * 자막 단위로 셀 수 있는 둘(나눔·합침)만 숫자를 달고, 나머지 손질(마침표·
+ * 말줄임표·3줄 접기)은 한 줄로 뭉친다. `enforceTextRules`의 report는 항목마다
+ * 단위가 달라서(`linesMerged`는 줄, `linesJoined`는 자막) 그대로 나열하면
+ * 읽는 사람이 같은 걸 센다고 오해한다.
+ */
+function changeLines(summary: PolishSummary): string[] {
   const c = COPY.polish;
-  const parts: string[] = [];
-  if (summary.linesSplit > 0) parts.push(c.countSplit(summary.linesSplit));
-  if (summary.trailingPunctuationStripped > 0)
-    parts.push(c.countPunctuation(summary.trailingPunctuationStripped));
-  if (summary.linesMerged > 0) parts.push(c.countMerged(summary.linesMerged));
-  if (summary.ellipsisNormalized > 0)
-    parts.push(c.countEllipsis(summary.ellipsisNormalized));
-  if (summary.linesJoined > 0) parts.push(c.countJoined(summary.linesJoined));
-  if (summary.speakerLinesSplit > 0)
-    parts.push(c.countSpeaker(summary.speakerLinesSplit));
-  return parts;
+  const lines: string[] = [];
+
+  if (summary.linesSplit > 0) lines.push(c.splitLine(summary.linesSplit));
+  if (summary.linesJoined > 0) lines.push(c.joinedLine(summary.linesJoined));
+
+  const tidied =
+    summary.trailingPunctuationStripped +
+    summary.ellipsisNormalized +
+    summary.linesMerged +
+    summary.midLinePeriodsToCommas +
+    summary.speakerLinesSplit;
+  if (tidied > 0) lines.push(c.tidiedLine);
+
+  return lines;
 }
 
 export function PolishDoneStep({
@@ -32,24 +42,29 @@ export function PolishDoneStep({
   downloads,
   onStartOver,
 }: PolishDoneStepProps) {
-  const parts = summaryParts(summary);
+  const lines = changeLines(summary);
   const [primary, ...alternates] = downloads;
 
   return (
     <div className='animate-zslide'>
       <div className='head text-center mb-7'>
         <h1>{COPY.polish.doneTitle}</h1>
-        <p>
-          {parts.length > 0
-            ? COPY.polish.summary(parts)
-            : COPY.polish.nothingToDo}
-        </p>
-        {/* 나누지 못한 자막을 숨기지 않는다 — 결과를 그대로 쓸 사람에게
-            "여기는 아직 길다"는 사실이 필요하다. */}
-        {summary.unsplitLines > 0 && (
-          <p className='text-fineprint text-secondary mt-2'>
-            {COPY.polish.unsplit(summary.unsplitLines)}
-          </p>
+      </div>
+
+      <div className='card p-[22px] mb-4'>
+        {lines.length > 0 ? (
+          <ul className='flex flex-col gap-2'>
+            {lines.map((line) => (
+              <li key={line} className='text-sm text-ink flex gap-2'>
+                <span aria-hidden className='text-secondary'>
+                  ·
+                </span>
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className='text-sm text-secondary'>{COPY.polish.nothingToDo}</p>
         )}
       </div>
 

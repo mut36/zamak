@@ -82,7 +82,14 @@ export function spliceBlocks(fullSrt: string, rebuiltSubset: string): string {
 export interface PolishSummary extends TextRuleReport {
   /** 상한을 넘었다가 실제로 해소된 블록 수. */
   linesSplit: number;
-  /** 상한을 넘었는데 끝내 안 나뉜 블록 수(청크 실패 등). */
+  /**
+   * 상한을 넘었는데 끝내 안 나뉜 블록 수(청크 실패, 끊을 자리 없음 등).
+   *
+   * **화면에 안 띄운다**(2026-08-19 제품 결정). 개수만 알려주고 어느 자막인지는
+   * 못 알려주는 고지는 불안만 주고 행동은 못 하게 한다 — 띄우려면 번호까지
+   * 같이 줘야 한다. 지금은 `linesSplit`을 구하는 데 쓰이고, 파이프라인이
+   * 제대로 도는지 보는 테스트 신호로 남아 있다(`polish.test.ts`).
+   */
   unsplitLines: number;
 }
 
