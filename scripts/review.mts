@@ -228,11 +228,32 @@ if (P.limit > 0) sourceChunks = sourceChunks.slice(0, P.limit);
 
 const system = buildSystemPrompt();
 
+const THINKING = thinkingLevelForModel(P.model);
+/**
+ * Pro below HIGH does not measure anything we can act on.
+ *
+ * decisions.md §2-15: the 2026-07-28 lever-1 experiment had the owner read
+ * whole translations by eye and conclude that LOW and MEDIUM are
+ * indistinguishable while HIGH is decisively better. That is a human quality
+ * judgement, not a token statistic, so a cheap LOW run cannot overturn it — it
+ * can only produce a cost table whose premise is already void. Cut the sample
+ * (`limit=`) when a run is too expensive, never the thinking level.
+ */
+const INVALID_TIER = P.model === PRO_MODEL && THINKING !== 'HIGH';
+
 console.log(
   `review: ${blocks.length} blocks → ${sourceChunks.length} chunks ` +
     `(size ${P_CHUNK}, concurrency ${SERVER_CONCURRENCY}), model ${P.model} ` +
-    `thinking ${thinkingLevelForModel(P.model)}`,
+    `thinking ${THINKING}`,
 );
+if (INVALID_TIER) {
+  console.log(
+    `\n⚠️  Pro를 ${THINKING}로 돌리고 있다. decisions.md §2-15 — Pro는 HIGH가 아니면\n` +
+      '    품질 판단의 근거가 되지 못한다(LOW·MEDIUM은 대표 육안 검수에서 차이 없음).\n' +
+      '    비용이 문제면 thinking이 아니라 limit=으로 표본을 줄일 것.\n' +
+      '    이 런의 리포트에는 무효 표시가 박힌다.\n',
+  );
+}
 
 const startedAt = Date.now();
 let apiFailures = 0;
@@ -403,7 +424,16 @@ writeFileSync(
     `# 검수 패스 리포트 — ${stem}`,
     '',
     `- 1차 번역: \`${P.translated}\`${P.source ? ` · 원문: \`${P.source}\`` : ''}`,
-    `- 검수 모델: \`${P.model}\` · thinking \`${thinkingLevelForModel(P.model)}\` · 청크 ${P_CHUNK}`,
+    `- 검수 모델: \`${P.model}\` · thinking \`${THINKING}\` · 청크 ${P_CHUNK}`,
+    ...(INVALID_TIER
+      ? [
+          '',
+          `> ⚠️ **이 런은 판단 근거가 될 수 없다.** Pro를 \`${THINKING}\`로 돌렸는데,`,
+          '> `decisions.md` §2-15에서 Pro는 HIGH가 아니면 품질이 안 나온다고 이미',
+          '> 결론났다(LOW·MEDIUM은 대표 육안 검수에서 차이 없음). 아래 비용표는',
+          '> 전제가 무효라 표 전체가 무효다.',
+        ]
+      : []),
     `- 블록 ${before.size}개(청크 ${sourceChunks.length}) · ${seconds.toFixed(1)}s · API실패 ${apiFailures} · 게으름 재요청 ${lazyRetries}회 (thinking < ${P_MIN_THINKING})`,
     `- **채점 대상 ${scored}블록** (모델이 답하지 않은 ${unscored.size}블록은 제외 — 1차 폴백이라 모델을 평가할 수 없다)`,
     '',
