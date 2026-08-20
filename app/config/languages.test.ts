@@ -54,7 +54,7 @@ describe('subtitle shapes (language × content profile)', () => {
     for (const lang of TARGET_LANGS) {
       expect(lang.lineMaxChars).toBeGreaterThan(0);
     }
-    expect(TARGET_LANGS[0].lineMaxChars).toBe(19);
+    expect(TARGET_LANGS[0].lineMaxChars).toBe(18);
   });
 
   it('keeps the ceiling above the target in every shape', () => {

@@ -87,7 +87,7 @@ export interface TargetLang {
   /**
    * Per-line character budget, in visible characters (spaces and punctuation
    * count; markup does not). CJK glyphs carry far more meaning per character
-   * than Latin ones, hence ~19 vs ~42. This is deliberately **not** part of
+   * than Latin ones, hence ~18 vs ~42. This is deliberately **not** part of
    * the content profile: a shorter line changes the translation itself (more
    * splitting and compression), where the profile is only meant to change how
    * long a finished line stays on screen.
@@ -151,7 +151,7 @@ export const TARGET_LANGS: TargetLang[] = [
     mono: 'KO',
     enabled: true,
     promptLabel: '한국어',
-    lineMaxChars: 19,
+    lineMaxChars: 18,
     formality: { formal: '존댓말', informal: '반말', mixed: '혼용' },
     trailingPunctuation: '.,',
     ellipsis: '…',

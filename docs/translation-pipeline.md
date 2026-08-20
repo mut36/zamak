@@ -515,13 +515,14 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   AI는 `|`로 **끊을 지점만 지정**하고 실제 줄바꿈은 코드가 수행한다. 코드의 2줄 상한은
   "AI가 `|`를 두 개 이상 넣었을 때의 안전망"이다.
   **한국어 규칙 2에는 두 개의 수가 있다**: 권장선 **16자**(Netflix 한국어 기준,
-  공백·문장부호 포함, 프롬프트에만 존재)와 강제선 **`lineMaxChars` 19자**
-  (= 16 + 3, `languages.ts`). 16자는 코드가 모르는 권유이므로 "번역문을 짧게
-  쓰라"는 압력일 뿐 줄 수를 정하지 않는다. 실제로 나뉘는 지점은 19자다.
-  **접기(`linesJoined`)도 같은 19자로 판정**하므로, 접은 결과가 프롬프트라면
+  공백·문장부호 포함, 프롬프트에만 존재)와 강제선 **`lineMaxChars` 18자**
+  (`languages.ts`). 16자는 코드가 모르는 권유이므로 "번역문을 짧게
+  쓰라"는 압력일 뿐 줄 수를 정하지 않는다. 실제로 나뉘는 지점은 18자다.
+  **접기(`linesJoined`)도 같은 18자로 판정**하므로, 접은 결과가 프롬프트라면
   나눠야 했을 줄이 되는 일은 없다 — 한 상수가 분할 트리거와 접기 예산을 겸한다.
   19자를 고른 근거(압축 필요 블록 4.9%→0.9%)와 ⚠️ 측정에 쓴 샘플이 전문가 자막이
-  아니라 **우리 이전 출력**이라는 점은 `decisions.md` §2-6.
+  아니라 **우리 이전 출력**이라는 점, 그리고 이후 18자로 내린 것(재측정 없이)은
+  `decisions.md` §2-6.
 - **스타일 태그 위치·의미 유지**(`translation_rules_<code>.txt` 규칙 6)는 스코프에서
   제외: 출력만 보고 고칠 수 있는 말줄임표·2줄 상한과 달리, 원본 블록과 번역 블록을
   태그 단위로 비교해야 판단이 서서 성격이 다르다 — 검토는 했으나(`decisions.md`
@@ -675,8 +676,8 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 존댓말/반말·인물 말투가 안 맞음(말투 축이 있는 언어) | 먼저 TranslateSettingsStep의 "등장인물·용어 일관성" 토글을 켜봤는지 확인(§2-C, 기본 OFF) — 켰다면 `cast_sheet_extraction.txt` 또는 `CastSheetCard`에서 직접 관계 수정. 안 켰거나 그래도 안 맞으면 `translation_rules_ko.txt`, (cinematic) `cinematic_translation_philosophy_ko.txt`, `TranslateSettingsStep`에서 사람이 톤 입력 |
 | 같은 이름이 청크마다 다르게 번역됨(표기 흔들림) | TranslateSettingsStep 토글을 켜지 않았으면 그게 원인(§2-C, 기본 OFF). 켰는데도 흔들리면 `extractCastSheet.ts` `sanitizeCastSheet`(환각 필터로 그 이름이 버려졌을 수 있음) 또는 `CastSheetCard`에서 직접 추가 |
 | 감정/뉘앙스가 밋밋함 | `cinematic_translation_philosophy_ko.txt` (+ 스타일을 cinematic로) |
-| 줄이 19자 넘는데 안 나뉨(의미 단위 줄바꿈) | `translation_rules_ko.txt` 규칙 2 — AI가 `|`로 끊을 지점만 지정, 실제 줄바꿈은 코드. 끊을 위치 판단은 프롬프트로만 유도(§9.7 스코프 밖) |
-| 줄이 16자를 넘음 | 19자까지는 정상 — 16자는 규칙 2의 **권장선**이고 강제선은 `lineMaxChars` **19자**다(§9.7, `decisions.md` §2-6). 19자를 넘으면 그때가 규칙 2 위반 |
+| 줄이 18자 넘는데 안 나뉨(의미 단위 줄바꿈) | `translation_rules_ko.txt` 규칙 2 — AI가 `|`로 끊을 지점만 지정, 실제 줄바꿈은 코드. 끊을 위치 판단은 프롬프트로만 유도(§9.7 스코프 밖) |
+| 줄이 16자를 넘음 | 18자까지는 정상 — 16자는 규칙 2의 **권장선**이고 강제선은 `lineMaxChars` **18자**다(§9.7, `decisions.md` §2-6). 18자를 넘으면 그때가 규칙 2 위반 |
 | 마침표·쉼표가 줄 끝에 남아 있음 / 3줄 이상 나옴 / `...`가 `…`로 안 바뀜 | `srt.ts` (`enforceTextRules`) — 이 셋은 코드가 강제하므로 재발하면 버그. `decisions.md` §2-8 — §9.7 |
 | 말줄임표 표기를 도착어별로 바꾸고 싶음 | `languages.ts`의 그 언어 행 `ellipsis` 한 줄. 배선(`TextRuleOptions.ellipsis`)은 언어 중립이라 코드는 안 건드려도 된다 — §9.7, `decisions.md` §6-13 |
 | 한 줄 안에 문장 마침표가 남아 있음 (`압니다. 결혼식에`) | `srt.ts` (`enforceTextRules`의 `midLinePeriodsToCommas`) — 한글 음절 뒤 `.`만 쉼표로 바꾼다. 소수·라틴 약어는 정상. `trailingPunctuation`에 `.`가 없는 도착어는 안 고친다 — §9.7 |
@@ -686,7 +687,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 자막 본문에 `|`가 그대로 보임 | 재조립을 안 거친 산출물이거나(하네스 원본 등) `|`가 두 개 이상이라 2줄 상한에 걸린 경우 → `srt.ts` `indexTranslatedBodies`, `enforceTextRules` |
 | 블록이 합쳐져 나옴(한 자막에 두 자막 내용) | 한 번호 = 한 줄 위반이라 블록 수 불일치로 잡힌다. 규칙 1·2를 확인하고, 재발하면 `decisions.md` §2-1 (3)의 실측 절차대로 하네스로 재현 |
 | 이웃 자막 본문에 `[N me]` 같은 깨진 마커가 끼어 있고 그 번호는 원문 폴백 | 모델이 마커 안에 잡텍스트를 섞음 → `srt.ts` `MARKER_LINE`이 `[숫자…]`를 흡수함(`decisions.md` §2-1·§2-3-3). 재발 시 정규식·`srt.test.ts` 회귀 확인 |
-| /polish가 긴 줄을 안 나눔 | 먼저 초과 줄이 실제로 있는지 확인 — 19자 이하면 AI를 안 부르는 게 정상이다(§9.8의 4번). 있는데도 그대로면 `prompts/common/line_split_ko.txt` 또는 청크 실패 → 응답의 `failedChunks`, 완료 화면의 "N개 자막은 나누지 못했습니다" |
+| /polish가 긴 줄을 안 나눔 | 먼저 초과 줄이 실제로 있는지 확인 — 18자 이하면 AI를 안 부르는 게 정상이다(§9.8의 4번). 있는데도 그대로면 `prompts/common/line_split_ko.txt` 또는 청크 실패 → 응답의 `failedChunks`, 완료 화면의 "N개 자막은 나누지 못했습니다" |
 | /polish에서 "오늘 사용할 수 있는 횟수를 모두 썼습니다" | 정상 — `RATE_LIMITS.polish`(하루 5회). 크레딧을 안 쓰는 라우트라 이 한도가 유일한 천장이다 — §9.8 |
 | /polish 결과의 타임코드가 원본과 다름 | **버그다.** 이 경로에는 타임스탬프를 쓰는 코드가 없다(§9.8) — `spliceBlocks`나 포맷 어댑터(`app/lib/subtitles/`)를 의심할 것 |
 | 자막이 밀림(번호 재배열) | 청크 크기 ↓ `constants.ts` `SERVER_CHUNK_SIZE` (**≥300 금지**), 재조립 `srt.ts`. 조절 절차는 위 §5 |

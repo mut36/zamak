@@ -13,7 +13,7 @@ import {
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '1.4.5';
+export const APP_VERSION = '1.4.6';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
@@ -627,6 +627,18 @@ export const MIN_SUBTITLE_DURATION_MS = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_MIN_SUBTITLE_DURATION_MS,
   800,
 );
+
+/**
+ * 규칙 적용(`/polish`) 화면에서 사용자가 **직접** 고를 수 있는 CPS 범위.
+ *
+ * 위 `shapes`(languages.ts)가 튜닝된 기본값이라면 이쪽은 그 밖으로 나가고 싶은
+ * 사람을 위한 난간이다. 4 아래는 한 줄이 몇 초씩 떠 있어 다음 대사를 밀어내고,
+ * 20 위는 한국어로는 사실상 못 읽는다(Netflix 한국어 성인 상한 12,
+ * `docs/standards/netflix-korean-subtitles.md`). 고른 두 값은 언제나
+ * 최소 < 최대여야 한다 — 같거나 뒤집히면 "상한을 넘은 것을 상한 위로
+ * 늦춘다"는 모순이 된다.
+ */
+export const CPS_USER_RANGE = { min: 4, max: 20 } as const;
 
 /**
  * Reading speed depends on two things: the script (a Latin line carries far

@@ -48,8 +48,8 @@
 **이미 잘 맞는 축**: 말줄임표 `…`, 줄 끝 `.`/`,` 제거, 최대 2줄, 성인 CPS 12,
 이중 화자 `- … \| - …` 형식, 존댓말/반말(규칙 + opt-in 글로사리).
 
-**의도적으로 Netflix와 다른 축**: 줄 길이 19자(권장선은 Netflix와 같은 16자, 강제선만
-+3자), 원본 이탤릭/스타일 태그 보존.
+**의도적으로 Netflix와 다른 축**: 줄 길이 18자(권장선은 Netflix와 같은 16자, 강제선만
++2자), 원본 이탤릭/스타일 태그 보존.
 
 **제품 스코프 밖**: 폰트·FN 제작·다큐 권리·KNP 승인 제목 납품 절차.
 
@@ -70,8 +70,8 @@
 | | |
 |---|---|
 | Netflix | 줄당 16자. 라틴·공백·부호 = 0.5자 |
-| ZAMAK | 권장선 **16자**(프롬프트 규칙 2, Netflix와 동일) + 강제선 `lineMaxChars: 19` (`languages.ts`). 모델에게 주는 예산이자 `enforceTextRules` 접기 판정값. **글자 가중치 0.5 없음** (전부 1자로 취급하는 CPS·길이 계산) |
-| 근거 | `decisions.md` §2-6 — 16자를 강제하면 압축 필요 블록 4.9%, +3자면 0.9%(실측 1,126블록). 이전 25자는 CPS_TARGET 10자/초 × ~2.5초 유도였다. `docs/tuning/reading-speed.md` |
+| ZAMAK | 권장선 **16자**(프롬프트 규칙 2, Netflix와 동일) + 강제선 `lineMaxChars: 18` (`languages.ts`). 모델에게 주는 예산이자 `enforceTextRules` 접기 판정값. **글자 가중치 0.5 없음** (전부 1자로 취급하는 CPS·길이 계산) |
+| 근거 | `decisions.md` §2-6 — 16자를 강제하면 압축 필요 블록 4.9%, 19자면 0.9%(실측 1,126블록). 이전 25자는 CPS_TARGET 10자/초 × ~2.5초 유도였다. 19자 → 18자는 2026-08-21에 재측정 없이 더 내렸다. `docs/tuning/reading-speed.md` |
 
 ### I.3 인물·캐릭터 이름 — 미준수·미커버
 
@@ -216,7 +216,7 @@ philosophy compression: 불필요한 반복 생략 **가능**이라고만 함. �
 | Netflix에 가까운 동작 | ZAMAK 위치 |
 |---|---|
 | `…` 정규화, 2줄 상한, 줄 끝 `.,` 제거 | `app/lib/srt.ts` `enforceTextRules` |
-| 줄 길이 가이드(25), 이중 화자 형식, 존대 | `prompts/common/translation_rules_ko.txt` + `languages.ts` |
+| 줄 길이 가이드(권장 16 / 강제 18), 이중 화자 형식, 존대 | `prompts/common/translation_rules_ko.txt` + `languages.ts` |
 | 성인 12 CPS 타이밍 확장 | `adjustSubtitleTiming` + `TargetLang.reading` |
 | 말투·고유명 일관성(opt-in) | `/api/glossary`, `extractCastSheet`, `<glossary>` / `<speech_relations>` |
 | 의미·톤·압축 철학 | `cinematic_translation_philosophy_ko.txt` |

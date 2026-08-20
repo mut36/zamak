@@ -278,7 +278,7 @@ export const COPY = {
     // `computeCps`(공백 포함, 태그 제외) 방식으로 계산한 값이다.
     //
     // ⚠️ 한 줄 자수는 여기에 없다 — 프로필이 아니라 도착어가 정한다
-    // (`lineMaxChars`, 한국어 19자). 프로필이 바꾸는 건 **노출 시간**뿐이므로
+    // (`lineMaxChars`, 한국어 18자). 프로필이 바꾸는 건 **노출 시간**뿐이므로
     // `action`도 그 얘기만 해야 한다(decisions.md §1-19).
     // 표가 바뀌면 여기도 같은 커밋에서 고칠 것 — 어긋나면
     // `simpleCopy.test.ts`가 잡는다.
@@ -368,7 +368,7 @@ export const COPY = {
   polish: {
     navLink: '규칙 적용',
     title: '자막 규칙 적용',
-    sub: '이미 번역된 한국어 자막을 방송 표기 규칙에 맞게 다듬어 드립니다.\n번역은 하지 않고, 타임코드도 손대지 않습니다.',
+    sub: '이미 번역된 한국어 자막을 방송 표기 규칙에 맞게 다듬어 드립니다.\n번역은 하지 않고, 타임코드는 아래를 켰을 때만 손댑니다.',
     dropButton: '자막 파일 선택',
     dropFormats: '지원 포맷: .srt, .vtt, .ass, .smi',
     working: '규칙을 적용하는 중…',
@@ -392,6 +392,31 @@ export const COPY = {
       '오늘 사용할 수 있는 횟수를 모두 썼습니다. 내일 다시 시도해 주세요.',
     tooLarge: '파일이 너무 큽니다. 더 짧은 자막으로 시도해 주세요.',
     failed: '규칙 적용에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+
+    // 읽기 속도(CPS) 조정 — **기본 OFF의 opt-in**. 이 화면의 원래 약속이
+    // "타임코드를 안 건드린다"였으므로, 켜지 않은 사람에게는 지금까지와
+    // 똑같이 동작해야 한다(`applySubtitleRules`의 `timing` 인자).
+    //
+    // 화면에서 쓰는 "최소·최대"는 엔진의 `cpsTarget`·`cpsHardMax`다. 최대는
+    // **손댈지 말지를 가르는 선**이고 최소는 **손댄 자막이 내려앉는 자리**라,
+    // 최소는 하한 보장이 아니다 — 원래 그보다 느린 자막은 그대로 둔다.
+    // `bandNote`가 그 동작을 그대로 풀어 쓰는 이유다.
+    timing: {
+      title: '노출 시간도 읽기 속도에 맞추기',
+      desc: '너무 빨리 지나가는 자막을 앞뒤 여백 안에서만 늘립니다',
+      presetLabel: '영상 종류',
+      presetMovie: '영화 · 드라마',
+      presetVariety: '예능 · 유튜브',
+      presetTalk: '강연 · 토크쇼',
+      presetCustom: '직접 설정',
+      minLabel: '최소 CPS',
+      maxLabel: '최대 CPS',
+      unit: (n: number) => `초당 ${n}자`,
+      bandNote: (min: number, max: number) =>
+        `초당 ${max}자보다 빨리 지나가는 자막을 초당 ${min}자까지 늦춥니다. 원래 그보다 느린 자막과 대사 순서는 건드리지 않습니다.`,
+      invalid: '최소 CPS는 최대 CPS보다 작아야 합니다.',
+    },
+    timingLine: (n: number) => `자막 ${n}개의 노출 시간을 늘렸습니다`,
   },
 
   credits: {

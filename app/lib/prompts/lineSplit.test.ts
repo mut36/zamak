@@ -7,9 +7,9 @@ vi.mock('server-only', () => ({}));
 import { composeLineSplitPrompt } from './lineSplit';
 
 describe('composeLineSplitPrompt', () => {
-  it('한국어의 lineMaxChars(19)를 렌더한다', async () => {
+  it('한국어의 lineMaxChars(18)를 렌더한다', async () => {
     const prompt = await composeLineSplitPrompt('ko');
-    expect(prompt).toContain('19자');
+    expect(prompt).toContain('18자');
   });
 
   it('렌더되지 않은 자리표시자를 남기지 않는다', async () => {
