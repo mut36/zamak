@@ -1880,6 +1880,159 @@ EOF
 
 ---
 
+## Task 11-B: 내레이션 문체를 프리패스가 판정한다 (2026-08-21 추가)
+
+**대표 요청**: 내레이션·편지 낭독이 해요체(`~해요`/`~예요`)로 나오는 일이 잦다.
+`~니다`체를 원한다.
+
+**왜 규칙만으로는 부족한가**: 규칙 한 줄이면 각 청크가 알아서 판단하는데, 그러면
+**1번 청크는 편지를 낭독으로 읽고 3번 청크는 서술로 읽을** 수 있다. 청크 간
+불일치는 글로사리가 존재하는 바로 그 이유다. 그리고 내레이션이 아예 없는
+작품에는 그 지시가 붙을 이유가 없다(대표 지적).
+
+**그래서 두 층으로 나눈다.**
+
+| 층 | 내용 | 적용 범위 |
+|---|---|---|
+| 규칙 파일 한 줄 | 대화가 아닌 글에 **해요체 금지** | 라이트 포함 **모든** 번역 |
+| 프리패스 판정 | 이 작품의 내레이션이 **어느 쪽인지** | 프로만 |
+
+라이트에는 추출이 안 도니 판정이 없다. 그런데 해요체 내레이션은 라이트에서도
+결함이므로, "잘못된 것만 막는" 한 줄은 상시로 둔다. 역할이 겹치지 않는다.
+
+**Files:**
+- Modify: `prompts/common/translation_rules_ko.txt` (한국어만 — 해요체는 한국어 구분)
+- Modify: `prompts/common/cast_sheet_extraction.txt` (할 일 3)
+- Modify: `app/types/glossary.ts` (`CastSheet.narration`)
+- Modify: `app/lib/server/extractCastSheet.ts` (스키마 2종 + `sanitizeCastSheet`)
+- Modify: `app/lib/server/requestValidation.ts` (`parseCastSheet`)
+- Modify: `app/lib/prompts/glossaryContent.ts` (조건부 렌더)
+- Modify: `app/components/simple/SpeechRelationsTab.tsx` + `app/i18n/simpleCopy.ts` (셀렉트)
+- Test: `extractCastSheet.test.ts`, `glossaryContent.test.ts`, `requestValidation.test.ts`
+
+- [ ] **Step 1: 타입에 필드를 추가한다**
+
+`app/types/glossary.ts`:
+
+```ts
+/**
+ * 이 작품에 대화가 아닌 낭독(내레이션·편지·일기·안내방송)이 나오는가, 나온다면
+ * 어느 결인가. 청크마다 따로 판단하면 1번 청크는 낭독으로 3번 청크는 서술로
+ * 읽어 문체가 갈리므로, 표기·말투와 같은 이유로 파일당 한 번 정한다.
+ *
+ * - `none`     — 없음. 프롬프트에 아무것도 붙지 않는다.
+ * - `formal`   — 청자를 향한 낭독(다큐 해설·뉴스·안내방송·남에게 읽어주는 편지) → ~습니다
+ * - `literary` — 혼자 하는 서술(1인칭 회상·일기·속마음) → ~다
+ * - `mixed`    — 둘 다 나옴. 구분해 쓰라고만 이른다.
+ */
+export type NarrationStyle = 'none' | 'formal' | 'literary' | 'mixed';
+
+export const NARRATION_STYLES: NarrationStyle[] = [
+  'none',
+  'formal',
+  'literary',
+  'mixed',
+];
+```
+
+`CastSheet`에 `narration: NarrationStyle;`을 추가하고 `EMPTY_CAST_SHEET`에
+`narration: 'none'`을 넣는다. **필수 필드로 두면** 넣는 것을 잊은 자리를 tsc가
+전부 잡아준다.
+
+- [ ] **Step 2: 추출 프롬프트에 할 일 3을 넣는다**
+
+`prompts/common/cast_sheet_extraction.txt`의 `[공통]` **앞**에:
+
+```
+[할 일 3 — 내레이션 문체(narration)]
+- 대사가 아닌 글을 소리 내어 읽거나 화면에 띄우는 대목이 있는지 봐. 다큐 해설,
+  뉴스·안내방송, 편지·일기 낭독, 1인칭 회상 같은 것.
+- 없으면 "none". 있으면 어느 쪽인지 하나 골라:
+  - "formal"  — 듣는 사람을 향해 읽어주는 글(해설·뉴스·안내·남에게 보내는 편지)
+  - "literary" — 혼자 하는 서술(1인칭 회상·일기·속마음)
+  - "mixed"   — 둘 다 뚜렷하게 나옴
+- 애매하면 "none"을 골라. 틀린 지정은 없는 것만 못하다.
+```
+
+마지막 줄이 중요하다 — 잘못된 판정은 파일 전체의 문체를 틀리게 만든다.
+
+- [ ] **Step 3: 두 스키마에 필드를 추가한다**
+
+`extractCastSheet.ts`의 `CAST_SHEET_SCHEMA`(Gemini)와
+`CAST_SHEET_JSON_SCHEMA`(OpenAI strict) **둘 다**에 `narration`을 넣고 `required`에
+추가한다. OpenAI strict는 모든 속성이 required여야 한다.
+
+```ts
+narration: { type: Type.STRING, enum: NARRATION_STYLES },   // Gemini
+narration: { type: 'string', enum: [...NARRATION_STYLES] }, // OpenAI
+```
+
+- [ ] **Step 4: sanitize에서 검증한다**
+
+`sanitizeCastSheet`의 반환을 `{ terms, relations, narration }`으로 바꾸고:
+
+```ts
+  // 모르는 값은 'none'으로 떨어뜨린다 — 안 붙는 쪽이 안전하다. 틀린 문체 지정은
+  // 파일 전체를 망치지만, 없으면 규칙 파일의 "해요체 금지" 한 줄이 받아준다.
+  const narration = NARRATION_STYLES.includes(raw.narration as NarrationStyle)
+    ? (raw.narration as NarrationStyle)
+    : 'none';
+```
+
+- [ ] **Step 5: 서버 재검증에도 같은 규칙**
+
+`requestValidation.ts`의 `parseCastSheet`가 같은 방식으로 `narration`을 통과시킨다
+(모르는 값 → `'none'`).
+
+- [ ] **Step 6: 조건부로 렌더한다**
+
+`glossaryContent.ts`의 `GlossaryTags`에 `narration: string`을 더하고, `'none'`이면
+빈 문자열을 돌려준다. 문구는 `app/i18n`이 아니라 **프롬프트 쪽**에 둔다(화면 문구가
+아니다):
+
+```ts
+const NARRATION_LINE: Record<Exclude<NarrationStyle, 'none'>, string> = {
+  formal: '이 작품의 내레이션·낭독은 듣는 사람을 향한 글이다. ~습니다/~입니다로 끝내라.',
+  literary: '이 작품의 내레이션은 혼자 하는 서술이다. ~다로 끝내라(해요체·습니다체 금지).',
+  mixed:
+    '이 작품에는 두 결의 내레이션이 있다. 듣는 사람을 향한 낭독은 ~습니다, 혼자 하는 서술은 ~다로 끝내라.',
+};
+```
+
+composer가 이 줄을 유저 턴의 `<speech_relations>` **뒤**에 붙인다. 태그가 아니라
+한 줄이므로 `<narration>` 태그를 새로 만들지 않는다 — 신뢰 경계에 이름을 하나
+더 추가하면 시스템 프롬프트 4행도 같이 고쳐야 한다.
+
+> ⚠️ **지시문(`glossary_directive.txt`)은 건드리지 말 것.** 그 파일은 네 줄로
+> 묶여 있고 그 길이가 설계의 일부다(스펙 §2-3). 내레이션 줄은 데이터 쪽에 붙는다.
+
+- [ ] **Step 7: 규칙 파일에 상시 한 줄**
+
+`prompts/common/translation_rules_ko.txt` 끝에 (번호는 9):
+
+```
+9. 내레이션·편지·낭독처럼 대화가 아닌 글에 해요체(~해요, ~예요)를 쓰지 마.
+```
+
+**한국어 파일에만** 넣는다. 해요체/습니다체 구분은 한국어에만 있다.
+
+- [ ] **Step 8: 편집 카드에 셀렉트 하나**
+
+`SpeechRelationsTab` 맨 위(안내문 아래)에 `narration` 셀렉트를 둔다. 번역 AI가
+이 값을 따르므로 사람이 고칠 수 있어야 한다 — 말투 관계와 같은 이유다.
+`COPY.info.castSheet`에 라벨과 네 값의 한국어 이름을 넣는다.
+
+- [ ] **Step 9: 테스트**
+
+- `extractCastSheet.test.ts` — 모델이 이상한 값을 주면 `'none'`
+- `glossaryContent.test.ts` — `'none'`이면 빈 문자열, 나머지는 해당 줄
+- `requestValidation.test.ts` — 조작된 값이 `'none'`으로 떨어진다
+- 기존 `composer.test.ts` parity 테스트가 깨지지 않는지 (시트 없으면 여전히 무변화)
+
+- [ ] **Step 10: 전체 검증 후 커밋**
+
+---
+
 ## Task 12: 게이트를 만들고 훅을 파생값으로 바꾼다
 
 **Files:**
@@ -2471,6 +2624,49 @@ Task 7 Step 5와 같은 세 가지(표기 일관성·말투 방향·부작용 �
 - [ ] **Step 6: 발견한 문제를 보고한다**
 
 문제가 있으면 고치고, 없으면 대표에게 완료를 보고한다. **`OPENAI_API_KEY`가 배포 환경에 설정돼 있는지 확인이 필요하다는 것도 함께 보고한다** — 로컬에서 되는 것과 배포에서 되는 것은 다르다.
+
+---
+
+## 진행 중 발견 — 이 계획 밖이지만 기록해 둘 것
+
+작업하다 걸린 것들. 고치지 않았고, 다음 사람이 같은 조사를 반복하지 않게만 적는다.
+
+### F1. `cost-per-block.md`의 luna 단가가 공식 문서와 5배 다르다
+
+| | 리포 문서 | OpenAI 공식 |
+|---|---|---|
+| 입력 | $1.00/1M | **$0.20/1M** |
+| 출력 | $6.00/1M | **$1.20/1M** |
+
+정확히 5배씩 높게 잡혀 있어 "글로사리 프리패스 106원"이 실제로는 21원 안팎일
+수 있다. 방향이 안전한 쪽(과대추정)이라 마진이 위험해지진 않지만, **프로
+손익분기 3,299원과 라이트 팩 재가격 판단이 이 숫자 위에 서 있다.** 캐시 입력
+$0.02/1M도 문서에 없는데, 청크마다 같은 시스템 프롬프트가 나가는 구조라
+의미가 있을 수 있다. 가격 판단이라 손대지 않았다.
+
+### F2. 개발용 Supabase에 `0014_coupons` · `0016_coupon_expiry`가 없다
+
+배포용에는 올라가 있어 두 DB의 스키마가 갈라진 상태다. 지금은 무제한 등록에
+지장이 없지만(0013판 `begin_translation_job`이 만료 조건을 안 본다), 쿠폰 관련
+코드를 로컬에서 만지는 순간 "배포에선 되는데 로컬에선 안 되는" 상황이 된다.
+특히 `0016`은 **만료된 쿠폰의 면제를 끊는** 마이그레이션이라 로컬에서는 만료가
+영원히 안 걸린다.
+
+### F3. `<user_notes>`는 지시를 못 받는다 — 그런데 화면은 반영된다고 약속한다
+
+설정 화면의 `톤앤매너` 칸은 *"번역에 그대로 반영됩니다"*라고 적고 있지만,
+신뢰 경계가 `<user_notes>` 안의 **명령**을 따르지 말라고 한다. `고전적이고
+절제된 어투` 같은 **묘사**는 데이터로 쓰이고, `~니다체로 써라` 같은 **명령**은
+무시된다. 인젝션 방어라 경계를 느슨하게 할 생각은 없지만, 화면 문구와 실제
+동작 사이에 사용자가 알 수 없는 선이 그어져 있다. 문구를 좁히거나
+(Task 11-B처럼) 진짜 설정 항목을 만드는 쪽이 정직하다.
+
+### F4. 하네스가 글로사리 효과를 측정하지 못한다
+
+`prompt-ab.mts`에 `castSheet` 인자가 없어 **글로사리가 번역 결과를 바꾸는지
+숫자로 말할 수 없다.** 이번 검수가 육안에 머문 이유이자, "지시문이 먹혔는가"와
+"시트가 옳았는가"를 가르지 못한 이유다. `glossary-ab.mts`가 뱉는 시트를
+물려주면 추출 → 번역 A/B가 이어진다. 대표 결정으로 이번 범위 밖.
 
 ---
 
