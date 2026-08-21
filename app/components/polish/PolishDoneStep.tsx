@@ -25,6 +25,9 @@ function changeLines(summary: PolishSummary): string[] {
 
   if (summary.linesSplit > 0) lines.push(c.splitLine(summary.linesSplit));
   if (summary.linesJoined > 0) lines.push(c.joinedLine(summary.linesJoined));
+  // 노출 시간은 사용자가 켰을 때만 0이 아니다(`applySubtitleRules`의 timing).
+  if (summary.timingAdjusted > 0)
+    lines.push(c.timingLine(summary.timingAdjusted));
 
   const tidied =
     summary.trailingPunctuationStripped +

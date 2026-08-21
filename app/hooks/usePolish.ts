@@ -1,7 +1,11 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { applySubtitleRules, type PolishSummary } from '../lib/polish';
+import {
+  applySubtitleRules,
+  type PolishSummary,
+  type PolishTimingOptions,
+} from '../lib/polish';
 import { buildDownloads } from '../lib/downloads';
 import { parseSrtBlocks } from '../lib/srt';
 import { loadSubtitleFile, type SubtitleDoc } from '../lib/subtitles';
@@ -36,60 +40,65 @@ export function usePolish() {
     setDownloads([]);
   }, []);
 
-  const handleFile = useCallback(async (file: File) => {
-    setStage('working');
-    setError('');
+  // `timing`이 null이면 타임코드를 아예 안 건드린다 — 업로드 화면의 기본값.
+  const handleFile = useCallback(
+    async (file: File, timing: PolishTimingOptions | null = null) => {
+      setStage('working');
+      setError('');
 
-    // 어떤 포맷이든 정규 SRT로. 파싱 실패는 업로드 화면의 기존 문구를 쓴다.
-    let doc: SubtitleDoc;
-    try {
-      doc = await loadSubtitleFile(file);
-    } catch {
-      setError(COPY.upload.invalidFile);
-      setStage('error');
-      return;
-    }
-
-    const blockCount = parseSrtBlocks(doc.srt).length;
-    if (blockCount === 0) {
-      setError(COPY.upload.noBlocks);
-      setStage('error');
-      return;
-    }
-    if (blockCount > POLISH_MAX_BLOCKS) {
-      setError(COPY.polish.tooLarge);
-      setStage('error');
-      return;
-    }
-
-    try {
-      const outcome = await applySubtitleRules(
-        doc.srt,
-        resolveTargetLang(TARGET_LANG),
-        async (subset) => {
-          const response = await requestLineSplit(subset, TARGET_LANG);
-          return response.content;
-        },
-      );
-
-      setSummary(outcome.summary);
-      setDownloads(
-        buildDownloads(doc, file.name, TARGET_LANG, outcome.content),
-      );
-      setStage('done');
-    } catch (err) {
-      if (err instanceof PolishRefusedError) {
-        setError(
-          err.code === 'file_too_large'
-            ? COPY.polish.tooLarge
-            : COPY.polish.limitReached,
-        );
-      } else {
-        setError(COPY.polish.failed);
+      // 어떤 포맷이든 정규 SRT로. 파싱 실패는 업로드 화면의 기존 문구를 쓴다.
+      let doc: SubtitleDoc;
+      try {
+        doc = await loadSubtitleFile(file);
+      } catch {
+        setError(COPY.upload.invalidFile);
+        setStage('error');
+        return;
       }
-      setStage('error');
-    }
-  }, []);
+
+      const blockCount = parseSrtBlocks(doc.srt).length;
+      if (blockCount === 0) {
+        setError(COPY.upload.noBlocks);
+        setStage('error');
+        return;
+      }
+      if (blockCount > POLISH_MAX_BLOCKS) {
+        setError(COPY.polish.tooLarge);
+        setStage('error');
+        return;
+      }
+
+      try {
+        const outcome = await applySubtitleRules(
+          doc.srt,
+          resolveTargetLang(TARGET_LANG),
+          async (subset) => {
+            const response = await requestLineSplit(subset, TARGET_LANG);
+            return response.content;
+          },
+          timing,
+        );
+
+        setSummary(outcome.summary);
+        setDownloads(
+          buildDownloads(doc, file.name, TARGET_LANG, outcome.content),
+        );
+        setStage('done');
+      } catch (err) {
+        if (err instanceof PolishRefusedError) {
+          setError(
+            err.code === 'file_too_large'
+              ? COPY.polish.tooLarge
+              : COPY.polish.limitReached,
+          );
+        } else {
+          setError(COPY.polish.failed);
+        }
+        setStage('error');
+      }
+    },
+    [],
+  );
 
   return { stage, error, summary, downloads, handleFile, reset };
 }

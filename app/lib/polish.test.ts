@@ -175,4 +175,41 @@ describe('applySubtitleRules', () => {
     expect(content).toContain('00:00:01,000 --> 00:00:01,900');
     expect(content).toContain('00:00:02,000 --> 00:00:02,900');
   });
+
+  // 읽기 속도 밴드(opt-in) — 이 화면에서 타임코드가 바뀔 수 있는 **유일한** 길.
+  describe('timing 옵션', () => {
+    // 0.9초에 12자 = 13.3 CPS. 상한 12를 넘으므로 넓혀야 하는 자막이다.
+    const fast = '열두글자짜리인자막줄이다';
+    const srt = () => [block(1, '짧다'), block(2, fast)].join('\n\n');
+
+    it('안 주면 지금까지와 똑같이 타임코드를 안 건드린다', async () => {
+      const { content, summary } = await applySubtitleRules(srt(), ko, never);
+
+      expect(content).toContain('00:00:02,000 --> 00:00:02,900');
+      expect(summary.timingAdjusted).toBe(0);
+    });
+
+    it('주면 너무 빠른 자막만 넓히고 느린 자막은 그대로 둔다', async () => {
+      const { content, summary } = await applySubtitleRules(srt(), ko, never, {
+        cpsTarget: 10,
+        cpsHardMax: 12,
+      });
+
+      // 2.2 CPS로 읽히는 1번은 손댈 이유가 없다.
+      expect(content).toContain('00:00:01,000 --> 00:00:01,900');
+      expect(content).not.toContain('00:00:02,000 --> 00:00:02,900');
+      expect(summary.timingAdjusted).toBe(1);
+      expect(parseSrtBlocks(content)).toHaveLength(2);
+    });
+
+    it('상한을 올려 잡으면 아무것도 안 넓힌다', async () => {
+      const { content, summary } = await applySubtitleRules(srt(), ko, never, {
+        cpsTarget: 14,
+        cpsHardMax: 16,
+      });
+
+      expect(content).toContain('00:00:02,000 --> 00:00:02,900');
+      expect(summary.timingAdjusted).toBe(0);
+    });
+  });
 });

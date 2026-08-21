@@ -1,4 +1,5 @@
 import {
+  adjustSubtitleTimingWithReport,
   enforceTextRules,
   parseBlockTiming,
   parseSrtBlocks,
@@ -7,6 +8,24 @@ import {
   type TextRuleReport,
 } from './srt';
 import type { TargetLang } from '../config/languages';
+import {
+  MIN_SUBTITLE_DURATION_MS,
+  MIN_SUBTITLE_GAP_MS,
+} from '../config/constants';
+
+/**
+ * 사용자가 고른 읽기 속도 밴드. 없으면(`undefined`) 타임코드를 아예 안 건드린다 —
+ * 이 경로의 기본값이자 원래 약속이다.
+ *
+ * 이름은 화면 문구(최소·최대)가 아니라 엔진의 말로 적는다. 화면에서 말하는
+ * "최대"는 손댈지 말지를 가르는 **발동선**(`cpsHardMax`)이고, "최소"는 손댄
+ * 자막이 내려앉는 **착지점**(`cpsTarget`)이다. 원래 최소보다 느리게 읽히는
+ * 자막은 그대로 둔다 — 이 파이프라인은 노출을 넓히기만 하고 깎지 않는다.
+ */
+export interface PolishTimingOptions {
+  cpsTarget: number;
+  cpsHardMax: number;
+}
 
 export interface OverLongCollection {
   /**
@@ -83,6 +102,11 @@ export interface PolishSummary extends TextRuleReport {
   /** 상한을 넘었다가 실제로 해소된 블록 수. */
   linesSplit: number;
   /**
+   * 노출 시간이 실제로 넓어진 자막 수. 사용자가 읽기 속도 밴드를 고르지 않았으면
+   * 언제나 0이다(타임코드를 건드리는 경로 자체가 안 열린다).
+   */
+  timingAdjusted: number;
+  /**
    * 상한을 넘었는데 끝내 안 나뉜 블록 수(청크 실패, 끊을 자리 없음 등).
    *
    * **화면에 안 띄운다**(2026-08-19 제품 결정). 개수만 알려주고 어느 자막인지는
@@ -121,12 +145,16 @@ function addReports(a: TextRuleReport, b: TextRuleReport): TextRuleReport {
  * `splitLongLines`를 주입받는 것은 그 성질을 관찰 가능하게 만들기 위해서다 —
  * 호출 여부가 곧 비용이다.
  *
- * **타임코드를 읽지도 쓰지도 않는다.** `adjustSubtitleTiming`은 이 흐름에 없다.
+ * **`timing`을 안 주면 타임코드를 읽지도 쓰지도 않는다** — 이 화면의 기본값이다.
+ * 주면 마지막 단계에서 딱 한 번 `adjustSubtitleTimingWithReport`를 태운다.
+ * 순서가 중요하다: 마침표 제거·두 줄 접기로 **글자 수가 확정된 뒤**라야 CPS가
+ * 맞다. 규칙 적용 전 글자 수로 재면 이미 사라질 마침표까지 세고 넓힌다.
  */
 export async function applySubtitleRules(
   srt: string,
   lang: TargetLang,
   splitLongLines: (subset: string) => Promise<string>,
+  timing?: PolishTimingOptions | null,
 ): Promise<PolishOutcome> {
   const ruleOptions = {
     trailingPunctuation: lang.trailingPunctuation,
@@ -159,10 +187,21 @@ export async function applySubtitleRules(
     lang.lineMaxChars,
   ).indices.length;
 
+  // 타임코드는 여기서만, 그리고 사용자가 명시적으로 켰을 때만 바뀐다.
+  const timed = timing
+    ? adjustSubtitleTimingWithReport(second.content, {
+        cpsTarget: timing.cpsTarget,
+        cpsHardMax: timing.cpsHardMax,
+        minGapMs: MIN_SUBTITLE_GAP_MS,
+        minDurationMs: MIN_SUBTITLE_DURATION_MS,
+      })
+    : { content: second.content, adjusted: 0 };
+
   return {
-    content: second.content,
+    content: timed.content,
     summary: {
       ...addReports(first.report, second.report),
+      timingAdjusted: timed.adjusted,
       // 2차의 3줄→2줄 병합이 새로 긴 줄을 만들 수 있어 unsplitLines가 원래 초과
       // 수를 넘길 수 있다. 요약에 음수가 뜨는 것보다 0이 정직하다.
       linesSplit: Math.max(0, indices.length - unsplitLines),

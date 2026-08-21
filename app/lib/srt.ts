@@ -169,6 +169,31 @@ export function adjustSubtitleTiming(
   srt: string,
   options: TimingAdjustOptions = {},
 ): string {
+  return adjustSubtitleTimingWithReport(srt, options).content;
+}
+
+export interface TimingAdjustResult {
+  /** The rewritten SRT. */
+  content: string;
+  /**
+   * Blocks whose on-screen window actually grew — the only number the polish
+   * page can honestly show. Blocks that triggered but found no free gap to
+   * borrow from are not counted: nothing changed for the viewer.
+   */
+  adjusted: number;
+}
+
+/**
+ * `adjustSubtitleTiming` plus the count of blocks it actually widened.
+ *
+ * Two entry points rather than one changed return type: the translation path
+ * (`useTranslation`) only ever wanted the string, and the polish page's done
+ * screen refuses to print numbers it did not measure (see `doneReport.ts`).
+ */
+export function adjustSubtitleTimingWithReport(
+  srt: string,
+  options: TimingAdjustOptions = {},
+): TimingAdjustResult {
   const cpsHardMax = options.cpsHardMax ?? 12;
   const cpsTarget = options.cpsTarget ?? 10;
   const minGapMs = Math.max(0, options.minGapMs ?? 84);
@@ -182,6 +207,7 @@ export function adjustSubtitleTiming(
   // borrowable — and resets to null after an unparseable block, whose unknown
   // span the following block must not cross.
   let prevEnd: number | null = 0;
+  let adjusted = 0;
 
   const rewritten = blocks.map((raw, i) => {
     const timing = timings[i];
@@ -223,13 +249,14 @@ export function adjustSubtitleTiming(
     }
 
     prevEnd = endMs;
+    if (startMs !== timing.startMs || endMs !== timing.endMs) adjusted += 1;
 
     const lines = raw.split('\n');
     lines[1] = `${msToHms(startMs)} --> ${msToHms(endMs)}`;
     return lines.join('\n');
   });
 
-  return rewritten.join('\n\n');
+  return { content: rewritten.join('\n\n'), adjusted };
 }
 
 export interface TextRuleReport {
