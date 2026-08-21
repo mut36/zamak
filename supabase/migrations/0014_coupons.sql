@@ -88,13 +88,32 @@ begin
    where code = v_code
      for update;
 
-  -- 없는 코드 / 회수된 코드 / 수명이 끝난 코드 / 정원이 찬 코드를 전부 같은
-  -- 사유로 답한다. 존재 여부를 구분해 알려주면 그게 곧 열거 힌트다.
+  -- 없는 코드 / 회수된 코드 / 수명이 끝난 코드를 같은 사유로 답한다. 존재
+  -- 여부를 구분해 알려주면 그게 곧 열거 힌트다. 정원 검사는 여기 넣지 않고
+  -- 아래로 미룬다 — 순서 이유는 바로 다음 블록 주석 참고.
   if v_coupon.code is null
      or not v_coupon.active
      or (v_coupon.valid_until is not null and v_coupon.valid_until < now())
-     or (v_coupon.max_redemptions is not null
-         and v_coupon.redeemed_count >= v_coupon.max_redemptions)
+  then
+    return query select 'invalid'::text, null::timestamptz;
+    return;
+  end if;
+
+  -- 정원 검사보다 먼저 본다: 이미 쓴 사람에게 "정원이 찼다"는 뜻의 invalid를
+  -- 돌려주면 자기가 언제 썼는지도 모르게 된다. 다른 사람들이 그 뒤에 정원을
+  -- 채웠더라도 이미 쓴 사람은 항상 already_redeemed로 답을 받아야 한다.
+  if exists (
+    select 1 from public.coupon_redemptions r
+     where r.code = v_code and r.user_id = v_user_id
+  ) then
+    select t.expires_at into v_expires
+      from public.unlimited_testers t where t.user_id = v_user_id;
+    return query select 'already_redeemed'::text, v_expires;
+    return;
+  end if;
+
+  if v_coupon.max_redemptions is not null
+     and v_coupon.redeemed_count >= v_coupon.max_redemptions
   then
     return query select 'invalid'::text, null::timestamptz;
     return;
@@ -107,8 +126,10 @@ begin
   get diagnostics v_inserted = row_count;
 
   if v_inserted = 0 then
-    -- 이것만 따로 구분한다. 사용자가 "왜 안 되지" 하고 재시도하는 걸 막는
-    -- 실용적인 이유이고, 이미 자기가 쓴 코드라 새로 새는 정보도 없다.
+    -- 벨트-앤-브레이스: 위 exists 검사와 이 insert 사이에 같은 유저가 다른
+    -- 탭에서 동시에 교환을 시도하는 극히 드문 경쟁 상황만 여기로 온다.
+    -- 사용자가 "왜 안 되지" 하고 재시도하는 걸 막는 실용적인 이유이고,
+    -- 이미 자기가 쓴 코드라 새로 새는 정보도 없다.
     select t.expires_at into v_expires
       from public.unlimited_testers t where t.user_id = v_user_id;
     return query select 'already_redeemed'::text, v_expires;
@@ -176,6 +197,8 @@ begin
     raise exception 'invalid block count' using errcode = '22023';
   end if;
 
+  -- The caller passes a model id; the mapping to a balance lives here too so
+  -- a client cannot pick which balance to drain.
   v_kind := case when p_model = 'gemini-3.1-pro-preview' then 'pro' else 'lite' end;
 
   select exists (
@@ -185,6 +208,8 @@ begin
   ) into v_unlimited;
 
   if not v_unlimited then
+    -- Single statement per branch: the row lock serialises concurrent requests,
+    -- so the last credit cannot be spent twice.
     if v_kind = 'pro' then
       update public.credits
          set pro_balance = pro_balance - 1,
@@ -200,6 +225,8 @@ begin
     end if;
 
     if not found then
+      -- The kind is carried in the message so the route can tell the user which
+      -- balance ran out without a second query.
       raise exception 'insufficient credits: %', v_kind using errcode = 'P0001';
     end if;
   end if;
