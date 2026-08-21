@@ -181,77 +181,12 @@ grant execute on function public.redeem_coupon(text) to authenticated;
 
 -- ------------------------------- begin_translation_job: 만료 반영 ---
 
--- 0013판을 그대로 두고 allowlist 조건에 만료만 더한다. 시그니처가 같으므로
--- drop 없이 replace한다 — grant도 유지된다.
+-- **여기 없다.** 만료 조건을 먹이는 교체판은 0016_coupon_expiry.sql에 있다.
 --
--- ⚠️ 이 교체가 빠지면 쿠폰은 기간제가 아니라 영구 무제한이 된다.
-create or replace function public.begin_translation_job(
-  p_total_blocks integer,
-  p_model text
-)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_user_id   uuid := auth.uid();
-  v_job_id    uuid;
-  v_kind      text;
-  v_unlimited boolean;
-begin
-  if v_user_id is null then
-    raise exception 'not authenticated' using errcode = '28000';
-  end if;
-
-  if p_total_blocks is null or p_total_blocks <= 0 then
-    raise exception 'invalid block count' using errcode = '22023';
-  end if;
-
-  -- The caller passes a model id; the mapping to a balance lives here too so
-  -- a client cannot pick which balance to drain.
-  v_kind := case when p_model = 'gemini-3.1-pro-preview' then 'pro' else 'lite' end;
-
-  select exists (
-    select 1 from public.unlimited_testers
-     where user_id = v_user_id
-       and (expires_at is null or expires_at > now())
-  ) into v_unlimited;
-
-  if not v_unlimited then
-    -- Single statement per branch: the row lock serialises concurrent requests,
-    -- so the last credit cannot be spent twice.
-    if v_kind = 'pro' then
-      update public.credits
-         set pro_balance = pro_balance - 1,
-             updated_at = now()
-       where user_id = v_user_id
-         and pro_balance > 0;
-    else
-      update public.credits
-         set lite_balance = lite_balance - 1,
-             updated_at = now()
-       where user_id = v_user_id
-         and lite_balance > 0;
-    end if;
-
-    if not found then
-      -- The kind is carried in the message so the route can tell the user which
-      -- balance ran out without a second query.
-      raise exception 'insufficient credits: %', v_kind using errcode = 'P0001';
-    end if;
-  end if;
-
-  insert into public.translation_jobs (user_id, total_blocks, model)
-  values (v_user_id, p_total_blocks, p_model)
-  returning id into v_job_id;
-
-  return v_job_id;
-end;
-$$;
-
-revoke all on function public.begin_translation_job(integer, text) from public;
-grant execute on function public.begin_translation_job(integer, text) to authenticated;
+-- 왜 갈라놨나: 0015가 같은 함수를 "자막 1,200줄 = 1장"으로 재정의한다. 이
+-- 파일에 0013 기준 본문을 들고 있으면, 0015가 적용된 DB에 이 파일을 나중에
+-- 돌리는 순간 그 과금이 **에러 없이 조용히** 0013판으로 되돌아간다. 함수
+-- 교체는 항상 가장 마지막 번호에 혼자 있어야 한다.
 
 -- ------------------------------------------------ 첫 쿠폰 발행 ---
 
