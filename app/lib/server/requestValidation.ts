@@ -153,8 +153,13 @@ function parseSpeechRelation(value: unknown): SpeechRelation | null {
 /**
  * Re-validated here even though extractCastSheet.ts already sanitizes its own
  * output: this sheet arrives back from the client (possibly user-edited in
- * InfoStep), so the same size caps apply again — a client bug or a tampered
- * request must not turn into an unbounded per-chunk prompt.
+ * the settings screen), so the same size caps apply again — a client bug or a
+ * tampered request must not turn into an unbounded per-chunk prompt.
+ *
+ * 화자·청자 규칙도 여기서 다시 건다. `sanitizeCastSheet`는 `kind === 'person'`인
+ * term만 from/to로 허용하는데(2026-07-28 도시가 화자로 앉던 버그의 방어선),
+ * 사람 손을 거친 시트에만 그 규칙이 없으면 **모델은 막고 사람은 안 막는**
+ * 비대칭이 남는다 — 같은 버그가 편집 경로로 되돌아온다.
  */
 function parseCastSheet(value: unknown): CastSheet | undefined {
   if (value === undefined) return undefined;
@@ -165,9 +170,14 @@ function parseCastSheet(value: unknown): CastSheet | undefined {
     .filter((t): t is GlossaryTerm => t !== null)
     .slice(0, GLOSSARY_MAX_TERMS);
 
+  const speakers = new Set(
+    terms.filter((t) => t.kind === 'person').map((t) => t.target),
+  );
+
   const relations = (Array.isArray(value.relations) ? value.relations : [])
     .map(parseSpeechRelation)
     .filter((r): r is SpeechRelation => r !== null)
+    .filter((r) => speakers.has(r.from) && speakers.has(r.to))
     .slice(0, GLOSSARY_MAX_RELATIONS);
 
   return { terms, relations };

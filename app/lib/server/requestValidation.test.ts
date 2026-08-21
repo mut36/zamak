@@ -6,6 +6,7 @@ import {
   parseChunkTranslationRequest,
 } from './requestValidation';
 import { TARGET_LANGS } from '../../config/languages';
+import { PRO_MODEL } from '../../config/constants';
 
 const movieInfo = {
   title: '',
@@ -85,7 +86,13 @@ describe('translation request validation', () => {
       movieInfo,
       jobId,
       castSheet: {
-        terms: [{ source: 'Jonathan', ko: '조너선', kind: 'person' }],
+        // 두 인물 모두 terms에 있어야 관계가 살아남는다 — 화자·청자는 terms의
+        // person 항목이어야 한다는 규칙이 여기에도 걸리기 때문이다. 이 테스트가
+        // 확인하려는 것은 옛 키(ko/존댓말)의 매핑이므로 인물만 채워 둔다.
+        terms: [
+          { source: 'Jonathan', ko: '조너선', kind: 'person' },
+          { source: 'Elizabeth', ko: '엘리자베스', kind: 'person' },
+        ],
         relations: [
           {
             from: '조너선',
@@ -100,6 +107,50 @@ describe('translation request validation', () => {
 
     expect(result.castSheet?.terms[0]).toMatchObject({ target: '조너선' });
     expect(result.castSheet?.relations[0]).toMatchObject({ speech: 'formal' });
+  });
+
+  it('person이 아닌 term을 화자로 쓴 관계는 버린다 (사용자 편집본도 예외 없음)', () => {
+    const result = parseChunkTranslationRequest({
+      chunk: 'subtitle',
+      chunkIndex: 1,
+      totalChunks: 1,
+      movieInfo,
+      jobId,
+      model: PRO_MODEL,
+      castSheet: {
+        terms: [
+          { source: 'Blackwood Manor', target: '블랙우드 저택', kind: 'place' },
+          { source: 'Jonathan', target: '조너선', kind: 'person' },
+          { source: 'Elizabeth', target: '엘리자베스', kind: 'person' },
+        ],
+        relations: [
+          { from: '블랙우드 저택', to: '조너선', speech: 'formal', fromBlock: 1, toBlock: 9 },
+          { from: '조너선', to: '엘리자베스', speech: 'formal', fromBlock: 1, toBlock: 9 },
+        ],
+      },
+    });
+
+    expect(result.castSheet?.relations).toHaveLength(1);
+    expect(result.castSheet?.relations[0].from).toBe('조너선');
+  });
+
+  it('terms에 아예 없는 이름을 쓴 관계도 버린다', () => {
+    const result = parseChunkTranslationRequest({
+      chunk: 'subtitle',
+      chunkIndex: 1,
+      totalChunks: 1,
+      movieInfo,
+      jobId,
+      model: PRO_MODEL,
+      castSheet: {
+        terms: [{ source: 'Jonathan', target: '조너선', kind: 'person' }],
+        relations: [
+          { from: '조너선', to: '없는사람', speech: 'formal', fromBlock: 1, toBlock: 9 },
+        ],
+      },
+    });
+
+    expect(result.castSheet?.relations).toHaveLength(0);
   });
 
   it('defaults to the current meaning-first style', () => {
