@@ -170,6 +170,14 @@ export function useTranslation(
   const [result, setResult] = useState<TranslationResult | null>(null);
   /** Set when the server declined to open a job (out of credits, file too big). */
   const [refusal, setRefusal] = useState<JobRefusedError | null>(null);
+  /**
+   * Credits the open job actually cost, as reported by /api/translation/begin.
+   *
+   * Only the cancel confirmation reads it, and only to avoid telling someone
+   * who is cancelling a 2,400-line file that "1장" was used. Starts at 1 so the
+   * dialog is never blank before a job opens.
+   */
+  const [creditsSpent, setCreditsSpent] = useState(1);
   /** The currently (or most recently) opened job's id, exposed so the
    *  completion screen and history can both refer to the same run. */
   const [jobId, setJobId] = useState<string | null>(null);
@@ -270,12 +278,19 @@ export function useTranslation(
         throw new Error(msg.emptyFile);
       }
 
-      // Spend the credit before any chunk goes out. Doing it here — once per
-      // file rather than once per chunk — is what makes a credit worth one
-      // title, and it means a refusal costs nothing.
-      const newJobId = await beginTranslationJob(blocks.length, model as AllowedModel);
+      // Spend the credits before any chunk goes out. Doing it here — once per
+      // file rather than once per chunk — is what ties the charge to the file's
+      // length rather than to how we happened to split it, and it means a
+      // refusal costs nothing.
+      const { jobId: newJobId, credits } = await beginTranslationJob(
+        blocks.length,
+        model as AllowedModel,
+      );
       creditSpent = true;
       setJobId(newJobId);
+      // The server's count, not a recomputation — the cancel dialog has to name
+      // the same number the ledger actually took.
+      setCreditsSpent(credits);
 
       // Concurrency comes from the tier, which is the one place the
       // billing/session gate will hook into. Chunk size is model-specific
@@ -677,6 +692,7 @@ export function useTranslation(
     translationProgress,
     result,
     refusal,
+    creditsSpent,
     jobId,
     errorCreditSpent,
     // Reading and parsing belong to the caller — it owns the upload screen and

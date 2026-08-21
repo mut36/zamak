@@ -192,6 +192,13 @@ npm run review -- translated=.harness/<런>/meaning.srt source=samples/subtitles
 
 결제가 열리기 전(베타 기간) 수동 크레딧 지급은 [`supabase/comp-credit.sql`](supabase/comp-credit.sql)을 씁니다. dev-seed와 달리 잔액을 더하기 때문에 프로덕션에서 실행해도 안전합니다.
 
+### 운영 중 보는 쿼리
+
+두 파일 모두 **Supabase 대시보드 SQL Editor에서만** 돕니다 — 계측 테이블이 전부 RLS로 "본인 행만" 읽히게 돼 있어서(0005·0009·0011) 앱을 통한 집계는 구조적으로 불가능하고, 대시보드는 service role로 돌아 RLS를 우회합니다.
+
+- [`supabase/daily.sql`](supabase/daily.sql) — **매일 아침 1분.** 신규가입·로그인·업로드·완료·재방문 5개 숫자를 어제/최근7일 두 줄로 뽑습니다. 대시보드에 스니펫으로 저장해두고 Run만 누르는 용도입니다. **방문(익명)은 여기 없습니다** — `beta_events.user_id`가 `not null`이라(0009) 익명 방문자는 그 테이블에 들어갈 수 없고, 방문 수는 별도 수단이 필요합니다.
+- [`supabase/beta-review.sql`](supabase/beta-review.sql) — **결산·진단.** 블록별로 나뉘어 있고 통째로 실행하지 않습니다. daily의 숫자가 이상할 때 내려가는 곳이며, 대응표는 daily.sql 하단에 있습니다.
+
 ### 결제 (`feature/payments`)
 
 **베타(main)에는 결제가 없습니다.** 토스페이먼츠 연동은 완성돼 동작하지만, 가맹점 심사에 사업자등록과 통신판매업 신고가 필요해서 열 수 없는 상태입니다. 그래서 코드를 main에서 걷어내 `feature/payments` 브랜치에 보관합니다 — main에 두면 진입점 없는 결제 코드가 계속 리뷰·리팩터 대상이 되고, 실제로 열 때는 어차피 새 디자인으로 UI를 다시 붙여야 합니다.
@@ -270,7 +277,8 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 | `GOOGLE_GENAI_API_KEY` | — | **필수.** analyze/enrich/summarize/translate 4개 라우트 전부가 이 키로 동작. grounding 때문에 결제 연결 프로젝트여야 함 |
 | `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` | — | **필수.** 없으면 모델 라우트가 전부 500으로 닫힘 |
 | `NEXT_PUBLIC_SITE_URL` | `https://zamak.app` (프로덕션) | OG·메타 `metadataBase`용 캐논 오리진. 없으면 프로덕션에서 `SITE.url`, 프리뷰는 Vercel URL |
-| `NEXT_PUBLIC_MAX_BLOCKS_PER_CREDIT` | 2000 | 크레딧 1개가 커버하는 자막 블록 수 |
+| `NEXT_PUBLIC_BLOCKS_PER_CREDIT` | 1200 | 번역권 1장이 커버하는 자막 블록 수. 상한이 아니라 **나눗셈의 분모**다 — 더 긴 파일은 거절되지 않고 올림해서 여러 장을 쓴다(`decisions.md` §6-22). 바꾸면 `supabase/migrations/0015_credit_by_lines.sql`의 리터럴 1200도 같이 고쳐야 한다 |
+| `POLISH_MAX_BLOCKS` | 2000 | `/api/polish`가 한 파일에서 받는 블록 수. 차감이 없는 경로라 위 분모와 별개다 |
 | `JOB_VALIDITY_MINUTES` | 60 | 결제된 job이 유효한 시간 |
 | `TOSS_SECRET_KEY` / `NEXT_PUBLIC_TOSS_CLIENT_KEY` | — | **main에서는 안 읽습니다.** 결제 코드가 `feature/payments`에 있어, 그 브랜치에서 작업할 때만 필요합니다 |
 | `GLOSSARY_PROVIDER` | `openai` | 글로사리·존대관계 추출 프로바이더 (`openai`\|`gemini`). 기본은 OpenAI(GPT-5.6-luna, `decisions.md` §2-14). Gemini로 롤백하려면 `gemini` + 아래 `GLOSSARY_MODEL`을 Gemini 모델명으로 |
@@ -321,6 +329,8 @@ proxy.ts                        # Supabase 세션 쿠키 갱신 (게이트 아�
 supabase/migrations/            # 크레딧·job 스키마 + 가입 시 1크레딧 트리거, 주문·정산
 supabase/dev-seed.sql           # 개발용 크레딧 조작 스니펫 (프로덕션 금지)
 supabase/comp-credit.sql        # 베타용 수동 크레딧 지급 (프로덕션에서 실행 가능)
+supabase/beta-review.sql        # 베타 결산 쿼리 (블록별로 실행)
+supabase/daily.sql              # 아침 1분 퍼널 — 5개 숫자, 어제/최근7일
 app/
 ├── auth/callback/route.ts      # Google OAuth 코드 → 세션 쿠키
 ├── legal/page.tsx              # 환불 정책 + 전자상거래법 표시사항 (사업자 정보 TODO)

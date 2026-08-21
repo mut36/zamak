@@ -4,7 +4,7 @@ import {
   FLASH_MODEL,
   FREE_CHUNK_SIZE,
   FREE_CONCURRENCY,
-  MAX_BLOCKS_PER_CREDIT,
+  BLOCKS_PER_CREDIT,
   MIN_VERIFY_MS,
   PRO_CHUNK_SIZE,
   PRO_MODEL,
@@ -13,6 +13,7 @@ import {
   SERVER_CONCURRENCY,
   TRANSLATION_ESTIMATE_MS,
   chunkSizeForModel,
+  creditsForBlocks,
   estimateTranslationMs,
   getTierLimits,
   resolveTier,
@@ -68,14 +69,14 @@ describe('getTierLimits', () => {
     //
     // Chunk size is deliberately NOT compared: the two are derived from
     // unrelated constraints — free from the wall-clock optimum under RPM 15,
-    // server from fitting MAX_BLOCKS_PER_CREDIT into one concurrent wave — and
+    // server from fitting one credit's worth of blocks into one concurrent wave — and
     // server currently lands *below* free (100 vs 150) as a result.
     expect(getTierLimits('free').concurrency).toBeLessThan(
       getTierLimits('server').concurrency,
     );
   });
 
-  // The one-wave rule (K ≥ ⌈MAX_BLOCKS_PER_CREDIT / B⌉) used to be asserted
+  // The one-wave rule (K ≥ ⌈BLOCKS_PER_CREDIT / B⌉) used to be asserted
   // here. Dropped 2026-07-22: extra waves cost seconds on a job that already
   // finishes well under a minute, and enforcing it pinned K to B for no
   // benefit. What remains are the only two limits that are actually derivable
@@ -104,13 +105,13 @@ describe('getTierLimits', () => {
     expect(duration).toBeLessThan(TIMEOUT_S);
   });
 
-  it('never splits an accepted file into more chunks than it has blocks', () => {
-    // B currently equals the credit cap (one request per file), so this is an
-    // equality today. It guards the direction that would be a bug: a chunk
-    // size larger than any file we accept means the extra capacity is paid for
-    // in output-cap headroom and bought nothing.
+  it('keeps a chunk no larger than one credit buys', () => {
+    // Guards the direction that would be a bug: a chunk size above one
+    // credit's worth of blocks means the extra capacity is paid for in
+    // output-cap headroom and can never be used — the smallest billable file
+    // would still be a single chunk.
     expect(getTierLimits('server').chunkSize).toBeLessThanOrEqual(
-      MAX_BLOCKS_PER_CREDIT,
+      BLOCKS_PER_CREDIT,
     );
   });
 });
@@ -123,12 +124,13 @@ describe('chunkSizeForModel', () => {
     expect(chunkSizeForModel(FLASH_MODEL)).toBe(SERVER_CHUNK_SIZE);
   });
 
-  it('never splits a max-credit file into more Pro chunks than one wave covers', () => {
+  it('never splits one credit of blocks into more Pro chunks than one wave covers', () => {
     // Same one-wave property SERVER_CHUNK_SIZE already gets checked for above
-    // — MAX_BLOCKS_PER_CREDIT / PRO_CHUNK_SIZE must stay at or under
-    // SERVER_CONCURRENCY so every chunk of the largest accepted file starts in
-    // a single wave.
-    expect(Math.ceil(MAX_BLOCKS_PER_CREDIT / PRO_CHUNK_SIZE)).toBeLessThanOrEqual(
+    // — BLOCKS_PER_CREDIT / PRO_CHUNK_SIZE must stay at or under
+    // SERVER_CONCURRENCY so a one-credit file starts every chunk in a single
+    // wave. There is no longer a largest *accepted* file (a long one just
+    // spends more credits), so one credit's slice is the unit this is about.
+    expect(Math.ceil(BLOCKS_PER_CREDIT / PRO_CHUNK_SIZE)).toBeLessThanOrEqual(
       SERVER_CONCURRENCY,
     );
   });
@@ -193,5 +195,29 @@ describe('MIN_VERIFY_MS', () => {
 
   it('기다림이 부담될 만큼 길지는 않다', () => {
     expect(MIN_VERIFY_MS).toBeLessThanOrEqual(3_000);
+  });
+});
+
+describe('creditsForBlocks', () => {
+  it('charges one credit up to and including the divisor', () => {
+    // The boundary is where an off-by-one silently double-charges an ordinary
+    // file, so both sides of it are pinned rather than a midpoint.
+    expect(creditsForBlocks(1)).toBe(1);
+    expect(creditsForBlocks(BLOCKS_PER_CREDIT)).toBe(1);
+  });
+
+  it('rounds up, so one block over the divisor costs two', () => {
+    expect(creditsForBlocks(BLOCKS_PER_CREDIT + 1)).toBe(2);
+    expect(creditsForBlocks(BLOCKS_PER_CREDIT * 2)).toBe(2);
+    expect(creditsForBlocks(BLOCKS_PER_CREDIT * 2 + 1)).toBe(3);
+  });
+
+  it('matches the arithmetic the SQL function repeats as a literal', () => {
+    // 0015_credit_by_lines.sql hardcodes ceil(p_total_blocks / 1200) because
+    // Postgres cannot import this module. If the default here ever moves, that
+    // migration has to move with it — this pins the number the SQL assumes.
+    expect(BLOCKS_PER_CREDIT).toBe(1200);
+    // The spec's worked example: a 1,874-block feature costs two credits.
+    expect(creditsForBlocks(1874)).toBe(2);
   });
 });

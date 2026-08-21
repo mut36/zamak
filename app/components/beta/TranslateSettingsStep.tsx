@@ -9,6 +9,7 @@ import type { CastSheet } from '../../types/glossary';
 import type { CreditBalances } from '../../lib/creditKind';
 import type { ContentType, MovieInfo } from '../../types/translation';
 import {
+  BLOCKS_PER_CREDIT,
   FLASH_MODEL,
   GLOSSARY_UI_ENABLED,
   PRO_MODEL,
@@ -48,6 +49,11 @@ interface TranslateSettingsStepProps {
   /** Target language code — the cast sheet's 표기/말투 columns follow it. */
   targetLang: string;
   etaSeconds: number;
+  /** Credits pressing start will spend — distinct from `credits` above, which
+   *  is the account's balances. Repeated here rather than only on the upload
+   *  screen because work-pick and the glossary sit between the two, and the
+   *  charge has to be on screen at the moment of commitment. */
+  creditCost: number;
   onStart: () => void;
 }
 
@@ -75,6 +81,7 @@ export function TranslateSettingsStep({
   onCastSheetRefetch,
   targetLang,
   etaSeconds,
+  creditCost,
   onStart,
 }: TranslateSettingsStepProps) {
   const cardCredits = {
@@ -364,7 +371,11 @@ export function TranslateSettingsStep({
 
       <div className='fixed bottom-0 left-0 right-0 z-40 glass-nav glass-bar backdrop-blur-[20px] backdrop-saturate-[180%]'>
         <div className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 py-4 flex items-center justify-center gap-4'>
-          <span className='text-caption text-tertiary'>{c.eta(etaSeconds)}</span>
+          <span className='text-caption text-tertiary'>
+            {c.eta(etaSeconds)}
+            {creditCost > 0 &&
+              ` · ${COPY.credits.cost(creditCost, BLOCKS_PER_CREDIT)}`}
+          </span>
           <button
             type='button'
             onClick={onStart}

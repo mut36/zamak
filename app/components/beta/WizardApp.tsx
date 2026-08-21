@@ -69,6 +69,7 @@ export function WizardApp() {
     jobId,
     errorCreditSpent,
     totalLines,
+    uploadCredits,
     enrichStatus,
     enrichCandidates,
     castSheet,
@@ -101,10 +102,6 @@ export function WizardApp() {
         unreadableFile: COPY.upload.unreadableFile,
         invalidFile: COPY.upload.invalidFile,
         noBlocks: COPY.upload.noBlocks,
-        // Same sentence the server-refusal screen uses — it already says
-        // exactly this ("N줄까지 커버해요, 이 파일은 M줄"), and one wording for
-        // one fact keeps the two paths from drifting apart.
-        tooLarge: COPY.credits.tooLargeBody,
       },
       cancelConfirm: COPY.progress.cancelConfirm,
       copyright: { failed: COPY.copyright.failed },
@@ -167,6 +164,8 @@ export function WizardApp() {
               uploading={uploading}
               uploadingFileName={uploadingFileName}
               fileName={loadedFileName || undefined}
+              lineCount={totalLines}
+              credits={uploadCredits}
               error={uploadError}
               onFile={handleFile}
               onNext={() => goScreen(POST_UPLOAD_SCREEN)}
@@ -254,6 +253,7 @@ export function WizardApp() {
                   )
                 }
                 etaSeconds={etaSeconds}
+                creditCost={uploadCredits}
                 onStart={() => {
                   void recordEvent('settings_confirmed', {
                     contentType: contentType ?? 'movie',
@@ -292,33 +292,22 @@ export function WizardApp() {
           {refusal && refusal.code === 'insufficient_credits' && (
             <ExhaustedStep
               kind={refusal.kind ?? 'lite'}
+              required={refusal.required}
+              have={refusal.have}
               defaultEmail={email ?? ''}
               onGoHistory={() => router.push('/mypage')}
               onBack={clearRefusal}
             />
           )}
 
-          {refusal && refusal.code === 'file_too_large' && (
-            <div className='animate-zslide'>
-              <div className='head text-center mb-7'>
-                <h1>{COPY.credits.tooLargeTitle}</h1>
-                <p>{COPY.credits.tooLargeBody(refusal.maxBlocks ?? 0, totalLines)}</p>
-              </div>
+          {/* 'file_too_large' no longer exists — a long file spends more
+              credits instead of being refused (§6-22), so the screen that used
+              to sit here was removed with the 413. */}
 
-              <div className='card p-[22px] flex flex-col items-center gap-3'>
-                <button type='button' className='btn btn-primary w-full' onClick={resetAll}>
-                  {COPY.credits.startOver}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* unauthorized / unknown: neither documented screen applies (not a
-              credits or file-size problem), so this falls back to the app's
-              generic error copy rather than misusing the file-too-large text. */}
-          {refusal &&
-            refusal.code !== 'insufficient_credits' &&
-            refusal.code !== 'file_too_large' && (
+          {/* unauthorized / unknown: the documented screen does not apply (not
+              a credits problem), so this falls back to the app's generic error
+              copy. */}
+          {refusal && refusal.code !== 'insufficient_credits' && (
               <div className='animate-zslide'>
                 <div className='head text-center mb-7'>
                   <h1>{COPY.error.title}</h1>

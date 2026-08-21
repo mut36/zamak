@@ -15,7 +15,7 @@ import { recordEvent } from '../lib/client/events';
 import { DEFAULT_TARGET_LANG } from '../config/languages';
 import {
   DEFAULT_MODEL,
-  MAX_BLOCKS_PER_CREDIT,
+  creditsForBlocks,
   type AllowedModel,
 } from '../config/constants';
 import type { ContentType, MovieInfo } from '../types/translation';
@@ -33,25 +33,25 @@ function fileExtension(filename: string): string | null {
  * Blocks in a parsed document, counted exactly the way the server counts them.
  *
  * `useTranslation` sends `parseSrtBlocks(doc.srt).length` to
- * /api/translation/begin, which compares it against MAX_BLOCKS_PER_CREDIT. The
- * upload guard has to agree with that number or it would refuse files the
- * server would accept (or worse, pass files it will reject), so both go
- * through this one parse rather than counting cues or lines independently.
+ * /api/translation/begin, which divides it by BLOCKS_PER_CREDIT to price the
+ * job. The upload screen has to arrive at the same number or it would quote a
+ * charge the ledger then contradicts, so both go through this one parse rather
+ * than counting cues or lines independently.
  */
 export function countBlocks(srt: string): number {
   return parseSrtBlocks(srt).length;
 }
 
 /**
- * Whether a file is too big to translate on one credit.
+ * Credits this upload will spend, for the line the upload screen shows before
+ * the user commits.
  *
- * Strictly greater-than, matching /api/translation/begin — a file of exactly
- * MAX_BLOCKS_PER_CREDIT blocks is allowed. Exported for the test that pins
- * that boundary; the two checks drifting by one block would either leak spend
- * or reject a legal file.
+ * Until 2026-08-21 this was `exceedsCreditCap` and a file over the cap was
+ * turned away at the dropzone. There is no cap now — the same length that used
+ * to be a refusal is a bigger number here.
  */
-export function exceedsCreditCap(blockCount: number): boolean {
-  return blockCount > MAX_BLOCKS_PER_CREDIT;
+export function creditsForUpload(blockCount: number): number {
+  return creditsForBlocks(blockCount);
 }
 
 /**
@@ -92,11 +92,15 @@ export type UploadRejection =
   | 'invalidFile'
   | 'bilingualSmi'
   | 'unreadable'
-  | 'noBlocks'
-  | 'tooLarge';
+  | 'noBlocks';
 
 export type UploadInspection =
-  | { ok: true; doc: Awaited<ReturnType<typeof loadSubtitleFile>> }
+  | {
+      ok: true;
+      doc: Awaited<ReturnType<typeof loadSubtitleFile>>;
+      /** Blocks in the accepted document — what the charge is derived from. */
+      blockCount: number;
+    }
   | { ok: false; reason: UploadRejection; message: string };
 
 /**
@@ -110,10 +114,10 @@ export type UploadInspection =
  * pressed translate on B and paid a credit to translate A.
  *
  * With the decision separated from the writes, a rejection has nothing to undo:
- * `handleFile` cannot publish anything until this returns `ok`. The three
- * refusal paths and the boundary they sit on are pinned in useWizard.test.ts.
+ * `handleFile` cannot publish anything until this returns `ok`. The refusal
+ * paths are pinned in useWizard.test.ts.
  *
- * Order matters and is not arbitrary — filename before parse before size, so
+ * Order matters and is not arbitrary — filename before parse before timing, so
  * we never spend a decode on a file the extension already disqualifies, and
  * never count blocks on a document that failed to parse.
  */
@@ -136,12 +140,9 @@ export async function inspectUpload(
     };
   }
 
-  // Size check belongs HERE, not at translate time. /api/translation/begin
-  // enforces MAX_BLOCKS_PER_CREDIT too (that check is the billing defense and
-  // stays), but by then the settings screen has already fired enrich,
-  // summarize and — if the toggle is on — a full glossary extraction. Those
-  // are real API spend on a file we are about to refuse. Same parse the
-  // server check uses, so the two can never disagree about the count.
+  // Counted here rather than at translate time so the upload screen can quote
+  // the charge on the spot. Same parse /api/translation/begin prices from, so
+  // the quote and the ledger can never disagree about the count.
   const blockCount = countBlocks(doc.srt);
 
   // A .srt-named file whose body isn't actually subtitles (a VTT saved with
@@ -156,15 +157,7 @@ export async function inspectUpload(
     return { ok: false, reason: 'noBlocks', message: messages.noBlocks };
   }
 
-  if (exceedsCreditCap(blockCount)) {
-    return {
-      ok: false,
-      reason: 'tooLarge',
-      message: messages.tooLarge(MAX_BLOCKS_PER_CREDIT, blockCount),
-    };
-  }
-
-  return { ok: true, doc };
+  return { ok: true, doc, blockCount };
 }
 
 /**
@@ -181,10 +174,9 @@ export interface WizardMessages {
     invalidFile: string;
     /** 파싱은 됐지만 자막 블록이 0개일 때 — 확장자만 .srt인 다른 포맷 파일 등. */
     noBlocks: string;
-    /** (상한, 실제) — 크레딧 상한을 넘는 파일을 드롭존에서 돌려보낼 때. */
-    tooLarge: (max: number, actual: number) => string;
   };
-  cancelConfirm: string;
+  /** (차감 장수) — 이미 시작된 번역을 취소할 때. */
+  cancelConfirm: (credits: number) => string;
   copyright: {
     failed: string;
   };
@@ -334,6 +326,7 @@ export function useWizard(
     translationProgress,
     result,
     refusal,
+    creditsSpent,
     jobId,
     errorCreditSpent,
     processFile,
@@ -357,6 +350,17 @@ export function useWizard(
   const totalLines = useMemo(
     () => (fileContent ? parseSrtBlocks(fileContent).length : 0),
     [fileContent],
+  );
+
+  /**
+   * Credits the loaded file will spend, shown before the user commits.
+   *
+   * Zero with no file loaded, which is how the upload screen tells "nothing to
+   * quote yet" from "this one is free" — nothing is free.
+   */
+  const uploadCredits = useMemo(
+    () => (totalLines > 0 ? creditsForUpload(totalLines) : 0),
+    [totalLines],
   );
 
   // Latest values for async callbacks, so the enrich/summarize lifecycle can
@@ -598,7 +602,7 @@ export function useWizard(
   };
 
   const handleCancel = () => {
-    if (confirm(messages.cancelConfirm)) {
+    if (confirm(messages.cancelConfirm(creditsSpent))) {
       cancelTranslation();
       setScreen('settings');
     }
@@ -721,6 +725,7 @@ export function useWizard(
     jobId,
     errorCreditSpent,
     totalLines,
+    uploadCredits,
     // Passed through from useEnrich.
     enrichStatus,
     enrichError,

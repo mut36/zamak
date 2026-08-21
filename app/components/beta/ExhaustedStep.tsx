@@ -10,6 +10,11 @@ const c = COPY.exhausted;
 
 interface ExhaustedStepProps {
   kind: CreditKind;
+  /** Credits this file needs and credits the account holds, straight from the
+   *  ledger's refusal. Undefined when the server could not report them — the
+   *  screen then falls back to its original "you are out" wording. */
+  required?: number;
+  have?: number;
   /** Signed-in account's email, pre-filling the form — the user shouldn't
    *  have to retype a value we already know. */
   defaultEmail: string;
@@ -26,6 +31,8 @@ type JoinStatus = 'idle' | 'joining' | 'joined' | 'failed';
  */
 export function ExhaustedStep({
   kind,
+  required,
+  have,
   defaultEmail,
   onGoHistory,
   onBack,
@@ -40,6 +47,10 @@ export function ExhaustedStep({
   }, [kind]);
 
   const kindLabel = kind === 'pro' ? c.kindPro : c.kindLite;
+  // Both numbers or neither — a shortfall sentence with one of them missing
+  // reads worse than the generic "you are out of credits".
+  const shortOfThisFile =
+    required !== undefined && have !== undefined && have > 0;
 
   const handleJoin = async () => {
     if (!email || status === 'joining') return;
@@ -56,11 +67,18 @@ export function ExhaustedStep({
             className='mono text-h2 font-bold leading-none'
             style={{ color: 'var(--ink)' }}
           >
-            0
+            {have ?? 0}
           </span>
         </div>
         <div className='head'>
-          <h1 className='!text-h1-sm'>{c.title(kindLabel)}</h1>
+          {/* 잔액이 남아 있는데 이 파일에 모자란 것과, 정말 다 쓴 것은 다른
+              사실이다 — 줄 수 차감(§6-22) 전에는 후자만 있었다. */}
+          <h1 className='!text-h1-sm'>
+            {shortOfThisFile ? c.shortTitle(kindLabel) : c.title(kindLabel)}
+          </h1>
+          {shortOfThisFile && (
+            <p>{COPY.credits.shortfall(required as number, have as number)}</p>
+          )}
           {c.body.split('\n').map((line) => (
             <p key={line}>{line}</p>
           ))}

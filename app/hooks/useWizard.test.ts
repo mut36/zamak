@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   countBlocks,
-  exceedsCreditCap,
+  creditsForUpload,
   inspectUpload,
   type WizardMessages,
 } from './useWizard';
-import { MAX_BLOCKS_PER_CREDIT } from '../config/constants';
+import { BLOCKS_PER_CREDIT } from '../config/constants';
 
 /** N blocks of valid SRT, so countBlocks parses rather than guesses. */
 function srtWithBlocks(n: number): string {
@@ -15,24 +15,31 @@ function srtWithBlocks(n: number): string {
   }).join('\n\n');
 }
 
-describe('upload-time credit-cap guard', () => {
-  // The guard exists because /api/translation/begin's cap check runs too late:
-  // by then the settings screen has already paid for enrich, summarize and a
-  // glossary extraction on a file we are about to refuse.
-  it('allows a file of exactly MAX_BLOCKS_PER_CREDIT blocks', () => {
-    // The server uses `> MAX_BLOCKS_PER_CREDIT`. Off-by-one here would reject
-    // a file the server would happily translate.
-    expect(exceedsCreditCap(MAX_BLOCKS_PER_CREDIT)).toBe(false);
+describe('upload-time credit quote', () => {
+  // What the upload screen shows before the user commits. It has to match what
+  // begin_translation_job will charge — the quote is the promise, and the
+  // ledger is what happens.
+  it('quotes one credit for a file at exactly the divisor', () => {
+    expect(creditsForUpload(BLOCKS_PER_CREDIT)).toBe(1);
   });
 
-  it('rejects one block past the cap', () => {
-    expect(exceedsCreditCap(MAX_BLOCKS_PER_CREDIT + 1)).toBe(true);
+  it('quotes two credits one block past the divisor, instead of refusing', () => {
+    // Until 2026-08-21 this was a refusal (`exceedsCreditCap`). A file this
+    // size is now translatable and simply costs more — if this ever goes back
+    // to being a boolean, the dead end is back with it.
+    expect(creditsForUpload(BLOCKS_PER_CREDIT + 1)).toBe(2);
+  });
+
+  it('has no upper bound', () => {
+    // The point of the change: a professional translator's long file has a
+    // price, not a wall.
+    expect(creditsForUpload(BLOCKS_PER_CREDIT * 10)).toBe(10);
   });
 
   it('counts blocks the way the server does', () => {
-    // useTranslation sends parseSrtBlocks(doc.srt).length to the begin route.
-    // If this ever counted cues or lines instead, the client and server would
-    // disagree about which files are too large.
+    // useTranslation sends parseSrtBlocks(doc.srt).length to the begin route,
+    // which prices the job from it. If this ever counted cues or lines
+    // instead, the quoted charge and the billed one would differ.
     expect(countBlocks(srtWithBlocks(3))).toBe(3);
     expect(countBlocks('')).toBe(0);
   });
@@ -51,7 +58,7 @@ describe('upload-time credit-cap guard', () => {
  *
  * These tests pin the two halves of that contract: every refusal path is
  * reachable and reports itself, and an accepted file comes back with the parsed
- * document (the only thing that may then be published).
+ * document and its block count (the only things that may then be published).
  */
 describe('inspectUpload: 거절은 아무것도 남기지 않는다', () => {
   const messages: WizardMessages['upload'] = {
@@ -59,7 +66,6 @@ describe('inspectUpload: 거절은 아무것도 남기지 않는다', () => {
     unreadableFile: 'UNREADABLE',
     invalidFile: 'INVALID',
     noBlocks: 'NO_BLOCKS',
-    tooLarge: (max, actual) => `TOO_LARGE ${max} ${actual}`,
   };
 
   const file = (name: string, body: string) =>
@@ -107,17 +113,19 @@ describe('inspectUpload: 거절은 아무것도 남기지 않는다', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('크레딧 상한을 넘으면 실제 블록 수를 담아 돌려보낸다', async () => {
-    const over = MAX_BLOCKS_PER_CREDIT + 1;
+  it('상한을 넘던 크기도 이제는 통과하고, 블록 수를 들고 온다', async () => {
+    // 이 크기는 2026-08-21까지 'tooLarge'로 거절되던 자리다(§6-22). 통과
+    // 자체가 이 변경의 요지이고, blockCount는 업로드 화면이 차감 장수를
+    // 계산하는 근거다 — 화면이 doc을 다시 파싱하면 두 숫자가 갈라진다.
+    const over = BLOCKS_PER_CREDIT + 1;
     const result = await inspectUpload(
       file('huge.srt', srtWithBlocks(over)),
       messages,
     );
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.reason).toBe('tooLarge');
-    // 사용자에게 "얼마나 넘었는지"를 보여줄 수 있어야 한다.
-    expect(result.message).toBe(`TOO_LARGE ${MAX_BLOCKS_PER_CREDIT} ${over}`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.blockCount).toBe(over);
+    expect(creditsForUpload(result.blockCount)).toBe(2);
   });
 
   it('통과한 파일은 파싱된 문서를 들고 돌아온다', async () => {
@@ -131,26 +139,25 @@ describe('inspectUpload: 거절은 아무것도 남기지 않는다', () => {
     expect(countBlocks(result.doc.srt)).toBe(3);
   });
 
-  it('경계(정확히 상한)는 통과한다 — 서버와 같은 부등호', async () => {
+  it('경계(정확히 1장 분량)는 1장으로 통과한다', async () => {
     const result = await inspectUpload(
-      file('exact.srt', srtWithBlocks(MAX_BLOCKS_PER_CREDIT)),
+      file('exact.srt', srtWithBlocks(BLOCKS_PER_CREDIT)),
       messages,
     );
     expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(creditsForUpload(result.blockCount)).toBe(1);
   });
 
   it('거절된 검사는 문서를 들고 오지 않는다', async () => {
     // 이게 버그의 핵심이었다 — 거절 경로가 "쓸 수 있는 것"을 만들어 내면
     // handleFile이 그걸 발행할 여지가 다시 생긴다. 타입으로도 막혀 있지만,
-    // 넷 다 실제로 doc이 없는지 값으로도 고정한다.
+    // 셋 다 실제로 doc이 없는지 값으로도 고정한다. (넷째였던 '상한 초과'는
+    // 더 이상 거절 경로가 아니다 — §6-22.)
     const rejected = await Promise.all([
       inspectUpload(file('movie.mp4', 'x'), messages),
       inspectUpload(file('empty.srt', '   '), messages),
       inspectUpload(file('not-actually-subtitles.srt', 'just prose'), messages),
-      inspectUpload(
-        file('huge.srt', srtWithBlocks(MAX_BLOCKS_PER_CREDIT + 1)),
-        messages,
-      ),
     ]);
     for (const result of rejected) {
       expect(result.ok).toBe(false);

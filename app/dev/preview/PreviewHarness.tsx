@@ -143,6 +143,8 @@ export function PreviewHarness() {
             uploading={screen === 'upload:uploading'}
             uploadingFileName='eternal.sunshine.2004.1080p.srt'
             fileName={screen === 'upload' ? 'eternal.sunshine.2004.1080p.srt' : undefined}
+            lineCount={screen === 'upload' ? 1874 : 0}
+            credits={screen === 'upload' ? 2 : 0}
             error=''
             onFile={noop}
             onNext={() => setScreen('settings')}
@@ -186,6 +188,7 @@ export function PreviewHarness() {
             onCastSheetRefetch={noop}
             targetLang='ko'
             etaSeconds={model === PRO_MODEL ? 40 : 10}
+            creditCost={2}
             onStart={() => setScreen('progress')}
           />
         )}

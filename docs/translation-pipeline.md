@@ -57,15 +57,17 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 - **읽기 실패는 여기서 끝난다**: 파싱은 `app/hooks/useWizard.ts`의 `handleFile`이
   await하므로, 읽히지 않는 파일·이중 언어 SMI는 업로드 화면에 머무른다(다음
   단계로 안 넘어감).
-- **크레딧 상한 초과도 여기서 끝난다** (2026-07-31~): 같은 `handleFile`이 파싱
-  직후 `countBlocks(doc.srt) > MAX_BLOCKS_PER_CREDIT`이면 드롭존에서 돌려보낸다.
-  **`/api/translation/begin`의 같은 검사보다 먼저 걸러야 하는 이유는 비용이다** —
-  다음 화면(설정)에 도달하는 순간 enrich·summarize·글로사리 추출이 전부 실제
-  API 호출로 나가는데, 어차피 거절할 파일이면 그게 전부 낭비다. 서버 검사는
-  그대로 남아 있다(클라이언트는 UX·낭비 방지, 과금 방어는 서버).
-  경계는 `>`라 정확히 상한과 같은 블록 수는 통과한다 — 두 검사가 한 블록이라도
-  어긋나면 서버가 받아줄 파일을 클라이언트가 거절하므로 `useWizard.test.ts`가
-  이 경계를 고정한다.
+- **차감 장수도 여기서 정해진다** (2026-08-21~, `decisions.md` §6-22): 같은
+  `handleFile`이 파싱 직후 `countBlocks(doc.srt)`를 세고, `creditsForUpload`가
+  `BLOCKS_PER_CREDIT`(1,200)로 나눠 **올림**한 장수를 업로드 화면에 표시한다
+  (`COPY.credits.cost`). 파일이 길다고 거절하지 않는다 — 2026-07-31~08-21에는
+  상한(2,000블록) 초과를 여기서 돌려보냈지만, 그 상한과 `/api/translation/begin`의
+  413은 함께 없어졌다.
+  **화면의 장수는 예고일 뿐 과금이 아니다** — 실제 차감은 `begin_translation_job`이
+  자기가 받은 블록 수로 다시 계산한다(`0015_credit_by_lines.sql`). 두 숫자가
+  갈라지면 화면이 약속한 것과 청구가 어긋나므로, 클라이언트와 서버가 **같은
+  `parseSrtBlocks` 결과**를 세도록 `countBlocks` 한 곳을 통과시킨다.
+  `useWizard.test.ts`가 경계(정확히 1,200줄 → 1장, 1,201줄 → 2장)를 고정한다.
 - **품질 레버**: 포맷 파싱 이상 → `app/lib/subtitles/*`. 정규화 이후 SRT 파싱 문제 →
   `parseSrtBlocks`. 프롬프트는 건드릴 필요 없음(모델은 `[N] 대사`만 봄).
 - **불변식**: 큐 본문에 빈 줄이 들어가면 SRT 블록이 쪼개져 번호 없는 고아 블록이 되므로
@@ -550,12 +552,32 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 5 | 초과분만 한 요청으로 전송 | 서버 | `/api/polish` → `polishService` |
 | 6 | 번호로 제자리 교체 | 코드 | `spliceBlocks` (`app/lib/polish.ts`) |
 | 7 | 2차 `enforceTextRules` | 코드 | AI 결과에 2줄 상한·접기·마침표 재적용 |
-| 8 | `buildDownloads` | 코드 | `app/lib/downloads.ts` |
+| 8 | (opt-in) 읽기 속도 조정 | 코드 | `adjustSubtitleTimingWithReport` (`app/lib/srt.ts`) |
+| 9 | `buildDownloads` | 코드 | `app/lib/downloads.ts` |
 
-**타임코드를 읽지도 쓰지도 않는다.** `adjustSubtitleTiming`(§9.5)을 부르지 않으므로
-타임스탬프를 건드리는 코드가 이 경로에 하나도 없다 — 번역 경로의 "밀리지 않는다"보다
-센 "바뀌지 않는다"가 성립한다. 대신 CPS 조정도 안 되며, 그래서 업로드 화면에
-콘텐츠 유형 선택이 없다.
+**기본값은 여전히 "타임코드를 읽지도 쓰지도 않는다"**(2026-08-21까지는 유일한
+동작이었다). `applySubtitleRules`의 네 번째 인자 `timing`이 없으면 8단계 자체가
+없는 것과 같아, 번역 경로의 "밀리지 않는다"보다 센 "바뀌지 않는다"가 그대로
+성립한다.
+
+**켰을 때만 8단계가 열린다.** 업로드 화면의 토글(기본 OFF, `PolishUploadStep`)로
+읽기 속도 밴드를 고르면 마지막에 딱 한 번 `adjustSubtitleTimingWithReport`가 돈다.
+순서가 중요하다 — 2차 `enforceTextRules` **뒤**여야 마침표 제거·두 줄 접기로
+글자 수가 확정된 상태에서 CPS를 잰다. 밴드는
+
+- **프리셋** = `languages.ts`의 `shapes`(영화 10/12 · 예능 8/11 · 강연 12/15)를
+  그대로 쓴다. 번역 경로가 콘텐츠 유형으로 고르는 것과 같은 표다 — 여기서 숫자를
+  새로 적으면 같은 제품이 화면마다 다른 읽기 속도를 판다.
+- **직접 설정** = `CPS_USER_RANGE`(4~20) 안에서 최소·최대를 고른다. 화면의
+  "최대"는 엔진의 `cpsHardMax`(손댈지 가르는 발동선), "최소"는 `cpsTarget`
+  (손댄 자막이 내려앉는 자리)이다. **최소는 하한 보장이 아니다** — 이 엔진은
+  노출을 넓히기만 하므로 원래 그보다 느린 자막은 손대지 않는다. 최소 ≥ 최대는
+  모순이라 업로드 자체를 막는다.
+
+완료 화면의 "자막 N개의 노출 시간을 늘렸습니다"는 `PolishSummary.timingAdjusted` —
+**실제로 창이 넓어진** 블록만 센다. 발동은 했지만 앞뒤 여백이 없어 못 넓힌 블록은
+빼는데, 그건 보는 사람에게 아무 일도 안 일어난 것이기 때문이다(`doneReport.ts`의
+"측정 안 한 숫자는 안 적는다"와 같은 규칙).
 
 **병합을 새로 안 짰다.** `reassembleTranslatedChunk`(§9)를 그대로 쓴다 — 그 함수는
 위치가 아니라 **번호로** 대조하므로 청크가 연속일 필요가 없다. 초과 블록만 원본
@@ -614,6 +636,13 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   `constants.ts` `BETA_EVENTS`).
 - **스키마**: `supabase/migrations/0009_beta_metrics.sql`(적용 상태는
   README의 스키마 절 참고).
+- **조회**: 매일 아침은 `supabase/daily.sql` — 신규가입·로그인·업로드·완료·
+  재방문 5개를 어제/최근7일 두 줄로 뽑는 저장용 쿼리다. 업로드·완료는
+  `beta_events`가 아니라 `translation_jobs`에서 센다(서버가 쓴 행이라
+  fire-and-forget 유실이 없다). 숫자가 이상할 때만 `supabase/beta-review.sql`의
+  해당 블록으로 내려간다 — 대응표는 daily.sql 하단에 있다. **익명 방문은 어느
+  쪽에도 없다**: `beta_events.user_id`가 `not null`이라 로그인 전 행동은 이
+  테이블에 남지 않는다.
 - **불변식**: 자막 텍스트는 계측 어디에도 저장하지 않는다 —
   `feedback.reported_blocks`는 정수(SRT 시퀀스 번호) 배열이고, 그 줄의
   텍스트는 보관된 결과물(0007)에서 읽는다. 계측 실패가 번역·화면을 깨면 안
@@ -689,7 +718,8 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 이웃 자막 본문에 `[N me]` 같은 깨진 마커가 끼어 있고 그 번호는 원문 폴백 | 모델이 마커 안에 잡텍스트를 섞음 → `srt.ts` `MARKER_LINE`이 `[숫자…]`를 흡수함(`decisions.md` §2-1·§2-3-3). 재발 시 정규식·`srt.test.ts` 회귀 확인 |
 | /polish가 긴 줄을 안 나눔 | 먼저 초과 줄이 실제로 있는지 확인 — 18자 이하면 AI를 안 부르는 게 정상이다(§9.8의 4번). 있는데도 그대로면 `prompts/common/line_split_ko.txt` 또는 청크 실패 → 응답의 `failedChunks`, 완료 화면의 "N개 자막은 나누지 못했습니다" |
 | /polish에서 "오늘 사용할 수 있는 횟수를 모두 썼습니다" | 정상 — `RATE_LIMITS.polish`(하루 5회). 크레딧을 안 쓰는 라우트라 이 한도가 유일한 천장이다 — §9.8 |
-| /polish 결과의 타임코드가 원본과 다름 | **버그다.** 이 경로에는 타임스탬프를 쓰는 코드가 없다(§9.8) — `spliceBlocks`나 포맷 어댑터(`app/lib/subtitles/`)를 의심할 것 |
+| /polish 결과의 타임코드가 원본과 다름 | 업로드 화면의 "노출 시간도 읽기 속도에 맞추기"를 켰다면 정상 — 켠 사람에게만 §9.8의 8단계가 돈다. **껐는데도 다르면 버그다**: 그때는 타임스탬프를 쓰는 코드가 이 경로에 하나도 없다 — `spliceBlocks`나 포맷 어댑터(`app/lib/subtitles/`)를 의심할 것 |
+| /polish에서 켰는데도 노출이 안 늘어남 | 앞뒤 자막이 붙어 있어 빌릴 침묵이 없는 경우가 대부분이다 — `adjustSubtitleTiming`은 겹침을 만들지 않으려 여백 안에서만 넓힌다(§9.5). 완료 화면의 개수(`timingAdjusted`)가 실제로 넓어진 수다 |
 | 자막이 밀림(번호 재배열) | 청크 크기 ↓ `constants.ts` `SERVER_CHUNK_SIZE` (**≥300 금지**), 재조립 `srt.ts`. 조절 절차는 위 §5 |
 | 특정 구간에서 자막이 대거 미번역(원문 그대로) | 대사 자체가 숫자인 장면(카운트다운 등) → `srt.ts` `[N]` 표식(§7·§9, `decisions.md` §2-1)이 이미 방지함. 그래도 재발하면 그 청크의 `matched`/`unmatched` 로그 확인 |
 | 청크가 대화 중간을 자름 | `srt.ts` (`chunkSrtBlocksAtGaps` 파라미터) |
@@ -697,7 +727,8 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 자막이 너무 짧게 스쳐 지나감(대사와 무관하게) | `srt.ts` (`adjustSubtitleTiming`), `constants.ts` `MIN_SUBTITLE_DURATION_MS` — §9.5 |
 | 번역이 느림/비쌈 | `constants.ts` `SERVER_CHUNK_SIZE`(flash)/`PRO_CHUNK_SIZE`(Pro)/`CONCURRENCY`/`thinkingLevelForModel`, 모델(고급/빠른). **블록당 실측 원가는 `tuning/cost-per-block.md`** — 비용이 예상과 다르면 여기부터 볼 것 |
 | 비용을 **줄이고 싶다**(어느 노브가 실제로 효과 있나) | `tuning/token-economics.md` — 비용의 67%가 thinking, 6%가 입력이라 프롬프트 토큰 절감·캐싱은 거의 무의미하다. 이미 당긴 레버와 안 당긴 레버가 우선순위로 정리돼 있음 |
-| "파일이 너무 커요"로 거절됨 | 정상 — `MAX_BLOCKS_PER_CREDIT`(2,000) 초과. 업로드 시점(`useWizard.ts` `handleFile`)과 서버(`api/translation/begin`) 두 곳에서 막는다 — §0. 상한 자체를 바꾸려면 `constants.ts`(원가 근거가 그 주석에 있음) |
+| 긴 파일에 번역권이 2장 이상 나감 | 정상 — 자막 1,200줄당 1장 올림 차감(`BLOCKS_PER_CREDIT`, `decisions.md` §6-22). 장수는 업로드 화면에서 미리 표시된다. 분모를 바꾸려면 `constants.ts`(원가 근거가 그 주석에 있음)와 `0015_credit_by_lines.sql`의 리터럴을 **같은 커밋에서** 함께 고칠 것 |
+| "파일이 너무 커요"로 거절됨 | 더 이상 없는 동작이다(2026-08-21까지 존재). 아직 뜬다면 배포된 번들이 낡았거나, polish 경로(`POLISH_MAX_BLOCKS`, 2,000블록)를 보고 있는 것이다 |
 | 특정 청크만 원문 그대로 | 그 청크 호출 실패 + sweep도 못 건짐 — `gemini.ts` 로그, `chunkRetry.ts`(1차 판단), `[sweep]` 콘솔 로그의 `stoppedBy` — §9.6·§9.65 |
 | 일부 줄만 원문 그대로 | sweep을 통과하고도 남은 줄. `[sweep] ... stopped by` 로그로 원인 구분: `no-progress`(모델이 계속 같은 실패) / `budget`(호출 상한) / `fatal`(quota·auth) — §9.65 |
 | 원문으로 남은 줄이 늘었는데 비용은 그대로 | sweep이 안 돌았다는 뜻. `leftover` 수거(`useTranslation.ts`)나 `unmatchedIndices` 배관(`srt.ts`→SSE)이 끊겼는지 확인 — §9.65 |

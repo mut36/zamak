@@ -4,7 +4,7 @@ import { enforceRateLimit } from '../../lib/server/rateLimit';
 import { reportServerError } from '../../lib/server/reportError';
 import { splitLongLines } from '../../lib/server/polishService';
 import { parseSrtBlocks } from '../../lib/srt';
-import { FLASH_MODEL, MAX_BLOCKS_PER_CREDIT } from '../../config/constants';
+import { FLASH_MODEL, POLISH_MAX_BLOCKS } from '../../config/constants';
 
 export const maxDuration = 300;
 
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 업로드 화면이 이미 막지만 라우트는 직접 호출될 수 있으므로 여기서도 센다.
-  if (parseSrtBlocks(body.subset).length > MAX_BLOCKS_PER_CREDIT) {
+  if (parseSrtBlocks(body.subset).length > POLISH_MAX_BLOCKS) {
     return NextResponse.json(
       { error: 'file_too_large', code: 'file_too_large' },
       { status: 413 },

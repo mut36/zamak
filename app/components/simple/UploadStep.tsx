@@ -5,6 +5,7 @@ import { UploadIcon } from '../icons';
 import { StepBreadcrumb } from '../StepBreadcrumb';
 import type { ContentType } from '../../types/translation';
 import { COPY } from '../../i18n/simpleCopy';
+import { BLOCKS_PER_CREDIT } from '../../config/constants';
 
 interface UploadStepProps {
   contentType: ContentType | null;
@@ -15,6 +16,12 @@ interface UploadStepProps {
   uploadingFileName: string;
   /** Name of the successfully parsed file. */
   fileName?: string;
+  /** Blocks in the parsed file, and the credits it will spend. Shown together
+   *  right under the filename — this is where the user learns a long file
+   *  costs more than one credit, and it has to be *here* rather than on the
+   *  result screen. Zero when nothing is loaded. */
+  lineCount: number;
+  credits: number;
   error: string;
   onFile: (file: File) => void;
   onNext: () => void;
@@ -26,6 +33,8 @@ export function UploadStep({
   uploading,
   uploadingFileName,
   fileName,
+  lineCount,
+  credits,
   error,
   onFile,
   onNext,
@@ -124,8 +133,20 @@ export function UploadStep({
           </>
         ) : fileName ? (
           <>
-            <h3 className='text-lead font-semibold text-ink mb-2'>{fileName}</h3>
-            <p className='text-caption text-tertiary mb-[22px]'>{c.fileReady}</p>
+            <h3 className='text-lead font-semibold text-ink mb-2'>
+              {fileName}
+              {lineCount > 0 && (
+                <span className='text-tertiary font-normal'>
+                  {' · '}
+                  {COPY.credits.lines(lineCount)}
+                </span>
+              )}
+            </h3>
+            <p className='text-caption text-tertiary mb-[22px]'>
+              {credits > 0
+                ? COPY.credits.cost(credits, BLOCKS_PER_CREDIT)
+                : c.fileReady}
+            </p>
             <button
               type='button'
               className='btn btn-secondary btn-lg mt-3'

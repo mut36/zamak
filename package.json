@@ -1,6 +1,6 @@
 {
   "name": "srt-translator-web",
-  "version": "1.4.6",
+  "version": "1.4.8",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -21,6 +21,7 @@
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
     "@tosspayments/tosspayments-sdk": "^2.7.1",
+    "@vercel/analytics": "^2.0.1",
     "next": "^16.2.9",
     "openai": "^7.0.0",
     "react": "19.2.3",

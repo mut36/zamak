@@ -13,7 +13,7 @@ import {
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '1.4.6';
+export const APP_VERSION = '1.4.8';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
@@ -183,8 +183,10 @@ export const SERVER_CONCURRENCY = readPositiveIntEnv(
  * ~40/block at B=250-500 on a 461-block sample) because per-chunk "who are
  * these characters, what's the register" orientation cost amortizes over more
  * blocks. 250 was the harness winner: same thinking/cost as B=500 within 2%,
- * but ~half the wall-clock chunk time and 8 chunks at MAX_BLOCKS_PER_CREDIT
- * (2000/250) still fits one wave under SERVER_CONCURRENCY=16.
+ * but ~half the wall-clock chunk time and 5 chunks per credit's worth of
+ * blocks (BLOCKS_PER_CREDIT/250 = 1200/250) still fits one wave under
+ * SERVER_CONCURRENCY=16 — with far more headroom than the 8 chunks the old
+ * 2,000-block credit cap implied.
  *
  * Measured at feature-length scale 2026-07-31 (decisions.md §2-16): a
  * 1,124-block film at B=250/HIGH ran its slowest chunk in 141.5s against the
@@ -231,29 +233,66 @@ export function resolveTier(): Tier {
 }
 
 /**
- * Blocks a single credit covers. One credit buys "one title", so this has to
- * clear real films, not the average one — a typical feature is ~850 blocks but
- * a dialogue-dense arthouse film measured 1,480, which left only 20 blocks of
- * headroom under the old 1,500 cap. Raised to 2,000 (2026-07-22) because
- * exceeding it is a hard 413 with no partial-translation fallback, so the cap
- * failing is far worse than it being loose. It still stops someone from
- * spending one credit on a ten-hour concatenation.
+ * Blocks one credit covers — a **divisor, not a ceiling**.
  *
- * Cost at the cap, both paths measured (docs/tuning/cost-per-block.md, current
- * production settings). Credit pricing has to clear the worst case — pro at the
- * cap — not the flash average:
+ * This used to be MAX_BLOCKS_PER_CREDIT (2,000): one credit bought "one
+ * title", and anything longer was refused with a 413. That made a credit's
+ * cost swing 4.6x for the same price and put pro's margin at 6% on a
+ * feature-length file (decisions.md §1-17). Since 2026-08-21 a longer file
+ * spends more credits instead of being refused — `creditsForBlocks` rounds up
+ * — so this is the size of one credit's slice, and there is no upper bound on
+ * a translatable file at all.
  *
- *   flash (B=100, LOW):  0.23-0.28 KRW/block  →  ~460-560 KRW at 2,000
- *   pro   (B=250, HIGH): 1.25-1.34 KRW/block  →  ~2,670 KRW at 2,000
+ * Why 1,200 rather than 2,000:
  *
- * The pro figure is a real measurement now, not flash's numbers reused: a
- * 1,124-block film at the production settings billed $0.8888 with thinking at
- * 44 tok/block (decisions.md §2-16). Two earlier estimates here were wrong in
- * the same direction — both assumed pro thinking was free or cheap, and pro
- * thinking is most of the bill. Do not re-derive pro from flash.
+ *  - Margin. Cost is linear in blocks (docs/tuning/cost-per-block.md: lite
+ *    0.39, pro 1.45 KRW/block including glossary). At 1,200 per credit and the
+ *    prices in app/config/pricing.ts, margin never falls below 40% at any file
+ *    length — the worst case is a file that lands exactly on a multiple of
+ *    1,200. Raising this number lowers that floor proportionally.
+ *  - One wave. SERVER_CONCURRENCY=16 x SERVER_CHUNK_SIZE=100 = 1,600 blocks
+ *    per wave, so at 1,200 a one-credit file is *always* a single wave
+ *    (12 chunks <= 16). At 2,000 the 1,601-2,000 band was a one-credit file
+ *    that silently took two waves, which is why the landing page's "15 seconds"
+ *    needed a hedge ("드라마 한 편") pinned by simpleCopy.test.ts. A two-credit
+ *    file takes two waves, but the user already knows it is double-length.
+ *
+ * Lite and pro share this number on purpose. Two different limits would make
+ * the rule take two sentences to explain; the cost difference between the
+ * tiers is absorbed by *price*, not by a different slice size.
  */
-export const MAX_BLOCKS_PER_CREDIT = readPositiveIntEnv(
-  process.env.NEXT_PUBLIC_MAX_BLOCKS_PER_CREDIT,
+export const BLOCKS_PER_CREDIT = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_BLOCKS_PER_CREDIT,
+  1200,
+);
+
+/**
+ * Credits a file of `blockCount` blocks spends. Rounds up: 1,874 blocks is
+ * 2 credits.
+ *
+ * The client (upload screen), the server route and `begin_translation_job` in
+ * Postgres all have to agree on this number or the screen promises one figure
+ * and the ledger charges another. This is the single definition for the two
+ * JavaScript callers; the SQL function repeats the arithmetic as a literal
+ * (supabase/migrations/0015_credit_by_lines.sql) because it cannot import, and
+ * that copy — not this one — is the billing authority.
+ */
+export function creditsForBlocks(blockCount: number): number {
+  return Math.ceil(blockCount / BLOCKS_PER_CREDIT);
+}
+
+/**
+ * Blocks `/api/polish` accepts in one file.
+ *
+ * Deliberately its own number rather than BLOCKS_PER_CREDIT, which it used to
+ * borrow back when that constant was a 2,000-block ceiling. Polish spends no
+ * credits, so its only cost defence is the rate limit; letting it follow the
+ * credit divisor down to 1,200 would have shrunk what the free page accepts as
+ * a side effect of a pricing decision. 2,000 is the value it has always
+ * enforced, kept unchanged.
+ */
+export const POLISH_MAX_BLOCKS = readPositiveIntEnv(
+  process.env.POLISH_MAX_BLOCKS,
   2000,
 );
 
@@ -261,7 +300,7 @@ export const MAX_BLOCKS_PER_CREDIT = readPositiveIntEnv(
  * 무제한 테스터(`public.unlimited_testers`, 0013)의 잔액 칩에 띄울 숫자.
  *
  * 그 계정은 차감이 DB에서 면제되므로 실제 잔액은 0에 머문다. 그대로 두면 UI가
- * "0편 남음"을 빨갛게 띄우고(TranslateSettingsStep), 번역은 되는데 화면은
+ * "0장 남음"을 빨갛게 띄우고(TranslateSettingsStep), 번역은 되는데 화면은
  * 소진됐다고 말하는 상태가 된다. 표시용 값일 뿐 어떤 한도도 아니다 — 이 숫자를
  * 다 쓴다고 무언가 막히지 않는다.
  */
@@ -469,13 +508,13 @@ export const GLOSSARY_THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
  * — see extractCastSheet.ts.
  *
  * ⚠️ 3000 HAS NO DERIVATION — it arrived with the feature's first commit
- * (779ad6c) and nothing has tested it. It is also currently DEAD: it sits
- * above MAX_BLOCKS_PER_CREDIT (2000), so every file we actually translate is
- * sent whole and excerptBlocks() never runs. Since 2026-07-31 the upload
- * screen refuses over-cap files outright (useWizard's handleFile), so nothing
- * oversized reaches the glossary at all — the excerpt path is now unreachable
- * by construction, not just by coincidence. Harmless either way; see
- * docs/TODO.md for the delete-or-lower decision.
+ * (779ad6c) and nothing has tested it.
+ *
+ * It stopped being dead on 2026-08-21. It used to sit above the 2,000-block
+ * credit *cap*, so no translatable file could ever reach it and excerptBlocks()
+ * never ran. Now that a long file spends more credits instead of being refused
+ * (BLOCKS_PER_CREDIT), files above 3,000 blocks are translatable and the
+ * excerpt path is live again — on an untested threshold. See docs/TODO.md.
  *
  * Anything reasoning about glossary cost should therefore treat it as
  * proportional to file size up to the credit cap, not capped here.

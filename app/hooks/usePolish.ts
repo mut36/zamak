@@ -6,7 +6,7 @@ import { buildDownloads } from '../lib/downloads';
 import { parseSrtBlocks } from '../lib/srt';
 import { loadSubtitleFile, type SubtitleDoc } from '../lib/subtitles';
 import { resolveTargetLang } from '../config/languages';
-import { MAX_BLOCKS_PER_CREDIT } from '../config/constants';
+import { POLISH_MAX_BLOCKS } from '../config/constants';
 import { requestLineSplit, PolishRefusedError } from '../lib/client/polishApi';
 import type { DownloadOption } from '../types/translation';
 import { COPY } from '../i18n/simpleCopy';
@@ -56,7 +56,7 @@ export function usePolish() {
       setStage('error');
       return;
     }
-    if (blockCount > MAX_BLOCKS_PER_CREDIT) {
+    if (blockCount > POLISH_MAX_BLOCKS) {
       setError(COPY.polish.tooLarge);
       setStage('error');
       return;
