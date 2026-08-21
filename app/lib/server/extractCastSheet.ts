@@ -126,6 +126,12 @@ export const CAST_SHEET_JSON_SCHEMA: Record<string, unknown> = {
 function excerptBlocks(blocks: readonly string[], maxBlocks: number): string {
   if (blocks.length <= maxBlocks) return blocks.join('\n\n');
 
+  // 발췌는 "파일 전체를 보는 프리패스"가 파일 일부를 일부러 안 보는 순간이다.
+  // 조용히 일어나면 육안 검수로도 알 수 없으므로 반드시 남긴다.
+  console.log(
+    `[glossary] excerpted ${blocks.length}→${maxBlocks} blocks (threshold GLOSSARY_MAX_BLOCKS)`,
+  );
+
   const segments = 12;
   const segSize = Math.max(1, Math.floor(maxBlocks / segments));
   const step = blocks.length / segments;

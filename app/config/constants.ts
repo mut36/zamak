@@ -519,21 +519,35 @@ export const GLOSSARY_THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
  * scattered through a whole file, unlike summarize's leading-sample approach)
  * — see extractCastSheet.ts.
  *
- * ⚠️ 3000 HAS NO DERIVATION — it arrived with the feature's first commit
- * (779ad6c) and nothing has tested it.
+ * **옛 값 3,000은 유도 근거가 없었다**(도입 커밋 779ad6c). 2,000블록 크레딧
+ * 상한 위에 있어서 `excerptBlocks()`가 한 번도 안 돌던 죽은 값이었는데,
+ * §6-22로 길이 상한이 사라지면서 실제로 도는 경로가 됐다 — 근거 없는 임계값
+ * 위에서. 2026-08-21에 아래와 같이 유도해 8,500으로 올렸다.
  *
- * It stopped being dead on 2026-08-21. It used to sit above the 2,000-block
- * credit *cap*, so no translatable file could ever reach it and excerptBlocks()
- * never ran. Now that a long file spends more credits instead of being refused
- * (BLOCKS_PER_CREDIT), files above 3,000 blocks are translatable and the
- * excerpt path is live again — on an untested threshold. See docs/TODO.md.
+ * **1) 일반 비용은 상한의 근거가 못 된다.** 추출 입력은 461블록에 7,519토큰
+ * ≈ **16토큰/블록**(`token-economics.md` §8). 발췌로 아끼는 입력 비용은 같은
+ * 블록의 Pro 번역 원가에 견주면 2% 안쪽이고, **이 비율은 파일 길이와 무관하게
+ * 일정하다** — 길수록 둘 다 같은 비율로 커지기 때문이다. 그런데 발췌가 잃는
+ * 것은 "파일 전체 일관성"이라는 이 기능의 존재 이유다. 그러니 일반 비용만
+ * 보면 상한은 없는 편이 낫다.
  *
- * Anything reasoning about glossary cost should therefore treat it as
- * proportional to file size up to the credit cap, not capped here.
+ * **2) 진짜 제약은 가격 절벽이다.** gpt-5.6-luna는 컨텍스트가 1,050,000이라
+ * 창 자체는 남아돌지만, **입력 272K를 넘는 순간 그 요청 전체가 입력 2배·출력
+ * 1.5배로 청구된다**(OpenAI 모델 문서). 이건 비율이 아니라 계단이라 절대
+ * 밟으면 안 된다.
+ *
+ * **3) 그래서 272K의 절반을 예산으로 잡는다**: 136,000 ÷ 16 = **8,500블록**.
+ * 절반만 쓰는 이유는 시스템 프롬프트·`<content_metadata>`·`<tmdb_cast>`가 같은
+ * 예산을 나눠 쓰고, 블록당 16토큰이 자막 종류에 따라 오르내리기 때문이다.
+ * 8,500블록이면 현실의 어떤 자막 파일도 발췌되지 않는다(장편이 2~3천 블록).
+ * 발췌는 이제 상시 경로가 아니라 비정상 입력용 안전망이다.
+ *
+ * 발췌가 실제로 발동하면 `extractCastSheet`가 로그를 남긴다 — 예전에는 완전히
+ * 조용해서 육안 검수로도 발췌 여부를 알 수 없었다.
  */
 export const GLOSSARY_MAX_BLOCKS = readPositiveIntEnv(
   process.env.GLOSSARY_MAX_BLOCKS,
-  3000,
+  8500,
 );
 
 /** Hard caps on the extracted sheet — keeps the per-chunk prompt tax bounded. */
