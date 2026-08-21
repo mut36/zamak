@@ -209,7 +209,12 @@ export function PreviewHarness() {
             model={model as typeof DEFAULT_MODEL}
             onModel={setModel}
             credits={CREDITS}
-            directorNoteStatus={'ready'}
+            directorNoteStatus={
+              // 'settings:searching'은 이 화면의 "프리패스가 도는 중" 변형이다.
+              // 연출 메모 추출도 같은 순간에 도므로 같은 스위치에 물린다 —
+              // 두 상태를 다 볼 수 있어야 스피너 크기 같은 걸 눈으로 잡는다.
+              screen === 'settings:searching' ? 'extracting' : 'ready'
+            }
             onDirectorNoteRefetch={() => {}}
             castSheetStatus='ready'
             castSheet={castSheet}

@@ -287,7 +287,7 @@ export function TranslateSettingsStep({
 
           {directorNoteStatus === 'extracting' ? (
             <div className='flex items-center gap-2 text-caption text-secondary'>
-              <SpinnerIcon />
+              <SpinnerIcon className='w-4 h-4 text-accent shrink-0' />
               {c.noteExtracting}
             </div>
           ) : (
