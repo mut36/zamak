@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CastSheet } from '../../types/glossary';
 import { resolveTargetLang } from '../../config/languages';
 import type { CastSheetStatus } from '../../hooks/useCastSheet';
@@ -60,6 +60,21 @@ export function CastSheetCard({
   // Without a formality axis there are no relations to edit, so the tab is
   // dropped rather than shown empty.
   const activeTab = axis ? tab : 'terms';
+
+  // 추출이 끝난 직후의 시트를 기억해 두고, 지금 시트와 다르면 사람이 고친
+  // 것으로 본다. 시트의 소유자는 훅이고 카드는 받아 쓰기만 하므로, dirty
+  // 플래그를 따로 나르는 것보다 여기서 비교하는 편이 상태가 하나 적다.
+  const extractedRef = useRef<string>('');
+
+  useEffect(() => {
+    if (status === 'ready') extractedRef.current = JSON.stringify(sheet);
+    // status가 'ready'로 바뀌는 순간에만 기준선을 잡는다. sheet를 의존성에
+    // 넣으면 사용자가 고칠 때마다 기준선이 따라 움직여 항상 깨끗해 보인다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  const isEdited =
+    extractedRef.current !== '' && JSON.stringify(sheet) !== extractedRef.current;
 
   const itemCount = sheet.terms.length;
   const extracting = enabled && status === 'extracting';
@@ -137,7 +152,10 @@ export function CastSheetCard({
             <button
               type='button'
               className='btn btn-ghost !py-1.5 !px-3 !text-fineprint ml-auto'
-              onClick={onRefetch}
+              onClick={() => {
+                if (isEdited && !confirm(c.refetchConfirm)) return;
+                onRefetch();
+              }}
             >
               <RefreshIcon className='w-3.5 h-3.5' />
               {c.refetch}

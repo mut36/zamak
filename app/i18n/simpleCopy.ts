@@ -609,6 +609,7 @@ export const COPY = {
         `${language}에는 존댓말/반말 구분이 없어 표기만 통일합니다.`,
       relationRange: (from: number, to: number) => `${from}~${to}번 구간`,
       refetch: '다시 추출',
+      refetchConfirm: '직접 고치신 내용이 사라집니다. 다시 추출할까요?',
       addRelation: '+ 말투 관계 추가',
       /** 구간 입력 두 칸의 접근성 라벨. 화면에는 안 보인다. */
       rangeFrom: '시작 자막 번호',
