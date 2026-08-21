@@ -812,6 +812,30 @@ export const COPY = {
       `${date} · ${model}${glossary ? ' · 용어집' : ''}`,
   },
 
+  /**
+   * 가격 안내(`/pricing`). 결제는 아직 `feature/payments`에 있으므로 이 화면은
+   * **파는 화면이 아니라 알리는 화면**이다 — 버튼이 없고 `preparing` 한 줄이
+   * 그 자리를 대신한다. 결제를 열 때 이 문구를 구매 CTA로 바꾼다.
+   *
+   * 티어 이름·설명은 `COPY.plans`를 그대로 쓴다. 여기 다시 적으면 랜딩·설정
+   * 화면과 갈라진다.
+   */
+  pricing: {
+    title: '가격',
+    sub: '번역권을 미리 사고, 파일 하나에 1편씩 씁니다. 유효기간은 없습니다.',
+    creditUnit: (n: number) => `${n}편`,
+    perCredit: (won: string) => `편당 ${won}원`,
+    won: (won: string) => `${won}원`,
+    preparing: '결제 준비 중입니다',
+    preparingNote:
+      '결제 오픈 전까지는 가입 시 드리는 무료 번역권으로 사용해보실 수 있습니다.',
+    // 환불 규정은 약관 §번역권 구매와 취소·환불 하나만 둔다 — 여기 요약을
+    // 따로 적으면 둘이 갈라지고, 갈라진 환불 규정은 분쟁에서 이용자에게
+    // 유리한 쪽으로 읽힌다.
+    refundLink: '취소·환불 규정 보기',
+    vatNote: '모든 금액은 부가세 포함입니다.',
+  },
+
   footer: {
     feedback: '피드백 보내기',
     feedbackEmail: 'hello@mut36.com',
@@ -822,6 +846,7 @@ export const COPY = {
     serviceGroup: '서비스',
     policyGroup: '정책',
     home: '홈',
+    pricing: '가격',
     mypage: '마이페이지',
     // 브랜드명이 아니라 상호를 적는다 — 푸터에서 유일하게 ZAMAK만 보이던 줄이라
     // 상호와 어긋나 보였다(`SellerInfo` 주석 참고).

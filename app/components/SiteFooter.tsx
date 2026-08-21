@@ -38,6 +38,7 @@ export function SiteFooter({ withBottomBar }: { withBottomBar?: boolean }) {
           <div>
             <p className='site-footer-group'>{F.serviceGroup}</p>
             <Link href='/'>{F.home}</Link>
+            <Link href='/pricing'>{F.pricing}</Link>
             <Link href='/mypage'>{F.mypage}</Link>
             <a href={`mailto:${F.feedbackEmail}`}>{F.feedback}</a>
             {KAKAO_OPEN_CHAT_URL && (

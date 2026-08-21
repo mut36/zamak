@@ -2401,6 +2401,51 @@ button:disabled {
     font-weight: 600;
     color: var(--text-secondary);
   }
+  /* 가격표(`/pricing`) — 팩 3개가 넓은 화면에서 한 줄, 모바일에서 세로. */
+  .pricing-grid {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  @media (min-width: 640px) {
+    .pricing-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  .pricing-pack {
+    position: relative;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .pricing-badge {
+    position: absolute;
+    top: -9px;
+    left: 20px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--ink-strong);
+    font-size: var(--fs-fineprint);
+    font-weight: 600;
+  }
+  .pricing-pack-credits {
+    font-size: var(--fs-caption);
+    color: var(--text-secondary);
+    margin: 0;
+  }
+  .pricing-pack-amount {
+    font-size: var(--fs-body-lg);
+    font-weight: 700;
+    color: var(--ink-strong);
+    margin: 0;
+  }
+  .pricing-pack-unit {
+    font-size: var(--fs-fineprint);
+    color: var(--text-quaternary);
+    margin: 0;
+  }
   /* 판매자 표시 — 접지 않는다(`SellerInfo` 주석 참고). */
   .site-footer-seller-wrap {
     display: flex;
