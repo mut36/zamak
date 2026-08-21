@@ -12,6 +12,7 @@ import type {
   MovieInfo,
   TranslationStyle,
 } from '../../types/translation';
+import { glossaryAppliesTo } from '../glossaryGate';
 import type { CastSheet, GlossaryTerm, SpeechRelation } from '../../types/glossary';
 import {
   NARRATION_STYLES,
@@ -224,6 +225,8 @@ export function parseChunkTranslationRequest(
     throw new RequestValidationError('Invalid chunk position');
   }
 
+  const model = parseModel(value.model);
+
   return {
     chunk: requireString(value, 'chunk'),
     chunkIndex: chunkIndex as number,
@@ -232,10 +235,15 @@ export function parseChunkTranslationRequest(
     // rather than rejecting a translation the user already paid for.
     phase: value.phase === 'sweep' ? 'sweep' : 'main',
     movieInfo: parseMovieInfo(value.movieInfo),
-    model: parseModel(value.model),
+    model,
     targetLang: parseTargetLanguage(value.targetLang),
     translationStyle: parseTranslationStyle(value.translationStyle),
-    castSheet: parseCastSheet(value.castSheet),
+    // 글로사리는 프로에만 붙는다. 라이트 요청에 시트가 실려 오면(낡은 탭,
+    // 조작된 요청) 여기서 버린다 — 불변식 4는 클라이언트 선의가 아니라
+    // 서버가 지켜야 한다.
+    castSheet: glossaryAppliesTo(model)
+      ? parseCastSheet(value.castSheet)
+      : undefined,
     // The job this chunk was paid for; validated against the caller's own
     // rows before any model call happens.
     jobId: requireString(value, 'jobId'),

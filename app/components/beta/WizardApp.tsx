@@ -69,6 +69,7 @@ export function WizardApp() {
     jobId,
     errorCreditSpent,
     totalLines,
+    runtimeMinutes,
     uploadCredits,
     enrichStatus,
     enrichCandidates,
@@ -241,6 +242,7 @@ export function WizardApp() {
                 credits={credits}
                 targetLang={targetLang}
                 blockCount={totalLines}
+                runtimeMinutes={runtimeMinutes}
                 castSheetStatus={castSheet.status}
                 castSheet={castSheet.sheet}
                 onCastSheetChange={castSheet.setSheet}
@@ -249,6 +251,7 @@ export function WizardApp() {
                     fileContentRef.current,
                     movieInfoRef.current,
                     targetLang,
+                    model,
                   )
                 }
                 etaSeconds={etaSeconds}

@@ -49,6 +49,8 @@ interface TranslateSettingsStepProps {
   /** 총 블록 수 — 말투 관계의 구간 상한. useWizard의 totalLines를 그대로 받는다. */
   blockCount: number;
   etaSeconds: number;
+  /** 자막이 덮는 영상 길이(분). 타임코드가 없으면 null — 견적이 분을 뺀다. */
+  runtimeMinutes: number | null;
   /** Credits pressing start will spend — distinct from `credits` above, which
    *  is the account's balances. Repeated here rather than only on the upload
    *  screen because work-pick and the glossary sit between the two, and the
@@ -80,6 +82,7 @@ export function TranslateSettingsStep({
   targetLang,
   blockCount,
   etaSeconds,
+  runtimeMinutes,
   creditCost,
   onStart,
 }: TranslateSettingsStepProps) {
@@ -348,8 +351,15 @@ export function TranslateSettingsStep({
         <div className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 py-4 flex items-center justify-center gap-4'>
           <span className='text-caption text-tertiary'>
             {c.eta(etaSeconds)}
+            {/*
+              번역가의 단위(분)와 우리 단위(줄) 사이를 메우는 자리(§6-23).
+              러닝타임을 못 읽은 파일에서는 예전 문구로 떨어진다 — 분이
+              빠졌다고 차감 장수까지 안 보이면 그게 더 나쁘다.
+            */}
             {creditCost > 0 &&
-              ` · ${COPY.credits.cost(creditCost, BLOCKS_PER_CREDIT)}`}
+              (runtimeMinutes === null
+                ? ` · ${COPY.credits.cost(creditCost, BLOCKS_PER_CREDIT)}`
+                : ` · ${COPY.credits.quote(blockCount, runtimeMinutes, creditCost)}`)}
           </span>
           <button
             type='button'

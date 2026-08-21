@@ -68,6 +68,7 @@ export function useCastSheet(active: boolean) {
       content: string,
       movieInfo: CastSheetMovieInfo,
       targetLang: string,
+      model: string,
     ): Promise<CastSheet> => {
       if (!content) return Promise.resolve(EMPTY_CAST_SHEET);
       if (dispatchedRef.current && pendingRef.current) return pendingRef.current;
@@ -83,7 +84,9 @@ export function useCastSheet(active: boolean) {
           const res = await fetch('/api/glossary', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content, movieInfo, targetLang }),
+            // model은 서버가 게이트를 다시 거는 데 쓴다 — 과금 없는 호출 중
+            // 가장 비싼 것이라 라이트 요청이 새면 안 된다.
+            body: JSON.stringify({ content, movieInfo, targetLang, model }),
             signal: controller.signal,
           });
           const data: CastSheet = res.ok ? await res.json() : EMPTY_CAST_SHEET;
@@ -108,12 +111,17 @@ export function useCastSheet(active: boolean) {
 
   /** Force a fresh extraction even if one already completed ("다시 추출"). */
   const refetch = useCallback(
-    (content: string, movieInfo: CastSheetMovieInfo, targetLang: string) => {
+    (
+      content: string,
+      movieInfo: CastSheetMovieInfo,
+      targetLang: string,
+      model: string,
+    ) => {
       abortRef.current?.abort();
       dispatchedRef.current = false;
       pendingRef.current = null;
       setStatus('idle');
-      return request(content, movieInfo, targetLang);
+      return request(content, movieInfo, targetLang, model);
     },
     [request],
   );

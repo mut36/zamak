@@ -5,7 +5,11 @@ import { useTranslation, type TranslationMessages } from './useTranslation';
 import { useEnrich, type EnrichCandidate, type EnrichResult } from './useEnrich';
 import { useCastSheet } from './useCastSheet';
 import { glossaryAppliesTo } from '../lib/glossaryGate';
-import { parseBlockTiming, parseSrtBlocks } from '../lib/srt';
+import {
+  parseBlockTiming,
+  parseSrtBlocks,
+  subtitleRuntimeMs,
+} from '../lib/srt';
 import {
   BilingualSmiError,
   isSupportedSubtitleFilename,
@@ -354,6 +358,19 @@ export function useWizard(
   );
 
   /**
+   * 자막이 덮는 영상 길이(분, 반올림). 타임코드가 없으면 null — 견적 줄이
+   * 분을 빼고 줄·장만 말한다.
+   *
+   * `totalLines`와 같은 자리에서 같은 원본으로 뽑는다. 둘이 다른 시점의
+   * 파일을 보면 견적 한 줄 안에서 줄 수와 분이 어긋난다.
+   */
+  const runtimeMinutes = useMemo(() => {
+    if (!fileContent) return null;
+    const ms = subtitleRuntimeMs(fileContent);
+    return ms === null ? null : Math.round(ms / 60_000);
+  }, [fileContent]);
+
+  /**
    * Credits the loaded file will spend, shown before the user commits.
    *
    * Zero with no file loaded, which is how the upload screen tells "nothing to
@@ -490,8 +507,13 @@ export function useWizard(
     if (screen !== 'settings') return;
     if (!castSheetEnabled) return;
     if (!fileContent) return;
-    requestCastSheet(fileContentRef.current, movieInfoRef.current, targetLang);
-  }, [screen, castSheetEnabled, fileContent, requestCastSheet, targetLang]);
+    requestCastSheet(
+      fileContentRef.current,
+      movieInfoRef.current,
+      targetLang,
+      model,
+    );
+  }, [screen, castSheetEnabled, fileContent, requestCastSheet, targetLang, model]);
 
   const resetAnalysis = () => {
     enrichStartedRef.current = false;
@@ -726,6 +748,7 @@ export function useWizard(
     jobId,
     errorCreditSpent,
     totalLines,
+    runtimeMinutes,
     uploadCredits,
     // Passed through from useEnrich.
     enrichStatus,

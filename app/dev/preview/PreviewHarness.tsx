@@ -214,6 +214,8 @@ export function PreviewHarness() {
             onCastSheetChange={setCastSheet}
             onCastSheetRefetch={noop}
             targetLang='ko'
+            // 461블록은 드라마 샘플이다 — 러닝타임도 그 파일의 실측(56분)을 쓴다.
+            runtimeMinutes={56}
             blockCount={461}
             etaSeconds={model === PRO_MODEL ? 40 : 10}
             creditCost={2}

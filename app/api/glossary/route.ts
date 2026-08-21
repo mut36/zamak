@@ -3,6 +3,7 @@ import { requireUser } from '../../lib/server/auth';
 import { enforceRateLimit } from '../../lib/server/rateLimit';
 import { reportServerError } from '../../lib/server/reportError';
 import { extractCastSheet } from '../../lib/server/extractCastSheet';
+import { glossaryAppliesTo } from '../../lib/glossaryGate';
 import { EMPTY_CAST_SHEET } from '../../types/glossary';
 import { DEFAULT_TARGET_LANG } from '../../config/languages';
 
@@ -22,6 +23,8 @@ interface GlossaryRequest {
   /** Target language code; decides the spelling language and whether a
    * formality axis is asked for at all. Defaults to Korean. */
   targetLang?: string;
+  /** 번역 모델 — 서버가 프로 전용 게이트를 다시 거는 데 쓴다. */
+  model?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -44,6 +47,14 @@ export async function POST(request: NextRequest) {
   }
 
   if (typeof body.content !== 'string' || !body.content.trim()) {
+    return NextResponse.json(EMPTY_CAST_SHEET);
+  }
+
+  // 과금되지 않는 호출 중 가장 비싼 것이다(전체 자막 1회 스캔). 프로가 아닌
+  // 요청은 여기서 끝낸다 — 낡은 JS를 든 브라우저가 이걸 태우지 못하게.
+  // 스푸핑은 가능하지만 실제 방어선은 레이트 리밋(5회/분)이고, 이건 사고
+  // 방지용이다.
+  if (typeof body.model !== 'string' || !glossaryAppliesTo(body.model)) {
     return NextResponse.json(EMPTY_CAST_SHEET);
   }
 

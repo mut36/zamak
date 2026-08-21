@@ -6,7 +6,7 @@ import {
   parseChunkTranslationRequest,
 } from './requestValidation';
 import { TARGET_LANGS } from '../../config/languages';
-import { PRO_MODEL } from '../../config/constants';
+import { FLASH_MODEL, PRO_MODEL } from '../../config/constants';
 
 const movieInfo = {
   title: '',
@@ -85,6 +85,9 @@ describe('translation request validation', () => {
       totalChunks: 1,
       movieInfo,
       jobId,
+      // 글로사리는 프로에만 실린다 — 모델을 안 주면 기본값(라이트)이라 시트가
+      // 통째로 버려진다. 이 테스트가 보려는 것은 옛 키의 매핑이다.
+      model: PRO_MODEL,
       castSheet: {
         // 두 인물 모두 terms에 있어야 관계가 살아남는다 — 화자·청자는 terms의
         // person 항목이어야 한다는 규칙이 여기에도 걸리기 때문이다. 이 테스트가
@@ -151,6 +154,42 @@ describe('translation request validation', () => {
     });
 
     expect(result.castSheet?.relations).toHaveLength(0);
+  });
+
+  it('라이트 모델 요청의 castSheet는 버린다 (불변식 4)', () => {
+    const parsed = parseChunkTranslationRequest({
+      chunk: '1\n00:00:01,000 --> 00:00:02,000\nHi.',
+      chunkIndex: 1,
+      totalChunks: 1,
+      movieInfo,
+      model: FLASH_MODEL,
+      targetLang: 'ko',
+      jobId,
+      castSheet: {
+        terms: [{ source: 'Jonathan', target: '조너선', kind: 'person' }],
+        relations: [],
+      },
+    });
+
+    expect(parsed.castSheet).toBeUndefined();
+  });
+
+  it('프로 모델 요청의 castSheet는 살린다', () => {
+    const parsed = parseChunkTranslationRequest({
+      chunk: '1\n00:00:01,000 --> 00:00:02,000\nHi.',
+      chunkIndex: 1,
+      totalChunks: 1,
+      movieInfo,
+      model: PRO_MODEL,
+      targetLang: 'ko',
+      jobId,
+      castSheet: {
+        terms: [{ source: 'Jonathan', target: '조너선', kind: 'person' }],
+        relations: [],
+      },
+    });
+
+    expect(parsed.castSheet?.terms).toHaveLength(1);
   });
 
   it('모르는 내레이션 값은 none으로 떨어뜨린다', () => {
