@@ -133,6 +133,58 @@ describe('prompt composition', () => {
     expect(user).not.toMatch(/\n\n\n/);
   });
 
+  it('시트가 없으면 지시문도 붙지 않는다 (기능 도입 전과 동일)', async () => {
+    const { system } = await composeTranslationPrompt('gemini', {
+      movieInfo,
+      targetLanguage: 'ko',
+      translationMode: 'chunk',
+      translationStyle: 'meaning',
+      subtitleContent: '1\n00:00:01,000 --> 00:00:02,000\nHello.',
+      chunkPosition: { index: 1, total: 1 },
+    });
+
+    expect(system).not.toContain('[기준표]');
+    expect(system).not.toMatch(/\n\n\n/);
+    expect(system.trimEnd()).toMatch(/<\/translation_rules>$/);
+  });
+
+  it('시트가 있으면 지시문이 <translation_rules> 뒤에 온다', async () => {
+    const { system } = await composeTranslationPrompt('gemini', {
+      movieInfo,
+      targetLanguage: 'ko',
+      translationMode: 'chunk',
+      translationStyle: 'meaning',
+      subtitleContent: '1\n00:00:01,000 --> 00:00:02,000\nJonathan is here.',
+      chunkPosition: { index: 1, total: 1 },
+      castSheet: {
+        terms: [{ source: 'Jonathan', target: '조너선', kind: 'person' as const }],
+        relations: [],
+      },
+    });
+
+    expect(system).toContain('[기준표]');
+    // 우선순위 선언이 규칙 뒤에 와야 "위 규칙보다 우선"이 성립한다.
+    expect(system.indexOf('[기준표]')).toBeGreaterThan(
+      system.indexOf('</translation_rules>'),
+    );
+  });
+
+  it('시트가 있어도 태그가 하나도 안 붙으면 지시문도 안 붙는다', async () => {
+    // terms가 비면 renderGlossaryTags가 두 태그를 모두 빈 문자열로 돌려준다.
+    const { system, user } = await composeTranslationPrompt('gemini', {
+      movieInfo,
+      targetLanguage: 'ko',
+      translationMode: 'chunk',
+      translationStyle: 'meaning',
+      subtitleContent: '1\n00:00:01,000 --> 00:00:02,000\nHello.',
+      chunkPosition: { index: 1, total: 1 },
+      castSheet: { terms: [], relations: [] },
+    });
+
+    expect(user).not.toContain('<glossary>');
+    expect(system).not.toContain('[기준표]');
+  });
+
   it('injects the glossary (file-wide) and only in-range speech relations for this chunk', async () => {
     const castSheet = {
       terms: [

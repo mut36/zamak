@@ -83,6 +83,14 @@ export function loadCastSheetFormalityTask(): Promise<string> {
   return loadPromptFile('common/cast_sheet_formality_task.txt');
 }
 
+/**
+ * 기준표를 따르라는 지시문. 시스템 프롬프트에 들어가지만 시트가 실제로
+ * 렌더된 요청에만 붙는다 — 없는 표를 가리키는 문장이 되면 안 되기 때문이다.
+ */
+export function loadGlossaryDirective(): Promise<string> {
+  return loadPromptFile('common/glossary_directive.txt');
+}
+
 export function loadModelAdapterPrompt(
   provider: PromptProvider,
 ): Promise<string> {
