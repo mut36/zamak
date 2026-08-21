@@ -209,6 +209,8 @@ export function PreviewHarness() {
             model={model as typeof DEFAULT_MODEL}
             onModel={setModel}
             credits={CREDITS}
+            directorNoteStatus={'ready'}
+            onDirectorNoteRefetch={() => {}}
             castSheetStatus='ready'
             castSheet={castSheet}
             onCastSheetChange={setCastSheet}

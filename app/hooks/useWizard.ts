@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation, type TranslationMessages } from './useTranslation';
 import { useEnrich, type EnrichCandidate, type EnrichResult } from './useEnrich';
 import { useCastSheet } from './useCastSheet';
-import { glossaryAppliesTo } from '../lib/glossaryGate';
+import { useDirectorNote } from './useDirectorNote';
+import {
+  directorNoteAppliesTo,
+  glossaryAppliesTo,
+} from '../lib/glossaryGate';
 import {
   parseBlockTiming,
   parseSrtBlocks,
@@ -352,6 +356,11 @@ export function useWizard(
 
   const castSheet = useCastSheet(glossaryAppliesTo(model));
 
+  // 글로사리를 대체한 프리패스. 두 게이트가 나란히 있지만 오늘은 글로사리 쪽이
+  // 항상 false다(`GLOSSARY_ENABLED`) — 표를 되살리는 실험과 메모를 끄는 조치가
+  // 서로를 끌고 다니지 않도록 스위치를 갈라 뒀다.
+  const directorNote = useDirectorNote(directorNoteAppliesTo(model));
+
   const totalLines = useMemo(
     () => (fileContent ? parseSrtBlocks(fileContent).length : 0),
     [fileContent],
@@ -515,11 +524,46 @@ export function useWizard(
     );
   }, [screen, castSheetEnabled, fileContent, requestCastSheet, targetLang, model]);
 
+  // 연출 메모 프리패스. 위 castSheet 효과와 같은 조건에서 같은 방식으로 돈다
+  // (파일당 한 번, ref 가드가 중복 발사를 막는다).
+  //
+  // `prev.notes || note` — **기계가 쓴 값은 사용자가 쓴 값을 절대 덮지 않는다.**
+  // /api/summarize가 비영화 요약을 넣을 때 쓰는 것과 같은 식이다. 추출이 도는
+  // 동안 사용자가 메모 칸에 먼저 타이핑했다면 그쪽이 이긴다.
+  const directorNoteEnabled = directorNote.enabled;
+  const requestDirectorNote = directorNote.request;
+  useEffect(() => {
+    if (screen !== 'settings') return;
+    if (!directorNoteEnabled) return;
+    if (!fileContent) return;
+    // 영화 분기 전용이다. 비영화는 /api/summarize가 이미 같은 칸(notes)에 요약을
+    // 쓴다 — 둘 다 돌게 두면 한 필드에 기록자가 둘이 되고, 둘 다 `prev.notes ||`
+    // 가드를 쓰므로 결과가 "먼저 도착한 쪽"이라는 경주가 된다.
+    if (contentType !== 'movie') return;
+    requestDirectorNote(
+      fileContentRef.current,
+      movieInfoRef.current,
+      targetLang,
+      model,
+      (note) => setMovieInfo((prev) => ({ ...prev, notes: prev.notes || note })),
+    );
+  }, [
+    screen,
+    contentType,
+    directorNoteEnabled,
+    fileContent,
+    requestDirectorNote,
+    targetLang,
+    model,
+    setMovieInfo,
+  ]);
+
   const resetAnalysis = () => {
     enrichStartedRef.current = false;
     summarizeStartedRef.current = false;
     resetEnrich();
     castSheet.reset();
+    directorNote.reset();
     setSummarizing(false);
     setSelectedIndex(-1);
     setOtherType('');
@@ -577,6 +621,9 @@ export function useWizard(
     const resolvedCastSheet = castSheet.enabled
       ? await castSheet.awaitReady()
       : undefined;
+    // 메모 쪽은 값을 받아오지 않는다 — 실릴 값은 이미 movieInfo.notes에 있고,
+    // 여기서 기다리는 것은 "추출이 끝나 그 칸이 채워질 시간"뿐이다.
+    if (directorNote.enabled) await directorNote.awaitSettled();
     // translate() resolves true on success, false on error/abort/refusal.
     const ok = await translate(
       movieInfo,
@@ -758,6 +805,7 @@ export function useWizard(
     runSelectCandidate,
     // Passed through from useCastSheet.
     castSheet,
+    directorNote,
     fileContentRef,
     movieInfoRef,
   };

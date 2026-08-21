@@ -74,6 +74,7 @@ export function WizardApp() {
     enrichStatus,
     enrichCandidates,
     castSheet,
+    directorNote,
     fileContentRef,
     movieInfoRef,
     selectedIndex,
@@ -126,9 +127,14 @@ export function WizardApp() {
   // 쓴다 — 업로드 시점에 totalLines가 이미 잡혀 있으므로 파일 크기를 반영할 수
   // 있다. decisions.md §2-7이 걱정했던 "같은 화면에서 카피와 링이 다른 시간을
   // 말한다"가 여기서 해소된다: 두 숫자가 한 함수에서 나온다.
+  //
+  // 프리패스 유예(`GLOSSARY_WAIT_MS`)를 더하는 항은 **지금 실제로 도는 프리패스**를
+  // 봐야 한다. 글로사리를 끄고 연출 메모로 갈아탈 때(2026-08-21) 이 항이
+  // castSheet만 보고 있어서, 프로가 메모를 기다리는 시간만큼 약속이 짧아졌다.
+  const prepassRuns = castSheet.enabled || directorNote.enabled;
   const etaSeconds = Math.round(
     (estimateRunMsFromBlocks(totalLines, model) +
-      (castSheet.enabled ? GLOSSARY_WAIT_MS : 0)) /
+      (prepassRuns ? GLOSSARY_WAIT_MS : 0)) /
       1000,
   );
 
@@ -252,6 +258,19 @@ export function WizardApp() {
                     movieInfoRef.current,
                     targetLang,
                     model,
+                  )
+                }
+                directorNoteStatus={directorNote.status}
+                onDirectorNoteRefetch={() =>
+                  directorNote.refetch(
+                    fileContentRef.current,
+                    movieInfoRef.current,
+                    targetLang,
+                    model,
+                    // 사용자가 "다시 쓰기"를 눌렀다는 것은 기존 메모를 버리겠다는
+                    // 뜻이다(누르기 전에 확인을 받는다). 그래서 여기서는 자동
+                    // 채우기의 `prev.notes ||` 가드를 쓰지 않고 통째로 바꾼다.
+                    (note) => setMovieInfo((prev) => ({ ...prev, notes: note })),
                   )
                 }
                 etaSeconds={etaSeconds}

@@ -713,6 +713,19 @@ export const COPY = {
     eraPlaceholder: '예: 1920년대 아일랜드 해안, 고립된 등대',
     toneLabel: '톤앤매너',
     tonePlaceholder: '예: 고전적이고 절제된 어투, 심리극',
+    // 연출 메모(프로 전용). AI가 자막 전체를 읽고 먼저 채워 넣지만, 이 칸은
+    // 어디까지나 사용자의 칸이다 — 그래서 문구가 "메모"라고만 말하고, 지우는
+    // 것도 자유라고 명시한다.
+    noteBadge: 'AI 연출 메모',
+    noteExtracting: '자막 전체를 읽고 번역 메모를 쓰고 있습니다…',
+    noteFailed: '메모를 쓰지 못했습니다. 직접 적으셔도 됩니다.',
+    noteHint:
+      'AI가 자막을 끝까지 읽고 적은 메모입니다. 그대로 번역에 반영되니 자유롭게 고치거나 지우셔도 됩니다.',
+    noteLabel: '참고할 내용',
+    notePlaceholder: '번역에 참고할 내용을 자유롭게 적어주세요.',
+    noteRewrite: '다시 쓰기',
+    noteOverwriteConfirm:
+      '메모를 새로 쓰면 지금 적으신 내용이 사라집니다. 계속할까요?',
     contextEditable: '(수정 가능)',
     contextHint:
       '번역에 그대로 반영됩니다. 비워 두시면 자막 내용만으로 판단합니다.',

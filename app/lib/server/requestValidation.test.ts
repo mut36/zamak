@@ -2,6 +2,22 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
+/**
+ * 글로사리 차단기(`GLOSSARY_ENABLED`)는 2026-08-21부터 내려가 있어, 실제 게이트는
+ * 어떤 모델에도 false를 준다. 아래 castSheet 검증들이 확인하는 것은 **게이트가
+ * 아니라 그 뒤의 정제 로직**(화자=person 규칙, 없는 이름 버리기, 내레이션 값
+ * 검증)이므로, 차단기만 우회하고 프로/라이트 판별은 진짜 규칙을 그대로 쓴다.
+ * 차단기가 실제로 내려가 있다는 사실 자체는 glossaryGate.test.ts가 지킨다.
+ */
+vi.mock('../glossaryGate', async () => {
+  const { creditKindForModel } = await import('../creditKind');
+  return {
+    glossaryAppliesTo: (model: string) => creditKindForModel(model) === 'pro',
+    directorNoteAppliesTo: (model: string) =>
+      creditKindForModel(model) === 'pro',
+  };
+});
+
 import {
   parseChunkTranslationRequest,
 } from './requestValidation';

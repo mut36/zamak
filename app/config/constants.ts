@@ -23,7 +23,23 @@ export const APP_VERSION = '1.5.3';
 export const RESULT_RETENTION_DAYS = 30;
 
 /**
- * 글로사리·존대관계 프리패스(§2-9)의 **비상 차단기**.
+ * 글로사리·존대관계 프리패스(§2-9)의 **비상 차단기** — 2026-08-21부터 꺼져 있다.
+ *
+ * 끈 이유: 표 자체가 아니라 표에 붙은 **권한**이 품질을 깎았다.
+ * `glossary_directive.txt`가 "표기·말투는 위 규칙보다 이 표가 우선"이라고
+ * 선언했고, 그 문장이 시스템 프롬프트의 **마지막 줄**로 렌더됐다. 모델은
+ * `<translation_philosophy>`(감정·리듬·의역)를 한 단계 밑으로 내리고 표 맞추기를
+ * 최우선 과제로 삼았다 — 정확한데 밋밋한 자막이 나왔다. 말투 표는 한술 더 떠
+ * "대사만 보고 달리 판단하지 마"로 장면별 말투 변주까지 금지했다.
+ *
+ * 대체재는 `DIRECTOR_NOTE_ENABLED` — 같은 프리패스가 표 대신 짧은 연출 메모를
+ * 써서 `movieInfo.notes`에 넣는다. 메모는 `<user_notes>`로 들어가므로 신뢰 경계
+ * **안쪽의 데이터**다. 규칙을 이길 권한이 애초에 없다는 것이 요점이다.
+ *
+ * 코드는 통째로 남겨둔다(추출·편집 UI·프롬프트 전부). 이 값만 true로 되돌리면
+ * 그대로 되살아난다.
+ *
+ * 아래는 켜져 있던 시절의 설명이다:
  *
  * 이 값이 켜져 있을 때 글로사리가 도는지는 모델이 정한다 — 프로면 항상 돌고
  * 라이트면 안 돈다(`app/lib/glossaryGate.ts`). 사용자가 켜고 끄는 토글은 없다:
@@ -37,7 +53,20 @@ export const RESULT_RETENTION_DAYS = 30;
  *
  * Typed `boolean` (not inferred) so flipping it needs no other edit.
  */
-export const GLOSSARY_ENABLED: boolean = true;
+export const GLOSSARY_ENABLED: boolean = false;
+
+/**
+ * 연출 메모 프리패스의 차단기. 글로사리를 대체한 경로다(2026-08-21).
+ *
+ * 같은 프리패스, 같은 프로바이더·모델·발췌 로직을 쓰지만 산출물이 다르다:
+ * 40항목짜리 표가 아니라 사람이 30초에 읽는 짧은 산문 메모 한 덩이다. 그 메모는
+ * `movieInfo.notes`에 들어가 화면에 뜨고, 사용자가 고친 그대로
+ * `<user_notes>`로 프롬프트에 실린다.
+ *
+ * 표를 메모로 바꾼 것이 왜 품질 조치인가 — `GLOSSARY_ENABLED`의 주석 참조.
+ * 요약하면 메모는 **규칙을 이길 권한이 없는 자리**에 놓인다.
+ */
+export const DIRECTOR_NOTE_ENABLED: boolean = true;
 
 /**
  * Version of the notice the user agrees to before their first translation.
@@ -572,6 +601,23 @@ export const GLOSSARY_MAX_TERM_CHARS = readPositiveIntEnv(
 );
 export const GLOSSARY_MAX_RELATION_CHARS = readPositiveIntEnv(
   process.env.GLOSSARY_MAX_RELATION_CHARS,
+  600,
+);
+
+/**
+ * 연출 메모 길이 캡, 문자 수. **짧은 것이 이 기능의 핵심이다.**
+ *
+ * 글로사리가 실패한 방식이 정확히 "길어져서 규칙이 된 것"이었다: 표기 40항목 +
+ * 관계 16항목이면 모델의 주의가 그 표를 만족시키는 데 쏠린다. 메모가 같은
+ * 길이로 자라면 이름만 바뀐 같은 실패다.
+ *
+ * 600자면 "가족 간 대화는 반말", "내레이션은 ~다체", 오용 위험 용어 서너 개가
+ * 들어가고 그 이상은 안 들어간다 — 의도한 천장이다. 추출 프롬프트도 같은 수를
+ * 보고 쓰고(`{{maxChars}}`), 서버가 넘치면 잘라낸다. 두 겹인 이유는 모델이
+ * 분량 지시를 자주 흘리기 때문이다.
+ */
+export const DIRECTOR_NOTE_MAX_CHARS = readPositiveIntEnv(
+  process.env.DIRECTOR_NOTE_MAX_CHARS,
   600,
 );
 

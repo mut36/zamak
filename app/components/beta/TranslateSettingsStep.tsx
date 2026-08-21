@@ -5,6 +5,7 @@ import { ChevronDownIcon, PencilIcon, SpinnerIcon } from '../icons';
 import { StepBreadcrumb } from '../StepBreadcrumb';
 import { CastSheetCard } from '../simple/CastSheetCard';
 import type { CastSheetStatus } from '../../hooks/useCastSheet';
+import type { DirectorNoteStatus } from '../../hooks/useDirectorNote';
 import type { CastSheet } from '../../types/glossary';
 import type { CreditBalances } from '../../lib/creditKind';
 import type { ContentType, MovieInfo } from '../../types/translation';
@@ -14,7 +15,10 @@ import {
   PRO_MODEL,
   type AllowedModel,
 } from '../../config/constants';
-import { glossaryAppliesTo } from '../../lib/glossaryGate';
+import {
+  directorNoteAppliesTo,
+  glossaryAppliesTo,
+} from '../../lib/glossaryGate';
 import { COPY } from '../../i18n/simpleCopy';
 
 const c = COPY.settings;
@@ -42,6 +46,10 @@ interface TranslateSettingsStepProps {
   // both branches (see docs/decisions.md)
   castSheetStatus: CastSheetStatus;
   castSheet: CastSheet;
+  /** 연출 메모 프리패스의 상태. 값 자체는 movieInfo.notes에 있다 — 이 화면이
+   *  받는 것은 "지금 쓰고 있는 중인가"뿐이다. */
+  directorNoteStatus: DirectorNoteStatus;
+  onDirectorNoteRefetch: () => void;
   onCastSheetChange: (sheet: CastSheet) => void;
   onCastSheetRefetch: () => void;
   /** Target language code — the cast sheet's 표기/말투 columns follow it. */
@@ -77,6 +85,8 @@ export function TranslateSettingsStep({
   credits,
   castSheetStatus,
   castSheet,
+  directorNoteStatus,
+  onDirectorNoteRefetch,
   onCastSheetChange,
   onCastSheetRefetch,
   targetLang,
@@ -240,6 +250,68 @@ export function TranslateSettingsStep({
         </div>
         <p className='text-fineprint text-secondary mt-3'>{c.contextHint}</p>
       </div>
+
+      {/* 연출 메모 — 글로사리 표를 대체한 자리(2026-08-21).
+          이 칸은 `movieInfo.notes`, 즉 프롬프트의 `<user_notes>`로 그대로 실린다.
+          AI가 먼저 채우지만 **사용자의 칸이라는 성질은 그대로다**: 언제나 보이고,
+          언제나 편집 가능하고, 지우면 아무것도 안 실린다. 기계가 쓴 값이 화면
+          뒤에서 조용히 프롬프트로 가는 일은 없어야 한다(CLAUDE.md 불변식 4).
+
+          라이트에서도 칸 자체는 남긴다. 모델을 바꿨다고 입력칸이 사라지면
+          사용자가 적어 둔 메모가 화면에서만 없어지고 프롬프트에는 계속 실린다 —
+          보이지 않는데 작동하는 상태가 제일 나쁘다. AI 배지와 '다시 쓰기'만
+          프로에서 붙는다. */}
+      {contentType === 'movie' && (
+        <div className='card p-[18px] mb-[14px]'>
+          <div className='flex items-center gap-2 mb-3'>
+            {directorNoteAppliesTo(model) && (
+              <div className='dbadge !mb-0'>
+                <b />
+                {c.noteBadge}
+              </div>
+            )}
+            {directorNoteAppliesTo(model) && (
+              <button
+                type='button'
+                className='btn btn-ghost ml-auto !px-3 !py-2 !text-caption'
+                disabled={directorNoteStatus === 'extracting'}
+                onClick={() => {
+                  if (movieInfo.notes && !confirm(c.noteOverwriteConfirm)) return;
+                  onDirectorNoteRefetch();
+                }}
+              >
+                {c.noteRewrite}
+              </button>
+            )}
+          </div>
+
+          {directorNoteStatus === 'extracting' ? (
+            <div className='flex items-center gap-2 text-caption text-secondary'>
+              <SpinnerIcon />
+              {c.noteExtracting}
+            </div>
+          ) : (
+            <div className='field !mb-0'>
+              <label>{c.noteLabel}</label>
+              <textarea
+                className='input'
+                rows={5}
+                placeholder={c.notePlaceholder}
+                value={movieInfo.notes}
+                onChange={(e) => onMovieInfo({ notes: e.target.value })}
+              />
+            </div>
+          )}
+
+          <p className='text-fineprint text-secondary mt-3'>
+            {directorNoteStatus === 'error' && directorNoteAppliesTo(model)
+              ? c.noteFailed
+              : directorNoteAppliesTo(model)
+                ? c.noteHint
+                : c.notePlaceholder}
+          </p>
+        </div>
+      )}
 
       {/* 랜딩의 "라이트 vs 프로" 섹션과 같은 `COPY.plans`를 읽는 팝오버.
           두 화면이 서로 다른 시간을 약속하는 일이 없도록 소스를 하나로

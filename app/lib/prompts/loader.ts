@@ -76,6 +76,15 @@ export function loadCastSheetExtractionPrompt(): Promise<string> {
 }
 
 /**
+ * 연출 메모 프리패스의 시스템 프롬프트. 글로사리 추출 프롬프트와 나란히 있지만
+ * 산출물이 표가 아니라 짧은 산문이다 — 왜 갈아탔는지는
+ * `GLOSSARY_ENABLED`(constants.ts) 주석에 있다.
+ */
+export function loadDirectorNotePrompt(): Promise<string> {
+  return loadPromptFile('common/director_note.txt');
+}
+
+/**
  * The relations half of the cast sheet, injected only for target languages
  * that actually have a formality axis (TargetLang.formality).
  */
