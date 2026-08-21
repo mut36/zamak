@@ -55,7 +55,9 @@ export default function PricingPage() {
             <p className='mt-2'>{P.preparingNote}</p>
           </div>
 
-          <p className='mt-6 flex items-center gap-2.5 text-caption text-secondary'>
+          <p className='mt-6 text-caption text-secondary'>{P.betaNote}</p>
+
+          <p className='mt-2 flex items-center gap-2.5 text-caption text-secondary'>
             <span>{P.vatNote}</span>
             <span className='dot-sep' />
             <Link href={`${COPY.legal.termsHref}#payment`} className='underline'>
