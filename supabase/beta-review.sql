@@ -276,3 +276,42 @@ select
   count(*) filter (where hits > 15)              as 열다섯회_초과_유저
 from public.api_rate_limits
 group by 1;
+
+
+-- ══════════════════════════ 10. 실패한 번역 — 번역권을 돌려줘야 하는 런 ═══
+-- 약관이 "우리 오류로 번역이 실패하면 요청 시 번역권을 복구한다"고 약속하고
+-- 있다(`app/legal/page.tsx` §번역권 구매와 취소·환불, decisions.md §1-7).
+-- 자동 복구는 베타 범위 밖이라(`docs/TODO.md`) **복구는 이 블록으로 찾아
+-- `supabase/comp-credit.sql`로 지급하는 수동 경로**다.
+--
+-- 번역권은 job이 열릴 때 차감되고 끝날 때 정산되지 않는다. 그래서 실패는
+-- 두 가지 모습으로 남는다:
+--   - `completed_at`이 null   → 결과물에 도달하지 못했다(크래시·이탈·타임아웃)
+--   - `failed_chunks > 0`     → 도달은 했지만 일부 청크가 원문으로 남았다
+--
+-- ⚠️ **이 목록이 곧 환불 대상은 아니다.** `completed_at`이 null인 것 중
+-- 상당수는 사용자가 그냥 탭을 닫은 경우이고, 부분 실패는 재생 가능한 완전한
+-- SRT가 손에 남는다(§1-7이 수용한 판단). 요청이 들어온 계정을 이 목록에서
+-- **대조**하는 용도이지, 여기 뜬 전부를 선제 복구하는 용도가 아니다.
+--
+-- `복구할_장수`는 begin이 실제로 차감한 값과 같은 식이다(0015: 1,200줄당
+-- 1장, 올림). comp-credit.sql에 넣을 숫자가 바로 이 값이다.
+select
+  j.created_at                                   as 시각,
+  j.user_id                                      as 유저,
+  j.source_filename                              as 파일,
+  j.total_blocks                                 as 줄수,
+  case when j.model = 'gemini-3.1-pro-preview'
+       then 'pro' else 'lite' end                as 종류,
+  ceil(j.total_blocks::numeric / 1200)::integer  as 복구할_장수,
+  case
+    when j.completed_at is null then '결과물 미도달'
+    else '부분 실패(청크 ' || j.failed_chunks || '개)'
+  end                                            as 증상,
+  j.failed_chunks                                as 실패청크,
+  j.duration_ms                                  as 소요ms
+from public.translation_jobs j
+where j.completed_at is null
+   or coalesce(j.failed_chunks, 0) > 0
+order by j.created_at desc
+limit 100;

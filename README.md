@@ -1,6 +1,6 @@
 # ZAMAK
 
-**v0.15.0 Beta**
+**v0.16.0 Beta**
 
 SRT·VTT·SMI·ASS 자막을 Gemini로 번역하는 웹 애플리케이션입니다. 업로드 포맷은
 가장자리에서 정규 SRT로 바꾼 뒤, AI에는 대사만 보내고 코드가 타임코드를 복원합니다.
@@ -192,12 +192,14 @@ npm run review -- translated=.harness/<런>/meaning.srt source=samples/subtitles
 
 결제가 열리기 전(베타 기간) 수동 크레딧 지급은 [`supabase/comp-credit.sql`](supabase/comp-credit.sql)을 씁니다. dev-seed와 달리 잔액을 더하기 때문에 프로덕션에서 실행해도 안전합니다.
 
+**번역이 실패한 계정의 번역권 복구**도 같은 파일로 처리합니다. 약관이 "ZAMAK의 오류나 장애로 번역이 실패한 경우 요청하시면 차감된 번역권을 복구한다"고 약속하고 있고(`app/legal/page.tsx`), 자동 복구는 베타 범위 밖이라 이 경로가 그 약속의 이행 수단입니다. 순서는 ① `supabase/beta-review.sql`의 **10번 블록**으로 해당 계정의 실패한 job을 찾아 `복구할_장수`를 확인하고 ② `comp-credit.sql`의 지급 블록에 그 장수를 넣어 실행합니다. 번역권은 job이 열릴 때 차감되고 끝날 때 정산되지 않으므로 복구는 되돌리기가 아니라 **다시 지급하기**입니다 — 그래서 두 번 실행하면 두 번 지급됩니다. 요청당 한 번만 실행하세요.
+
 ### 운영 중 보는 쿼리
 
 두 파일 모두 **Supabase 대시보드 SQL Editor에서만** 돕니다 — 계측 테이블이 전부 RLS로 "본인 행만" 읽히게 돼 있어서(0005·0009·0011) 앱을 통한 집계는 구조적으로 불가능하고, 대시보드는 service role로 돌아 RLS를 우회합니다.
 
 - [`supabase/daily.sql`](supabase/daily.sql) — **매일 아침 1분.** 신규가입·로그인·업로드·완료·재방문 5개 숫자를 어제/최근7일 두 줄로 뽑습니다. 대시보드에 스니펫으로 저장해두고 Run만 누르는 용도입니다. **방문(익명)은 여기 없습니다** — `beta_events.user_id`가 `not null`이라(0009) 익명 방문자는 그 테이블에 들어갈 수 없고, 방문 수는 별도 수단이 필요합니다.
-- [`supabase/beta-review.sql`](supabase/beta-review.sql) — **결산·진단.** 블록별로 나뉘어 있고 통째로 실행하지 않습니다. daily의 숫자가 이상할 때 내려가는 곳이며, 대응표는 daily.sql 하단에 있습니다.
+- [`supabase/beta-review.sql`](supabase/beta-review.sql) — **결산·진단.** 블록별로 나뉘어 있고 통째로 실행하지 않습니다. 10번 블록은 결산이 아니라 **운영용**입니다 — 번역권 복구 요청이 들어왔을 때 대조하는 자리입니다. daily의 숫자가 이상할 때 내려가는 곳이며, 대응표는 daily.sql 하단에 있습니다.
 
 ### 결제 (`feature/payments`)
 
