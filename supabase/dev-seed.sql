@@ -136,3 +136,37 @@ select u.email, t.note, t.created_at
   from public.unlimited_testers t
   join auth.users u on u.id = t.user_id
  order by t.created_at;
+
+
+-- ═══════════════════════════════════════════════ 8. 쿠폰 발행/회수 ═══
+-- 0014_coupons.sql이 만든 표. 코드를 입력한 계정은 unlimited_testers에
+-- expires_at과 함께 등록되고, begin_translation_job이 만료 전까지 차감을
+-- 건너뛴다.
+--
+-- ⚠️ 7번과 마찬가지로 **배포용 DB에 실행해도 되는** 블록이다 — 쿠폰은
+--    배포된 앱에서 쓰라고 만드는 것이다. 다만 max_redemptions를 반드시
+--    적을 것. null로 두면 코드가 새는 순간 인원 상한이 사라진다.
+
+-- 발행
+insert into public.coupons (code, duration_days, max_redemptions, note)
+values (public.normalize_coupon_code('세르지오'), 30, 10, '지인 배포 2026-08')
+    on conflict (code) do nothing;
+
+-- 회수 (지운 게 아니라 끈다 — 이미 쓴 사람의 기간은 그대로 살려 둔다)
+update public.coupons set active = false where code = '세르지오';
+
+-- 사용 현황
+select c.code, c.redeemed_count, c.max_redemptions, c.active, c.note
+  from public.coupons c
+ order by c.created_at desc;
+
+-- 누가 언제 썼고 언제까지인가
+select u.email, r.code, r.redeemed_at, t.expires_at
+  from public.coupon_redemptions r
+  join auth.users u on u.id = r.user_id
+  left join public.unlimited_testers t on t.user_id = r.user_id
+ order by r.redeemed_at desc;
+
+-- 한 사람의 기간을 끊는다 (쿠폰 자체는 그대로)
+delete from public.unlimited_testers
+ where user_id = (select id from auth.users where email = 'YOUR_EMAIL_HERE');
