@@ -42,25 +42,33 @@ describe('PRICING_TIERS', () => {
   });
 
   it('기준가(가장 작은 팩)는 확정된 값 그대로다', () => {
-    // 라이트 990 · 프로 3,300은 비교표·랜딩이 인용하는 숫자다. 할인 없는
-    // 기준가라 여기서 움직이면 화면 여러 곳이 같이 틀린다.
+    // 라이트 990 · 프로 5,900은 비교표·랜딩·분당 환산이 인용하는 숫자다.
+    // 할인 없는 기준가라 여기서 움직이면 화면 여러 곳이 같이 틀린다.
+    // 프로 3,300이었던 값은 §6-23에서 5,900으로 올렸다.
     const base = (id: 'lite' | 'pro') => {
       const tier = PRICING_TIERS.find((t) => t.id === id);
       return pricePerCredit(tier!.packs[0]);
     };
     expect(base('lite')).toBe(990);
-    expect(base('pro')).toBe(3_300);
+    expect(base('pro')).toBe(5_900);
   });
 
-  it('큰 팩이 작은 팩보다 장당 비싸지 않다', () => {
+  it('팩이 클수록 장당 단가가 낮아진다', () => {
     // 크기를 여러 개 파는 이유 자체. 이게 뒤집히면 큰 팩은 작은 팩을 반복
     // 구매하는 것보다 순수하게 나쁜 상품이 된다.
+    //
+    // **같은 값도 허용하지 않는다**(`<`이지 `<=`가 아니다). 이 단언이
+    // `<=`였을 때 라이트 3장·10장이 둘 다 990원이라 사다리가 평평했고,
+    // 평평한 사다리는 다음 조정에서 조용히 역전으로 넘어간다 — 실제로
+    // §6-23에서 10장만 890으로 내렸다면 30장(900원)보다 싸질 뻔했다.
     for (const tier of PRICING_TIERS) {
       const byCredits = [...tier.packs].sort((a, b) => a.credits - b.credits);
       for (let i = 1; i < byCredits.length; i++) {
-        expect(pricePerCredit(byCredits[i])).toBeLessThanOrEqual(
-          pricePerCredit(byCredits[i - 1]),
-        );
+        expect(
+          pricePerCredit(byCredits[i]),
+          `${byCredits[i].id}(장당 ${pricePerCredit(byCredits[i])}원)가 ` +
+            `${byCredits[i - 1].id}(장당 ${pricePerCredit(byCredits[i - 1])}원)보다 싸야 한다`,
+        ).toBeLessThan(pricePerCredit(byCredits[i - 1]));
       }
     }
   });
