@@ -47,6 +47,7 @@ export const COPY = {
       compare: '번역 비교',
       speed: '속도',
       cps: '자막 규칙',
+      pricing: '가격',
     },
 
     // 여기 `\n`은 **모든 폭에서 지켜진다**. 예전에는 640px 아래에서 공백으로
@@ -569,6 +570,9 @@ export const COPY = {
   plans: {
     title: '라이트 vs 프로',
     sub: '적용하는 규칙은 같습니다. 다른 건 속도와 맥락 분석입니다.',
+    /** 비교표 아래 → `/pricing`. 금액은 여기 적지 않는다 — `/pricing`이 가격의
+     *  유일한 표시 지점이다(`docs/decisions.md` §6-21). */
+    priceLink: '번역권 가격 보기',
     lite: {
       name: '라이트',
       time: '약 15초',

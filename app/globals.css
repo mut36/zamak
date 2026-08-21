@@ -2401,6 +2401,18 @@ button:disabled {
     font-weight: 600;
     color: var(--text-secondary);
   }
+  /* 라이트/프로 비교표 아래 가격 링크 — CTA가 아니라 링크다. 이 자리의
+     주 행동은 가입(`Cta`)이고, 가격은 궁금한 사람만 새는 옆길이다. */
+  .lp-plan-pricelink {
+    font-size: var(--fs-caption);
+    color: var(--text-secondary);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: color 0.2s;
+  }
+  .lp-plan-pricelink:hover {
+    color: var(--ink-strong);
+  }
   /* 가격표(`/pricing`) — 팩 3개가 넓은 화면에서 한 줄, 모바일에서 세로. */
   .pricing-grid {
     display: grid;

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { COPY } from '../../i18n/simpleCopy';
 import { useAuth } from '../../hooks/useAuth';
@@ -200,6 +201,10 @@ export function LandingPage() {
             <a href='#cps' className='lp-navlink'>
               {L.nav.cps}
             </a>
+            {/* 유일한 페이지 밖 링크라 `Link`다 — 나머지는 앵커다. */}
+            <Link href='/pricing' className='lp-navlink'>
+              {L.nav.pricing}
+            </Link>
             <span className='lp-navsep' aria-hidden />
           </div>
           <Cta
@@ -624,6 +629,18 @@ export function LandingPage() {
                 </div>
               ))}
             </div>
+
+            {/* 가격은 이 비교표 바로 다음에 오는 질문이다("그래서 얼마?").
+                여기 금액을 적지 않는 건 `/pricing`이 가격의 유일한 표시
+                지점이기 때문 — 두 곳에 적으면 한쪽만 고쳐진다. */}
+            <p
+              className='text-center mt-9 reveal'
+              style={revealDelay(3)}
+            >
+              <Link href='/pricing' className='lp-plan-pricelink'>
+                {PLANS.priceLink}
+              </Link>
+            </p>
           </div>
         </section>
 
