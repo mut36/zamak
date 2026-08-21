@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { JetBrains_Mono } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { BRAND, SITE, resolveSiteUrl } from './lib/brand';
@@ -89,6 +90,7 @@ export default function RootLayout({
       </head>
       <body className='antialiased'>
         <ErrorBoundary>{children}</ErrorBoundary>
+        <Analytics />
       </body>
     </html>
   );
