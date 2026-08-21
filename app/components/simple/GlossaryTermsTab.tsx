@@ -26,7 +26,19 @@ export function GlossaryTermsTab({
 
   const updateTerm = (index: number, patch: Partial<GlossaryTerm>) => {
     const terms = sheet.terms.map((t, i) => (i === index ? { ...t, ...patch } : t));
-    onChangeSheet({ ...sheet, terms });
+
+    // 인물에서 다른 유형으로 바꾸면 그 사람이 화자·청자인 관계는 성립하지
+    // 않는다. 서버가 어차피 버리므로, 화면에서 미리 지워 사용자가 "있는 줄
+    // 알았던 관계"를 잃는 일이 없게 한다. (삭제 시 removeTerm의 처리와 같은
+    // 이유다.)
+    const speakers = new Set(
+      terms.filter((t) => t.kind === 'person').map((t) => t.target),
+    );
+    const relations = sheet.relations.filter(
+      (r) => speakers.has(r.from) && speakers.has(r.to),
+    );
+
+    onChangeSheet({ ...sheet, terms, relations });
   };
 
   const removeTerm = (index: number) => {
@@ -42,7 +54,9 @@ export function GlossaryTermsTab({
   const addTerm = () => {
     onChangeSheet({
       ...sheet,
-      terms: [...sheet.terms, { source: '', target: '', kind: 'term' }],
+      // 사용자가 손으로 넣는 항목은 대개 모델이 놓친 인물이고, 인물이어야
+      // 말투 표에서 화자·청자로 쓸 수 있다.
+      terms: [...sheet.terms, { source: '', target: '', kind: 'person' }],
     });
   };
 
@@ -57,7 +71,21 @@ export function GlossaryTermsTab({
         <p className='text-fineprint text-secondary mb-2'>{c.emptyTerms}</p>
       )}
       {sheet.terms.map((term, i) => (
-        <div key={i} className='flex items-center gap-2 mb-2'>
+        <div key={i} className='flex items-center gap-2 mb-2 flex-wrap'>
+          <select
+            className='input !py-1.5 !w-auto'
+            aria-label={c.kindLabel}
+            value={term.kind}
+            onChange={(e) =>
+              updateTerm(i, { kind: e.target.value as GlossaryTerm['kind'] })
+            }
+          >
+            {(Object.keys(c.kinds) as GlossaryTerm['kind'][]).map((k) => (
+              <option key={k} value={k}>
+                {c.kinds[k]}
+              </option>
+            ))}
+          </select>
           <input
             className='input !py-1.5 flex-1'
             placeholder={c.termSourceLabel}
@@ -70,6 +98,12 @@ export function GlossaryTermsTab({
             placeholder={c.termTargetLabel(language.label)}
             value={term.target}
             onChange={(e) => updateTerm(i, { target: e.target.value })}
+          />
+          <input
+            className='input !py-1.5 flex-1'
+            placeholder={c.notePlaceholder}
+            value={term.note ?? ''}
+            onChange={(e) => updateTerm(i, { note: e.target.value })}
           />
           <button
             type='button'

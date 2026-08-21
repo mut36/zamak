@@ -587,6 +587,17 @@ export const COPY = {
       tabTerms: '표기',
       tabRelations: '말투',
       termSourceLabel: '원문',
+      kindLabel: '유형',
+      /** 키는 `GlossaryTerm['kind']`와 정확히 같아야 한다. 프롬프트용 KIND_LABEL
+       *  (`app/lib/prompts/glossaryContent.ts`)과는 일부러 합치지 않는다 —
+       *  프롬프트 문구가 화면 문구를 따라 흔들리면 안 된다. */
+      kinds: {
+        person: '인물',
+        place: '장소',
+        org: '조직',
+        term: '용어',
+      },
+      notePlaceholder: '메모 (예: 주인공의 형)',
       /** Doubles as the placeholder, so it names the actual target language. */
       termTargetLabel: (language: string) => `${language} 표기`,
       addTerm: '+ 새 항목',
