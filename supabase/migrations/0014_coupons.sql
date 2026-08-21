@@ -58,6 +58,9 @@ alter table public.coupon_redemptions enable row level security;
 -- 공백 클래스를 `\s`(POSIX `[[:space:]]`)에 맡기지 않고 풀어 쓴 이유: Postgres의
 -- `\s`는 유니코드 공백(NBSP, 전각 공백 등)을 JS `\s`만큼 걷어낸다는 보장이 없다.
 -- DB가 클라이언트보다 덜 걷어내면 "신뢰하는 쪽은 DB"가 거짓이 된다.
+-- 그 문자들을 소스에 그대로 박지 않고 `U&` 이스케이프로 적는 이유: 마이그레이션은
+-- 한 번 적용되면 되돌릴 수 없는데, 이 파일을 린트하는 도구가 없어 에디터나 패치가
+-- 조용히 뭉개도 아무도 못 잡는다.
 create or replace function public.normalize_coupon_code(p_code text)
 returns text
 language sql
@@ -65,7 +68,7 @@ immutable
 as $$
   select upper(regexp_replace(
     normalize(coalesce(p_code, ''), nfc),
-    '[[:space:]   -     　﻿]',
+    U&'[[:space:]\00a0\1680\2000-\200a\2028\2029\202f\205f\3000\feff]',
     '',
     'g'
   ));
