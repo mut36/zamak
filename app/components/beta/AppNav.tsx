@@ -24,7 +24,9 @@ export function AppNav({ credits, onHome }: AppNavProps) {
         <div className='flex items-center gap-3'>
           {credits && (
             <span className='inline-flex items-center rounded-[var(--r-btn)] bg-[var(--fill-hover)] px-[13px] py-1.5 text-fineprint font-medium text-ink'>
-              {COPY.nav.credits(credits.lite, credits.pro)}
+              {credits.unlimitedUntil !== undefined
+                ? COPY.nav.unlimited(credits.unlimitedUntil)
+                : COPY.nav.credits(credits.lite, credits.pro)}
             </span>
           )}
 

@@ -12,6 +12,11 @@ export type CreditKind = 'lite' | 'pro';
 export interface CreditBalances {
   lite: number;
   pro: number;
+  /**
+   * 무제한 계정의 만료 시각(ISO). `null`이면 무기한(운영자), 필드 자체가
+   * 없으면 무제한이 아닌 보통 계정이다.
+   */
+  unlimitedUntil?: string | null;
 }
 
 /**

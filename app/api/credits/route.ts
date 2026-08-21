@@ -23,15 +23,23 @@ export async function GET() {
   // 그대로 내보내면 번역은 되는데 화면만 "0편 남음"이 되므로 표시용 값으로
   // 바꿔 준다. 조회가 실패해도(표가 아직 없는 DB 등) 잔액 화면이 깨지면 안
   // 되니 에러는 삼키고 일반 계정으로 취급한다.
+  //
+  // 만료 조건은 begin_translation_job(0014)과 **같아야 한다** — 다르면 화면은
+  // 무제한이라 하는데 번역은 거절당하는 상태가 생긴다.
   const { data: tester } = await supabase
     .from('unlimited_testers')
-    .select('user_id')
+    .select('expires_at')
     .eq('user_id', auth.user.id)
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
     .maybeSingle();
 
   if (tester) {
     return NextResponse.json({
-      credits: { lite: UNLIMITED_CREDIT_DISPLAY, pro: UNLIMITED_CREDIT_DISPLAY },
+      credits: {
+        lite: UNLIMITED_CREDIT_DISPLAY,
+        pro: UNLIMITED_CREDIT_DISPLAY,
+        unlimitedUntil: tester.expires_at ?? null,
+      },
       email: auth.user.email ?? null,
     });
   }
