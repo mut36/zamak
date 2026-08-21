@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import robots from './robots';
 import sitemap from './sitemap';
+import { SITE } from './lib/brand';
 
 /**
  * These two files decide what a stranger can find. The invariant worth pinning
@@ -111,5 +112,24 @@ describe('canonical URLs', () => {
     expect(sitemap().map((e) => new URL(e.url).pathname).sort()).toEqual(
       [...declared].sort(),
     );
+  });
+});
+
+/**
+ * 네이버 웹페이지 최적화 진단이 80자를 넘는 설명문을 경고한다. 2026-08-21에
+ * 실제로 걸렸고(당시 101자), `페이지 설명`과 `Open Graph 설명` 두 항목이
+ * 동시에 빨간불이었다 — 한 문자열이 셋을 다 먹이기 때문이다.
+ *
+ * 길이 규칙을 주석으로만 적어두면 다음 사람이 문구를 늘릴 때 아무것도 막지
+ * 못한다. 진단은 우리가 돌려야 보이고, 그때는 이미 배포된 뒤다.
+ */
+describe('SITE.description', () => {
+  it('네이버 권장 80자 이내다', () => {
+    expect(SITE.description.length).toBeLessThanOrEqual(80);
+  });
+
+  it('제목과 설명이 서로 다른 말을 한다', () => {
+    // 같은 문장을 양쪽에 넣으면 검색 결과에서 한 줄이 통째로 낭비된다.
+    expect(SITE.description).not.toBe(SITE.title);
   });
 });

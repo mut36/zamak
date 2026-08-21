@@ -35,16 +35,22 @@ export const SITE = {
   url: 'https://zamak.app',
   // Title focuses on the structural guarantee (timecode integrity), not speed.
   title: 'ZAMAK — 타임코드가 밀리지 않는 자막 번역기',
-  // Description covers: formats, timecode safety, output. Deliberately
-  // doesn't claim a target-language count — `languages.ts`'s TARGET_LANGS has
-  // 7 enabled entries, but the wizard has no picker wired to setTargetLang,
-  // so every job actually ships Korean today (CLAUDE.md: "도착어는 한국어만
-  // 활성"). "7개 도착어" here would be a meta-description overclaim of
-  // exactly the kind `docs/TODO.md`'s landing-copy audit already caught
-  // elsewhere — this string just lives outside `simpleCopy.ts` so that sweep
-  // never saw it. Revert to a count once the picker ships.
-  description:
-    'SRT·VTT·SMI·ASS를 올리고, AI는 대사만 한국어로 번역하며 코드가 타임코드를 다시 연결해 후속 자막의 연쇄 밀림을 막습니다. 다운로드는 SRT 또는 원본 형식(VTT).',
+  // ⚠️ **80자 이내로 유지할 것.** 네이버 웹페이지 최적화 진단이 그 이상을
+  // 경고한다(2026-08-21 실측: 종전 101자 문구가 `페이지 설명`·`Open Graph
+  // 설명` 두 항목에서 동시에 걸렸다). 두 항목이 함께 걸리는 이유는 이 한
+  // 문자열이 `metadata.description`과 og/twitter 설명을 전부 먹이기
+  // 때문이다 — 여기만 고치면 셋이 같이 고쳐진다. `app/seo.test.ts`가 길이를
+  // 못 박는다(주석만으로는 다음 사람이 늘리는 걸 못 막는다).
+  //
+  // 종전 문구는 포맷 나열(SRT·VTT·SMI·ASS)과 다운로드 형식까지 담았는데,
+  // 검색 결과에서 잘려나가는 뒷부분이라 아무도 읽지 않았다. 대표 결정으로
+  // 혜택 중심으로 다시 썼다(40자).
+  //
+  // 여전히 도착어 개수는 주장하지 않는다 — `languages.ts`의 TARGET_LANGS는
+  // 7개가 켜져 있지만 위저드에 setTargetLang을 물린 피커가 없어 실제로는
+  // 전부 한국어로 나간다(CLAUDE.md: "도착어는 한국어만 활성"). 피커가
+  // 나오면 그때 개수를 넣는다.
+  description: '쉽고 빠른 자막 초벌 번역. 자연스러운 한국어 자막을 빠르게 완성하세요.',
   locale: 'ko_KR',
 } as const;
 
