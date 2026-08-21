@@ -598,6 +598,14 @@ export const COPY = {
         `${language}에는 존댓말/반말 구분이 없어 표기만 통일합니다.`,
       relationRange: (from: number, to: number) => `${from}~${to}번 구간`,
       refetch: '다시 추출',
+      addRelation: '+ 말투 관계 추가',
+      /** 구간 입력 두 칸의 접근성 라벨. 화면에는 안 보인다. */
+      rangeFrom: '시작 자막 번호',
+      rangeTo: '끝 자막 번호',
+      /** 인물 항목이 둘 미만이면 관계를 만들 수 없다 — 화자·청자가 모두 인물이어야 한다. */
+      needTwoPeople: '인물 항목이 둘 이상이어야 말투 관계를 만들 수 있습니다.',
+      /** 번역 AI가 이 표를 그대로 따른다는 사실을 사람에게 알린다(스펙 §3-0). */
+      relationsNotice: '번역은 이 표를 그대로 따릅니다. 틀린 곳은 고쳐 주세요.',
     },
   },
 
