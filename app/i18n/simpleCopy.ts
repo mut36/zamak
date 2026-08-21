@@ -16,6 +16,15 @@ export const COPY = {
 
   nav: {
     credits: (lite: number, pro: number) => `라이트 ${lite} · 프로 ${pro}`,
+    // 무제한 계정은 편수가 의미 없다. 만료가 있으면 날짜까지, 없으면(운영자)
+    // 그냥 무제한.
+    unlimited: (until: string | null) =>
+      until
+        ? `무제한 · ${new Date(until).toLocaleDateString('ko-KR', {
+            month: 'numeric',
+            day: 'numeric',
+          })}까지`
+        : '무제한',
     mypage: '마이페이지',
   },
 
