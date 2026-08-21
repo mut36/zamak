@@ -150,6 +150,60 @@ describe('extractCastSheet (gemini provider)', () => {
     expect(result.terms[0].source).toBe('Jonathan');
   });
 
+  it('라틴 문자 source는 단어 경계로 판정한다 (Al은 Always 안에서 안 걸린다)', async () => {
+    mocks.generateContent.mockResolvedValue(
+      jsonResponse({
+        terms: [
+          { source: 'Al', target: '알', kind: 'person' },
+          { source: 'Sam', target: '샘', kind: 'person' },
+        ],
+        relations: [],
+      }),
+    );
+
+    const result = await extractCastSheet(
+      '1\n00:00:01,000 --> 00:00:02,000\nAlways ask Sam.',
+      movieInfo,
+      'ko',
+    );
+
+    expect(result.terms.map((t) => t.source)).toEqual(['Sam']);
+  });
+
+  it('CJK source는 부분문자열 판정을 유지한다 (단어 경계가 없는 언어)', async () => {
+    mocks.generateContent.mockResolvedValue(
+      jsonResponse({
+        terms: [{ source: '조너선', target: '조너선', kind: 'person' }],
+        relations: [],
+      }),
+    );
+
+    const result = await extractCastSheet(
+      '1\n00:00:01,000 --> 00:00:02,000\n조너선이었다.',
+      movieInfo,
+      'ko',
+    );
+
+    expect(result.terms).toHaveLength(1);
+  });
+
+  it('정규식 메타문자가 든 source도 터지지 않는다', async () => {
+    mocks.generateContent.mockResolvedValue(
+      jsonResponse({
+        terms: [{ source: 'Dr. Who (M.D.)', target: '닥터 후', kind: 'person' }],
+        relations: [],
+      }),
+    );
+
+    const result = await extractCastSheet(
+      '1\n00:00:01,000 --> 00:00:02,000\nDr. Who (M.D.) arrived.',
+      movieInfo,
+      'ko',
+    );
+
+    expect(result.terms).toHaveLength(1);
+  });
+
   it('drops a relation referencing a target name that is not in the surviving terms', async () => {
     mocks.generateContent.mockResolvedValue(
       jsonResponse({

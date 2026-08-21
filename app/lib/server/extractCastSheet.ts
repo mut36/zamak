@@ -239,8 +239,45 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+/**
+ * 라틴 문자·숫자·기본 문장부호로만 이루어진 문자열인지. 이런 source에만 단어
+ * 경계를 적용한다 — 한국어·일본어·중국어에는 단어 경계 개념이 없어 경계 검사가
+ * 오히려 정상 항목을 떨어뜨린다.
+ */
+const BOUNDARY_SAFE = /^[\p{Script=Latin}0-9\s'’.,\-()]+$/u;
+
+function escapeRegExp(source: string): string {
+  return source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** 경계 판정이 가능한 source면 그 정규식, 아니면 null(부분문자열로 폴백). */
+function boundaryMatcher(needle: string): RegExp | null {
+  if (!BOUNDARY_SAFE.test(needle)) return null;
+  return new RegExp(
+    `(?<![\\p{L}\\p{N}])${escapeRegExp(needle)}(?![\\p{L}\\p{N}])`,
+    'gu',
+  );
+}
+
+/**
+ * HALLUCINATION FILTER의 판정부. `includes('Al')`은 "Always" 안에서도 참이라,
+ * 모델이 지어낸 짧은 이름이 필터를 통과해 모든 청크의 고정 표기가 될 수 있었다.
+ */
+function appearsInSource(haystack: string, needle: string): boolean {
+  if (!needle) return false;
+  const matcher = boundaryMatcher(needle);
+  return matcher ? matcher.test(haystack) : haystack.includes(needle);
+}
+
+/**
+ * 등장 빈도. 정렬에만 쓰지만 `appearsInSource`와 **같은 판정**을 써야 한다 —
+ * 다른 규칙을 쓰면 "필터는 통과했는데 0회로 세어지는" 항목이 생긴다.
+ */
 function countOccurrences(haystack: string, needle: string): number {
   if (!needle) return 0;
+  const matcher = boundaryMatcher(needle);
+  if (matcher) return (haystack.match(matcher) ?? []).length;
+
   let count = 0;
   let index = 0;
   for (;;) {
@@ -283,7 +320,7 @@ export function sanitizeCastSheet(
       // HALLUCINATION FILTER: a term the model invented (not present in the
       // actual subtitles) must never become the fixed spelling every chunk is
       // told to use.
-      if (!sourceContent.includes(source)) return null;
+      if (!appearsInSource(sourceContent, source)) return null;
       if (seenSource.has(source)) return null;
       seenSource.add(source);
       return note ? { source, target, kind, note } : { source, target, kind };
