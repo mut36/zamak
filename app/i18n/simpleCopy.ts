@@ -889,6 +889,27 @@ export const COPY = {
     vatNote: '모든 금액은 부가세 포함입니다.',
   },
 
+  // 지인용 비밀코드. 판정은 전부 서버에 있고 여기서는 세 가지 결말을 사람
+  // 말로 바꾸기만 한다 — 실패 사유를 더 캐묻지 않는 것도 의도다(코드 존재
+  // 여부를 알려주면 그게 열거 힌트가 된다).
+  coupon: {
+    title: '쿠폰 코드',
+    placeholder: '받으신 코드를 입력하세요',
+    submit: '등록',
+    submitting: '확인 중…',
+    ok: (until: string | null) =>
+      until
+        ? `등록됐습니다. ${new Date(until).toLocaleDateString('ko-KR', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })}까지 번역권 차감 없이 쓰실 수 있어요.`
+        : '등록됐습니다.',
+    alreadyRedeemed: '이미 사용하신 코드예요.',
+    invalid: '사용할 수 없는 코드예요. 다시 확인해 주세요.',
+    failed: '잠시 후 다시 시도해 주세요.',
+  },
+
   footer: {
     feedback: '피드백 보내기',
     feedbackEmail: 'hello@mut36.com',

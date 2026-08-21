@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppNav } from '../components/beta/AppNav';
 import { SiteFooter } from '../components/SiteFooter';
+import { CouponRedeemCard } from '../components/CouponRedeemCard';
 import { useAuth } from '../hooks/useAuth';
 import { fetchHistory } from '../lib/client/history';
 import type { HistoryItem } from '../lib/jobHistory';
@@ -75,7 +76,7 @@ function HistoryRow({ item }: { item: HistoryItem }) {
  */
 export default function MyPage() {
   const router = useRouter();
-  const { user, credits, loading, signOut } = useAuth();
+  const { user, credits, loading, signOut, refreshBalance } = useAuth();
   /** null = still fetching; [] = fetched and genuinely empty. */
   const [history, setHistory] = useState<HistoryItem[] | null>(null);
 
@@ -118,9 +119,13 @@ export default function MyPage() {
               <CreditCard label={c.proCredits} count={credits?.pro ?? 0} />
             </div>
 
-            <p className='text-caption-sm text-secondary mt-3 mb-7'>
+            <p className='text-caption-sm text-secondary mt-3 mb-3'>
               {c.retention(RESULT_RETENTION_DAYS)}
             </p>
+
+            <div className='mb-7'>
+              <CouponRedeemCard onRedeemed={refreshBalance} />
+            </div>
 
             <p className='qlabel'>{c.historyTitle}</p>
 
