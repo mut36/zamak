@@ -278,6 +278,12 @@ export const POLISH_CHUNK_SIZE = 150;
 export const UNLIMITED_CREDIT_DISPLAY = 999;
 
 /**
+ * 쿠폰 코드 입력 상한. 코드는 사람이 외워서 치는 짧은 말이고, 이 길이를
+ * 넘는 입력은 코드가 아니라 쓰레기다 — 정규화 전에 잘라 버린다.
+ */
+export const COUPON_CODE_MAX_LENGTH = 64;
+
+/**
  * How long a paid-for job stays usable, in minutes.
  *
  * A job is opened once per file and every chunk request is checked against it.
@@ -327,6 +333,12 @@ export const RATE_LIMITS = {
    * 요청을 쪼갰다면 하루 5회가 파일 한두 개로 줄었을 것이다.
    */
   polish: { limit: 5, windowSeconds: 86_400 },
+  /**
+   * /api/coupons/redeem — 비밀코드 교환. 지인 배포용이라 코드가 짧고 사람이
+   * 기억할 수 있는 말이므로, 무차별 대입이 실제로 가능한 유일한 입구다.
+   * 정상 사용자는 평생 한두 번 부르는 경로라 한도를 아주 낮게 잡는다.
+   */
+  coupon: { limit: 5, windowSeconds: 3_600 },
 } as const;
 
 export type RateLimitBucket = keyof typeof RATE_LIMITS;
