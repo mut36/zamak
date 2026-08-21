@@ -173,6 +173,10 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   표가 틀렸을 때 바로잡을 수 있는 유일한 지점이다. 카드는 **말투 탭이 펼쳐진 채**
   나온다 — 틀릴 수 있는 쪽이 말투이기 때문이다(표기는 실측에서 이형 0건).
 - **품질 레버**:
+  - **target에 자막에 없는 성·직함이 붙음**(`Camillo` → `카밀로 벨로키오`) →
+    `cast_sheet_extraction.txt` 할 일 1의 "target은 source를 대체할 표기" 조항.
+    번역 AI가 표를 그대로 따르므로(§6-24) 이게 틀리면 애칭을 부르는 장면까지
+    풀네임으로 나간다. 성은 `note`에 적히면 된다 — note도 프롬프트에 함께 나간다.
   - 표기·관계가 틀리거나 아예 안 잡힘 → `prompts/common/cast_sheet_extraction.txt`
     (말투 파트는 별도 파일 `prompts/common/cast_sheet_formality_task.txt` — 말투 축이
     있는 언어에서만 주입됨, `extractCastSheet.ts`의 `buildSystemInstruction`)
