@@ -27,6 +27,31 @@ function CreditCard({ label, count }: { label: string; count: number }) {
   );
 }
 
+/**
+ * 무제한 계정(운영자 또는 쿠폰 사용자)의 잔액 카드.
+ *
+ * 잔액 숫자를 아예 안 쓴다 — /api/credits가 표시용으로 내려보내는 999를 그대로
+ * 그리면 "999회 남음"이라는 거짓말이 된다. 만료가 있으면 언제까지인지가 이
+ * 화면에서 유일하게 의미 있는 숫자다.
+ */
+function UnlimitedCreditCard({ until }: { until: string | null }) {
+  return (
+    <div className='card p-[22px_24px]'>
+      <div className='text-caption text-tertiary'>{c.unlimitedTitle}</div>
+      <div className='mt-1 flex items-baseline gap-2'>
+        <span className='text-h1-sm font-semibold tracking-[-0.01em] leading-none'>
+          {c.unlimited}
+        </span>
+        {until && (
+          <span className='text-title-sm font-normal text-tertiary'>
+            {c.unlimitedUntil(until)}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function HistoryRow({ item }: { item: HistoryItem }) {
   // Never show the raw model id on screen — map to the two display names.
   const modelLabel =
@@ -114,10 +139,14 @@ export default function MyPage() {
             </div>
 
             <p className='qlabel'>{c.creditsTitle}</p>
-            <div className='grid grid-cols-2 gap-[14px]'>
-              <CreditCard label={c.liteCredits} count={credits?.lite ?? 0} />
-              <CreditCard label={c.proCredits} count={credits?.pro ?? 0} />
-            </div>
+            {credits?.unlimitedUntil !== undefined ? (
+              <UnlimitedCreditCard until={credits.unlimitedUntil} />
+            ) : (
+              <div className='grid grid-cols-2 gap-[14px]'>
+                <CreditCard label={c.liteCredits} count={credits?.lite ?? 0} />
+                <CreditCard label={c.proCredits} count={credits?.pro ?? 0} />
+              </div>
+            )}
 
             <p className='text-caption-sm text-secondary mt-3 mb-3'>
               {c.retention(RESULT_RETENTION_DAYS)}

@@ -853,6 +853,17 @@ export const COPY = {
     liteCredits: '라이트 번역권',
     proCredits: '프로 번역권',
     unit: '회',
+    // 무제한 계정은 잔액이 숫자로 의미가 없다 — UNLIMITED_CREDIT_DISPLAY(999)를
+    // 그대로 보여주면 "999회 남음"이라는 거짓말이 된다. 칩(`COPY.nav.unlimited`)과
+    // 같은 말을 쓴다.
+    unlimitedTitle: '번역권',
+    unlimited: '무제한',
+    unlimitedUntil: (until: string) =>
+      `${new Date(until).toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })}까지`,
     historyTitle: '번역 기록',
     retention: (days: number) => `완성된 자막은 ${days}일간 보관됩니다.`,
     download: '다시 받기',
