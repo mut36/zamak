@@ -712,8 +712,7 @@ button:disabled {
     color: var(--text-secondary);
   }
 
-  /* 번역 품질 라벨 옆 "?" 팝오버 토글 — `.seller-toggle-btn`(푸터)과 같은
-     크롬리스 텍스트 버튼 패턴. */
+  /* 번역 품질 라벨 옆 "?" 팝오버 토글 — 크롬리스 텍스트 버튼 패턴. */
   .plan-info-toggle {
     display: inline-flex;
     align-items: center;
@@ -2402,45 +2401,16 @@ button:disabled {
     font-weight: 600;
     color: var(--text-secondary);
   }
-  /* 판매자 표시 아코디언 */
+  /* 판매자 표시 — 접지 않는다(`SellerInfo` 주석 참고). */
   .site-footer-seller-wrap {
     display: flex;
     flex-direction: column;
     gap: 8px;
   }
-  .site-footer-seller-toggle {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 5px 9px;
+  .site-footer-seller-operator {
     font-size: var(--fs-fineprint);
-    color: var(--text-quaternary);
+    color: var(--text-tertiary);
     line-height: 1.6;
-  }
-  .seller-toggle-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--text-quaternary);
-    font-size: var(--fs-fineprint);
-    font-weight: 400;
-    transition: color 0.2s;
-    background: transparent;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-  }
-  .seller-toggle-btn:hover {
-    color: var(--text-secondary);
-    text-decoration: underline;
-  }
-  .seller-toggle-btn svg {
-    width: 12px;
-    height: 12px;
-    transition: transform 0.2s;
-  }
-  .seller-toggle-btn[aria-expanded='true'] svg {
-    transform: rotate(180deg);
   }
   /* 판매자 표시는 <address> — 기본 이탤릭을 되돌리고, `·` 구분자가 좁은
      화면에서 줄바꿈을 타도록 inline flex wrap으로 흘린다. */

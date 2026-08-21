@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { APP_VERSION, KAKAO_OPEN_CHAT_URL } from '../config/constants';
 import { COPY } from '../i18n/simpleCopy';
 import { Wordmark } from './Wordmark';
-import { SellerInfoToggle } from './SellerInfoToggle';
+import { SellerInfo } from './SellerInfo';
 
 const F = COPY.footer;
 
@@ -55,9 +55,9 @@ export function SiteFooter({ withBottomBar }: { withBottomBar?: boolean }) {
       </div>
 
       <div className='site-footer-bottom'>
-        <SellerInfoToggle />
+        <SellerInfo />
         <div className='site-footer-copyright'>
-          <span>{F.copyright}</span>
+          <span>{F.copyright(COPY.seller.name)}</span>
           <span className='mono'>v{APP_VERSION} · Beta</span>
         </div>
       </div>

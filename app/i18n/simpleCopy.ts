@@ -815,13 +815,17 @@ export const COPY = {
   footer: {
     feedback: '피드백 보내기',
     feedbackEmail: 'hello@mut36.com',
-    sellerInfo: '사업자 정보 확인',
+    /** 브랜드명(ZAMAK)과 상호(뭍36)를 잇는 문장 — PG 심사가 정확히 이 연결고리를
+     *  못 찾아 한 번 반려됐다. 상호는 `COPY.seller.name`에서 받는다. */
+    operatedBy: (name: string) => `ZAMAK은 ${name}이 운영하는 서비스입니다.`,
     tagline: '타임코드가 밀리지 않는 자막 번역기.',
     serviceGroup: '서비스',
     policyGroup: '정책',
     home: '홈',
     mypage: '마이페이지',
-    copyright: '© 2026 ZAMAK. All rights reserved.',
+    // 브랜드명이 아니라 상호를 적는다 — 푸터에서 유일하게 ZAMAK만 보이던 줄이라
+    // 상호와 어긋나 보였다(`SellerInfo` 주석 참고).
+    copyright: (name: string) => `© 2026 ${name}. All rights reserved.`,
     eventBadge: (hasKakao: boolean) =>
       hasKakao
         ? '피드백 이벤트: 오픈카톡·이메일로 의견 주시면 번역권을 더 드려요.'
