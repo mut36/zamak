@@ -13,7 +13,12 @@ import type {
   TranslationStyle,
 } from '../../types/translation';
 import type { CastSheet, GlossaryTerm, SpeechRelation } from '../../types/glossary';
-import { SPEECH_FORMALITIES, type SpeechFormality } from '../../types/glossary';
+import {
+  NARRATION_STYLES,
+  SPEECH_FORMALITIES,
+  type NarrationStyle,
+  type SpeechFormality,
+} from '../../types/glossary';
 import {
   DEFAULT_TARGET_LANG,
   getEnabledTargetLang,
@@ -180,7 +185,13 @@ function parseCastSheet(value: unknown): CastSheet | undefined {
     .filter((r) => speakers.has(r.from) && speakers.has(r.to))
     .slice(0, GLOSSARY_MAX_RELATIONS);
 
-  return { terms, relations };
+  // 조작되거나 모르는 값은 'none'으로 — 틀린 문체 지정은 파일 전체의 어미를
+  // 바꾸므로, 의심스러우면 안 붙이는 쪽이 안전하다(sanitizeCastSheet와 같은 규칙).
+  const narration = NARRATION_STYLES.includes(value.narration as NarrationStyle)
+    ? (value.narration as NarrationStyle)
+    : 'none';
+
+  return { terms, relations, narration };
 }
 
 function parseTranslationStyle(value: unknown): 'meaning' | 'cinematic' {

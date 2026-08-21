@@ -1,6 +1,11 @@
 'use client';
 
-import type { CastSheet, GlossaryTerm, SpeechRelation } from '../../types/glossary';
+import type {
+  CastSheet,
+  GlossaryTerm,
+  NarrationStyle,
+  SpeechRelation,
+} from '../../types/glossary';
 import { SPEECH_FORMALITIES } from '../../types/glossary';
 import type { FormalityAxis } from '../../config/languages';
 import { COPY } from '../../i18n/simpleCopy';
@@ -99,6 +104,30 @@ export function SpeechRelationsTab({
   return (
     <div>
       <p className='text-fineprint text-secondary mb-2'>{c.relationsNotice}</p>
+
+      {/* 내레이션 문체는 관계가 아니라 작품 전체의 성질이라 표 위에 홀로 선다.
+          번역 AI가 이 값을 그대로 따르므로 관계표와 같은 이유로 고칠 수 있어야
+          한다 — 틀린 지정은 파일 전체의 어미를 바꾼다. */}
+      <div className='flex items-center gap-2 mb-3'>
+        <span className='text-fineprint text-secondary'>{c.narrationLabel}</span>
+        <select
+          className='input !py-1.5 !w-auto'
+          aria-label={c.narrationLabel}
+          value={sheet.narration}
+          onChange={(e) =>
+            onChangeSheet({
+              ...sheet,
+              narration: e.target.value as NarrationStyle,
+            })
+          }
+        >
+          {(Object.keys(c.narrations) as NarrationStyle[]).map((n) => (
+            <option key={n} value={n}>
+              {c.narrations[n]}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {sheet.relations.length === 0 && (
         <p className='text-fineprint text-secondary mb-2'>{c.emptyRelations}</p>

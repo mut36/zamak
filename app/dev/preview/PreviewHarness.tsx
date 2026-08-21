@@ -84,6 +84,7 @@ const MOCK_CAST_SHEET: CastSheet = {
     { from: '레오나르디', to: '알도 모로', speech: 'formal', basis: '상사–부하', fromBlock: 1, toBlock: 461 },
     { from: '알도 모로', to: '프란체스코 코시가', speech: 'informal', basis: '오랜 동료', fromBlock: 1, toBlock: 461 },
   ],
+  narration: 'formal',
 };
 
 const SRT = '1\n00:00:01,000 --> 00:00:03,000\n안녕하세요.\n';

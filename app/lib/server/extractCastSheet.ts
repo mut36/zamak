@@ -9,8 +9,17 @@ import {
   GLOSSARY_THINKING_LEVEL,
   type GlossaryProvider,
 } from '../../config/constants';
-import type { CastSheet, GlossaryTerm, SpeechRelation } from '../../types/glossary';
-import { EMPTY_CAST_SHEET, SPEECH_FORMALITIES } from '../../types/glossary';
+import type {
+  CastSheet,
+  GlossaryTerm,
+  NarrationStyle,
+  SpeechRelation,
+} from '../../types/glossary';
+import {
+  EMPTY_CAST_SHEET,
+  NARRATION_STYLES,
+  SPEECH_FORMALITIES,
+} from '../../types/glossary';
 import type { MovieInfo } from '../../types/translation';
 import { resolveTargetLang, type TargetLang } from '../../config/languages';
 import { formatBlocksForModel, parseSrtBlocks } from '../srt';
@@ -65,8 +74,9 @@ const CAST_SHEET_SCHEMA = {
         ],
       },
     },
+    narration: { type: Type.STRING, enum: NARRATION_STYLES },
   },
-  required: ['terms', 'relations'],
+  required: ['terms', 'relations', 'narration'],
 };
 
 /**
@@ -109,8 +119,9 @@ export const CAST_SHEET_JSON_SCHEMA: Record<string, unknown> = {
         additionalProperties: false,
       },
     },
+    narration: { type: 'string', enum: [...NARRATION_STYLES] },
   },
-  required: ['terms', 'relations'],
+  required: ['terms', 'relations', 'narration'],
   additionalProperties: false,
 };
 
@@ -239,6 +250,7 @@ export function buildUserTurn(
 interface RawCastSheet {
   terms?: unknown;
   relations?: unknown;
+  narration?: unknown;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -407,7 +419,13 @@ export function sanitizeCastSheet(
     );
   }
 
-  return { terms, relations };
+  // 모르는 값은 'none'으로 떨어뜨린다 — 안 붙는 쪽이 안전하다. 틀린 문체 지정은
+  // 파일 전체를 망치지만, 없으면 규칙 파일의 "해요체 금지" 한 줄이 받아준다.
+  const narration = NARRATION_STYLES.includes(raw.narration as NarrationStyle)
+    ? (raw.narration as NarrationStyle)
+    : 'none';
+
+  return { terms, relations, narration };
 }
 
 /** Read at call time so harnesses can flip provider after module load. */

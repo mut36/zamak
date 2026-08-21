@@ -150,6 +150,12 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   말투 값은 언어 중립(`formal`/`informal`/`mixed`)으로 저장하고, 프롬프트·UI에는
   도착어의 어휘(존댓말·반말 / 敬語·タメ口 / usted·tú …)로 번역해 보여준다 —
   라벨 출처는 `app/config/languages.ts`의 `TargetLang.formality`.
+  ③**내레이션 문체**(`CastSheet.narration` — `none`/`formal`/`literary`/`mixed`)도
+  같이 판정한다. 청크마다 따로 판단하면 1번 청크는 낭독으로 3번 청크는 서술로 읽어
+  어미가 갈리므로 파일당 한 번 정한다. 렌더는 태그가 아니라 유저 턴의 한 줄이고
+  (`NARRATION_LINE`, `glossaryContent.ts`), `none`이면 아무것도 안 붙는다.
+  잘못된 해요체 내레이션은 프리패스가 안 도는 라이트에서도 결함이므로,
+  `translation_rules_ko.txt` 9번이 "대화가 아닌 글에 해요체 금지"를 상시로 받는다.
   **말투 축이 없는 언어(영어·중국어)는 `formality: null`이라 relations를 아예 뽑지
   않고 `<speech_relations>` 태그도 나가지 않는다**(§7). 파일당 1회이고
   청크별 병렬 번역 호출과 별개 — 결과가 모든 청크 프롬프트에 주입된다(§7). **OFF가
@@ -295,7 +301,8 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   - **유저 턴**: `<content_metadata>`(`formatMovieInfo` — 제목/연도/장르/배경·시대/톤앤매너)
     + `<user_notes>` + 청크 위치 + `<glossary>`(파일 전체 표기, §2-C 켰을 때만) +
     `<speech_relations>`(이 청크의 블록 범위와 겹치는 관계만, `getBlockIndexRange` +
-    `renderGlossaryTags` — §2-C) + `<subtitle_data>`(타임스탬프 제거, **줄마다
+    `renderGlossaryTags` — §2-C) + 내레이션 문체 한 줄(§2-C, `narration !== 'none'`
+    일 때만) + `<subtitle_data>`(타임스탬프 제거, **줄마다
     `[N] 대사` 표식** — `formatBlocksForModel`, `srt.ts`) + 블록 수 지시(구조 기반
     카운트, `parseSrtBlocks(...).length`)
   - **규칙 파일은 lean 체제**(2026-07-28, `decisions.md` §2-1 (3)): 7개 규칙, 언어당

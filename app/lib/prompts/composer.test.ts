@@ -159,6 +159,7 @@ describe('prompt composition', () => {
       castSheet: {
         terms: [{ source: 'Jonathan', target: '조너선', kind: 'person' as const }],
         relations: [],
+        narration: 'none' as const,
       },
     });
 
@@ -178,7 +179,7 @@ describe('prompt composition', () => {
       translationStyle: 'meaning',
       subtitleContent: '1\n00:00:01,000 --> 00:00:02,000\nHello.',
       chunkPosition: { index: 1, total: 1 },
-      castSheet: { terms: [], relations: [] },
+      castSheet: { terms: [], relations: [], narration: 'none' },
     });
 
     expect(user).not.toContain('<glossary>');
@@ -208,6 +209,7 @@ describe('prompt composition', () => {
           toBlock: 1000,
         },
       ],
+      narration: 'none' as const,
     };
 
     const { user } = await composeTranslationPrompt('gemini', {
@@ -295,6 +297,7 @@ describe('prompt composition', () => {
           toBlock: 2,
         },
       ],
+      narration: 'none' as const,
     };
     const base = {
       movieInfo,

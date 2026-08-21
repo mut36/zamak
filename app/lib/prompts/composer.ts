@@ -50,7 +50,7 @@ export async function composeTranslationPrompt(
   // in a chunk covering blocks 900-1000. Terms (spelling) are not filtered —
   // consistent spelling matters file-wide regardless of chunk.
   const chunkRange = getBlockIndexRange(context.subtitleContent);
-  const { glossary, speechRelations } = renderGlossaryTags(
+  const { glossary, speechRelations, narration } = renderGlossaryTags(
     context.castSheet,
     chunkRange,
     getTargetLang(context.targetLanguage)?.formality ?? null,
@@ -85,6 +85,7 @@ export async function composeTranslationPrompt(
     translationVariables.chunkContext,
     glossary,
     speechRelations,
+    narration,
     `<subtitle_data>\n${formatted}\n</subtitle_data>`,
     blockCountInstruction,
   ]

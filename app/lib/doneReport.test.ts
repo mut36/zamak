@@ -45,6 +45,7 @@ describe('buildReport', () => {
         relations: [
           { from: '핀', to: '토마스', speech: 'formal', fromBlock: 1, toBlock: 1204 },
         ],
+        narration: 'none',
       },
     });
     expect(withSheet.find((i) => i.key === 'glossary')?.params).toEqual({ terms: 2 });

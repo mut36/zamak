@@ -153,6 +153,24 @@ describe('translation request validation', () => {
     expect(result.castSheet?.relations).toHaveLength(0);
   });
 
+  it('모르는 내레이션 값은 none으로 떨어뜨린다', () => {
+    const build = (narration: unknown) =>
+      parseChunkTranslationRequest({
+        chunk: 'subtitle',
+        chunkIndex: 1,
+        totalChunks: 1,
+        movieInfo,
+        jobId,
+        model: PRO_MODEL,
+        castSheet: { terms: [], relations: [], narration },
+      });
+
+    // 틀린 문체 지정은 파일 전체의 어미를 바꾼다 — 의심스러우면 안 붙인다.
+    expect(build('작가체').castSheet?.narration).toBe('none');
+    expect(build(undefined).castSheet?.narration).toBe('none');
+    expect(build('literary').castSheet?.narration).toBe('literary');
+  });
+
   it('defaults to the current meaning-first style', () => {
     const result = parseChunkTranslationRequest({
       chunk: 'subtitle',

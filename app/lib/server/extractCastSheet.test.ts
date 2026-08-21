@@ -102,13 +102,13 @@ describe('extractCastSheet (gemini provider)', () => {
   it('returns an empty sheet without calling the model when no API key is configured', async () => {
     delete process.env.GOOGLE_GENAI_API_KEY;
     const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
-    expect(result).toEqual({ terms: [], relations: [] });
+    expect(result).toEqual({ terms: [], relations: [], narration: 'none' });
     expect(mocks.generateContent).not.toHaveBeenCalled();
   });
 
   it('returns an empty sheet for empty subtitle content, without calling the model', async () => {
     const result = await extractCastSheet('', movieInfo, 'ko');
-    expect(result).toEqual({ terms: [], relations: [] });
+    expect(result).toEqual({ terms: [], relations: [], narration: 'none' });
     expect(mocks.generateContent).not.toHaveBeenCalled();
   });
 
@@ -131,6 +131,23 @@ describe('extractCastSheet (gemini provider)', () => {
         toBlock: 2,
       },
     ]);
+  });
+
+  it('모델이 모르는 내레이션 값을 주면 none으로 떨어뜨린다', async () => {
+    // 틀린 문체 지정은 파일 전체의 어미를 바꾸므로, 안 붙는 쪽이 안전하다.
+    mocks.generateContent.mockResolvedValue(
+      jsonResponse({ terms: [], relations: [], narration: '작가체' }),
+    );
+    expect((await extractCastSheet(SUBTITLE, movieInfo, 'ko')).narration).toBe(
+      'none',
+    );
+
+    mocks.generateContent.mockResolvedValue(
+      jsonResponse({ terms: [], relations: [], narration: 'literary' }),
+    );
+    expect((await extractCastSheet(SUBTITLE, movieInfo, 'ko')).narration).toBe(
+      'literary',
+    );
   });
 
   it('drops a term whose source string does not actually appear in the subtitles (hallucination filter)', async () => {
@@ -250,7 +267,7 @@ describe('extractCastSheet (gemini provider)', () => {
   it('returns an empty sheet when the model response is not parseable JSON', async () => {
     mocks.generateContent.mockResolvedValue({ text: 'not json at all' });
     const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
-    expect(result).toEqual({ terms: [], relations: [] });
+    expect(result).toEqual({ terms: [], relations: [], narration: 'none' });
   });
 
   it('includes a <tmdb_cast> anchor tag (character + actor, not a target-language spelling) when TMDB has a match', async () => {
@@ -262,7 +279,7 @@ describe('extractCastSheet (gemini provider)', () => {
       cast: [{ character: 'Jonathan', actor: 'John Smith' }],
     });
     mocks.generateContent.mockResolvedValue(
-      jsonResponse({ terms: [], relations: [] }),
+      jsonResponse({ terms: [], relations: [], narration: 'none' }),
     );
 
     await extractCastSheet(SUBTITLE, movieInfo, 'ko');
@@ -278,7 +295,7 @@ describe('extractCastSheet (gemini provider)', () => {
   it('omits the <tmdb_cast> tag when TMDB has no match', async () => {
     mocks.searchCandidates.mockResolvedValue([]);
     mocks.generateContent.mockResolvedValue(
-      jsonResponse({ terms: [], relations: [] }),
+      jsonResponse({ terms: [], relations: [], narration: 'none' }),
     );
 
     await extractCastSheet(SUBTITLE, movieInfo, 'ko');
@@ -290,7 +307,7 @@ describe('extractCastSheet (gemini provider)', () => {
 
   it('asks for the target language’s own formality axis, and for none at all when the language has no axis', async () => {
     mocks.generateContent.mockResolvedValue(
-      jsonResponse({ terms: [], relations: [] }),
+      jsonResponse({ terms: [], relations: [], narration: 'none' }),
     );
 
     await extractCastSheet(SUBTITLE, movieInfo, 'ja');
@@ -330,7 +347,7 @@ describe('extractCastSheet (gemini provider)', () => {
   it('returns an empty sheet when the model call throws', async () => {
     mocks.generateContent.mockRejectedValue(new Error('quota exceeded'));
     const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
-    expect(result).toEqual({ terms: [], relations: [] });
+    expect(result).toEqual({ terms: [], relations: [], narration: 'none' });
   });
 });
 
@@ -361,7 +378,7 @@ describe('extractCastSheet (openai provider)', () => {
 
     const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
 
-    expect(result).toEqual({ terms: [], relations: [] });
+    expect(result).toEqual({ terms: [], relations: [], narration: 'none' });
     expect(mocks.openaiGenerateJson).not.toHaveBeenCalled();
     expect(mocks.generateContent).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith(
@@ -387,7 +404,7 @@ describe('extractCastSheet (openai provider)', () => {
   it('returns an empty sheet when openaiGenerateJson throws', async () => {
     mocks.openaiGenerateJson.mockRejectedValue(new Error('rate limited'));
     const result = await extractCastSheet(SUBTITLE, movieInfo, 'ko');
-    expect(result).toEqual({ terms: [], relations: [] });
+    expect(result).toEqual({ terms: [], relations: [], narration: 'none' });
   });
 
   it('still applies the hallucination filter on OpenAI output', async () => {
