@@ -25,24 +25,26 @@ export default function PolishPage() {
   }
 
   return (
-    <div className='min-h-screen'>
-      <AppNav credits={credits} onHome={() => router.push('/')} />
+    <div>
+      <div className='page-fold'>
+        <AppNav credits={credits} onHome={() => router.push('/')} />
 
-      <main className='w-full max-w-[840px] mx-auto px-5 sm:px-10 pt-4 sm:pt-16 pb-20'>
-        {stage === 'done' && summary ? (
-          <PolishDoneStep
-            summary={summary}
-            downloads={downloads}
-            onStartOver={reset}
-          />
-        ) : (
-          <PolishUploadStep
-            working={stage === 'working'}
-            error={error}
-            onFile={handleFile}
-          />
-        )}
-      </main>
+        <main className='w-full max-w-[840px] mx-auto px-5 sm:px-10 pt-4 sm:pt-16 pb-20 flex-1'>
+          {stage === 'done' && summary ? (
+            <PolishDoneStep
+              summary={summary}
+              downloads={downloads}
+              onStartOver={reset}
+            />
+          ) : (
+            <PolishUploadStep
+              working={stage === 'working'}
+              error={error}
+              onFile={handleFile}
+            />
+          )}
+        </main>
+      </div>
 
       <SiteFooter />
     </div>

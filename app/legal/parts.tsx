@@ -69,33 +69,35 @@ export function LegalShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className='min-h-screen'>
-      <header className='flex items-center justify-between w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 h-16'>
-        <Link href='/'>
-          <BrandMark />
-        </Link>
-      </header>
-
-      <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14'>
-        <div className='head'>
-          <h1>{title}</h1>
-          <p>{subtitle}</p>
-        </div>
-
-        {children}
-
-        <p className='mt-10 text-caption-sm text-secondary'>시행일: {effectiveDate}</p>
-
-        <p className='mt-6 flex items-center gap-2.5 text-caption text-secondary'>
-          <Link href={otherDoc.href} className='underline'>
-            {otherDoc.label}
+    <div>
+      <div className='page-fold'>
+        <header className='flex items-center justify-between w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 h-16'>
+          <Link href='/'>
+            <BrandMark />
           </Link>
-          <span className='dot-sep' />
-          <Link href='/' className='underline'>
-            {COPY.legal.backHome}
-          </Link>
-        </p>
-      </main>
+        </header>
+
+        <main className='w-full max-w-[600px] lg:max-w-[840px] mx-auto px-5 pt-4 pb-14 flex-1'>
+          <div className='head'>
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+          </div>
+
+          {children}
+
+          <p className='mt-10 text-caption-sm text-secondary'>시행일: {effectiveDate}</p>
+
+          <p className='mt-6 flex items-center gap-2.5 text-caption text-secondary'>
+            <Link href={otherDoc.href} className='underline'>
+              {otherDoc.label}
+            </Link>
+            <span className='dot-sep' />
+            <Link href='/' className='underline'>
+              {COPY.legal.backHome}
+            </Link>
+          </p>
+        </main>
+      </div>
 
       <SiteFooter />
     </div>

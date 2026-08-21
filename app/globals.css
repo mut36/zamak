@@ -2341,6 +2341,25 @@ button:disabled {
     border-radius: var(--r-chip);
   }
 
+  /* 헤더+본문만 한 화면을 채우고, 푸터는 그 아래로 밀어내는 셸 래퍼.
+
+     이전에는 셸 바깥 div의 `min-h-screen`이 푸터까지 감싸고 있었다. 본문이
+     짧으면 푸터가 첫 화면 안에 들어왔고, 남는 여백이 푸터 *아래*로 깔려서
+     화면 세로 길이마다 푸터가 다른 높이로 보였다(푸터 자체 높이는 고정이다).
+     그래서 100dvh 상자에서 푸터를 빼고, `<main>`이 flex-1로 남는 높이를
+     먹게 한다 — 푸터는 항상 첫 화면 경계 바로 아래에서 시작한다.
+
+     `100vh`가 아니라 `100dvh`인 이유: 모바일 100vh는 주소창을 포함한
+     높이라, 실제 보이는 화면보다 커서 푸터가 필요 이상으로 멀리 밀린다.
+
+     헤더 높이를 상수로 빼지 않는 것도 의도다 — `AppNav`는 52px(fixed +
+     스페이서), `/legal`은 64px로 서로 다르다. flex로 채우면 몰라도 된다. */
+  .page-fold {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+  }
+
   /* 전 페이지 공용 푸터(app/components/SiteFooter.tsx). 3단: 브랜드+링크 /
      판매자 표시 / 저작권+버전. */
   .site-footer {

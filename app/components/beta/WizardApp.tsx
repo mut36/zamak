@@ -137,201 +137,203 @@ export function WizardApp() {
   const resetAll = resetWizard;
 
   return (
-    <div className='min-h-screen'>
-      <AppNav
-        credits={credits}
-        onHome={resetAll}
-      />
+    <div>
+      <div className='page-fold'>
+        <AppNav
+          credits={credits}
+          onHome={resetAll}
+        />
 
-      <main className='w-full max-w-[840px] mx-auto px-5 sm:px-10 pt-4 sm:pt-16 pb-20'>
-        {/* Mandatory first-translation gate: a fixed full-screen overlay with
-            no close affordance, over whichever screen is showing (the wizard
-            stays on 'settings' behind it). */}
-        {showConsentModal && (
-          <CopyrightModal
-            onAgree={handleAgreeConsent}
-            pending={consentPending}
-            error={consentError}
-          />
-        )}
+        <main className='w-full max-w-[840px] mx-auto px-5 sm:px-10 pt-4 sm:pt-16 pb-20 flex-1'>
+          {/* Mandatory first-translation gate: a fixed full-screen overlay with
+              no close affordance, over whichever screen is showing (the wizard
+              stays on 'settings' behind it). */}
+          {showConsentModal && (
+            <CopyrightModal
+              onAgree={handleAgreeConsent}
+              pending={consentPending}
+              error={consentError}
+            />
+          )}
 
-        {!refusal && screen === 'upload' && pendingFeedback && (
-          <FeedbackFollowup item={pendingFeedback} onDone={clearPendingFeedback} />
-        )}
+          {!refusal && screen === 'upload' && pendingFeedback && (
+            <FeedbackFollowup item={pendingFeedback} onDone={clearPendingFeedback} />
+          )}
 
-        {!refusal && screen === 'upload' && (
-          <UploadStep
-            contentType={contentType}
-            onContentType={setContentType}
-            uploading={uploading}
-            uploadingFileName={uploadingFileName}
-            fileName={loadedFileName || undefined}
-            error={uploadError}
-            onFile={handleFile}
-            onNext={() => goScreen(POST_UPLOAD_SCREEN)}
-          />
-        )}
+          {!refusal && screen === 'upload' && (
+            <UploadStep
+              contentType={contentType}
+              onContentType={setContentType}
+              uploading={uploading}
+              uploadingFileName={uploadingFileName}
+              fileName={loadedFileName || undefined}
+              error={uploadError}
+              onFile={handleFile}
+              onNext={() => goScreen(POST_UPLOAD_SCREEN)}
+            />
+          )}
 
-        {!refusal && screen === 'workPick' && (
-          <WorkPickStep
-            contentType={contentType ?? 'movie'}
-            fileName={loadedFileName}
-            candidates={enrichCandidates}
-            selectedIndex={selectedIndex}
-            onSelect={setSelectedIndex}
-            onSearch={searchWork}
-            // Covers both the file-analysis phase and the TMDB search itself
-            // (mirrors InfoStep's old `busy` computation) so the movie branch
-            // never flashes an empty candidate list before either kicks in.
-            searching={
-              analysis.isAnalyzing ||
-              enrichStatus === 'searching' ||
-              enrichStatus === 'idle'
-            }
-            otherType={otherType}
-            onOtherType={setOtherType}
-            toneText={toneText}
-            onToneText={setToneText}
-            onConfirm={confirmWorkPick}
-          />
-        )}
-
-        {!refusal && screen === 'settings' && (
-          <>
-            {error && (
-              <div
-                className='card p-4 mb-4 text-sm'
-                style={{ color: 'oklch(0.55 0.2 25)' }}
-              >
-                {error}
-                {/* Only when the run had already opened a job — a failure
-                    before that (file analysis, an empty parse) cost nothing,
-                    and promising a refund there would be noise. */}
-                {errorCreditSpent && (
-                  <p className='mt-2 text-fineprint text-secondary'>
-                    {COPY.error.creditNote}{' '}
-                    <a
-                      href={`mailto:${COPY.footer.feedbackEmail}`}
-                      className='underline'
-                    >
-                      {COPY.footer.feedbackEmail}
-                    </a>
-                  </p>
-                )}
-              </div>
-            )}
-            <TranslateSettingsStep
+          {!refusal && screen === 'workPick' && (
+            <WorkPickStep
               contentType={contentType ?? 'movie'}
-              movieInfo={movieInfo}
-              onMovieInfo={(patch) =>
-                setMovieInfo((prev) => ({ ...prev, ...patch }))
-              }
-              needsConfirm={needsConfirm}
-              // Same condition the picker uses — settings now owns the wait,
-              // since upload hands off before the TMDB search settles.
+              fileName={loadedFileName}
+              candidates={enrichCandidates}
+              selectedIndex={selectedIndex}
+              onSelect={setSelectedIndex}
+              onSearch={searchWork}
+              // Covers both the file-analysis phase and the TMDB search itself
+              // (mirrors InfoStep's old `busy` computation) so the movie branch
+              // never flashes an empty candidate list before either kicks in.
               searching={
                 analysis.isAnalyzing ||
                 enrichStatus === 'searching' ||
                 enrichStatus === 'idle'
               }
-              onConfirmWork={confirmWork}
-              onChangeWork={goWorkPick}
-              model={model}
-              onModel={setModel}
-              credits={credits}
-              targetLang={targetLang}
-              castSheetEnabled={castSheet.enabled}
-              onCastSheetToggle={castSheet.setEnabled}
-              castSheetStatus={castSheet.status}
-              castSheet={castSheet.sheet}
-              onCastSheetChange={castSheet.setSheet}
-              onCastSheetRefetch={() =>
-                castSheet.refetch(
-                  fileContentRef.current,
-                  movieInfoRef.current,
-                  targetLang,
-                )
-              }
-              etaSeconds={etaSeconds}
-              onStart={() => {
-                void recordEvent('settings_confirmed', {
-                  contentType: contentType ?? 'movie',
-                  model,
-                  glossaryEnabled: castSheet.enabled,
-                  targetLang,
-                });
-                handleTranslate(model);
-              }}
+              otherType={otherType}
+              onOtherType={setOtherType}
+              toneText={toneText}
+              onToneText={setToneText}
+              onConfirm={confirmWorkPick}
             />
-          </>
-        )}
+          )}
 
-        {!refusal && screen === 'progress' && (
-          <ProgressStep
-            progress={translationProgress}
-            totalLines={totalLines}
-            onCancel={handleCancel}
-            enrichDone={ENRICH_ALWAYS_DONE}
-            glossaryEnabled={castSheet.enabled}
-            glossaryDone={castSheet.status !== 'extracting'}
-            model={model}
-          />
-        )}
+          {!refusal && screen === 'settings' && (
+            <>
+              {error && (
+                <div
+                  className='card p-4 mb-4 text-sm'
+                  style={{ color: 'oklch(0.55 0.2 25)' }}
+                >
+                  {error}
+                  {/* Only when the run had already opened a job — a failure
+                      before that (file analysis, an empty parse) cost nothing,
+                      and promising a refund there would be noise. */}
+                  {errorCreditSpent && (
+                    <p className='mt-2 text-fineprint text-secondary'>
+                      {COPY.error.creditNote}{' '}
+                      <a
+                        href={`mailto:${COPY.footer.feedbackEmail}`}
+                        className='underline'
+                      >
+                        {COPY.footer.feedbackEmail}
+                      </a>
+                    </p>
+                  )}
+                </div>
+              )}
+              <TranslateSettingsStep
+                contentType={contentType ?? 'movie'}
+                movieInfo={movieInfo}
+                onMovieInfo={(patch) =>
+                  setMovieInfo((prev) => ({ ...prev, ...patch }))
+                }
+                needsConfirm={needsConfirm}
+                // Same condition the picker uses — settings now owns the wait,
+                // since upload hands off before the TMDB search settles.
+                searching={
+                  analysis.isAnalyzing ||
+                  enrichStatus === 'searching' ||
+                  enrichStatus === 'idle'
+                }
+                onConfirmWork={confirmWork}
+                onChangeWork={goWorkPick}
+                model={model}
+                onModel={setModel}
+                credits={credits}
+                targetLang={targetLang}
+                castSheetEnabled={castSheet.enabled}
+                onCastSheetToggle={castSheet.setEnabled}
+                castSheetStatus={castSheet.status}
+                castSheet={castSheet.sheet}
+                onCastSheetChange={castSheet.setSheet}
+                onCastSheetRefetch={() =>
+                  castSheet.refetch(
+                    fileContentRef.current,
+                    movieInfoRef.current,
+                    targetLang,
+                  )
+                }
+                etaSeconds={etaSeconds}
+                onStart={() => {
+                  void recordEvent('settings_confirmed', {
+                    contentType: contentType ?? 'movie',
+                    model,
+                    glossaryEnabled: castSheet.enabled,
+                    targetLang,
+                  });
+                  handleTranslate(model);
+                }}
+              />
+            </>
+          )}
 
-        {!refusal && screen === 'done' && result && (
-          <DoneStep
-            result={result}
-            movieInfo={movieInfo}
-            castSheet={castSheet.enabled ? castSheet.sheet : undefined}
-            jobId={jobId}
-            onStartOver={resetAll}
-          />
-        )}
+          {!refusal && screen === 'progress' && (
+            <ProgressStep
+              progress={translationProgress}
+              totalLines={totalLines}
+              onCancel={handleCancel}
+              enrichDone={ENRICH_ALWAYS_DONE}
+              glossaryEnabled={castSheet.enabled}
+              glossaryDone={castSheet.status !== 'extracting'}
+              model={model}
+            />
+          )}
 
-        {refusal && refusal.code === 'insufficient_credits' && (
-          <ExhaustedStep
-            kind={refusal.kind ?? 'lite'}
-            defaultEmail={email ?? ''}
-            onGoHistory={() => router.push('/mypage')}
-            onBack={clearRefusal}
-          />
-        )}
+          {!refusal && screen === 'done' && result && (
+            <DoneStep
+              result={result}
+              movieInfo={movieInfo}
+              castSheet={castSheet.enabled ? castSheet.sheet : undefined}
+              jobId={jobId}
+              onStartOver={resetAll}
+            />
+          )}
 
-        {refusal && refusal.code === 'file_too_large' && (
-          <div className='animate-zslide'>
-            <div className='head text-center mb-7'>
-              <h1>{COPY.credits.tooLargeTitle}</h1>
-              <p>{COPY.credits.tooLargeBody(refusal.maxBlocks ?? 0, totalLines)}</p>
-            </div>
+          {refusal && refusal.code === 'insufficient_credits' && (
+            <ExhaustedStep
+              kind={refusal.kind ?? 'lite'}
+              defaultEmail={email ?? ''}
+              onGoHistory={() => router.push('/mypage')}
+              onBack={clearRefusal}
+            />
+          )}
 
-            <div className='card p-[22px] flex flex-col items-center gap-3'>
-              <button type='button' className='btn btn-primary w-full' onClick={resetAll}>
-                {COPY.credits.startOver}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* unauthorized / unknown: neither documented screen applies (not a
-            credits or file-size problem), so this falls back to the app's
-            generic error copy rather than misusing the file-too-large text. */}
-        {refusal &&
-          refusal.code !== 'insufficient_credits' &&
-          refusal.code !== 'file_too_large' && (
+          {refusal && refusal.code === 'file_too_large' && (
             <div className='animate-zslide'>
               <div className='head text-center mb-7'>
-                <h1>{COPY.error.title}</h1>
-                <p>{COPY.error.body}</p>
+                <h1>{COPY.credits.tooLargeTitle}</h1>
+                <p>{COPY.credits.tooLargeBody(refusal.maxBlocks ?? 0, totalLines)}</p>
               </div>
 
               <div className='card p-[22px] flex flex-col items-center gap-3'>
                 <button type='button' className='btn btn-primary w-full' onClick={resetAll}>
-                  {COPY.error.retry}
+                  {COPY.credits.startOver}
                 </button>
               </div>
             </div>
           )}
-      </main>
+
+          {/* unauthorized / unknown: neither documented screen applies (not a
+              credits or file-size problem), so this falls back to the app's
+              generic error copy rather than misusing the file-too-large text. */}
+          {refusal &&
+            refusal.code !== 'insufficient_credits' &&
+            refusal.code !== 'file_too_large' && (
+              <div className='animate-zslide'>
+                <div className='head text-center mb-7'>
+                  <h1>{COPY.error.title}</h1>
+                  <p>{COPY.error.body}</p>
+                </div>
+
+                <div className='card p-[22px] flex flex-col items-center gap-3'>
+                  <button type='button' className='btn btn-primary w-full' onClick={resetAll}>
+                    {COPY.error.retry}
+                  </button>
+                </div>
+              </div>
+            )}
+        </main>
+      </div>
 
       <SiteFooter
         withBottomBar={

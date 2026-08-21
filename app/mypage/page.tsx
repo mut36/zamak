@@ -99,61 +99,63 @@ export default function MyPage() {
   if (loading || !user) return null;
 
   return (
-    <div className='min-h-screen'>
-      <AppNav
-        credits={credits}
-        onHome={() => router.push('/')}
-      />
+    <div>
+      <div className='page-fold'>
+        <AppNav
+          credits={credits}
+          onHome={() => router.push('/')}
+        />
 
-      <main className='w-full max-w-[840px] mx-auto px-5 sm:px-10 pt-4 sm:pt-16 pb-14'>
-        <div className='animate-zslide max-w-[720px] mx-auto'>
-          <div className='head mb-8'>
-            <h1>{c.title}</h1>
-          </div>
-
-          <p className='qlabel'>{c.creditsTitle}</p>
-          <div className='grid grid-cols-2 gap-[14px]'>
-            <CreditCard label={c.liteCredits} count={credits?.lite ?? 0} />
-            <CreditCard label={c.proCredits} count={credits?.pro ?? 0} />
-          </div>
-
-          <p className='text-caption-sm text-secondary mt-3 mb-7'>
-            {c.retention(RESULT_RETENTION_DAYS)}
-          </p>
-
-          <p className='qlabel'>{c.historyTitle}</p>
-
-          {history === null ? (
-            <p className='text-caption text-secondary py-6 text-center'>
-              {COPY.auth.loading}
-            </p>
-          ) : history.length === 0 ? (
-            <p className='text-caption text-secondary py-6 text-center'>{c.empty}</p>
-          ) : (
-            <div className='flex flex-col gap-2.5'>
-              {history.map((item) => (
-                <HistoryRow key={item.jobId} item={item} />
-              ))}
+        <main className='w-full max-w-[840px] mx-auto px-5 sm:px-10 pt-4 sm:pt-16 pb-14 flex-1'>
+          <div className='animate-zslide max-w-[720px] mx-auto'>
+            <div className='head mb-8'>
+              <h1>{c.title}</h1>
             </div>
-          )}
 
-          <button
-            type='button'
-            className='btn btn-primary btn-block mt-7'
-            onClick={() => router.push('/')}
-          >
-            {c.again}
-          </button>
+            <p className='qlabel'>{c.creditsTitle}</p>
+            <div className='grid grid-cols-2 gap-[14px]'>
+              <CreditCard label={c.liteCredits} count={credits?.lite ?? 0} />
+              <CreditCard label={c.proCredits} count={credits?.pro ?? 0} />
+            </div>
 
-          <button
-            type='button'
-            className='btn btn-ghost btn-block mt-2.5'
-            onClick={signOut}
-          >
-            {c.signOut}
-          </button>
-        </div>
-      </main>
+            <p className='text-caption-sm text-secondary mt-3 mb-7'>
+              {c.retention(RESULT_RETENTION_DAYS)}
+            </p>
+
+            <p className='qlabel'>{c.historyTitle}</p>
+
+            {history === null ? (
+              <p className='text-caption text-secondary py-6 text-center'>
+                {COPY.auth.loading}
+              </p>
+            ) : history.length === 0 ? (
+              <p className='text-caption text-secondary py-6 text-center'>{c.empty}</p>
+            ) : (
+              <div className='flex flex-col gap-2.5'>
+                {history.map((item) => (
+                  <HistoryRow key={item.jobId} item={item} />
+                ))}
+              </div>
+            )}
+
+            <button
+              type='button'
+              className='btn btn-primary btn-block mt-7'
+              onClick={() => router.push('/')}
+            >
+              {c.again}
+            </button>
+
+            <button
+              type='button'
+              className='btn btn-ghost btn-block mt-2.5'
+              onClick={signOut}
+            >
+              {c.signOut}
+            </button>
+          </div>
+        </main>
+      </div>
 
       <SiteFooter />
     </div>
