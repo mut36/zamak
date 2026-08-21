@@ -545,10 +545,22 @@ export const GLOSSARY_MAX_RELATIONS = readPositiveIntEnv(
   process.env.GLOSSARY_MAX_RELATIONS,
   16,
 );
-/** Rendered <glossary>/<speech_relations> text length cap, in characters. */
-export const GLOSSARY_MAX_CHARS = readPositiveIntEnv(
-  process.env.GLOSSARY_MAX_CHARS,
+/**
+ * 렌더된 태그 길이 캡, 문자 수. **태그마다 따로** 둔다.
+ *
+ * 예전에는 둘의 합계 캡(`GLOSSARY_MAX_CHARS` = 1200) 하나였고, 넘치면
+ * relations를 먼저 전부 버렸다. 그런데 `GLOSSARY_MAX_TERMS`가 40이고 한 줄이
+ * 30자 안팎이라 terms만으로 합계 캡을 다 쓴다 — 항목이 많은 작품에서 관계표가
+ * 통째로, 그리고 **조용히** 사라졌다. 조용한 실패가 문제의 본질이라 캡 자체를
+ * 갈랐다(2026-08-21). 이제 한쪽이 넘쳐도 다른 쪽 예산을 잡아먹지 않는다.
+ */
+export const GLOSSARY_MAX_TERM_CHARS = readPositiveIntEnv(
+  process.env.GLOSSARY_MAX_TERM_CHARS,
   1200,
+);
+export const GLOSSARY_MAX_RELATION_CHARS = readPositiveIntEnv(
+  process.env.GLOSSARY_MAX_RELATION_CHARS,
+  600,
 );
 
 /**

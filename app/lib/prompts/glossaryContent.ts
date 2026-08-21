@@ -1,4 +1,7 @@
-import { GLOSSARY_MAX_CHARS } from '../../config/constants';
+import {
+  GLOSSARY_MAX_RELATION_CHARS,
+  GLOSSARY_MAX_TERM_CHARS,
+} from '../../config/constants';
 import type { FormalityAxis } from '../../config/languages';
 import type { CastSheet, GlossaryTerm, SpeechRelation } from '../../types/glossary';
 import type { BlockIndexRange } from '../srt';
@@ -38,12 +41,11 @@ function buildTag(name: string, lines: readonly string[]): string {
   return lines.length > 0 ? `<${name}>\n${lines.join('\n')}\n</${name}>` : '';
 }
 
-/** Total serialized length of both tags together, as actually sent. */
-function combinedLength(termLines: string[], relationLines: string[]): number {
-  return (
-    buildTag('glossary', termLines).length +
-    buildTag('speech_relations', relationLines).length
-  );
+/** 자기 캡에 들어갈 때까지 뒤에서부터 줄을 버린다. */
+function trimToCap(name: string, lines: readonly string[], cap: number): string[] {
+  const kept = [...lines];
+  while (kept.length > 0 && buildTag(name, kept).length > cap) kept.pop();
+  return kept;
 }
 
 export interface GlossaryTags {
@@ -58,11 +60,10 @@ export interface GlossaryTags {
  * chunk's, since a relation outside this chunk's range doesn't apply here,
  * see decisions.md on the character-sheet reversal).
  *
- * No castSheet (the default — this feature is an opt-in InfoStep toggle)
- * renders both as empty strings, which the composer's `.filter(Boolean)`
- * then drops entirely: the prompt is byte-identical to before this feature
- * existed. A target language with no formality axis (`axis` null — English,
- * Chinese) drops <speech_relations> the same way, keeping only the spellings.
+ * 시트가 없으면 두 태그 모두 빈 문자열이고, composer의 `.filter(Boolean)`이
+ * 통째로 드롭한다 — 이 기능이 없던 때와 프롬프트가 바이트 단위로 같아진다.
+ * 말투 축이 없는 도착어(`axis` null — 영어·중국어)도 같은 방식으로
+ * <speech_relations>만 빠지고 표기는 남는다.
  */
 export function renderGlossaryTags(
   castSheet: CastSheet | undefined,
@@ -82,20 +83,17 @@ export function renderGlossaryTags(
     relationLines.push(...relevant.map((r) => relationLine(r, axis)));
   }
 
-  // Defense in depth against a pathological sheet (e.g. a user-edited one)
-  // blowing up the per-chunk token cost: drop relations first (they are the
-  // less foundational of the two — spelling consistency matters more than
-  // formality hints), then terms, until under the cap.
-  while (
-    combinedLength(termLines, relationLines) > GLOSSARY_MAX_CHARS &&
-    (relationLines.length > 0 || termLines.length > 0)
-  ) {
-    if (relationLines.length > 0) relationLines.pop();
-    else termLines.pop();
-  }
-
+  // 병적인 시트(사용자가 편집한 것 포함)가 청크당 토큰 비용을 부풀리는 걸 막는
+  // 방어선. 두 태그가 서로의 예산을 잡아먹지 않도록 각자 자기 캡으로만 자른다 —
+  // 합계 캡이던 시절에는 표기 40개가 예산을 다 써서 관계표가 통째로 사라졌다.
   return {
-    glossary: buildTag('glossary', termLines),
-    speechRelations: buildTag('speech_relations', relationLines),
+    glossary: buildTag(
+      'glossary',
+      trimToCap('glossary', termLines, GLOSSARY_MAX_TERM_CHARS),
+    ),
+    speechRelations: buildTag(
+      'speech_relations',
+      trimToCap('speech_relations', relationLines, GLOSSARY_MAX_RELATION_CHARS),
+    ),
   };
 }
