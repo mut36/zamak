@@ -40,6 +40,7 @@ const SELLER_INFO: { label: string; value: string }[] = [
 const CONTENTS = [
   { id: 'copyright', label: '자막 저작권과 이용자 책임' },
   { id: 'data', label: '파일과 데이터 처리' },
+  { id: 'payment', label: '번역권 구매와 취소·환불' },
   { id: 'liability', label: '책임의 한계' },
   { id: 'report', label: '권리침해 신고' },
   { id: 'seller', label: '사업자 정보' },
@@ -51,7 +52,7 @@ export default function LegalPage() {
     <LegalShell
       title='이용약관'
       subtitle='자막을 올리기 전에 확인해주세요.'
-      effectiveDate='2026년 8월 1일'
+      effectiveDate='2026년 8월 21일'
       otherDoc={{ href: COPY.legal.privacyHref, label: COPY.legal.privacy }}
     >
       <Contents items={CONTENTS} />
@@ -116,6 +117,50 @@ export default function LegalPage() {
             {COPY.legal.privacy}
           </Link>
           에서 확인하실 수 있습니다.
+        </p>
+      </Section>
+
+      {/*
+        전자상거래법 제17조(청약철회)가 요구하는 표시이자, PG 가맹점 심사의
+        상시 확인 항목이다 — 2026-08-21 심사 반려 때 이 조항이 아예 없었다.
+        번역권은 디지털 재화라 "사용 시작 = 철회 불가"가 기준선이고, 그
+        '시작' 시점을 코드가 실제로 차감하는 시점과 같게 적어야 한다:
+        번역권은 작업이 열릴 때 차감된다(`translationJob.ts`). 실패 복구가
+        아직 수동이라는 것도 그대로 적는다 — 자동화하면 이 문단을 고칠 것.
+      */}
+      <Section title='번역권 구매와 취소·환불' id='payment'>
+        <p className='m-0'>
+          ZAMAK은 <b>번역권</b>을 미리 구매해 사용하는 선불 방식입니다. 번역권
+          1개로 자막 파일 1개를 번역할 수 있고, 결제가 확인되면 계정에 바로
+          적립됩니다. 번역권에는 유효기간이 없습니다.
+        </p>
+        <p>
+          <b>사용하지 않은 번역권</b>은 구매일로부터 7일 이내에 청약철회하실 수
+          있으며, 남은 개수만큼 전액 환불해 드립니다. 7일이 지난 뒤라도 사용하지
+          않은 번역권은 아래 고객문의로 요청하시면 환불해 드립니다.
+        </p>
+        <p>
+          <b>이미 사용한 번역권</b>은 환불되지 않습니다. 번역권은 번역이 시작되는
+          시점에 차감되므로, 그 전까지는 취소하실 수 있고 시작된 뒤에는 결과물을
+          받으셨는지와 무관하게 사용한 것으로 봅니다. 자동 번역의 특성상 결과물의
+          품질이나 문체가 기대와 다른 것은 환불 사유에 해당하지 않습니다 —
+          구매 전에 홈페이지의 번역 예시로 결과를 확인해주세요.
+        </p>
+        <p>
+          <b>ZAMAK의 오류나 장애로 번역이 실패한 경우</b>에는 사용한 것으로 보지
+          않습니다. 아래 고객문의로 알려주시면 차감된 번역권을 복구하거나, 원하시면
+          환불해 드립니다.
+        </p>
+        <p>
+          환불은 결제하신 수단으로 취소 처리하며, 요청을 확인한 날부터 3영업일
+          이내에 진행합니다. 결제 수단에 따라 실제 반영까지는 며칠이 더 걸릴 수
+          있습니다. 서비스를 종료하는 경우 남은 번역권은 전액 환불합니다.
+        </p>
+        <p>
+          문의는 <a href={`mailto:${COPY.footer.feedbackEmail}`} className='underline'>
+            {COPY.footer.feedbackEmail}
+          </a>
+          로 보내주세요.
         </p>
       </Section>
 
