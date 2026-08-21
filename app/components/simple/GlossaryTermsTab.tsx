@@ -2,6 +2,7 @@
 
 import type { CastSheet, GlossaryTerm } from '../../types/glossary';
 import { resolveTargetLang } from '../../config/languages';
+import { applyTermPatch, removeTermAt } from '../../lib/castSheetEdit';
 import { COPY } from '../../i18n/simpleCopy';
 
 const c = COPY.info.castSheet;
@@ -25,30 +26,11 @@ export function GlossaryTermsTab({
   const language = resolveTargetLang(targetLang);
 
   const updateTerm = (index: number, patch: Partial<GlossaryTerm>) => {
-    const terms = sheet.terms.map((t, i) => (i === index ? { ...t, ...patch } : t));
-
-    // 인물에서 다른 유형으로 바꾸면 그 사람이 화자·청자인 관계는 성립하지
-    // 않는다. 서버가 어차피 버리므로, 화면에서 미리 지워 사용자가 "있는 줄
-    // 알았던 관계"를 잃는 일이 없게 한다. (삭제 시 removeTerm의 처리와 같은
-    // 이유다.)
-    const speakers = new Set(
-      terms.filter((t) => t.kind === 'person').map((t) => t.target),
-    );
-    const relations = sheet.relations.filter(
-      (r) => speakers.has(r.from) && speakers.has(r.to),
-    );
-
-    onChangeSheet({ ...sheet, terms, relations });
+    onChangeSheet(applyTermPatch(sheet, index, patch));
   };
 
   const removeTerm = (index: number) => {
-    const removed = sheet.terms[index];
-    const terms = sheet.terms.filter((_, i) => i !== index);
-    // A term that backs a relation shouldn't leave a dangling reference.
-    const relations = sheet.relations.filter(
-      (r) => r.from !== removed.target && r.to !== removed.target,
-    );
-    onChangeSheet({ ...sheet, terms, relations });
+    onChangeSheet(removeTermAt(sheet, index));
   };
 
   const addTerm = () => {
