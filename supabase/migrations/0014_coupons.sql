@@ -55,12 +55,20 @@ alter table public.coupon_redemptions enable row level security;
 -- 한글에 upper()는 무해하다. 영문 코드를 섞어 발행할 때를 위해 남긴다.
 -- 실제 목적은 모바일 IME가 붙이는 앞뒤·중간 공백을 흡수하는 것이다.
 -- 클라이언트도 같은 규칙을 쓰지만(app/lib/coupon.ts) 신뢰하는 쪽은 여기다.
+-- 공백 클래스를 `\s`(POSIX `[[:space:]]`)에 맡기지 않고 풀어 쓴 이유: Postgres의
+-- `\s`는 유니코드 공백(NBSP, 전각 공백 등)을 JS `\s`만큼 걷어낸다는 보장이 없다.
+-- DB가 클라이언트보다 덜 걷어내면 "신뢰하는 쪽은 DB"가 거짓이 된다.
 create or replace function public.normalize_coupon_code(p_code text)
 returns text
 language sql
 immutable
 as $$
-  select upper(regexp_replace(normalize(coalesce(p_code, ''), nfc), '\s', '', 'g'));
+  select upper(regexp_replace(
+    normalize(coalesce(p_code, ''), nfc),
+    '[[:space:]   -     　﻿]',
+    '',
+    'g'
+  ));
 $$;
 
 -- ------------------------------------------------------- 코드 교환 ---

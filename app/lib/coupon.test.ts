@@ -34,6 +34,11 @@ describe('normalizeCouponCode', () => {
   it('빈 문자열은 빈 문자열이다', () => {
     expect(normalizeCouponCode('   ')).toBe('');
   });
+
+  it('NBSP·전각 공백처럼 눈에 안 보이는 공백도 지운다 — 붙여넣기 경로', () => {
+    expect(normalizeCouponCode('세르 지오')).toBe('세르지오');
+    expect(normalizeCouponCode('세르　지오')).toBe('세르지오');
+  });
 });
 
 describe('isCouponRedeemStatus', () => {
