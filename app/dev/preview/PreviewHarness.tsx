@@ -12,7 +12,7 @@ import { ProgressStep } from '../../components/simple/ProgressStep';
 import { UploadStep } from '../../components/simple/UploadStep';
 import { DEFAULT_MODEL, PRO_MODEL } from '../../config/constants';
 import type { EnrichCandidate } from '../../hooks/useEnrich';
-import { EMPTY_CAST_SHEET } from '../../types/glossary';
+import type { CastSheet } from '../../types/glossary';
 import type {
   ContentType,
   MovieInfo,
@@ -57,6 +57,34 @@ const CANDIDATES: EnrichCandidate[] = [
     posterUrl: null,
   },
 ];
+
+/**
+ * 실측(익스테리어 나잇, 2026-08-21)에서 나온 시트를 줄인 것. 두 성질을 일부러
+ * 남겼다 — 이 화면이 검토돼야 하는 이유가 그 둘이기 때문이다:
+ *
+ * 1. **같은 target을 가진 항목이 여럿이다**(`알도 모로` ×2, `붉은 여단` ×2).
+ *    자막에 축약형과 전체형이 다 나오면 둘 다 같은 표기로 고정돼야 하므로
+ *    이건 정상 데이터다. 화자 셀렉트가 이걸 감당하는지 여기서 보인다.
+ * 2. **말투 판정이 틀려 있다** — 모로 ↔ 레오나르디(경호대장)를 양방향 존댓말로
+ *    잡았는데 자막에서는 한쪽만 존댓말이다. 번역 AI는 이 표를 그대로 따르므로
+ *    (`prompts/common/glossary_directive.txt`) 사람이 여기서 고쳐야 한다.
+ */
+const MOCK_CAST_SHEET: CastSheet = {
+  terms: [
+    { source: 'Aldo Moro', target: '알도 모로', kind: 'person', note: '기독교민주당 당수' },
+    { source: 'Moro', target: '알도 모로', kind: 'person' },
+    { source: 'Leonardi', target: '레오나르디', kind: 'person', note: '모로의 경호대장' },
+    { source: 'Cossiga', target: '프란체스코 코시가', kind: 'person', note: '내무장관' },
+    { source: 'Red Brigades', target: '붉은 여단', kind: 'org' },
+    { source: 'RedBrigades', target: '붉은 여단', kind: 'org' },
+    { source: 'Rome', target: '로마', kind: 'place' },
+  ],
+  relations: [
+    { from: '알도 모로', to: '레오나르디', speech: 'formal', basis: '공적 관계', fromBlock: 1, toBlock: 461 },
+    { from: '레오나르디', to: '알도 모로', speech: 'formal', basis: '상사–부하', fromBlock: 1, toBlock: 461 },
+    { from: '알도 모로', to: '프란체스코 코시가', speech: 'informal', basis: '오랜 동료', fromBlock: 1, toBlock: 461 },
+  ],
+};
 
 const SRT = '1\n00:00:01,000 --> 00:00:03,000\n안녕하세요.\n';
 
@@ -108,7 +136,8 @@ export function PreviewHarness() {
   const [contentType, setContentType] = useState<ContentType | null>('movie');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [model, setModel] = useState<string>(DEFAULT_MODEL);
-  const [castSheetOn, setCastSheetOn] = useState(false);
+  const [castSheetOn, setCastSheetOn] = useState(true);
+  const [castSheet, setCastSheet] = useState<CastSheet>(MOCK_CAST_SHEET);
   const [movieInfo, setMovieInfo] = useState<MovieInfo>(MOVIE_INFO);
   const [otherType, setOtherType] = useState('다큐멘터리');
   const [toneText, setToneText] = useState('');
@@ -182,11 +211,12 @@ export function PreviewHarness() {
             credits={CREDITS}
             castSheetEnabled={castSheetOn}
             onCastSheetToggle={setCastSheetOn}
-            castSheetStatus='idle'
-            castSheet={EMPTY_CAST_SHEET}
-            onCastSheetChange={noop}
+            castSheetStatus='ready'
+            castSheet={castSheet}
+            onCastSheetChange={setCastSheet}
             onCastSheetRefetch={noop}
             targetLang='ko'
+            blockCount={461}
             etaSeconds={model === PRO_MODEL ? 40 : 10}
             creditCost={2}
             onStart={() => setScreen('progress')}

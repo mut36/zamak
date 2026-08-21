@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import type { CastSheet, GlossaryTerm, SpeechRelation } from '../../types/glossary';
-import { SPEECH_FORMALITIES } from '../../types/glossary';
+import type { CastSheet } from '../../types/glossary';
 import { resolveTargetLang } from '../../config/languages';
 import type { CastSheetStatus } from '../../hooks/useCastSheet';
 import { ChevronDownIcon, RefreshIcon, SpinnerIcon } from '../icons';
 import { COPY } from '../../i18n/simpleCopy';
+import { GlossaryTermsTab } from './GlossaryTermsTab';
+import { SpeechRelationsTab } from './SpeechRelationsTab';
 
 const c = COPY.info.castSheet;
 
@@ -20,6 +21,8 @@ interface CastSheetCardProps {
   /** Target language code — decides the 표기 column's label and whether the
    * 말투 tab exists at all (English/Chinese have no formality axis). */
   targetLang: string;
+  /** 총 블록 수 — 말투 관계의 구간이 넘어설 수 없는 상한. */
+  blockCount: number;
 }
 
 /**
@@ -28,6 +31,12 @@ interface CastSheetCardProps {
  * once enabled, and only once extraction has something to show. A failed
  * extraction degrades to an empty, still-editable sheet rather than an error
  * banner — translation proceeds normally either way.
+ *
+ * **기본으로 펼쳐서 보여준다(C0).** 번역 AI가 이 표를 그대로 따르므로, 표가
+ * 사람 눈앞에 오지 않으면 "검토된 표"라는 전제가 거짓이 된다(스펙 §3-0).
+ * 확인 버튼이나 강제 게이트는 두지 않는다 — 매번 눌러야 하는 확인은 결국
+ * 안 읽고 누르는 확인이 된다. 안 읽는 것은 사용자의 선택으로 두되, 우리가
+ * 숨기지는 않는다.
  */
 export function CastSheetCard({
   enabled,
@@ -37,12 +46,17 @@ export function CastSheetCard({
   onChangeSheet,
   onRefetch,
   targetLang,
+  blockCount,
 }: CastSheetCardProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [tab, setTab] = useState<'terms' | 'relations'>('terms');
-
   const language = resolveTargetLang(targetLang);
   const axis = language.formality;
+
+  const [expanded, setExpanded] = useState(true);
+  // 말투가 기본 탭인 이유: 표기는 첫 실측에서 이형 0건으로 완벽했고, 틀릴 수
+  // 있는 쪽이 말투다. 축이 없는 언어에는 말투 탭 자체가 없으므로 표기로 간다.
+  const [tab, setTab] = useState<'terms' | 'relations'>(
+    axis ? 'relations' : 'terms',
+  );
   // Without a formality axis there are no relations to edit, so the tab is
   // dropped rather than shown empty.
   const activeTab = axis ? tab : 'terms';
@@ -50,39 +64,6 @@ export function CastSheetCard({
   const itemCount = sheet.terms.length;
   const extracting = enabled && status === 'extracting';
   const hasResult = enabled && (status === 'ready' || status === 'error');
-
-  const updateTerm = (index: number, patch: Partial<GlossaryTerm>) => {
-    const terms = sheet.terms.map((t, i) => (i === index ? { ...t, ...patch } : t));
-    onChangeSheet({ ...sheet, terms });
-  };
-
-  const removeTerm = (index: number) => {
-    const removed = sheet.terms[index];
-    const terms = sheet.terms.filter((_, i) => i !== index);
-    // A term that backs a relation shouldn't leave a dangling reference.
-    const relations = sheet.relations.filter(
-      (r) => r.from !== removed.target && r.to !== removed.target,
-    );
-    onChangeSheet({ ...sheet, terms, relations });
-  };
-
-  const addTerm = () => {
-    onChangeSheet({
-      ...sheet,
-      terms: [...sheet.terms, { source: '', target: '', kind: 'term' }],
-    });
-  };
-
-  const updateRelation = (index: number, patch: Partial<SpeechRelation>) => {
-    const relations = sheet.relations.map((r, i) =>
-      i === index ? { ...r, ...patch } : r,
-    );
-    onChangeSheet({ ...sheet, relations });
-  };
-
-  const removeRelation = (index: number) => {
-    onChangeSheet({ ...sheet, relations: sheet.relations.filter((_, i) => i !== index) });
-  };
 
   return (
     <div className='card mt-4 overflow-hidden'>
@@ -164,109 +145,20 @@ export function CastSheetCard({
           </div>
 
           {activeTab === 'terms' ? (
-            <div>
-              {!axis && (
-                <p className='text-fineprint text-secondary mb-2'>
-                  {c.noFormality(language.label)}
-                </p>
-              )}
-              {sheet.terms.length === 0 && (
-                <p className='text-fineprint text-secondary mb-2'>{c.emptyTerms}</p>
-              )}
-              {sheet.terms.map((term, i) => (
-                <div key={i} className='flex items-center gap-2 mb-2'>
-                  <input
-                    className='input !py-1.5 flex-1'
-                    placeholder={c.termSourceLabel}
-                    value={term.source}
-                    onChange={(e) => updateTerm(i, { source: e.target.value })}
-                  />
-                  <span className='text-secondary'>→</span>
-                  <input
-                    className='input !py-1.5 flex-1'
-                    placeholder={c.termTargetLabel(language.label)}
-                    value={term.target}
-                    onChange={(e) => updateTerm(i, { target: e.target.value })}
-                  />
-                  <button
-                    type='button'
-                    className='btn btn-ghost !py-1.5 !px-2 !text-fineprint'
-                    aria-label={c.removeRow}
-                    onClick={() => removeTerm(i)}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-              <button
-                type='button'
-                className='btn btn-ghost !py-1.5 !px-3 !text-fineprint mt-1'
-                onClick={addTerm}
-              >
-                {c.addTerm}
-              </button>
-            </div>
+            <GlossaryTermsTab
+              sheet={sheet}
+              onChangeSheet={onChangeSheet}
+              targetLang={targetLang}
+            />
           ) : (
-            <div>
-              {sheet.relations.length === 0 && (
-                <p className='text-fineprint text-secondary mb-2'>{c.emptyRelations}</p>
-              )}
-              {sheet.relations.map((rel, i) => (
-                <div key={i} className='flex items-center gap-2 mb-2 flex-wrap'>
-                  <select
-                    className='input !py-1.5 !w-auto'
-                    value={rel.from}
-                    onChange={(e) => updateRelation(i, { from: e.target.value })}
-                  >
-                    {sheet.terms.map((t) => (
-                      <option key={t.target} value={t.target}>
-                        {t.target}
-                      </option>
-                    ))}
-                  </select>
-                  <span className='text-secondary'>→</span>
-                  <select
-                    className='input !py-1.5 !w-auto'
-                    value={rel.to}
-                    onChange={(e) => updateRelation(i, { to: e.target.value })}
-                  >
-                    {sheet.terms.map((t) => (
-                      <option key={t.target} value={t.target}>
-                        {t.target}
-                      </option>
-                    ))}
-                  </select>
-                  <div className='flex gap-1'>
-                    {SPEECH_FORMALITIES.map((option) => (
-                      <button
-                        key={option}
-                        type='button'
-                        className='btn btn-ghost !py-1 !px-2 !text-fineprint'
-                        style={
-                          rel.speech === option
-                            ? { background: 'var(--ink-strong)', color: 'white' }
-                            : undefined
-                        }
-                        onClick={() => updateRelation(i, { speech: option })}
-                      >
-                        {axis?.[option] ?? option}
-                      </button>
-                    ))}
-                  </div>
-                  <span className='text-mono-step text-secondary'>
-                    {c.relationRange(rel.fromBlock, rel.toBlock)}
-                  </span>
-                  <button
-                    type='button'
-                    className='btn btn-ghost !py-1.5 !px-2 !text-fineprint ml-auto'
-                    aria-label={c.removeRow}
-                    onClick={() => removeRelation(i)}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
+            // activeTab이 'relations'인 것은 axis가 non-null일 때뿐이다
+            // (activeTab = axis ? tab : 'terms').
+            <SpeechRelationsTab
+              sheet={sheet}
+              onChangeSheet={onChangeSheet}
+              axis={axis!}
+              blockCount={blockCount}
+            />
           )}
         </div>
       )}

@@ -48,6 +48,8 @@ interface TranslateSettingsStepProps {
   onCastSheetRefetch: () => void;
   /** Target language code — the cast sheet's 표기/말투 columns follow it. */
   targetLang: string;
+  /** 총 블록 수 — 말투 관계의 구간 상한. useWizard의 totalLines를 그대로 받는다. */
+  blockCount: number;
   etaSeconds: number;
   /** Credits pressing start will spend — distinct from `credits` above, which
    *  is the account's balances. Repeated here rather than only on the upload
@@ -80,6 +82,7 @@ export function TranslateSettingsStep({
   onCastSheetChange,
   onCastSheetRefetch,
   targetLang,
+  blockCount,
   etaSeconds,
   creditCost,
   onStart,
@@ -341,6 +344,7 @@ export function TranslateSettingsStep({
                 onChangeSheet={onCastSheetChange}
                 onRefetch={onCastSheetRefetch}
                 targetLang={targetLang}
+                blockCount={blockCount}
               />
             </div>
           ) : (

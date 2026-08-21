@@ -240,6 +240,7 @@ export function WizardApp() {
                 onModel={setModel}
                 credits={credits}
                 targetLang={targetLang}
+                blockCount={totalLines}
                 castSheetEnabled={castSheet.enabled}
                 onCastSheetToggle={castSheet.setEnabled}
                 castSheetStatus={castSheet.status}
