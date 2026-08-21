@@ -10,7 +10,9 @@ import {
   parseBlockTiming,
   parseSrtBlocks,
   reassembleTranslatedChunk,
+  subtitleRuntimeMs,
 } from './srt';
+import { readFileSync } from 'node:fs';
 
 describe('SRT utilities', () => {
   it('normalizes line endings and parses blocks', () => {
@@ -989,5 +991,55 @@ describe('enforceTextRules', () => {
     });
     expect(content).toBe('1\n00:00:00,000 --> 00:00:01,000\nそこにいるのか');
     expect(report.trailingPunctuationStripped).toBe(1);
+  });
+});
+
+describe('subtitleRuntimeMs', () => {
+  it('마지막 자막의 종료 시각을 영상 길이로 본다', () => {
+    expect(
+      subtitleRuntimeMs(
+        '1\n00:00:01,000 --> 00:00:02,000\nHello\n\n' +
+          '2\n00:01:39,500 --> 00:01:42,250\nWorld',
+      ),
+    ).toBe(102_250);
+  });
+
+  it('블록이 시간순이 아니어도 가장 늦은 종료 시각을 쓴다', () => {
+    // 수작업으로 편집된 파일에서 실제로 어긋난다. 마지막 블록을 그냥 믿으면
+    // 견적의 러닝타임이 실제보다 짧게 나온다.
+    expect(
+      subtitleRuntimeMs(
+        '1\n00:10:00,000 --> 00:10:05,000\nLate\n\n' +
+          '2\n00:00:01,000 --> 00:00:02,000\nEarly',
+      ),
+    ).toBe(605_000);
+  });
+
+  it('타임코드가 깨진 블록은 건너뛰고, 하나도 없으면 null이다', () => {
+    expect(
+      subtitleRuntimeMs(
+        '1\n(타임코드 없음)\nHello\n\n' +
+          '2\n00:00:03,000 --> 00:00:04,000\nWorld',
+      ),
+    ).toBe(4_000);
+    expect(subtitleRuntimeMs('')).toBe(null);
+    expect(subtitleRuntimeMs('1\n(타임코드 없음)\nHello')).toBe(null);
+  });
+
+  it('실측 샘플의 줄/분 밀도가 화면에 적은 범위 안에 있다', () => {
+    // `/pricing`의 분당 환산과 견적 줄의 '약'이 이 벌어짐 위에 서 있다
+    // (§6-23). 샘플이 바뀌어 범위를 벗어나면 화면 문구도 같이 틀린다.
+    const density = (path: string) => {
+      const content = readFileSync(path, 'utf8');
+      const lines = parseSrtBlocks(content).length;
+      const minutes = subtitleRuntimeMs(content)! / 60_000;
+      return lines / minutes;
+    };
+    const drama = density('samples/subtitles/drama-episode.srt');
+    const movie = density('samples/subtitles/full-movie.srt');
+    expect(drama).toBeGreaterThan(8);
+    expect(drama).toBeLessThan(8.5);
+    expect(movie).toBeGreaterThan(12);
+    expect(movie).toBeLessThan(12.6);
   });
 });

@@ -5,6 +5,7 @@ import {
   PRICING_TIERS,
   formatKRW,
   pricePerCredit,
+  type PricingPack,
   type PricingTier,
 } from '../config/pricing';
 import { COPY } from '../i18n/simpleCopy';
@@ -18,6 +19,20 @@ export const metadata = {
 };
 
 const P = COPY.pricing;
+
+/**
+ * 장당 가격을 영상 1분당으로 환산한다.
+ *
+ * 1장 = 자막 1,200줄이고 자막 밀도가 분당 8.2~12.5줄이라 1장이 덮는 영상은
+ * 96~146분이다. 그 **중앙값 120분**으로 나눈다 — 범위를 그대로 보여주면
+ * 분당 단가도 범위가 돼 읽히지 않는다(근거는 `COPY.pricing.perMinuteBasis`가
+ * 화면에서 말한다).
+ */
+const MINUTES_PER_CREDIT = 120;
+
+function pricePerMinute(pack: PricingPack): number {
+  return Math.round(pricePerCredit(pack) / MINUTES_PER_CREDIT);
+}
 
 /**
  * 가격 안내.
@@ -53,6 +68,12 @@ export default function PricingPage() {
           <div className='card p-5 mt-10 text-caption text-nav leading-relaxed'>
             <p className='m-0 text-ink-strong font-bold'>{P.preparing}</p>
             <p className='mt-2'>{P.preparingNote}</p>
+          </div>
+
+          <div className='mt-10 text-caption text-secondary leading-relaxed'>
+            <p className='m-0'>{P.humanAnchor}</p>
+            <p className='mt-1 text-tertiary'>{P.humanAnchorNote}</p>
+            <p className='mt-3 text-tertiary'>{P.perMinuteBasis}</p>
           </div>
 
           <p className='mt-6 text-caption text-secondary'>{P.betaNote}</p>
@@ -96,6 +117,9 @@ function TierBlock({ tier }: { tier: PricingTier }) {
             <p className='pricing-pack-amount'>{P.won(formatKRW(pack.amount))}</p>
             <p className='pricing-pack-unit'>
               {P.perCredit(formatKRW(pricePerCredit(pack)))}
+            </p>
+            <p className='pricing-pack-unit text-tertiary'>
+              {P.perMinute(pricePerMinute(pack))}
             </p>
           </div>
         ))}

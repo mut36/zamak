@@ -72,6 +72,30 @@ export function parseBlockTiming(raw: string): BlockTiming | null {
   };
 }
 
+/**
+ * 자막이 덮는 영상 길이(밀리초). 타임코드가 없거나 블록이 없으면 null.
+ *
+ * **러닝타임은 공짜 정보다** — 마지막 자막의 종료 타임코드가 곧 영상 길이다.
+ * 이걸 뽑는 이유는 견적의 단위를 맞추기 위해서다(§6-23): 번역가는 영상 '분'
+ * 단위로 견적을 내는데 우리는 '줄' 단위로 과금하므로, 화면이 줄·분·장을
+ * 같이 말해주지 않으면 사용자가 우리 숫자를 자기 숫자로 옮기지 못한다.
+ *
+ * 마지막 블록의 값을 그냥 쓰지 않고 **최댓값**을 취한다. 블록이 시간순으로
+ * 정렬돼 있다는 보장이 SRT 규격에 없고(수작업 편집된 파일에서 실제로 어긋난다),
+ * 어긋난 파일에서 마지막 블록을 믿으면 러닝타임이 실제보다 짧게 나온다.
+ * 타임코드가 깨진 블록은 건너뛴다 — 견적 한 줄 때문에 업로드를 막을 이유는
+ * 없고, 차감 장수는 어차피 줄 수로만 계산된다.
+ */
+export function subtitleRuntimeMs(content: string): number | null {
+  let maxEndMs: number | null = null;
+  for (const block of parseSrtBlocks(content)) {
+    const timing = parseBlockTiming(block);
+    if (!timing) continue;
+    if (maxEndMs === null || timing.endMs > maxEndMs) maxEndMs = timing.endMs;
+  }
+  return maxEndMs;
+}
+
 const STYLE_TAG = /<[^>]*>|\{[^}]*\}/g;
 
 export interface CpsResult {
