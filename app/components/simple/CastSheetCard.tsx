@@ -12,8 +12,6 @@ import { SpeechRelationsTab } from './SpeechRelationsTab';
 const c = COPY.info.castSheet;
 
 interface CastSheetCardProps {
-  enabled: boolean;
-  onToggle: (value: boolean) => void;
   status: CastSheetStatus;
   sheet: CastSheet;
   onChangeSheet: (sheet: CastSheet) => void;
@@ -26,11 +24,10 @@ interface CastSheetCardProps {
 }
 
 /**
- * Independent toggle from the translation model (고급/빠른번역) — see
- * docs/decisions.md. The header row *is* the toggle; the body only appears
- * once enabled, and only once extraction has something to show. A failed
- * extraction degrades to an empty, still-editable sheet rather than an error
- * banner — translation proceeds normally either way.
+ * 프로 번역에 딸려 오는 결과 카드다 — 토글이 아니다(§6-24). 카드가 보이는
+ * 것 자체가 "이 번역에 글로사리가 붙는다"는 뜻이므로 헤더는 접기/펴기만
+ * 한다. A failed extraction degrades to an empty, still-editable sheet rather
+ * than an error banner — translation proceeds normally either way.
  *
  * **기본으로 펼쳐서 보여준다(C0).** 번역 AI가 이 표를 그대로 따르므로, 표가
  * 사람 눈앞에 오지 않으면 "검토된 표"라는 전제가 거짓이 된다(스펙 §3-0).
@@ -39,8 +36,6 @@ interface CastSheetCardProps {
  * 숨기지는 않는다.
  */
 export function CastSheetCard({
-  enabled,
-  onToggle,
   status,
   sheet,
   onChangeSheet,
@@ -77,27 +72,20 @@ export function CastSheetCard({
     extractedRef.current !== '' && JSON.stringify(sheet) !== extractedRef.current;
 
   const itemCount = sheet.terms.length;
-  const extracting = enabled && status === 'extracting';
-  const hasResult = enabled && (status === 'ready' || status === 'error');
+  const extracting = status === 'extracting';
+  const hasResult = status === 'ready' || status === 'error';
 
   return (
     <div className='card mt-4 overflow-hidden'>
       <button
         type='button'
         className='w-full flex items-center gap-3 p-[18px_24px] text-left'
-        onClick={() => {
-          if (!enabled) {
-            onToggle(true);
-            setExpanded(true);
-          } else {
-            onToggle(false);
-          }
-        }}
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
       >
         <span className='flex-1 min-w-0'>
           <span className='flex items-center gap-2'>
             <span className='text-title-sm font-semibold tracking-[-0.01em]'>{c.title}</span>
-            <span className='dbadge-pro'>{c.badge}</span>
             {hasResult && (
               <span className='text-fineprint text-secondary'>{c.count(itemCount)}</span>
             )}
@@ -105,24 +93,11 @@ export function CastSheetCard({
           <span className='block text-caption-sm text-tertiary mt-0.5'>{c.hint}</span>
         </span>
         {extracting && <SpinnerIcon className='w-4 h-4 text-accent shrink-0' />}
-        <span className={`ztoggle${enabled ? ' on' : ''}`} aria-hidden>
-          <span className='ztoggle-knob' />
-        </span>
         {hasResult && (
-          <span
-            role='button'
-            tabIndex={-1}
-            className='shrink-0'
-            onClick={(e) => {
-              e.stopPropagation();
-              setExpanded((v) => !v);
-            }}
-          >
-            <ChevronDownIcon
-              className='w-4 h-4 text-secondary transition-transform'
-              style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
-            />
-          </span>
+          <ChevronDownIcon
+            className='w-4 h-4 text-secondary transition-transform shrink-0'
+            style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
+          />
         )}
       </button>
 

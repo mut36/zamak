@@ -23,23 +23,21 @@ export const APP_VERSION = '1.5.2';
 export const RESULT_RETENTION_DAYS = 30;
 
 /**
- * Whether the glossary / speech-relation prepass (§2-9) is offered at all.
+ * 글로사리·존대관계 프리패스(§2-9)의 **비상 차단기**.
  *
- * OFF for the beta launch (2026-08-02): the feature works but its editing
- * surface isn't finished, and shipping a half-built control is worse than
- * shipping without it. Planned to come back during the beta.
+ * 이 값이 켜져 있을 때 글로사리가 도는지는 모델이 정한다 — 프로면 항상 돌고
+ * 라이트면 안 돈다(`app/lib/glossaryGate.ts`). 사용자가 켜고 끄는 토글은 없다:
+ * `COPY.settings.proDesc`가 이미 "인물명 일관성"을 프로의 약속으로 팔고 있고,
+ * 프로 손익분기(3,299원/편, `cost-per-block.md`)에 글로사리 원가가 이미 들어가
+ * 있다 — 말과 값이 둘 다 "프로에 포함"을 가리킨다.
  *
- * A single flag rather than commenting the JSX out, because the toggle's
- * on/off state is **persisted per browser** (`zamak.castSheet.enabled` in
- * useCastSheet). Hiding only the UI would leave anyone who ever switched it on
- * — every pre-beta tester, this laptop included — silently running the
- * extraction on every file with no way to stop it: an extra model call, an
- * extra wait in the ETA, and a fourth stage in the progress bar. This flag is
- * read at both ends, so off means off.
+ * 여기 남은 이유는 하나뿐이다: 추출 프로바이더(기본 OpenAI)가 죽었을 때
+ * 재배포 없이 경로 전체를 끄는 것. 옛 이름은 `GLOSSARY_UI_ENABLED`였는데,
+ * 끌 UI가 없어진 지금은 이름의 "UI"가 거짓말이다.
  *
- * Typed `boolean` (not inferred as `false`) so flipping it needs no other edit.
+ * Typed `boolean` (not inferred) so flipping it needs no other edit.
  */
-export const GLOSSARY_UI_ENABLED: boolean = false;
+export const GLOSSARY_ENABLED: boolean = true;
 
 /**
  * Version of the notice the user agrees to before their first translation.

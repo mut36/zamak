@@ -11,10 +11,10 @@ import type { ContentType, MovieInfo } from '../../types/translation';
 import {
   BLOCKS_PER_CREDIT,
   FLASH_MODEL,
-  GLOSSARY_UI_ENABLED,
   PRO_MODEL,
   type AllowedModel,
 } from '../../config/constants';
+import { glossaryAppliesTo } from '../../lib/glossaryGate';
 import { COPY } from '../../i18n/simpleCopy';
 
 const c = COPY.settings;
@@ -38,10 +38,8 @@ interface TranslateSettingsStepProps {
   model: AllowedModel;
   onModel: (m: AllowedModel) => void;
   credits: CreditBalances | null;
-  // cast sheet — independent toggle from the translation model, shared by
+  // cast sheet — 프로 번역에 딸려 오는 결과 카드다(토글 아님, §6-24). 공유:
   // both branches (see docs/decisions.md)
-  castSheetEnabled: boolean;
-  onCastSheetToggle: (value: boolean) => void;
   castSheetStatus: CastSheetStatus;
   castSheet: CastSheet;
   onCastSheetChange: (sheet: CastSheet) => void;
@@ -75,8 +73,6 @@ export function TranslateSettingsStep({
   model,
   onModel,
   credits,
-  castSheetEnabled,
-  onCastSheetToggle,
   castSheetStatus,
   castSheet,
   onCastSheetChange,
@@ -328,47 +324,22 @@ export function TranslateSettingsStep({
         })}
       </div>
 
-      {/* 베타 오픈에서는 접어둔 섹션. 편집 화면이 아직 덜 만들어졌다 —
-          자세한 이유와 "왜 주석이 아니라 플래그인가"는 GLOSSARY_UI_ENABLED. */}
-      {GLOSSARY_UI_ENABLED && (
+      {/* 글로사리는 프로의 약속("작품 맥락 분석과 인물명 일관성", COPY.settings.proDesc)
+          중 인물명 일관성을 실제로 수행하는 부분이다. 그래서 토글이 아니라
+          프로를 고르면 나타나는 결과 카드다 — docs/decisions.md §6-24. */}
+      {glossaryAppliesTo(model) && (
         <>
           <p className='qlabel'>{c.sectionAdvanced}</p>
-
-          {castSheetEnabled ? (
-            <div className='animate-zslide mb-[14px]'>
-              <CastSheetCard
-                enabled={castSheetEnabled}
-                onToggle={onCastSheetToggle}
-                status={castSheetStatus}
-                sheet={castSheet}
-                onChangeSheet={onCastSheetChange}
-                onRefetch={onCastSheetRefetch}
-                targetLang={targetLang}
-                blockCount={blockCount}
-              />
-            </div>
-          ) : (
-            <button
-              type='button'
-              className='card w-full flex items-center justify-between gap-3 p-[18px_24px] text-left mb-[14px]'
-              onClick={() => onCastSheetToggle(true)}
-            >
-              <span className='flex-1 min-w-0'>
-                <span className='flex items-center gap-2'>
-                  <span className='text-title-sm font-semibold tracking-[-0.01em]'>
-                    {c.glossaryTitle}
-                  </span>
-                  <span className='dbadge-pro'>{c.glossaryBadge}</span>
-                </span>
-                <span className='block text-caption-sm text-tertiary mt-0.5'>
-                  {c.glossaryDesc}
-                </span>
-              </span>
-              <span className='ztoggle' aria-hidden>
-                <span className='ztoggle-knob' />
-              </span>
-            </button>
-          )}
+          <div className='animate-zslide mb-[14px]'>
+            <CastSheetCard
+              status={castSheetStatus}
+              sheet={castSheet}
+              onChangeSheet={onCastSheetChange}
+              onRefetch={onCastSheetRefetch}
+              targetLang={targetLang}
+              blockCount={blockCount}
+            />
+          </div>
         </>
       )}
     </div>

@@ -4,22 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CastSheet } from '../types/glossary';
 import { EMPTY_CAST_SHEET } from '../types/glossary';
 import type { MovieInfo } from '../types/translation';
-import { GLOSSARY_UI_ENABLED, GLOSSARY_WAIT_MS } from '../config/constants';
+import { GLOSSARY_WAIT_MS } from '../config/constants';
 
 export type CastSheetStatus = 'idle' | 'extracting' | 'ready' | 'error';
-
-const STORAGE_KEY = 'zamak.castSheet.enabled';
-
-function readStoredEnabled(): boolean {
-  // The remembered preference is only honoured while the feature is actually
-  // offered. Without this guard, hiding the toggle would strand every browser
-  // that had it switched on in a state it can no longer leave — see
-  // GLOSSARY_UI_ENABLED. The stored value is left in place rather than cleared,
-  // so turning the feature back on restores each user's own choice.
-  if (!GLOSSARY_UI_ENABLED) return false;
-  if (typeof window === 'undefined') return false;
-  return window.localStorage.getItem(STORAGE_KEY) === '1';
-}
 
 type CastSheetMovieInfo = Pick<
   MovieInfo,
@@ -27,25 +14,22 @@ type CastSheetMovieInfo = Pick<
 >;
 
 /**
- * Cast-sheet toggle + extraction lifecycle for InfoStep. Independent of the
- * translation model choice — a plain on/off, remembered per browser so a
- * user who turns it on once gets it automatically from then on (see
- * docs/decisions.md on the toggle default).
+ * Cast-sheet extraction lifecycle. **켜고 끄는 주체는 모델이지 사용자가
+ * 아니다** — 호출자가 `glossaryAppliesTo(model)`을 넘긴다(2026-08-21).
+ *
+ * 예전에는 브라우저별로 저장되는 opt-in 토글이었다. 저장값을 남겨두지 않고
+ * 통째로 지운 이유: 이제 이 기능의 on/off는 계정이 무엇을 샀는지(프로냐
+ * 라이트냐)로 정해지므로, 브라우저에 남은 옛 선택은 어떤 경우에도 정답이
+ * 아니다. §6-7이 저장값을 남긴 것은 그때는 그게 사용자의 선택이었기 때문이다.
  *
  * Extraction is fire-once-per-file: `request` is a no-op while one is
  * already in flight or done for the current file (guarded by a ref, not
  * React state, so effect double-invocation in dev can't double-dispatch).
- * Turning the toggle off aborts an in-flight call and rewinds it to 'idle'
- * so turning back on retries — but a call that already finished ('ready')
- * is left alone, so re-enabling never re-fetches for the same file.
+ * `active`가 false로 떨어지면 진행 중인 호출을 끊고 'idle'로 되감아, 다시
+ * 프로로 돌아왔을 때 재시도가 가능하게 한다 — 이미 끝난 호출('ready')은
+ * 건드리지 않으므로 같은 파일을 두 번 뽑는 일은 없다.
  */
-export function useCastSheet() {
-  // Lazy initializer: reads localStorage once, on first mount. A hydration
-  // mismatch would need this value in rendered markup at mount time, but the
-  // component that shows it (InfoStep, step 1) never mounts on first paint —
-  // the wizard always starts at step 0 — so server and client agreeing on a
-  // placeholder `false` here is never actually observed.
-  const [enabled, setEnabledState] = useState(readStoredEnabled);
+export function useCastSheet(active: boolean) {
   const [status, setStatus] = useState<CastSheetStatus>('idle');
   const [sheet, setSheet] = useState<CastSheet>(EMPTY_CAST_SHEET);
 
@@ -53,26 +37,31 @@ export function useCastSheet() {
   const dispatchedRef = useRef(false);
   const pendingRef = useRef<Promise<CastSheet> | null>(null);
   const sheetRef = useRef(sheet);
+  // status를 effect의 의존성에 넣으면 abort가 status를 바꾸고 그게 다시 effect를
+  // 도는 고리가 된다. sheetRef와 같은 이유로 ref에서 읽는다.
+  const statusRef = useRef(status);
 
   useEffect(() => {
     sheetRef.current = sheet;
   }, [sheet]);
 
-  const setEnabled = useCallback(
-    (value: boolean) => {
-      setEnabledState(value);
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(STORAGE_KEY, value ? '1' : '0');
-      }
-      if (!value && status === 'extracting') {
-        abortRef.current?.abort();
-        dispatchedRef.current = false;
-        pendingRef.current = null;
-        setStatus('idle');
-      }
-    },
-    [status],
-  );
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  // 프로 → 라이트로 바꾸면 진행 중인 추출은 의미가 없다. 끊고 되감아 두면
+  // 다시 프로로 돌아왔을 때 트리거 effect가 새로 요청한다.
+  useEffect(() => {
+    if (active) return;
+    if (statusRef.current !== 'extracting') return;
+    abortRef.current?.abort();
+    dispatchedRef.current = false;
+    pendingRef.current = null;
+    // 외부 시스템(AbortController)을 끊은 뒤 그 사실을 상태에 반영하는 것이라
+    // 렌더 연쇄가 아니다 — active가 바뀌는 순간에만, 그것도 진행 중일 때만 돈다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStatus('idle');
+  }, [active]);
 
   const request = useCallback(
     (
@@ -173,8 +162,7 @@ export function useCastSheet() {
   }, []);
 
   return {
-    enabled,
-    setEnabled,
+    enabled: active,
     status,
     sheet,
     setSheet,

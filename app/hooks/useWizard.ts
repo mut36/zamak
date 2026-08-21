@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation, type TranslationMessages } from './useTranslation';
 import { useEnrich, type EnrichCandidate, type EnrichResult } from './useEnrich';
 import { useCastSheet } from './useCastSheet';
+import { glossaryAppliesTo } from '../lib/glossaryGate';
 import { parseBlockTiming, parseSrtBlocks } from '../lib/srt';
 import {
   BilingualSmiError,
@@ -345,7 +346,7 @@ export function useWizard(
     reset: resetEnrich,
   } = useEnrich();
 
-  const castSheet = useCastSheet();
+  const castSheet = useCastSheet(glossaryAppliesTo(model));
 
   const totalLines = useMemo(
     () => (fileContent ? parseSrtBlocks(fileContent).length : 0),

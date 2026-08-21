@@ -137,7 +137,6 @@ export function PreviewHarness() {
   const [contentType, setContentType] = useState<ContentType | null>('movie');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [model, setModel] = useState<string>(DEFAULT_MODEL);
-  const [castSheetOn, setCastSheetOn] = useState(true);
   const [castSheet, setCastSheet] = useState<CastSheet>(MOCK_CAST_SHEET);
   const [movieInfo, setMovieInfo] = useState<MovieInfo>(MOVIE_INFO);
   const [otherType, setOtherType] = useState('다큐멘터리');
@@ -210,8 +209,6 @@ export function PreviewHarness() {
             model={model as typeof DEFAULT_MODEL}
             onModel={setModel}
             credits={CREDITS}
-            castSheetEnabled={castSheetOn}
-            onCastSheetToggle={setCastSheetOn}
             castSheetStatus='ready'
             castSheet={castSheet}
             onCastSheetChange={setCastSheet}
@@ -239,7 +236,7 @@ export function PreviewHarness() {
             totalLines={1284}
             onCancel={noop}
             enrichDone
-            glossaryEnabled={castSheetOn}
+            glossaryEnabled
             glossaryDone
             model={DEFAULT_MODEL}
           />

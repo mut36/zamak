@@ -241,8 +241,6 @@ export function WizardApp() {
                 credits={credits}
                 targetLang={targetLang}
                 blockCount={totalLines}
-                castSheetEnabled={castSheet.enabled}
-                onCastSheetToggle={castSheet.setEnabled}
                 castSheetStatus={castSheet.status}
                 castSheet={castSheet.sheet}
                 onCastSheetChange={castSheet.setSheet}
