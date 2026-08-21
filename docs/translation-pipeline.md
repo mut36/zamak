@@ -24,10 +24,10 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   → /api/analyze         제목·연도 확정 (AUX 모델)
   → [영화] /api/enrich    TMDB + 그라운딩 → 제목/연도/감독/포스터 + 장르/배경/톤
     [기타] /api/summarize 자막 앞부분 요약 → notes
-  → (opt-in) /api/glossary  전체 자막 1회 스캔 → 글로사리+말투관계
-              ⚠️ 베타에서는 GLOSSARY_UI_ENABLED=false라 이 줄 전체가 안 돈다 (§2-C)
+  → (프로 전용) /api/glossary  전체 자막 1회 스캔 → 글로사리+말투관계+내레이션 문체
+              (프로 번역이면 항상 실행 — §2-C)
   → WorkPickStep          후보 선택(영화) / 유형·톤 입력(예능·다큐)
-  → TranslateSettingsStep 사람이 검토·수정 (+ 글로사리 카드, 켰다면)
+  → TranslateSettingsStep 사람이 검토·수정 (+ 글로사리 카드, 프로면 항상)
   → /api/translation/begin  크레딧 1 차감 → jobId
   → 청킹 (장면 갭 기준)
   → 청크별 병렬 /api/translate
@@ -127,15 +127,17 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 - **품질 레버**: 요약 프롬프트는 `summarize/route.ts` 안에 인라인. 샘플 줄 수는
   `constants.ts` `SUMMARY_SAMPLE_LINES`.
 
-### 2-C. 글로사리·존대관계 추출 (opt-in, 모델·콘텐츠 유형 무관)
+### 2-C. 글로사리·존대관계 추출 (프로 전용, 콘텐츠 유형 무관)
 
-> ⚠️ **2026-08-02 베타 오픈 기준 이 단계는 아예 돌지 않는다.**
-> `GLOSSARY_UI_ENABLED`(`app/config/constants.ts`)가 `false`라서 설정 화면에
-> 토글이 없고, `useCastSheet`의 `readStoredEnabled()`가 저장된 값까지 무시한다
-> (예전에 켜뒀던 브라우저가 끌 방법 없이 계속 도는 걸 막기 위해서다).
-> 따라서 아래 설명은 **플래그를 다시 켰을 때의 동작**이다 — 지금 프롬프트에는
-> `<glossary>`·`<speech_relations>` 태그가 어떤 경로로도 붙지 않는다.
-> 배경과 되살리는 순서: `decisions.md` §6-7, `docs/TODO.md`.
+> **판정은 `glossaryAppliesTo(model)` 하나다** (`app/lib/glossaryGate.ts`):
+> `GLOSSARY_ENABLED && creditKindForModel(model) === 'pro'`. 사용자가 켜고 끄는
+> 토글은 없다 — 프로면 항상 돌고 라이트면 안 돈다(`decisions.md` §6-25).
+> 이 함수를 **클라이언트와 서버가 함께 읽는다**: `useWizard`가 카드와 추출을
+> 켜고, `requestValidation.ts`가 라이트 요청의 `castSheet`를 버리며,
+> `/api/glossary`가 프로가 아닌 요청에 빈 시트를 돌려준다. 불변식 4는 화면
+> 조건부 렌더가 아니라 서버가 지킨다 — 낡은 탭 하나면 깨지기 때문이다.
+> `GLOSSARY_ENABLED`(옛 이름 `GLOSSARY_UI_ENABLED`)는 이제 **비상 차단기**로만
+> 남는다 — 추출 프로바이더가 죽으면 재배포 없이 여기서 경로 전체를 끈다.
 
 - **코드**: `app/api/glossary/route.ts` → `app/lib/server/extractCastSheet.ts`
   (`extractCastSheet` → `fetchCastAnchors`(TMDB cast, best-effort) + 프로바이더
@@ -144,8 +146,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   `app/lib/prompts/glossaryContent.ts` (`renderGlossaryTags`), 프롬프트
   `prompts/common/cast_sheet_extraction.txt`, 토글 훅 `app/hooks/useCastSheet.ts`,
   카드 `app/components/simple/CastSheetCard.tsx`.
-- **하는 일**: TranslateSettingsStep의 "등장인물·용어 일관성" 토글(기본 **OFF**, `localStorage`에
-  기억)을 켜면 전체 자막을 한 번 스캔해 ①인물·지명·용어의 확정 **도착어 표기**(글로사리,
+- **하는 일**: 프로 번역이면 TranslateSettingsStep 진입과 동시에 전체 자막을 한 번 스캔해 ①인물·지명·용어의 확정 **도착어 표기**(글로사리,
   `GlossaryTerm.target`)와 ②인물 간 말투(방향성 있음, 자막 블록 범위가 붙음)를 뽑는다.
   말투 값은 언어 중립(`formal`/`informal`/`mixed`)으로 저장하고, 프롬프트·UI에는
   도착어의 어휘(존댓말·반말 / 敬語·タメ口 / usted·tú …)로 번역해 보여준다 —
@@ -158,12 +159,19 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   `translation_rules_ko.txt` 9번이 "대화가 아닌 글에 해요체 금지"를 상시로 받는다.
   **말투 축이 없는 언어(영어·중국어)는 `formality: null`이라 relations를 아예 뽑지
   않고 `<speech_relations>` 태그도 나가지 않는다**(§7). 파일당 1회이고
-  청크별 병렬 번역 호출과 별개 — 결과가 모든 청크 프롬프트에 주입된다(§7). **OFF가
-  기본값이라 이 라우트는 사용자가 켜기 전엔 절대 호출되지 않는다.**
-- **왜 opt-in인가**: 추출에 20~40초 걸린다. 토글을 켜면 TranslateSettingsStep 진입과 동시에
-  백그라운드로 돌아 지연이 대부분 숨지만(사람이 작품 정보를 검토하는 동안 끝남), 처음
-  켜는 순간만은 그 지연이 노출된다. 번역 모델(고급/빠른) 선택과는 **무관한 독립
-  토글**이다 — 결정 배경은 `decisions.md` §2-9.
+  청크별 병렬 번역 호출과 별개 — 결과가 모든 청크 프롬프트에 주입된다(§7).
+  **라이트 번역이면 이 라우트는 호출되지 않는다.**
+- **왜 프로 전용인가**: 추출에 20~40초 걸리고 파일당 한 번 모델을 더 태운다.
+  `COPY.settings.proDesc`가 이미 "작품 맥락 분석과 인물명 일관성"을 프로의 약속으로
+  팔고 있고, 프로 손익분기 계산(`tuning/cost-per-block.md`)에 이 원가가 이미 들어가
+  있다 — 말과 값이 둘 다 "프로에 포함"을 가리킨다. 지연은 사람이 작품 정보를
+  검토하는 동안 백그라운드로 돌아 대부분 숨고, 남는 만큼은 하단 바의 ETA가
+  합산해 말한다(`GLOSSARY_WAIT_MS`). 결정 배경은 `decisions.md` §2-9 · §6-25.
+- **사람이 고칠 수 있어야 한다**: 번역 AI는 이 표를 **그대로 따른다**(참고 자료가
+  아니다 — `glossary_directive.txt`, §6-24). 그래서 편집 화면(`CastSheetCard` +
+  `GlossaryTermsTab`/`SpeechRelationsTab`)은 편의 기능이 아니라 이 설계의 전제다:
+  표가 틀렸을 때 바로잡을 수 있는 유일한 지점이다. 카드는 **말투 탭이 펼쳐진 채**
+  나온다 — 틀릴 수 있는 쪽이 말투이기 때문이다(표기는 실측에서 이형 0건).
 - **품질 레버**:
   - 표기·관계가 틀리거나 아예 안 잡힘 → `prompts/common/cast_sheet_extraction.txt`
     (말투 파트는 별도 파일 `prompts/common/cast_sheet_formality_task.txt` — 말투 축이
@@ -290,8 +298,12 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 - **조립 구조**:
   - **시스템 프롬프트**:
     - 페르소나 + 신뢰 경계 → `prompts/common/subtitle_translation_system.txt`
-      (`<glossary>`, `<speech_relations>`도 이 경계에 포함 — §2-C가 켜져 있을 때만
-      실제로 등장)
+      (`<glossary>`, `<speech_relations>`도 이 경계에 포함 — 프로일 때만 실제로 등장)
+    - `{{glossaryDirective}}` → `prompts/common/glossary_directive.txt`
+      (**`<translation_rules>` 뒤에 조건부로**: 렌더된 글로사리 태그가 하나라도
+      있을 때만. "표기·말투는 위 규칙보다 이 표가 우선"을 선언하는 네 줄이고,
+      그 **위치와 길이가 설계의 일부**다 — `decisions.md` §6-24,
+      `tuning/token-economics.md` §3. 길게 고쳐 쓰지 말 것)
     - `{{translationPhilosophy}}` → `prompts/common/cinematic_translation_philosophy_ko.txt`
       (**cinematic 스타일에서만**; meaning은 빈 문자열)
     - `{{translationRules}}` → **도착어별 독립 파일
@@ -704,6 +716,9 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 장르/배경·시대/톤앤매너가 이상함 | `enrichMovie.ts` (`buildKeywordPrompt` / `buildGroundedPrompt`) |
 | 배경/시대가 개봉연도로 나옴 | `enrichMovie.ts` 프롬프트 (그라운딩·"개봉연도≠극중배경" 지침) |
 | 번역이 직역투/어색함 | 해당 도착어의 `translation_rules_<code>.txt` |
+| 인물명 표기가 청크마다 다르다 | `prompts/common/glossary_directive.txt`(지시문이 붙었는지), `app/lib/prompts/glossaryContent.ts`(캡에 잘려나갔는지), `extractCastSheet.ts`(추출 품질) — §2-C · `decisions.md` §6-24 |
+| 말투 방향이 표와 다르다 | 표가 틀렸을 가능성이 먼저다 — 설정 화면 말투 탭에서 고친다(번역 AI는 표를 그대로 따른다). 표가 맞는데 안 지켜지면 `glossary_directive.txt` 2번 줄 — §2-C |
+| 내레이션이 해요체로 나온다 | `CastSheet.narration` 판정(설정 화면 말투 탭에서 고칠 수 있다) + `translation_rules_ko.txt` 9번 — §2-C |
 | 도착어를 추가하고 싶음 | `app/config/languages.ts`에 한 행 + `prompts/common/translation_rules_<code>.txt` — §4. 실제 모델 출력 확인은 `LIVE_LANG_SMOKE=1 npx vitest run app/lib/prompts/liveLang.smoke.test.ts` |
 | 영어/중국어인데 존댓말 관계표가 안 보임 | 정상 — 그 언어엔 문법적 말투 축이 없어 relations를 안 만든다(§2-C, `languages.ts`의 `formality: null`) |
 | 영어 자막인데 문장 끝 마침표가 사라짐 | `languages.ts`의 `trailingPunctuation`이 비어 있어야 정상 — 값이 있으면 §9.7이 지운다 |

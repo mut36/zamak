@@ -44,8 +44,10 @@
    장르/배경/톤(프롬프트용)을 섞지 말 것. `movieInfo.notes`는 사용자 자유 입력 전용.
    글로사리·존대관계(`CastSheet`, `app/types/glossary.ts`)는 이 둘과 또 다른 제3의
    버킷 — `MovieInfo`에 합치지 말고 별도 타입·별도 프롬프트 태그(`<glossary>`,
-   `<speech_relations>`)로 유지한다. opt-in 토글(기본 OFF)이 꺼지면 이 버킷은
-   프롬프트에 아예 나타나지 않아야 한다.
+   `<speech_relations>`)로 유지한다. 글로사리는 **프로 번역에만** 붙는다
+   (`app/lib/glossaryGate.ts`의 `glossaryAppliesTo`). 라이트면 이 버킷은
+   프롬프트에 아예 나타나지 않아야 하고, 그 강제는 화면이 아니라 서버
+   (`requestValidation.ts`)가 한다.
 
 ## 컨벤션
 

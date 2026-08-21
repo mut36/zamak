@@ -431,7 +431,7 @@ Vercel Project Settings → Environment Variables에 **다섯 개**를 추가합
 넣지 **않는** 것들과 이유:
 
 - `TOSS_SECRET_KEY`·`NEXT_PUBLIC_TOSS_CLIENT_KEY` — 결제 코드가 `feature/payments`에 있어 main에는 읽는 쪽이 없습니다.
-- `OPENAI_API_KEY` — 글로사리 전용인데 `GLOSSARY_UI_ENABLED`가 `false`라 지금은 호출 경로가 없습니다. 토글을 다시 켤 때 같이 추가하세요.
+- `OPENAI_API_KEY` — 글로사리 추출 전용. **프로 번역이면 파일마다 호출되므로 실제로 필요합니다**(2026-08-21부터 프로 전용 상시 실행). 없으면 추출이 조용히 빈 시트를 반환합니다 — 프로 사용자는 20초를 더 기다리고 아무것도 못 받습니다. 키가 없는 환경에서는 `GLOSSARY_PROVIDER=gemini`로 여세요.
 - `ANTHROPIC_API_KEY` — 로컬 실험 하네스(`scripts/`) 전용. 프로덕션 라우트는 안 씁니다.
 
 ⚠️ `NEXT_PUBLIC_SITE_URL`은 **프로덕션 환경에만** 설정합니다. 프리뷰에도 걸면 프리뷰 배포가 자기 sitemap·canonical을 프로덕션 도메인으로 광고하게 됩니다(`app/lib/brand.ts` `resolveSiteUrl`).

@@ -24,7 +24,7 @@ interface CastSheetCardProps {
 }
 
 /**
- * 프로 번역에 딸려 오는 결과 카드다 — 토글이 아니다(§6-24). 카드가 보이는
+ * 프로 번역에 딸려 오는 결과 카드다 — 토글이 아니다(§6-25). 카드가 보이는
  * 것 자체가 "이 번역에 글로사리가 붙는다"는 뜻이므로 헤더는 접기/펴기만
  * 한다. A failed extraction degrades to an empty, still-editable sheet rather
  * than an error banner — translation proceeds normally either way.

@@ -38,7 +38,7 @@ interface TranslateSettingsStepProps {
   model: AllowedModel;
   onModel: (m: AllowedModel) => void;
   credits: CreditBalances | null;
-  // cast sheet — 프로 번역에 딸려 오는 결과 카드다(토글 아님, §6-24). 공유:
+  // cast sheet — 프로 번역에 딸려 오는 결과 카드다(토글 아님, §6-25). 공유:
   // both branches (see docs/decisions.md)
   castSheetStatus: CastSheetStatus;
   castSheet: CastSheet;
@@ -329,7 +329,7 @@ export function TranslateSettingsStep({
 
       {/* 글로사리는 프로의 약속("작품 맥락 분석과 인물명 일관성", COPY.settings.proDesc)
           중 인물명 일관성을 실제로 수행하는 부분이다. 그래서 토글이 아니라
-          프로를 고르면 나타나는 결과 카드다 — docs/decisions.md §6-24. */}
+          프로를 고르면 나타나는 결과 카드다 — docs/decisions.md §6-25. */}
       {glossaryAppliesTo(model) && (
         <>
           <p className='qlabel'>{c.sectionAdvanced}</p>
