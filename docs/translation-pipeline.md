@@ -24,10 +24,10 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   → /api/analyze         제목·연도 확정 (AUX 모델)
   → [영화] /api/enrich    TMDB + 그라운딩 → 제목/연도/감독/포스터 + 장르/배경/톤
     [기타] /api/summarize 자막 앞부분 요약 → notes
-  → (프로 전용) /api/glossary  전체 자막 1회 스캔 → 글로사리+말투관계+내레이션 문체
-              (프로 번역이면 항상 실행 — §2-C)
+  → [영화·프로] /api/note  전체 자막 1회 스캔 → 연출 메모(짧은 산문) → notes
+              (§2-C. 글로사리 표를 대체한 경로 — decisions.md §6-26)
   → WorkPickStep          후보 선택(영화) / 유형·톤 입력(예능·다큐)
-  → TranslateSettingsStep 사람이 검토·수정 (+ 글로사리 카드, 프로면 항상)
+  → TranslateSettingsStep 사람이 검토·수정 (+ 연출 메모 카드, 영화면 항상)
   → /api/translation/begin  크레딧 1 차감 → jobId
   → 청킹 (장면 갭 기준)
   → 청크별 병렬 /api/translate
@@ -127,7 +127,50 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 - **품질 레버**: 요약 프롬프트는 `summarize/route.ts` 안에 인라인. 샘플 줄 수는
   `constants.ts` `SUMMARY_SAMPLE_LINES`.
 
-### 2-C. 글로사리·존대관계 추출 (프로 전용, 콘텐츠 유형 무관)
+### 2-C. 연출 메모 추출 (프로 + 영화 전용)
+
+> **2026-08-21부터 이 자리는 연출 메모가 쓴다.** 글로사리·존대관계 표는
+> `GLOSSARY_ENABLED = false`로 꺼져 있다 — 표 자체가 아니라 표에 준 권한이
+> 번역 품질을 깎았기 때문이다(`decisions.md` §6-26). 아래 2-C-old는 되살릴 때를
+> 위해 남긴 기록이고, **오늘 도는 것은 2-C-new다.**
+
+#### 2-C-new. 연출 메모 (도는 경로)
+
+> **판정은 `directorNoteAppliesTo(model)` 하나다** (`app/lib/glossaryGate.ts`):
+> `DIRECTOR_NOTE_ENABLED && creditKindForModel(model) === 'pro'`. 여기에
+> **영화 분기 조건**이 하나 더 붙는다(`useWizard`) — 비영화는 `/api/summarize`가
+> 이미 같은 `notes` 칸을 쓰므로, 둘 다 돌면 한 필드에 기록자가 둘이 되고
+> "먼저 도착한 쪽"이라는 경주가 된다.
+
+- **코드**: `app/api/note/route.ts` → `app/lib/server/extractDirectorNote.ts`
+  (`extractDirectorNote` → `fetchCastAnchors` + `buildUserTurn`을
+  `extractCastSheet.ts`에서 **그대로 재사용** → 프로바이더 분기 →
+  `sanitizeDirectorNote`), 훅 `app/hooks/useDirectorNote.ts`, 프롬프트
+  `prompts/common/director_note.txt`, 화면은 `TranslateSettingsStep`의 메모 카드.
+- **하는 일**: 자막 전체를 한 번 읽고 **짧은 산문 메모**를 써서
+  `movieInfo.notes`에 넣는다. 세 종류만 적게 프롬프트가 제한한다 —
+  ①말투 지형(쌍 나열 금지, 덩어리로) ②내레이션·낭독의 문체
+  ③**오용 위험이 있는 표기 몇 개만**(등장인물 전원 나열 금지).
+- **왜 표가 아니라 메모인가**: 메모는 `<user_notes>`로 실린다. 그 태그는 시스템
+  프롬프트의 신뢰 경계 목록에 이미 있는 **데이터** 태그이고, 규칙을 이길 권한이
+  구조적으로 없다. 표를 약하게 만든 게 아니라 권한을 줄 수 없는 자리에 놓았다.
+- **품질 레버**:
+  - 메모가 일반론을 늘어놓음("자연스럽게 옮겨라" 같은 것) → `director_note.txt`의
+    `[가장 중요한 것]` 절. 번역가가 이미 아는 것을 적지 말라고 최상단에 박혀 있다.
+  - 등장인물 이름을 전부 나열함 → 같은 파일 3번 항목의 선별 기준.
+  - 메모가 너무 김 → `DIRECTOR_NOTE_MAX_CHARS`(기본 600). **프롬프트와 코드 양쪽에**
+    걸려 있다. 길어지면 다시 규칙이 되고, 그게 글로사리가 실패한 방식이다.
+  - 마지막 문장이 중간에서 끊김 → `sanitizeDirectorNote`는 **줄 단위**로 버린다.
+    문자로 자르면 `Aldo Moro → 알도 모`처럼 틀린 지시가 남는다.
+  - 사용자 입력이 덮임 → 그럴 수 없다. 자동 채우기는 `prev.notes || note`이고,
+    통째로 덮는 것은 "다시 쓰기"뿐이며 그 전에 확인을 받는다(CLAUDE.md 불변식 5).
+  - 메모가 비어 있음 = 정상 강등. 어떤 실패(키 없음·API 오류·파싱 실패)든 빈
+    문자열로 떨어지고 번역을 막지 않는다.
+- **관측**: 서버 로그 `[note] provider=… model=… prompt=… output=…` 한 줄(파일당 1회).
+- **비용**: 글로사리와 같은 프로바이더·모델·발췌 로직을 쓰므로 입력 원가는 같고,
+  출력이 표(수십 항목 JSON)에서 산문 한 덩이(≤600자)로 줄어 더 싸다.
+
+#### 2-C-old. 글로사리·존대관계 추출 (현재 꺼짐 — 되살릴 때의 기록)
 
 > **판정은 `glossaryAppliesTo(model)` 하나다** (`app/lib/glossaryGate.ts`):
 > `GLOSSARY_ENABLED && creditKindForModel(model) === 'pro'`. 사용자가 켜고 끄는
@@ -303,11 +346,13 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   - **시스템 프롬프트**:
     - 페르소나 + 신뢰 경계 → `prompts/common/subtitle_translation_system.txt`
       (`<glossary>`, `<speech_relations>`도 이 경계에 포함 — 프로일 때만 실제로 등장)
-    - `{{glossaryDirective}}` → `prompts/common/glossary_directive.txt`
-      (**`<translation_rules>` 뒤에 조건부로**: 렌더된 글로사리 태그가 하나라도
-      있을 때만. "표기·말투는 위 규칙보다 이 표가 우선"을 선언하는 네 줄이고,
-      그 **위치와 길이가 설계의 일부**다 — `decisions.md` §6-24,
-      `tuning/token-economics.md` §3. 길게 고쳐 쓰지 말 것)
+    - `{{glossaryDirective}}` → **오늘은 항상 빈 문자열이다**(글로사리 꺼짐).
+      켜져 있던 시절에는 `prompts/common/glossary_directive.txt`가
+      `<translation_rules>` 뒤에 조건부로 붙어 "표기·말투는 위 규칙보다 이 표가
+      우선"을 선언했고, **그 문장이 품질 저하의 원인이었다** — 시스템 프롬프트의
+      마지막 줄이라 recency상 가장 세게 먹히면서 `<translation_philosophy>`를
+      한 단계 밑으로 밀었다(`decisions.md` §6-26). 되살릴 때 이 문장을 그대로
+      쓰지 말 것
     - `{{translationPhilosophy}}` → `prompts/common/cinematic_translation_philosophy_ko.txt`
       (**cinematic 스타일에서만**; meaning은 빈 문자열)
     - `{{translationRules}}` → **도착어별 독립 파일
@@ -315,7 +360,9 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
       한 파일에, **그 언어로 작성**; `{{lineMaxChars}}`만 `languages.ts` 값으로 치환 —
       `translationContent.ts`의 `buildTranslationRules`)
   - **유저 턴**: `<content_metadata>`(`formatMovieInfo` — 제목/연도/장르/배경·시대/톤앤매너)
-    + `<user_notes>` + 청크 위치 + `<glossary>`(파일 전체 표기, §2-C 켰을 때만) +
+    + `<user_notes>`(**영화·프로면 연출 메모가 여기 실린다** — §2-C-new;
+    비영화는 `/api/summarize` 요약; 어느 쪽이든 사용자가 고친 최종본)
+    + 청크 위치 + `<glossary>`(파일 전체 표기, §2-C-old를 되켰을 때만) +
     `<speech_relations>`(이 청크의 블록 범위와 겹치는 관계만, `getBlockIndexRange` +
     `renderGlossaryTags` — §2-C) + 내레이션 문체 한 줄(§2-C, `narration !== 'none'`
     일 때만) + `<subtitle_data>`(타임스탬프 제거, **줄마다
@@ -341,11 +388,15 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   - 줄 길이 상한 → `languages.ts`의 `lineMaxChars`(ko 25 / ja 20 / zh 18 / 라틴계 42).
     **도착어별이고 콘텐츠 프로필과 무관하다** — 프로필은 노출 시간만 바꾼다
     (`decisions.md` §1-19). 그래서 프롬프트 조합은 프로필을 아예 받지 않는다
-  - 이름 표기·말투가 청크마다 흔들림 → §2-C(추출) 참조. 표기 고정은 각
-    `translation_rules_<code>.txt`의 글로사리·우선순위 규칙에 못박혀 있음
-- **주의**: `castSheet`가 없으면(토글 OFF, 기본값) `<glossary>`/`<speech_relations>`는
-  `.filter(Boolean)`으로 완전히 드롭돼 프롬프트가 이 기능 도입 이전과 바이트 단위로
-  같다 — `composer.test.ts` 회귀 테스트로 고정됨.
+  - 이름 표기·말투가 청크마다 흔들림 → §2-C-new(연출 메모). 오용 위험이 있는
+    표기는 메모가 짚어 주고, 그 밖의 표기 고정은 각 `translation_rules_<code>.txt`의
+    우선순위 규칙에 못박혀 있음
+  - **번역이 "정확한데 밋밋함"** → 프롬프트에 규칙을 이기는 지시문이 들어갔는지
+    의심할 것. 시스템 프롬프트의 **마지막 줄**이 특히 위험하다(`decisions.md` §6-26)
+- **주의**: `castSheet`가 없으면(현재 항상 그렇다 — 글로사리 꺼짐)
+  `<glossary>`/`<speech_relations>`는 `.filter(Boolean)`으로 완전히 드롭돼 프롬프트가
+  이 기능 도입 이전과 **바이트 단위로** 같다 — `composer.test.ts` 회귀 테스트로
+  고정됨. 이 성질이 §6-26에서 "끄기"를 한 줄로 만들어 줬다.
 
 ### 8. 모델 호출
 - **코드**: `translateSubtitle` → `app/lib/providers/gemini.ts` (`generateModelText`),

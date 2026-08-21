@@ -14,7 +14,8 @@
 `docs/translation-pipeline.md`는 업로드→다운로드 전 과정과 "증상→고칠 파일"을 적은
 품질관리 지도다. 아래를 건드리면 그 지도가 낡으니 함께 고친다:
 프롬프트(`prompts/`), enrich(`app/lib/server/enrichMovie.ts`, `tmdb.ts`),
-글로사리 추출(`app/lib/server/extractCastSheet.ts`, `app/api/glossary`),
+연출 메모 추출(`app/lib/server/extractDirectorNote.ts`, `app/api/note`),
+글로사리 추출(`app/lib/server/extractCastSheet.ts`, `app/api/glossary` — 현재 꺼짐),
 청킹·재조립(`app/lib/srt.ts`), 포맷 어댑터(`app/lib/subtitles/`),
 프롬프트 조합(`app/lib/prompts/`),
 번역 서비스/라우트(`app/lib/server/translationService.ts`, `app/api/translate`),
@@ -40,18 +41,32 @@
 1. **청크 입력 블록 수 = 출력 블록 수** (재조립이 번호로 대조).
 2. **타임코드는 코드가 복원** — 모델엔 번호+대사만 보내고, 모델이 뱉은 타임스탬프는 불신.
 3. **청크 크기 상한**: 재번호 드리프트 천장(~600블록) 밑으로 유지.
-4. **UI 버킷↔AI 버킷↔글로사리 버킷 분리**: 제목/연도/감독/포스터(화면용)와
-   장르/배경/톤(프롬프트용)을 섞지 말 것. `movieInfo.notes`는 사용자 자유 입력 전용.
-   글로사리·존대관계(`CastSheet`, `app/types/glossary.ts`)는 이 둘과 또 다른 제3의
-   버킷 — `MovieInfo`에 합치지 말고 별도 타입·별도 프롬프트 태그(`<glossary>`,
-   `<speech_relations>`)로 유지한다. 글로사리는 **프로 번역에만** 붙는다
-   (`app/lib/glossaryGate.ts`의 `glossaryAppliesTo`). 라이트면 이 버킷은
-   프롬프트에 아예 나타나지 않아야 하고, 그 강제는 화면이 아니라 서버
-   (`requestValidation.ts`)가 한다.
+4. **UI 버킷↔AI 버킷 분리**: 제목/연도/감독/포스터(화면용)와
+   장르/배경/톤(프롬프트용)을 섞지 말 것.
+5. **기계가 쓴 값도 화면에 보이고 편집 가능해야 한다**: `movieInfo.notes`는
+   한때 "사용자 자유 입력 전용"이었지만 지금은 AI가 먼저 채운다 — 영화는 연출
+   메모(`/api/note`), 그 외는 요약(`/api/summarize`). 바뀐 것은 **누가 쓰는가**이지
+   **누가 소유하는가**가 아니다. 이 칸은 언제나 화면에 뜨고, 언제나 편집 가능하고,
+   지우면 프롬프트에 아무것도 안 실린다. 기계가 쓴 값이 화면 뒤에서 조용히
+   프롬프트로 가는 상태를 만들지 말 것. 덮어쓰기 규칙도 한 방향이다 —
+   자동 채우기는 `prev.notes || value`(사용자 입력이 이긴다), 사용자가 "다시 쓰기"를
+   눌렀을 때만 통째로 바꾸고 그 전에 확인을 받는다.
+6. **글로사리 버킷은 현재 꺼져 있다** — 코드는 전부 남아 있다.
+   `GLOSSARY_ENABLED = false`(2026-08-21). 표에 준 권한이 번역 품질을 깎았기
+   때문이고, 되살리는 조건은 `docs/decisions.md` §6-26에 적혀 있다. 되살릴 때의
+   불변식은 그대로다: 글로사리·존대관계(`CastSheet`, `app/types/glossary.ts`)는
+   위 둘과 또 다른 제3의 버킷 — `MovieInfo`에 합치지 말고 별도 타입·별도 프롬프트
+   태그(`<glossary>`, `<speech_relations>`)로 유지한다. **프로 번역에만** 붙고
+   (`app/lib/glossaryGate.ts`의 `glossaryAppliesTo`), 라이트면 프롬프트에 아예
+   나타나지 않아야 하며, 그 강제는 화면이 아니라 서버(`requestValidation.ts`)가
+   한다. 같은 규칙이 연출 메모의 게이트(`directorNoteAppliesTo`)에도 적용된다.
 
 ## 컨벤션
 
 - 화면 문구는 하드코딩 금지 → `app/i18n/simpleCopy.ts` (`COPY`).
+- 아이콘은 크기를 **밖에서** 받는다 (`app/components/icons.tsx`의 `base`에
+  width/height가 없다). `<SpinnerIcon />`처럼 맨몸으로 쓰면 flex 안에서 SVG가
+  줄 높이를 넘겨 커진다 — 항상 `w-4 h-4` 같은 크기 클래스를 넘길 것.
 - 설정/상수는 `app/config/constants.ts` 한 곳.
 - 도착어는 한국어만 활성 → `app/config/languages.ts`.
 
