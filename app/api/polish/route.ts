@@ -3,6 +3,8 @@ import { requireUser } from '../../lib/server/auth';
 import { enforceRateLimit } from '../../lib/server/rateLimit';
 import { reportServerError } from '../../lib/server/reportError';
 import { splitLongLines } from '../../lib/server/polishService';
+import { recordChunkUsage } from '../../lib/server/chunkUsage';
+import { createClient } from '../../lib/supabase/server';
 import { parseSrtBlocks } from '../../lib/srt';
 import { FLASH_MODEL, POLISH_MAX_BLOCKS } from '../../config/constants';
 
@@ -56,7 +58,26 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await splitLongLines(body.subset, body.targetLang);
+    // 규칙 적용도 크레딧을 안 쓰지만 청구서에는 남는다. job이 없으므로
+    // jobId는 null이다 (마이그레이션 0017) — 이 행들이 없으면 계정별 사용량
+    // 집계(supabase/monthly-usage.sql)가 실제보다 적게 나온다.
+    const supabase = await createClient();
+    const result = await splitLongLines(body.subset, body.targetLang, (m) => {
+      void recordChunkUsage(supabase, {
+        jobId: null,
+        userId: auth.user.id,
+        chunkIndex: m.chunkIndex,
+        totalChunks: m.totalChunks,
+        phase: 'polish',
+        blocks: m.blocks,
+        model: m.model,
+        thinkingLevel: m.thinkingLevel,
+        usage: m.usage,
+        latencyMs: m.latencyMs,
+        ok: m.ok,
+        errorCode: m.errorCode,
+      });
+    });
     return NextResponse.json(result);
   } catch (error) {
     console.error('Polish failed:', error);

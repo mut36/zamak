@@ -4,6 +4,8 @@ import { enforceRateLimit } from '../../lib/server/rateLimit';
 import { reportServerError } from '../../lib/server/reportError';
 import { extractDirectorNote } from '../../lib/server/extractDirectorNote';
 import { directorNoteAppliesTo } from '../../lib/glossaryGate';
+import { recordChunkUsage } from '../../lib/server/chunkUsage';
+import { createClient } from '../../lib/supabase/server';
 import { DEFAULT_TARGET_LANG } from '../../config/languages';
 
 export const maxDuration = 60;
@@ -54,7 +56,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const note = await extractDirectorNote(
+    const result = await extractDirectorNote(
       body.content,
       {
         title: body.movieInfo?.title ?? '',
@@ -68,7 +70,28 @@ export async function POST(request: NextRequest) {
         ? body.targetLang
         : DEFAULT_TARGET_LANG,
     );
-    return NextResponse.json({ note });
+    // 과금되지 않는 호출이라 여태 로그에만 남았고, 그래서 계정별 사용량
+    // 집계가 실제 청구서보다 적게 나왔다. job이 아직 없으므로 jobId는 null이다
+    // (마이그레이션 0017). 청크 쪽과 같이 await하지 않는다 — 측정 실패가
+    // 메모를 못 돌려주게 만드는 건 측정이 없는 것보다 나쁘다.
+    if (result.measurement) {
+      const m = result.measurement;
+      void recordChunkUsage(await createClient(), {
+        jobId: null,
+        userId: auth.user.id,
+        chunkIndex: 1,
+        totalChunks: 1,
+        phase: 'note',
+        blocks: m.blocks,
+        model: m.model,
+        thinkingLevel: m.thinkingLevel,
+        usage: m.usage,
+        latencyMs: m.latencyMs,
+        ok: m.ok,
+        errorCode: m.errorCode,
+      });
+    }
+    return NextResponse.json({ note: result.note });
   } catch (error) {
     console.error('[note] request failed:', error);
     // 빈 메모는 "메모가 없는 파일"과 구별되지 않는다 — 그래서 여기가 관측이

@@ -7,11 +7,13 @@ import type { TokenUsage } from '../providers';
  *  code — a failed call still cost latency and still happened, and dropping it
  *  would make the call count disagree with the retry logs. */
 export interface ChunkUsageRow {
-  jobId: string;
+  /** null이면 job에 매이지 않은 호출 — 연출 메모처럼 크레딧 차감 전에 도는
+   *  프리패스다. 붙일 job이 아직 존재하지 않는다 (마이그레이션 0017). */
+  jobId: string | null;
   userId: string;
   chunkIndex: number;
   totalChunks: number;
-  phase: 'main' | 'sweep';
+  phase: 'main' | 'sweep' | 'note' | 'polish';
   blocks: number;
   model: string;
   thinkingLevel: string | null;
@@ -22,7 +24,7 @@ export interface ChunkUsageRow {
 }
 
 /**
- * Records what one chunk translation consumed.
+ * Records what one model call consumed.
  *
  * Never throws and never awaited by the response path: a measurement that can
  * fail a translation is worse than no measurement.

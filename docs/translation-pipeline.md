@@ -705,7 +705,15 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   `{ text, usage, thinkingLevel }`를 반환(타입 `app/lib/providers/types.ts`) →
   `/api/translate`가 `app/lib/server/chunkUsage.ts`(`recordChunkUsage`)로
   `translation_chunk_usage`에 1행 기록(재시도·§9.65 sweep 라운드도 각각 1행 —
-  sweep은 `phase='sweep'`으로 구분). 런 1회당 — `useTranslation.ts` 완료 시
+  sweep은 `phase='sweep'`으로 구분). **번역 밖의 모델 호출도 같은 표에
+  들어간다**(2026-08-22, 마이그레이션 0017): 연출 메모는 `phase='note'`로
+  파일당 1행(`/api/note`), 규칙 적용은 `phase='polish'`로 청크당 1행
+  (`/api/polish`). 둘 다 크레딧을 안 쓰므로 붙일 job이 없고 `job_id`가 null이다
+  — 그전까지 이 호출들은 Vercel 로그에만 남아 계정별 사용량 집계가 실제
+  청구서보다 적게 나왔다. 서비스는 측정치를 **반환만** 하고
+  (`extractDirectorNote`의 `DirectorNoteResult.measurement`,
+  `splitLongLines`의 `onCall`) 쓰는 것은 라우트다 — 서비스가 요청의 신원을
+  알지 않게 하려는 것으로, `/api/translate`가 하는 것과 같은 분리다. 런 1회당 — `useTranslation.ts` 완료 시
   `app/lib/client/metrics.ts`(`sendRunMetrics`) → `/api/translation/metrics` →
   RPC `record_job_metrics` → `translation_jobs`의 실측 컬럼(청크 수·소요·잔여
   블록 등). 피드백 — 완료 화면 별점은 그 자리에서(`DoneStep.tsx`,
@@ -717,15 +725,21 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   `app/lib/client/events.ts`(`recordEvent`) → `/api/events` → `beta_events`
   (업로드 거절 · 설정 확정 · 다운로드 클릭 · 크레딧 소진 화면 노출, 목록은
   `constants.ts` `BETA_EVENTS`).
-- **스키마**: `supabase/migrations/0009_beta_metrics.sql`(적용 상태는
-  README의 스키마 절 참고).
+- **스키마**: `supabase/migrations/0009_beta_metrics.sql` +
+  `0017_prepass_usage.sql`(job_id nullable · phase에 note·polish 추가; 적용
+  상태는 README의 스키마 절 참고).
 - **조회**: 매일 아침은 `supabase/daily.sql` — 신규가입·로그인·업로드·완료·
   재방문 5개를 어제/최근7일 두 줄로 뽑는 저장용 쿼리다. 업로드·완료는
   `beta_events`가 아니라 `translation_jobs`에서 센다(서버가 쓴 행이라
   fire-and-forget 유실이 없다). 숫자가 이상할 때만 `supabase/beta-review.sql`의
   해당 블록으로 내려간다 — 대응표는 daily.sql 하단에 있다. **익명 방문은 어느
   쪽에도 없다**: `beta_events.user_id`가 `not null`이라 로그인 전 행동은 이
-  테이블에 남지 않는다.
+  테이블에 남지 않는다. 계정별·월별 API 사용량(달러)은
+  `supabase/monthly-usage.sql` — 전체 계정 월별 표 하나와, 계정·월을 직접
+  적어 넣는 단건 조회 두 개가 들어 있다. 단가표는 하드코딩이고
+  `docs/tuning/cost-per-block.md`에서 왔다 — 단가가 바뀌면 쿼리 안의
+  `rates`를 같이 고친다. 월 경계는 **KST 1일 00:00**이라 구글 청구서의
+  태평양시 경계와 몇 시간 어긋난다.
 - **불변식**: 자막 텍스트는 계측 어디에도 저장하지 않는다 —
   `feedback.reported_blocks`는 정수(SRT 시퀀스 번호) 배열이고, 그 줄의
   텍스트는 보관된 결과물(0007)에서 읽는다. 계측 실패가 번역·화면을 깨면 안

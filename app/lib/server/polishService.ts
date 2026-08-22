@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { geminiProvider } from '../providers/gemini';
+import type { TokenUsage } from '../providers';
+import { classifyError } from '../translationErrors';
 import { composeLineSplitPrompt } from '../prompts/lineSplit';
 import {
   chunkSrtBlocks,
@@ -14,6 +16,23 @@ import {
   POLISH_CHUNK_SIZE,
   SERVER_CONCURRENCY,
 } from '../../config/constants';
+
+/**
+ * 청크 한 개를 돈 모델 호출의 측정치. 서비스는 이걸 **돌려줄 뿐**이고 어디에
+ * 쓰는지는 라우트가 정한다 — 여기서 DB에 쓰면 이 모듈이 요청의 신원을 알아야
+ * 하고, 그건 translationService가 청크 사용량을 다루는 방식과 어긋난다.
+ */
+export interface PolishCallMeasurement {
+  chunkIndex: number;
+  totalChunks: number;
+  blocks: number;
+  model: string;
+  thinkingLevel: string | null;
+  usage: TokenUsage;
+  latencyMs: number;
+  ok: boolean;
+  errorCode?: string;
+}
 
 export interface PolishServiceResult {
   /** 재조립된 SRT. 실패한 청크의 블록은 원문 그대로 들어 있다. */
@@ -39,6 +58,7 @@ export interface PolishServiceResult {
 export async function splitLongLines(
   subset: string,
   targetLanguage: string,
+  onCall?: (measurement: PolishCallMeasurement) => void,
 ): Promise<PolishServiceResult> {
   const blocks = parseSrtBlocks(subset);
   if (blocks.length === 0) {
@@ -51,14 +71,44 @@ export async function splitLongLines(
   const results = await runOrderedPool<string, string>({
     items: chunks,
     concurrency: SERVER_CONCURRENCY,
-    worker: async (chunk) => {
-      const { text } = await geminiProvider.generateText({
-        model: FLASH_MODEL,
-        prompt: formatBlocksForModel(chunk),
-        translationMode: 'chunk',
-        systemInstruction,
-      });
-      return reassembleTranslatedChunk(chunk, text).content;
+    worker: async (chunk, index) => {
+      const blocks = parseSrtBlocks(chunk).length;
+      const startedAt = Date.now();
+      try {
+        const { text, usage, thinkingLevel } =
+          await geminiProvider.generateText({
+            model: FLASH_MODEL,
+            prompt: formatBlocksForModel(chunk),
+            translationMode: 'chunk',
+            systemInstruction,
+          });
+        onCall?.({
+          chunkIndex: index + 1,
+          totalChunks: chunks.length,
+          blocks,
+          model: FLASH_MODEL,
+          thinkingLevel,
+          usage,
+          latencyMs: Date.now() - startedAt,
+          ok: true,
+        });
+        return reassembleTranslatedChunk(chunk, text).content;
+      } catch (error) {
+        // 실패한 청크도 지연을 썼고 실제로 일어났다 — 토큰 0짜리 행을 남긴다.
+        // 여기서 삼키지 않고 다시 던진다: 원문 유지 분기는 pool이 맡는다.
+        onCall?.({
+          chunkIndex: index + 1,
+          totalChunks: chunks.length,
+          blocks,
+          model: FLASH_MODEL,
+          thinkingLevel: null,
+          usage: { prompt: 0, cached: 0, thoughts: 0, output: 0 },
+          latencyMs: Date.now() - startedAt,
+          ok: false,
+          errorCode: classifyError(error),
+        });
+        throw error;
+      }
     },
   });
 

@@ -8,6 +8,8 @@ import {
   type GlossaryProvider,
 } from '../../config/constants';
 import type { MovieInfo } from '../../types/translation';
+import type { TokenUsage } from '../providers';
+import { classifyError } from '../translationErrors';
 import { resolveTargetLang } from '../../config/languages';
 import { parseSrtBlocks } from '../srt';
 import { loadDirectorNotePrompt } from '../prompts/loader';
@@ -43,6 +45,30 @@ const NOTE_JSON_SCHEMA: Record<string, unknown> = {
 
 interface RawNote {
   note?: unknown;
+}
+
+/** 한 번의 모델 호출이 돌려준 것 — 파싱 전 원본과 그 호출이 쓴 토큰. */
+interface GeneratedNote {
+  raw: RawNote;
+  usage: TokenUsage;
+  thinkingLevel: string | null;
+}
+
+/**
+ * 메모와 그 메모를 만든 호출의 측정치. `measurement`가 null이면 모델을 아예
+ * 부르지 않았다는 뜻이다 (빈 파일이거나 키가 없다) — 기록할 호출이 없다.
+ */
+export interface DirectorNoteResult {
+  note: string;
+  measurement: {
+    blocks: number;
+    model: string;
+    thinkingLevel: string | null;
+    usage: TokenUsage;
+    latencyMs: number;
+    ok: boolean;
+    errorCode?: string;
+  } | null;
 }
 
 /** Read at call time so harnesses can flip provider after module load. */
@@ -112,7 +138,7 @@ export async function buildNoteSystemInstruction(
 async function generateViaOpenAi(
   system: string,
   user: string,
-): Promise<RawNote> {
+): Promise<GeneratedNote> {
   const { openaiGenerateJson } = await import('../providers/openai');
   const { json, usage } = await openaiGenerateJson({
     model: GLOSSARY_MODEL,
@@ -124,14 +150,25 @@ async function generateViaOpenAi(
   console.log(
     `[note] provider=openai model=${GLOSSARY_MODEL} prompt=${usage.inputTokens} output=${usage.outputTokens}`,
   );
-  return json as RawNote;
+  return {
+    raw: json as RawNote,
+    // OpenAI는 추론 토큰을 completion_tokens 안에 이미 포함해 돌려준다 —
+    // thoughts를 따로 세면 같은 토큰을 두 번 세는 셈이 된다.
+    usage: {
+      prompt: usage.inputTokens,
+      cached: 0,
+      thoughts: 0,
+      output: usage.outputTokens,
+    },
+    thinkingLevel: null,
+  };
 }
 
 async function generateViaGemini(
   apiKey: string,
   system: string,
   user: string,
-): Promise<RawNote> {
+): Promise<GeneratedNote> {
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: GLOSSARY_MODEL,
@@ -149,12 +186,26 @@ async function generateViaGemini(
   console.log(
     `[note] provider=gemini model=${GLOSSARY_MODEL} thinking=${GLOSSARY_THINKING_LEVEL} prompt=${usage?.promptTokenCount} thoughts=${usage?.thoughtsTokenCount ?? 0} output=${usage?.candidatesTokenCount}`,
   );
-  return JSON.parse(response.text ?? '{}') as RawNote;
+  return {
+    raw: JSON.parse(response.text ?? '{}') as RawNote,
+    usage: {
+      prompt: usage?.promptTokenCount ?? 0,
+      cached: usage?.cachedContentTokenCount ?? 0,
+      thoughts: usage?.thoughtsTokenCount ?? 0,
+      output: usage?.candidatesTokenCount ?? 0,
+    },
+    thinkingLevel: GLOSSARY_THINKING_LEVEL,
+  };
 }
 
 /**
  * 파일당 한 번. 어떤 실패든 빈 문자열로 떨어진다 — 이 프리패스는 번역을 막지
  * 않고, 메모가 없는 것은 이 기능이 없던 때와 같은 상태일 뿐이다.
+ *
+ * 측정치를 **함께 돌려주는** 이유: 이 호출은 과금되지 않지만 자막 전체를 한 번
+ * 읽는 가장 비싼 호출이고, 여태 console.log에만 남아 계정별 사용량 집계
+ * (`supabase/monthly-usage.sql`)가 실제 청구서보다 적게 나왔다. 쓰는 쪽은
+ * 라우트다 — 여기서 직접 DB에 쓰면 이 모듈이 요청의 신원(사용자)을 알아야 한다.
  */
 export async function extractDirectorNote(
   subtitleContent: string,
@@ -163,23 +214,24 @@ export async function extractDirectorNote(
     'title' | 'year' | 'genre' | 'country' | 'era' | 'tone'
   >,
   targetLang: string,
-): Promise<string> {
+): Promise<DirectorNoteResult> {
   const blockCount = parseSrtBlocks(subtitleContent).length;
-  if (blockCount === 0) return '';
+  if (blockCount === 0) return { note: '', measurement: null };
 
   const provider = resolveProvider();
   if (provider === 'openai') {
     if (!process.env.OPENAI_API_KEY) {
       console.warn('[note] OPENAI_API_KEY not configured — returning no note');
-      return '';
+      return { note: '', measurement: null };
     }
   } else if (!process.env.GOOGLE_GENAI_API_KEY) {
     console.warn(
       '[note] GOOGLE_GENAI_API_KEY not configured — returning no note',
     );
-    return '';
+    return { note: '', measurement: null };
   }
 
+  const startedAt = Date.now();
   try {
     const cast = await fetchCastAnchors(movieInfo.title, movieInfo.year);
     const system = await buildNoteSystemInstruction(
@@ -188,7 +240,7 @@ export async function extractDirectorNote(
     );
     const user = buildUserTurn(movieInfo, cast, subtitleContent, blockCount);
 
-    const parsed =
+    const generated =
       provider === 'openai'
         ? await generateViaOpenAi(system, user)
         : await generateViaGemini(
@@ -197,9 +249,32 @@ export async function extractDirectorNote(
             user,
           );
 
-    return sanitizeDirectorNote(parsed);
+    return {
+      note: sanitizeDirectorNote(generated.raw),
+      measurement: {
+        blocks: blockCount,
+        model: GLOSSARY_MODEL,
+        thinkingLevel: generated.thinkingLevel,
+        usage: generated.usage,
+        latencyMs: Date.now() - startedAt,
+        ok: true,
+      },
+    };
   } catch (error) {
     console.error('[note] director note extraction failed', error);
-    return '';
+    // 실패한 호출도 지연을 썼고 실제로 일어났다 — 청크 쪽과 같은 규칙으로
+    // 토큰 0짜리 행을 남긴다. 빼면 호출 수가 에러 표와 어긋난다.
+    return {
+      note: '',
+      measurement: {
+        blocks: blockCount,
+        model: GLOSSARY_MODEL,
+        thinkingLevel: null,
+        usage: { prompt: 0, cached: 0, thoughts: 0, output: 0 },
+        latencyMs: Date.now() - startedAt,
+        ok: false,
+        errorCode: classifyError(error),
+      },
+    };
   }
 }
