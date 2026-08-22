@@ -15,7 +15,7 @@
 품질관리 지도다. 아래를 건드리면 그 지도가 낡으니 함께 고친다:
 프롬프트(`prompts/`), enrich(`app/lib/server/enrichMovie.ts`, `tmdb.ts`),
 연출 메모 추출(`app/lib/server/extractDirectorNote.ts`, `app/api/note`),
-사용량 계측(`app/lib/server/chunkUsage.ts`, `supabase/monthly-usage.sql`),
+사용량 계측(`app/lib/server/chunkUsage.ts`, `supabase/api-usage.sql`),
 글로사리 추출(`app/lib/server/extractCastSheet.ts`, `app/api/glossary` — 현재 꺼짐),
 청킹·재조립(`app/lib/srt.ts`), 포맷 어댑터(`app/lib/subtitles/`),
 프롬프트 조합(`app/lib/prompts/`),

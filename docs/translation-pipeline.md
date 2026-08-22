@@ -734,9 +734,9 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   fire-and-forget 유실이 없다). 숫자가 이상할 때만 `supabase/beta-review.sql`의
   해당 블록으로 내려간다 — 대응표는 daily.sql 하단에 있다. **익명 방문은 어느
   쪽에도 없다**: `beta_events.user_id`가 `not null`이라 로그인 전 행동은 이
-  테이블에 남지 않는다. 계정별·월별 API 사용량(달러)은
-  `supabase/monthly-usage.sql` — 전체 계정 월별 표 하나와, 계정·월을 직접
-  적어 넣는 단건 조회 두 개가 들어 있다. 단가표는 하드코딩이고
+  테이블에 남지 않는다. API 사용량과 그 가격은
+  `supabase/api-usage.sql` — 누적 하나, 월별 하나(각각 총액 + 모델·단계별
+  내역). 단가표는 하드코딩이고
   `docs/tuning/cost-per-block.md`에서 왔다 — 단가가 바뀌면 쿼리 안의
   `rates`를 같이 고친다. 월 경계는 **KST 1일 00:00**이라 구글 청구서의
   태평양시 경계와 몇 시간 어긋난다.

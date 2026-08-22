@@ -203,8 +203,8 @@ async function generateViaGemini(
  * 않고, 메모가 없는 것은 이 기능이 없던 때와 같은 상태일 뿐이다.
  *
  * 측정치를 **함께 돌려주는** 이유: 이 호출은 과금되지 않지만 자막 전체를 한 번
- * 읽는 가장 비싼 호출이고, 여태 console.log에만 남아 계정별 사용량 집계
- * (`supabase/monthly-usage.sql`)가 실제 청구서보다 적게 나왔다. 쓰는 쪽은
+ * 읽는 가장 비싼 호출이고, 여태 console.log에만 남아 사용량 집계
+ * (`supabase/api-usage.sql`)가 실제 청구서보다 적게 나왔다. 쓰는 쪽은
  * 라우트다 — 여기서 직접 DB에 쓰면 이 모듈이 요청의 신원(사용자)을 알아야 한다.
  */
 export async function extractDirectorNote(

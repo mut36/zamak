@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         ? body.targetLang
         : DEFAULT_TARGET_LANG,
     );
-    // 과금되지 않는 호출이라 여태 로그에만 남았고, 그래서 계정별 사용량
+    // 과금되지 않는 호출이라 여태 로그에만 남았고, 그래서 사용량
     // 집계가 실제 청구서보다 적게 나왔다. job이 아직 없으므로 jobId는 null이다
     // (마이그레이션 0017). 청크 쪽과 같이 await하지 않는다 — 측정 실패가
     // 메모를 못 돌려주게 만드는 건 측정이 없는 것보다 나쁘다.

@@ -59,8 +59,8 @@ export async function POST(request: NextRequest) {
 
   try {
     // 규칙 적용도 크레딧을 안 쓰지만 청구서에는 남는다. job이 없으므로
-    // jobId는 null이다 (마이그레이션 0017) — 이 행들이 없으면 계정별 사용량
-    // 집계(supabase/monthly-usage.sql)가 실제보다 적게 나온다.
+    // jobId는 null이다 (마이그레이션 0017) — 이 행들이 없으면 사용량
+    // 집계(supabase/api-usage.sql)가 실제보다 적게 나온다.
     const supabase = await createClient();
     const result = await splitLongLines(body.subset, body.targetLang, (m) => {
       void recordChunkUsage(supabase, {
