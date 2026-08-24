@@ -130,7 +130,7 @@ export async function buildNoteSystemInstruction(
     // 앵커가 없는 요청에 "아래 표를 보라"고 적으면 없는 것을 가리키는 문장이
     // 된다 — composer가 glossaryDirective를 다루는 방식과 같은 이유다.
     castAnchorHint: hasCastAnchors
-      ? '<tmdb_cast>에 배역 이름이 주어졌다면 표기를 고를 때 참고하되, 그 목록을 그대로 옮겨 적지는 마.'
+      ? 'If <tmdb_cast> provides character names, use them only as spelling references; do not copy the list into the note.'
       : '',
   });
 }
