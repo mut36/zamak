@@ -278,9 +278,12 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   `app/api/translation/begin/route.ts`
 - **하는 일**: 크레딧 1 차감 → `jobId` 발급(파일당 1회). 번역 스타일·도착어 결정.
 - **품질 레버**:
-  - **번역 스타일** `meaning`(의미보존) / `cinematic`(영화적) — 현재 `handleTranslate`에서
-    **`'meaning'` 하드코딩**. cinematic 철학 파일은 존재하나 UI에 안 붙어 있음. 스타일을
-    노출/전환하려면 여기 + `TranslateSettingsStep`.
+  - **번역 스타일** `meaning`(의미보존) / `cinematic`(영화적) — `TranslateSettingsStep`의
+    **"[실험] 번역 철학 프롬프트 포함"** 체크박스가 정한다(기본 OFF). 상태는
+    `useWizard.philosophyOn`이고, 켜지면 `translate(..., 'cinematic')`이 되어 composer가
+    `cinematic_translation_philosophy_ko.txt`를 시스템에 얹는다. 철학 유무의 품질 차이를
+    눈으로 비교하려고 잠깐 노출한 스위치라 저장하지 않는다(새로고침하면 꺼짐) —
+    결론이 나면 토글·`COPY.settings.philosophy*`를 통째로 지우고 스타일을 고정한다.
   - 도착어 → **`app/config/languages.ts` (`TARGET_LANGS`)** — 한 행이 곧 한 언어다:
     picker 표시(label/mono/enabled), 프롬프트(promptLabel/lineMaxChars/formality),
     후처리(trailingPunctuation + `shapes[프로필].target/hardMax`). 현재 활성: 한국어·영어·일본어·스페인어·
