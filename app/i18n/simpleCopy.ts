@@ -748,6 +748,12 @@ export const COPY = {
     // purchase. Revisit this wording when paid credits ship.
     creditsLeft: (n: number) => `무료 ${n}장 남음`,
     eta: (sec: number) => `예상 소요 약 ${sec}초`,
+    // 임시 실험 스위치 — 번역 철학 프롬프트(cinematic_translation_philosophy_ko)를
+    // 실을지 말지를 눈으로 비교하려고 잠깐 노출한다. 결론이 나면 이 문구와
+    // 토글을 통째로 지운다.
+    philosophyLabel: '[실험] 번역 철학 프롬프트 포함',
+    philosophyHint:
+      '켜면 번역 철학 지시문이 시스템 프롬프트에 추가됩니다. 품질 비교용 임시 스위치입니다.',
     start: '번역 시작',
   },
 

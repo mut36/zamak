@@ -41,6 +41,10 @@ interface TranslateSettingsStepProps {
   onChangeWork: () => void;
   model: AllowedModel;
   onModel: (m: AllowedModel) => void;
+  /** 임시 실험 스위치 — 번역 철학 프롬프트를 실을지. 켜지면 요청의
+   *  translationStyle이 'cinematic'이 된다. 비교가 끝나면 지운다. */
+  philosophyOn: boolean;
+  onPhilosophyOn: (on: boolean) => void;
   credits: CreditBalances | null;
   // cast sheet — 프로 번역에 딸려 오는 결과 카드다(토글 아님, §6-25). 공유:
   // both branches (see docs/decisions.md)
@@ -82,6 +86,8 @@ export function TranslateSettingsStep({
   onChangeWork,
   model,
   onModel,
+  philosophyOn,
+  onPhilosophyOn,
   credits,
   castSheetStatus,
   castSheet,
@@ -398,6 +404,24 @@ export function TranslateSettingsStep({
           );
         })}
       </div>
+
+      {/* 임시 실험 스위치 — 철학 프롬프트 유무를 눈으로 비교하려고 잠깐 둔다. */}
+      <label className='card p-[14px_16px] mb-[14px] flex items-start gap-3 cursor-pointer'>
+        <input
+          type='checkbox'
+          checked={philosophyOn}
+          onChange={(e) => onPhilosophyOn(e.target.checked)}
+          className='mt-[2px] w-4 h-4 accent-[var(--ink-strong)]'
+        />
+        <span>
+          <span className='block text-caption font-medium text-ink'>
+            {c.philosophyLabel}
+          </span>
+          <span className='block text-fineprint text-secondary mt-1'>
+            {c.philosophyHint}
+          </span>
+        </span>
+      </label>
 
       {/* 글로사리는 프로의 약속("작품 맥락 분석과 인물명 일관성", COPY.settings.proDesc)
           중 인물명 일관성을 실제로 수행하는 부분이다. 그래서 토글이 아니라

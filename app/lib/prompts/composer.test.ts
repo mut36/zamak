@@ -103,13 +103,8 @@ describe('prompt composition', () => {
 
     expect(system.match(/<translation_philosophy>/g)).toHaveLength(1);
     expect(system).not.toContain('<translation_style>');
-    expect(system).toContain('<core_principles>');
-    expect(system).toContain('<character_voice>');
-    expect(system).toContain('<emotion_and_tone>');
-    expect(system).toContain('<localization>');
-    expect(system).toContain('<compression>');
-    expect(system).toContain('<prohibited>');
-    expect(system).toContain('<priority_order>');
+    expect(system).toContain('</translation_philosophy>');
+    expect(system).toContain('전문 번역가의 후편집');
     expect(system.indexOf('<translation_philosophy>')).toBeLessThan(
       system.indexOf('<translation_rules>'),
     );

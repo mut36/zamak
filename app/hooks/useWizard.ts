@@ -297,6 +297,10 @@ export function useWizard(
   const [otherType, setOtherType] = useState('');
   const [toneText, setToneText] = useState('');
   const [model, setModel] = useState<AllowedModel>(DEFAULT_MODEL);
+  // 임시 실험 스위치 — 켜면 translationStyle이 'cinematic'이 되고 composer가
+  // 번역 철학 프롬프트를 시스템에 얹는다(loadTranslationPhilosophy). 품질 비교가
+  // 끝나면 토글과 함께 지운다. 저장하지 않는다 — 새로고침하면 꺼진 상태로 돌아온다.
+  const [philosophyOn, setPhilosophyOn] = useState(false);
 
   // Copyright-consent gate (see handleTranslate). consentAgreed starts false
   // and fetchConsent fails closed, so a lookup that never lands just means the
@@ -629,7 +633,7 @@ export function useWizard(
       movieInfo,
       model,
       targetLang,
-      'meaning',
+      philosophyOn ? 'cinematic' : 'meaning',
       undefined,
       resolvedCastSheet,
       // Null only if the user somehow reached here without picking a type;
@@ -694,6 +698,7 @@ export function useWizard(
     setOtherType('');
     setToneText('');
     setModel(DEFAULT_MODEL);
+    setPhilosophyOn(false);
     setScreen('upload');
   };
 
@@ -769,6 +774,8 @@ export function useWizard(
     setOtherType,
     setToneText,
     setModel,
+    philosophyOn,
+    setPhilosophyOn,
     confirmWork,
     goWorkPick,
     searchWork,

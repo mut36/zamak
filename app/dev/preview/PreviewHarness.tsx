@@ -142,6 +142,7 @@ export function PreviewHarness() {
   const [otherType, setOtherType] = useState('다큐멘터리');
   const [toneText, setToneText] = useState('');
   const [checked, setChecked] = useState(false);
+  const [philosophyOn, setPhilosophyOn] = useState(false);
 
   const showNav = screen !== 'landing';
 
@@ -208,6 +209,8 @@ export function PreviewHarness() {
             onChangeWork={() => setScreen('workPick')}
             model={model as typeof DEFAULT_MODEL}
             onModel={setModel}
+            philosophyOn={philosophyOn}
+            onPhilosophyOn={setPhilosophyOn}
             credits={CREDITS}
             directorNoteStatus={
               // 'settings:searching'은 이 화면의 "프리패스가 도는 중" 변형이다.

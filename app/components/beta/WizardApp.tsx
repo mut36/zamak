@@ -91,6 +91,8 @@ export function WizardApp() {
     goWorkPick,
     goScreen,
     model,
+    philosophyOn,
+    setPhilosophyOn,
     setModel,
     showConsentModal,
     consentPending,
@@ -245,6 +247,8 @@ export function WizardApp() {
                 onChangeWork={goWorkPick}
                 model={model}
                 onModel={setModel}
+                philosophyOn={philosophyOn}
+                onPhilosophyOn={setPhilosophyOn}
                 credits={credits}
                 targetLang={targetLang}
                 blockCount={totalLines}
