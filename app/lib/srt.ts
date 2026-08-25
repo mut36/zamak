@@ -296,6 +296,11 @@ export interface TextRuleReport {
   midLinePeriodsToCommas: number;
   /** Lines carrying two speakers that were split one-per-line (§I.6). */
   speakerLinesSplit: number;
+  /**
+   * Speaker dashes brought to the house shape (§I.6): a missing space after
+   * the dash filled in, and a partner dash added to the line that lacked one.
+   */
+  speakerDashesNormalized: number;
 }
 
 const ELLIPSIS_RUN = /\.{2,}/g;
@@ -355,8 +360,25 @@ const MID_LINE_PERIOD = /([가-힣])\.(\s+)(?![-–—]\s)(?=\S)/g;
  * Group 1 is the first speaker, group 2 the second. The leading dash is
  * required, so a hyphen inside ordinary text ("3 - 4개") is never a match:
  * only a line that already declares itself dual-speaker can be split.
+ *
+ * The second speaker's own space is optional (`- 네. -올해…`) — the same slip
+ * UNSPACED_SPEAKER_DASH fixes, which runs after this split and so repairs the
+ * line this hands it. A digit after that dash is excluded, keeping "3 - 4개"
+ * and "- 기온은 -5도" out.
  */
-const DUAL_SPEAKER_LINE = /^((?:<[^>]+>\s*)*-\s.+?)\s+(-\s.+)$/;
+const DUAL_SPEAKER_LINE = /^((?:<[^>]+>\s*)*-\s.+?)\s+(-\s?[^\s\d-].*)$/;
+
+/**
+ * A speaker dash written without its space (`-그래`), at the start of a line.
+ *
+ * Group 1 is the leading whitespace and markup, which goes back untouched.
+ * The dash must be followed by a letter-ish character: a digit is excluded so
+ * `-5도야` stays a negative number, and a second dash so `-- ` is left alone.
+ * Only the line opening is examined — a hyphen mid-line is ordinary text
+ * ("3 - 4개"), and DUAL_SPEAKER_LINE already handles the one case where a
+ * mid-line dash is a speaker.
+ */
+const UNSPACED_SPEAKER_DASH = /^(\s*(?:<[^>]+>\s*)*)-(?=[^\s\d-])/;
 
 /**
  * Korean sentence-final endings, for the join rule below.
@@ -530,6 +552,7 @@ export function enforceTextRules(
     linesJoined: 0,
     midLinePeriodsToCommas: 0,
     speakerLinesSplit: 0,
+    speakerDashesNormalized: 0,
   };
 
   const rewritten = parseSrtBlocks(srt).map((raw) => {
@@ -557,6 +580,32 @@ export function enforceTextRules(
     if (bodyLines.length > 2) {
       report.linesMerged += bodyLines.length - 2;
       bodyLines = [bodyLines[0], bodyLines.slice(1).join(' ')];
+    }
+
+    // Speaker dashes, in the house shape. Both halves are arithmetic once a
+    // dash is present at all, so they belong here rather than in the prompt:
+    // the dash needs its space (`-그래` → `- 그래`), and a two-line block where
+    // only one line carries a dash is a two-speaker block written half-way —
+    // the source convention of dashing only the second speaker survives the
+    // translation, and the model inherits it. Runs after the 2-line cap so it
+    // sees the body that ships, and before the strip and fold below, which
+    // both read `isSpeakerLine`.
+    bodyLines = bodyLines.map((line) => {
+      if (!UNSPACED_SPEAKER_DASH.test(line)) return line;
+      report.speakerDashesNormalized++;
+      return line.replace(UNSPACED_SPEAKER_DASH, '$1- ');
+    });
+
+    if (bodyLines.length === 2) {
+      const dashed = bodyLines.map(isSpeakerLine);
+      if (dashed[0] !== dashed[1]) {
+        const bare = dashed[0] ? 1 : 0;
+        report.speakerDashesNormalized++;
+        bodyLines[bare] = bodyLines[bare].replace(
+          /^(\s*(?:<[^>]+>\s*)*)/,
+          '$1- ',
+        );
+      }
     }
 
     // Only for languages that drop the sentence period at all — the comma

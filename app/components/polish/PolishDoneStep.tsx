@@ -34,7 +34,8 @@ function changeLines(summary: PolishSummary): string[] {
     summary.ellipsisNormalized +
     summary.linesMerged +
     summary.midLinePeriodsToCommas +
-    summary.speakerLinesSplit;
+    summary.speakerLinesSplit +
+    summary.speakerDashesNormalized;
   if (tidied > 0) lines.push(c.tidiedLine);
 
   return lines;

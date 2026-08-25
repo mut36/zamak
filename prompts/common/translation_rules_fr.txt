@@ -1,6 +1,6 @@
 1. N’écris que des lignes `[numéro] traduction`. N’omets aucun numéro de l’entrée et garde l’ordre de l’entrée.
    Un numéro fait exactement une ligne — n’écris jamais deux fois le même numéro.
-2. Si un sous-titre doit tenir sur deux lignes, mets un seul `|` à l’intérieur de cette ligne (deux lignes au plus). Deux locuteurs : `- A | - B`.
+2. Si un sous-titre doit tenir sur deux lignes, mets un seul `|` à l’intérieur de cette ligne (deux lignes au plus). Un tiret au début de n’importe quelle ligne du bloc source signale deux locuteurs : mets un tiret aux deux lignes, chacune avec `- ` (tiret + espace), soit `- A | - B`.
    Coupe quand la ligne dépasse {{lineMaxChars}} caractères ; si ça déborde encore, comprime.
 3. Si la réplique est un nombre (ex. : « 8 »), place-le dans la traduction sans crochets. Pas d’horodatage, de commentaire ni de markdown.
 4. Une traduction libre et naturelle est permise, mais ne perds ni n’ajoute de sens. Rends-le en français standard parlé, avec des formes parlées en dialogue (t’as, j’suis) sauf personnage très formel ; évite les tournures propres au français canadien. Le français s’allonge : coupe le superflu. Conserve la ponctuation et mets une espace avant `?` `!` `:` `;`.

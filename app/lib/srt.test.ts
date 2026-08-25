@@ -934,6 +934,50 @@ describe('enforceTextRules', () => {
     expect(report.speakerLinesSplit).toBe(1);
   });
 
+  it('completes the speaker dash when only the second line carries one', () => {
+    const srt = '43\n00:09:10,960 --> 00:09:13,000\n자극제?\n-그래';
+    const { content, report } = enforceTextRules(srt, {
+      trailingPunctuation: '.,',
+      lineMaxChars: 16,
+    });
+    expect(content).toBe(
+      '43\n00:09:10,960 --> 00:09:13,000\n- 자극제?\n- 그래',
+    );
+    expect(report.speakerDashesNormalized).toBe(2);
+    // Two speakers stay two lines however short they are.
+    expect(report.linesJoined).toBe(0);
+  });
+
+  it('keeps the dash outside the markup when completing a speaker line', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n<i>어디 가?</i>\n<i>- 몰라</i>';
+    const { content } = enforceTextRules(srt, { lineMaxChars: 16 });
+    expect(content).toBe(
+      '1\n00:00:00,000 --> 00:00:01,000\n<i>- 어디 가?</i>\n<i>- 몰라</i>',
+    );
+  });
+
+  it('splits a one-line pair whose second dash lost its space', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n- 자극제? -그래';
+    const { content, report } = enforceTextRules(srt, { lineMaxChars: 16 });
+    expect(content).toBe(
+      '1\n00:00:00,000 --> 00:00:01,000\n- 자극제?\n- 그래',
+    );
+    expect(report.speakerLinesSplit).toBe(1);
+    expect(report.speakerDashesNormalized).toBe(1);
+  });
+
+  it('leaves a negative number and a single bare line alone', () => {
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n기온은\n-5도야\n\n2\n00:00:02,000 --> 00:00:03,000\n그냥 한 줄';
+    const { content, report } = enforceTextRules(srt, { lineMaxChars: 16 });
+    // No dash is added, so neither line reads as a speaker — which leaves the
+    // pair free to fold back onto one line, as any non-speaker pair would.
+    expect(content).toBe(
+      '1\n00:00:00,000 --> 00:00:01,000\n기온은 -5도야\n\n2\n00:00:02,000 --> 00:00:03,000\n그냥 한 줄',
+    );
+    expect(report.speakerDashesNormalized).toBe(0);
+  });
+
   it('does not treat a hyphen inside ordinary text as a speaker mark', () => {
     const srt = '1\n00:00:00,000 --> 00:00:01,000\n오후 3 - 4시에 만나';
     const { content, report } = enforceTextRules(srt, { lineMaxChars: 25 });

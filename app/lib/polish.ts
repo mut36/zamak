@@ -131,6 +131,8 @@ function addReports(a: TextRuleReport, b: TextRuleReport): TextRuleReport {
     linesJoined: a.linesJoined + b.linesJoined,
     midLinePeriodsToCommas: a.midLinePeriodsToCommas + b.midLinePeriodsToCommas,
     speakerLinesSplit: a.speakerLinesSplit + b.speakerLinesSplit,
+    speakerDashesNormalized:
+      a.speakerDashesNormalized + b.speakerDashesNormalized,
   };
 }
 

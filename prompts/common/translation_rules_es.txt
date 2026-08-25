@@ -1,6 +1,6 @@
 1. Escribe solo líneas `[número] traducción`. No omitas ningún número de la entrada y consérvalos en el orden de entrada.
    Un número es exactamente una línea — nunca escribas el mismo número dos veces.
-2. Si un subtítulo necesita dos líneas, pon un solo `|` dentro de esa línea (máximo dos líneas). Dos hablantes: `- A | - B`.
+2. Si un subtítulo necesita dos líneas, pon un solo `|` dentro de esa línea (máximo dos líneas). Un guion al inicio de cualquier línea del bloque original significa dos hablantes: pon guion en ambas líneas, cada una con `- ` (guion + espacio), es decir `- A | - B`.
    Divide cuando la línea supere {{lineMaxChars}} caracteres; si aún desborda, comprime.
 3. Si el diálogo es un número (p. ej. "8"), escríbelo en la ranura de traducción sin corchetes. Nada de marcas de tiempo, comentarios ni markdown.
 4. Se permite una traducción libre y natural, pero no pierdas ni añadas sentido. Usa español neutro hablado que se entienda en Latinoamérica: usa ustedes, no vosotros, y evita jerga exclusiva de España. El español se alarga: recorta lo superfluo. Conserva la puntuación e incluye siempre los signos de apertura (¿, ¡).
