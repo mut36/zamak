@@ -13,7 +13,7 @@ import {
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '1.6.3';
+export const APP_VERSION = '1.7.0';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
@@ -747,6 +747,27 @@ export const MIN_SUBTITLE_GAP_MS = readPositiveIntEnv(
 export const MIN_SUBTITLE_DURATION_MS = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_MIN_SUBTITLE_DURATION_MS,
   800,
+);
+
+/**
+ * 짧은 주고받음 합치기(`app/lib/mergeDialogue.ts`)의 두 시간 게이트.
+ *
+ * MAX_GAP은 "같은 주고받음인가"를 가르는 선이다. 1초를 넘게 벌어지면 대답이
+ * 아니라 다음 장면일 수 있다 — 청킹이 장면 경계로 보는 2초(`chunkSrtBlocksAtGaps`)
+ * 보다 **좁게** 잡는다. 여기서는 놓치는 쪽이 잘못 합치는 쪽보다 낫다.
+ *
+ * MAX_SPAN은 합친 결과의 노출 길이다. 합치면 두 대사가 앞 블록의 시작부터 뒤
+ * 블록의 끝까지 함께 떠 있으므로, 원본에서 각자 짧았어도 합계는 길어질 수 있다.
+ * 5초는 방송 자막의 통상 상한(7초)보다 보수적으로 잡은 값이다 — 짧은 대사
+ * 둘을 합치는 기능이 긴 자막을 만들면 안 된다.
+ */
+export const DIALOGUE_MERGE_MAX_GAP_MS = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_DIALOGUE_MERGE_MAX_GAP_MS,
+  1000,
+);
+export const DIALOGUE_MERGE_MAX_SPAN_MS = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_DIALOGUE_MERGE_MAX_SPAN_MS,
+  5000,
 );
 
 /**

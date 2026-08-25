@@ -59,6 +59,18 @@ export function loadLineSplitRules(
   return loadPromptFile(`common/line_split_${language}.txt`);
 }
 
+/**
+ * 짧은 주고받음 합치기의 판정 프롬프트(`/api/polish`의 merge 경로). 줄바꿈
+ * 규칙과 따로 두는 이유는 산출물이 자막이 아니라 **판정**이기 때문이다 — 이
+ * 프롬프트는 대사를 한 글자도 고치지 않는다. 자리표시자가 없어 렌더 없이 그대로
+ * 쓴다.
+ */
+export function loadDialogueMergeRules(
+  language: TargetLangCode,
+): Promise<string> {
+  return loadPromptFile(`common/dialogue_merge_${language}.txt`);
+}
+
 export function loadTranslationPhilosophy(
   style: 'meaning' | 'cinematic',
 ): Promise<string> {

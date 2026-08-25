@@ -7,6 +7,11 @@ import {
   visibleLength,
   type TextRuleReport,
 } from './srt';
+import {
+  applyDialogueMerges,
+  collectDialogueCandidates,
+  type DialogueCandidate,
+} from './mergeDialogue';
 import type { TargetLang } from '../config/languages';
 import {
   MIN_SUBTITLE_DURATION_MS,
@@ -115,7 +120,24 @@ export interface PolishSummary extends TextRuleReport {
    * 제대로 도는지 보는 테스트 신호로 남아 있다(`polish.test.ts`).
    */
   unsplitLines: number;
+  /**
+   * 짧은 주고받음으로 판정돼 합쳐진 쌍의 수 = **줄어든 블록 수**.
+   *
+   * 토글이 꺼져 있으면 언제나 0이고, 그때 이 파이프라인은 블록 수를 바꾸지
+   * 않는다 — 이 화면의 기본 약속이다.
+   */
+  blocksMerged: number;
 }
+
+/**
+ * 짧은 주고받음 합치기의 판정자. 후보를 받아 **합쳐도 되는 번호**를 돌려준다.
+ *
+ * `splitLongLines`와 같은 이유로 주입받는다: 호출 여부가 곧 비용이고, 그 성질은
+ * 렌더 없이 테스트로 지켜져야 한다. 후보가 0건이면 이 함수는 아예 안 불린다.
+ */
+export type DialogueJudge = (
+  candidates: readonly DialogueCandidate[],
+) => Promise<readonly number[]>;
 
 export interface PolishOutcome {
   content: string;
@@ -157,6 +179,7 @@ export async function applySubtitleRules(
   lang: TargetLang,
   splitLongLines: (subset: string) => Promise<string>,
   timing?: PolishTimingOptions | null,
+  judgeDialogue?: DialogueJudge | null,
 ): Promise<PolishOutcome> {
   const ruleOptions = {
     trailingPunctuation: lang.trailingPunctuation,
@@ -167,16 +190,37 @@ export async function applySubtitleRules(
   // 1차 — 코드가 결정적으로 처리하는 전부.
   const first = enforceTextRules(srt, ruleOptions);
 
+  // 블록 수를 바꾸는 유일한 단계 — 사용자가 켰을 때만 돈다. 여기서 먼저 도는
+  // 이유는 순서 때문이다: 합치기는 1차 규칙이 끝난 **한 줄짜리** 블록을 보고
+  // 판정하고(그 전에는 원본 줄바꿈이 남아 있다), 합쳐진 결과는 아래 상한 검사와
+  // 2차 규칙을 그대로 통과해야 한다.
+  let staged = first.content;
+  let blocksMerged = 0;
+  if (judgeDialogue) {
+    const candidates = collectDialogueCandidates(staged, lang.lineMaxChars);
+    // 후보가 없으면 모델을 부르지 않는다 — 상한 초과가 없을 때와 같은 약속이다.
+    if (candidates.length > 0) {
+      const approved = await judgeDialogue(candidates);
+      const result = applyDialogueMerges(
+        staged,
+        candidates,
+        new Set(approved),
+      );
+      staged = result.content;
+      blocksMerged = result.merged;
+    }
+  }
+
   const { subset, indices } = collectOverLongBlocks(
-    first.content,
+    staged,
     lang.lineMaxChars,
   );
 
   // 초과가 없으면 모델을 부르지 않는다. ZAMAK이 번역한 자막을 다시 넣으면
   // 대개 이 경로이고, 그때 이 기능은 비용 0에 즉시 끝난다.
-  let merged = first.content;
+  let merged = staged;
   if (indices.length > 0) {
-    merged = spliceBlocks(first.content, await splitLongLines(subset));
+    merged = spliceBlocks(staged, await splitLongLines(subset));
   }
 
   // 2차 — 모델이 나눈 결과에 2줄 상한·접기·마침표를 다시 적용.
@@ -208,6 +252,7 @@ export async function applySubtitleRules(
       // 수를 넘길 수 있다. 요약에 음수가 뜨는 것보다 0이 정직하다.
       linesSplit: Math.max(0, indices.length - unsplitLines),
       unsplitLines,
+      blocksMerged,
     },
   };
 }

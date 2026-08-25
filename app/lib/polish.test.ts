@@ -177,6 +177,78 @@ describe('applySubtitleRules', () => {
   });
 
   // 읽기 속도 밴드(opt-in) — 이 화면에서 타임코드가 바뀔 수 있는 **유일한** 길.
+  describe('짧은 주고받음 합치기', () => {
+    const exchange = [block(1, '자극제?'), block(2, '그래')].join('\n\n');
+
+    it('판정자를 안 주면 블록 수가 절대 안 바뀐다', async () => {
+      // 이 화면의 기본 약속이다 — 토글을 켜지 않은 사람에게는 원본 블록
+      // 경계가 그대로 남는다.
+      const { content, summary } = await applySubtitleRules(exchange, ko, never);
+
+      expect(parseSrtBlocks(content)).toHaveLength(2);
+      expect(summary.blocksMerged).toBe(0);
+    });
+
+    it('승인된 쌍을 대시 두 줄 한 블록으로 합친다', async () => {
+      const judge = vi.fn(async () => [1]);
+
+      const { content, summary } = await applySubtitleRules(
+        exchange,
+        ko,
+        never,
+        null,
+        judge,
+      );
+
+      expect(judge).toHaveBeenCalledOnce();
+      expect(summary.blocksMerged).toBe(1);
+      const blocks = parseSrtBlocks(content);
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]).toContain('- 자극제?\n- 그래');
+      // 합친 블록은 앞의 시작부터 뒤의 끝까지 덮는다.
+      expect(blocks[0]).toContain('00:00:01,000 --> 00:00:02,900');
+    });
+
+    it('모델이 거절하면 원본 블록이 그대로 남는다', async () => {
+      const { content, summary } = await applySubtitleRules(
+        exchange,
+        ko,
+        never,
+        null,
+        async () => [],
+      );
+
+      expect(parseSrtBlocks(content)).toHaveLength(2);
+      expect(summary.blocksMerged).toBe(0);
+    });
+
+    it('후보가 없으면 판정자를 부르지 않는다', async () => {
+      // 상한 초과가 없을 때 모델을 안 부르는 것과 같은 약속 — 후보가 0건인
+      // 파일에서 이 토글은 비용이 0이다.
+      const judge = vi.fn(async () => []);
+      const srt = [
+        block(1, '자극제?'),
+        block(3, '한참 뒤에 나오는 대사'),
+      ].join('\n\n');
+
+      await applySubtitleRules(srt, ko, never, null, judge);
+
+      expect(judge).not.toHaveBeenCalled();
+    });
+
+    it('합친 블록은 두 줄로 남는다 — 짧아도 한 줄로 접지 않는다', async () => {
+      const { content } = await applySubtitleRules(
+        exchange,
+        ko,
+        never,
+        null,
+        async () => [1],
+      );
+
+      expect(content.split('\n')).toHaveLength(4);
+    });
+  });
+
   describe('timing 옵션', () => {
     // 0.9초에 12자 = 13.3 CPS. 상한 12를 넘으므로 넓혀야 하는 자막이다.
     const fast = '열두글자짜리인자막줄이다';

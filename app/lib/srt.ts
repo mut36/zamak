@@ -58,6 +58,15 @@ function msToHms(totalMs: number): string {
 }
 
 /**
+ * The `HH:MM:SS,mmm --> HH:MM:SS,mmm` line for a span, i.e. the inverse of
+ * parseBlockTiming. Anyone writing a block's timing (rather than editing one
+ * in place) needs this — merging two blocks into one is the first such caller.
+ */
+export function formatTimingLine(timing: BlockTiming): string {
+  return `${msToHms(timing.startMs)} --> ${msToHms(timing.endMs)}`;
+}
+
+/**
  * Parse a block's timing line into start/end milliseconds, or null when the
  * block has no well-formed `HH:MM:SS,mmm --> HH:MM:SS,mmm` line (the timing
  * line is always the second line in a parsed SRT block).
@@ -435,7 +444,7 @@ function lastTextCharacter(line: string): string {
  * The line finishes a sentence — by its punctuation, or by its final syllable
  * when the punctuation was never written.
  */
-function endsASentence(line: string): boolean {
+export function endsASentence(line: string): boolean {
   return (
     SENTENCE_END.test(line) || KOREAN_SENTENCE_FINAL.test(lastTextCharacter(line))
   );

@@ -11,7 +11,11 @@ import { parseSrtBlocks } from '../lib/srt';
 import { loadSubtitleFile, type SubtitleDoc } from '../lib/subtitles';
 import { resolveTargetLang } from '../config/languages';
 import { POLISH_MAX_BLOCKS } from '../config/constants';
-import { requestLineSplit, PolishRefusedError } from '../lib/client/polishApi';
+import {
+  requestDialogueMerge,
+  requestLineSplit,
+  PolishRefusedError,
+} from '../lib/client/polishApi';
 import type { DownloadOption } from '../types/translation';
 import { COPY } from '../i18n/simpleCopy';
 
@@ -40,9 +44,14 @@ export function usePolish() {
     setDownloads([]);
   }, []);
 
-  // `timing`이 null이면 타임코드를 아예 안 건드린다 — 업로드 화면의 기본값.
+  // `timing`이 null이면 타임코드를 아예 안 건드리고, `mergeDialogue`가 false면
+  // 블록 수를 안 바꾼다 — 둘 다 업로드 화면의 기본값이자 이 화면의 약속이다.
   const handleFile = useCallback(
-    async (file: File, timing: PolishTimingOptions | null = null) => {
+    async (
+      file: File,
+      timing: PolishTimingOptions | null = null,
+      mergeDialogue = false,
+    ) => {
       setStage('working');
       setError('');
 
@@ -77,11 +86,26 @@ export function usePolish() {
             return response.content;
           },
           timing,
+          mergeDialogue
+            ? async (candidates) => {
+                const response = await requestDialogueMerge(
+                  candidates,
+                  TARGET_LANG,
+                );
+                return response.approved;
+              }
+            : null,
         );
 
         setSummary(outcome.summary);
         setDownloads(
-          buildDownloads(doc, file.name, TARGET_LANG, outcome.content),
+          buildDownloads(
+            doc,
+            file.name,
+            TARGET_LANG,
+            outcome.content,
+            outcome.summary.blocksMerged > 0,
+          ),
         );
         setStage('done');
       } catch (err) {

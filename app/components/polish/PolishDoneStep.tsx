@@ -23,6 +23,7 @@ function changeLines(summary: PolishSummary): string[] {
   const c = COPY.polish;
   const lines: string[] = [];
 
+  if (summary.blocksMerged > 0) lines.push(c.mergeLine(summary.blocksMerged));
   if (summary.linesSplit > 0) lines.push(c.splitLine(summary.linesSplit));
   if (summary.linesJoined > 0) lines.push(c.joinedLine(summary.linesJoined));
   // 노출 시간은 사용자가 켰을 때만 0이 아니다(`applySubtitleRules`의 timing).
@@ -99,6 +100,12 @@ export function PolishDoneStep({
             {COPY.polish.downloadAs(option.extension)}
           </button>
         ))}
+
+        {summary.blocksMerged > 0 && (
+          <p className='text-fineprint text-tertiary text-center'>
+            {COPY.polish.mergeSrtOnly}
+          </p>
+        )}
 
         <button type='button' className='btn w-full' onClick={onStartOver}>
           {COPY.polish.startOver}

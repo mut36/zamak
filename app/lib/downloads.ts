@@ -20,6 +20,13 @@ export function buildDownloads(
   originalName: string,
   targetLang: string,
   translatedSrt: string,
+  /**
+   * 블록 수가 원본과 달라졌다는 신호. 원본 포맷 되돌리기는 번역문을 **원본 큐의
+   * 자리에** 꽂는 방식이라(`emitInOriginalFormat`), 블록이 사라지면 그 큐에는
+   * 옛 대사가 그대로 남는다 — 조용히 원본 대사가 섞인 파일이 나가느니 SRT만
+   * 준다. 지금 이 값을 켜는 곳은 `/polish`의 짧은 대화 합치기 하나다.
+   */
+  blockCountChanged = false,
 ): DownloadOption[] {
   const asSrt: DownloadOption = {
     extension: 'srt',
@@ -27,7 +34,9 @@ export function buildDownloads(
     content: translatedSrt,
     mime: subtitleMime('srt'),
   };
-  if (!doc || doc.format === 'srt' || !doc.roundTrip) return [asSrt];
+  if (!doc || doc.format === 'srt' || !doc.roundTrip || blockCountChanged) {
+    return [asSrt];
+  }
 
   try {
     const extension = formatExtension(doc.format);

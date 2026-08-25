@@ -17,7 +17,8 @@
 연출 메모 추출(`app/lib/server/extractDirectorNote.ts`, `app/api/note`),
 사용량 계측(`app/lib/server/chunkUsage.ts`, `supabase/api-usage.sql`),
 글로사리 추출(`app/lib/server/extractCastSheet.ts`, `app/api/glossary` — 현재 꺼짐),
-청킹·재조립(`app/lib/srt.ts`), 포맷 어댑터(`app/lib/subtitles/`),
+청킹·재조립(`app/lib/srt.ts`), 짧은 대화 합치기(`app/lib/mergeDialogue.ts`,
+`app/lib/server/dialogueMergeService.ts`), 포맷 어댑터(`app/lib/subtitles/`),
 프롬프트 조합(`app/lib/prompts/`),
 번역 서비스/라우트(`app/lib/server/translationService.ts`, `app/api/translate`),
 관련 상수(`app/config/constants.ts`).
@@ -40,6 +41,9 @@
 ## 깨면 안 되는 불변식
 
 1. **청크 입력 블록 수 = 출력 블록 수** (재조립이 번호로 대조).
+   블록 수를 바꾸는 경로는 `/polish`의 **짧은 대화 합치기 토글 하나뿐**이고,
+   그건 번역 파이프라인 밖이며 기본 OFF다 — 켜면 원본 포맷 다운로드를 잃는다
+   (`docs/decisions.md` §6-27).
 2. **타임코드는 코드가 복원** — 모델엔 번호+대사만 보내고, 모델이 뱉은 타임스탬프는 불신.
 3. **청크 크기 상한**: 재번호 드리프트 천장(~600블록) 밑으로 유지.
 4. **UI 버킷↔AI 버킷 분리**: 제목/연도/감독/포스터(화면용)와

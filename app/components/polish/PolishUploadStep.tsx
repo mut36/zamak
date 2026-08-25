@@ -12,7 +12,11 @@ import type { PolishTimingOptions } from '../../lib/polish';
 interface PolishUploadStepProps {
   working: boolean;
   error: string;
-  onFile: (file: File, timing: PolishTimingOptions | null) => void;
+  onFile: (
+    file: File,
+    timing: PolishTimingOptions | null,
+    mergeDialogue: boolean,
+  ) => void;
 }
 
 /** 이 화면은 한국어 자막만 다듬는다(`usePolish`의 TARGET_LANG). */
@@ -33,7 +37,7 @@ const CPS_CHOICES = Array.from(
 );
 
 /**
- * 파일 드롭 + 읽기 속도 밴드(opt-in).
+ * 파일 드롭 + 읽기 속도 밴드(opt-in) + 짧은 대화 합치기(opt-in).
  *
  * 밴드는 **기본이 프리셋**이다. 영화·예능·강연 세 값은 번역 경로가 콘텐츠
  * 유형으로 고르는 것과 **같은 표**(`languages.ts`의 `shapes`)에서 그대로
@@ -43,6 +47,10 @@ const CPS_CHOICES = Array.from(
  *
  * 토글이 꺼져 있으면 `onFile`에 `null`이 가고, 파이프라인은 타임코드를 읽지도
  * 쓰지도 않는다 — 이 화면이 원래 하던 약속 그대로다.
+ *
+ * 두 번째 토글(합치기)도 같은 모양이지만 파는 것이 다르다. 켜면 **블록 수가
+ * 바뀌고**, 그 대가로 원본 포맷 다운로드를 잃는다. 그래서 켰을 때 설명이 아니라
+ * **대가**를 먼저 보여준다(`c.merge.note`).
  */
 export function PolishUploadStep({
   working,
@@ -51,6 +59,7 @@ export function PolishUploadStep({
 }: PolishUploadStepProps) {
   const c = COPY.polish;
   const [timingEnabled, setTimingEnabled] = useState(false);
+  const [mergeEnabled, setMergeEnabled] = useState(false);
   const [choice, setChoice] = useState<BandChoice>('movie');
   const [customTarget, setCustomTarget] = useState(SHAPES.movie.target);
   const [customHardMax, setCustomHardMax] = useState(SHAPES.movie.hardMax);
@@ -159,6 +168,33 @@ export function PolishUploadStep({
         )}
       </div>
 
+      <div className='card p-[22px] mb-4'>
+        <button
+          type='button'
+          className='w-full flex items-center justify-between gap-3 text-left'
+          aria-pressed={mergeEnabled}
+          onClick={() => setMergeEnabled((on) => !on)}
+        >
+          <span className='flex-1 min-w-0'>
+            <span className='block text-title-sm font-semibold tracking-[-0.01em]'>
+              {c.merge.title}
+            </span>
+            <span className='block text-caption-sm text-tertiary mt-0.5'>
+              {c.merge.desc}
+            </span>
+          </span>
+          <span className={`ztoggle${mergeEnabled ? ' on' : ''}`} aria-hidden>
+            <span className='ztoggle-knob' />
+          </span>
+        </button>
+
+        {mergeEnabled && (
+          <p className='animate-zslide text-fineprint text-tertiary mt-[14px]'>
+            {c.merge.note}
+          </p>
+        )}
+      </div>
+
       <div className='card p-[22px] flex flex-col items-center gap-3'>
         {error && (
           <p
@@ -188,6 +224,7 @@ export function PolishUploadStep({
                   timingEnabled
                     ? { cpsTarget: band.target, cpsHardMax: band.hardMax }
                     : null,
+                  mergeEnabled,
                 );
               }
               // 같은 파일을 다시 골라도 change가 뜨도록 비운다.
