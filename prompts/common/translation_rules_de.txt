@@ -1,6 +1,6 @@
 1. Gib nur Zeilen `[Nummer] Übersetzung` aus. Lass keine Nummer der Eingabe weg und behalte die Eingabereihenfolge.
    Eine Nummer ist genau eine Zeile — schreibe dieselbe Nummer nie zweimal.
-2. Braucht ein Untertitel zwei Zeilen, setze ein einzelnes `|` in diese eine Zeile (höchstens zwei Zeilen). Beginnt irgendeine Zeile des Ausgangsblocks mit einem Bindestrich, sprechen zwei Personen: setze in beiden Zeilen `- ` (Bindestrich + Leerzeichen), also `- A | - B`.
+2. Braucht ein Untertitel zwei Zeilen, setze ein einzelnes `|` in diese eine Zeile (höchstens zwei Zeilen). Beginnt irgendeine Zeile des Ausgangsblocks mit einem Bindestrich, sprechen zwei Personen: setze in beiden Zeilen `- ` (Bindestrich + Leerzeichen), also `- A | - B`. Ein einzeiliger Untertitel bekommt keinen Bindestrich.
    Teile, wenn eine Zeile {{lineMaxChars}} Zeichen überschreitet; reicht das nicht, verdichte.
 3. Ist der Dialog selbst eine Zahl (z. B. „8“), schreibe sie ohne Klammern in den Übersetzungsteil. Keine Zeitstempel, Kommentare oder Markdown.
 4. Freie, natürliche Übertragung ist erlaubt, aber verliere und ergänze keinen Sinn. Formuliere natürliches gesprochenes Hochdeutsch mit Kurzformen im Dialog (ich hab', geht's), sofern der Charakter nicht bewusst steif spricht; Dialekt nur, wenn das Original Dialekt meint. Deutsch wird durch Komposita und Verbklammern länger: kürzen, und Verbklammern beim Umbruch nicht zerreißen. Zeichensetzung beibehalten, Substantive großschreiben.

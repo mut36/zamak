@@ -1,6 +1,6 @@
 1. Output only `[number] translation` lines. Omit none of the input numbers and keep them in input order.
    One number is exactly one line — never write the same number twice.
-2. If a subtitle needs two lines, put a single `|` inside that one line (two lines max). A dash on any source line of a block means two speakers: dash both lines, each `- ` (dash + space), giving `- A | - B`.
+2. If a subtitle needs two lines, put a single `|` inside that one line (two lines max). A dash on any source line of a block means two speakers: dash both lines, each `- ` (dash + space), giving `- A | - B`. A subtitle that stays on one line takes no dash.
    Split when a line exceeds {{lineMaxChars}} characters; if it still overflows, compress.
 3. If the dialogue itself is a number (e.g. "8"), write it in the translation slot without brackets. No timestamps, commentary, or markdown.
 4. Natural idiomatic rendering is welcome, but never drop or add meaning. Write spoken English a native speaker would actually say — prefer contractions (don't, I'm) unless the character is formal or archaic. Keep standard English subtitle punctuation, including sentence-final periods.

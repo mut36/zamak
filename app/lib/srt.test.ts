@@ -978,6 +978,24 @@ describe('enforceTextRules', () => {
     expect(report.speakerDashesNormalized).toBe(0);
   });
 
+  it('drops the dash from a block that has only one line', () => {
+    const srt =
+      '1\n00:00:00,000 --> 00:00:01,000\n- 그래\n\n2\n00:00:02,000 --> 00:00:03,000\n-몰라\n\n3\n00:00:04,000 --> 00:00:05,000\n<i>- 어디 가</i>';
+    const { content, report } = enforceTextRules(srt, { lineMaxChars: 16 });
+    expect(content).toBe(
+      '1\n00:00:00,000 --> 00:00:01,000\n그래\n\n2\n00:00:02,000 --> 00:00:03,000\n몰라\n\n3\n00:00:04,000 --> 00:00:05,000\n<i>어디 가</i>',
+    );
+    // Once per block, even for the unspaced one.
+    expect(report.speakerDashesNormalized).toBe(3);
+  });
+
+  it('keeps a lone line that opens with a negative number', () => {
+    const srt = '1\n00:00:00,000 --> 00:00:01,000\n-5도야';
+    const { content, report } = enforceTextRules(srt, { lineMaxChars: 16 });
+    expect(content).toBe(srt);
+    expect(report.speakerDashesNormalized).toBe(0);
+  });
+
   it('does not treat a hyphen inside ordinary text as a speaker mark', () => {
     const srt = '1\n00:00:00,000 --> 00:00:01,000\n오후 3 - 4시에 만나';
     const { content, report } = enforceTextRules(srt, { lineMaxChars: 25 });

@@ -298,7 +298,8 @@ export interface TextRuleReport {
   speakerLinesSplit: number;
   /**
    * Speaker dashes brought to the house shape (§I.6): a missing space after
-   * the dash filled in, and a partner dash added to the line that lacked one.
+   * the dash filled in, a partner dash added to the line that lacked one, and
+   * the dash removed from a block that has only one line to begin with.
    */
   speakerDashesNormalized: number;
 }
@@ -379,6 +380,20 @@ const DUAL_SPEAKER_LINE = /^((?:<[^>]+>\s*)*-\s.+?)\s+(-\s?[^\s\d-].*)$/;
  * mid-line dash is a speaker.
  */
 const UNSPACED_SPEAKER_DASH = /^(\s*(?:<[^>]+>\s*)*)-(?=[^\s\d-])/;
+
+/**
+ * The dash on a block that has only one line — nothing for it to separate.
+ *
+ * The dash means "the other speaker starts here" (§I.6), so on a lone line it
+ * marks a distinction that isn't there and reads as a stray hyphen. The source
+ * often carries one anyway (a reply dashed out of habit) and the model copies
+ * it through.
+ *
+ * Both spellings are covered in one pass so a lone `-그래` is counted once
+ * rather than spaced and then stripped. A digit is excluded only in the
+ * unspaced form: `- 5명이야` is a dash before dialogue, `-5도야` is a number.
+ */
+const LONE_SPEAKER_DASH = /^(\s*(?:<[^>]+>\s*)*)-(?:\s+|(?=[^\s\d-]))/;
 
 /**
  * Korean sentence-final endings, for the join rule below.
@@ -590,6 +605,11 @@ export function enforceTextRules(
     // translation, and the model inherits it. Runs after the 2-line cap so it
     // sees the body that ships, and before the strip and fold below, which
     // both read `isSpeakerLine`.
+    if (bodyLines.length === 1 && LONE_SPEAKER_DASH.test(bodyLines[0])) {
+      report.speakerDashesNormalized++;
+      bodyLines = [bodyLines[0].replace(LONE_SPEAKER_DASH, '$1')];
+    }
+
     bodyLines = bodyLines.map((line) => {
       if (!UNSPACED_SPEAKER_DASH.test(line)) return line;
       report.speakerDashesNormalized++;

@@ -581,6 +581,11 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
       줄에도 붙인다. `자극제? / -그래` → `- 자극제? / - 그래`. 둘째 화자에만 대시를
       다는 원문 관행이 번역에도 그대로 딸려오는 걸 막는다. 앞의 태그는 건너뛰므로
       `<i>어디 가?</i>`는 `<i>- 어디 가?</i>`가 된다.
+    - **한 줄짜리 블록의 대시 제거**(2026-08-25~): 줄이 하나뿐이면 대시가 가를 상대가
+      없다 — `- 그래` → `그래`. 원문이 습관적으로 단 대시가 번역까지 딸려온 것이라
+      떼어 낸다. 두 표기(`- 그래`·`-그래`)를 한 번에 처리해서 계수는 블록당 1이고,
+      `-5도야`(음수)는 공백 없는 형태에서 숫자를 배제해 살아남는다. 반대로
+      `- 5명이야`는 공백이 있으니 대시로 읽고 뗀다.
     - 2줄 상한 **뒤**, 문장부호 스트립·접기 **앞**에 돈다 — 뒤의 둘이 `isSpeakerLine`을
       읽으므로, 대시가 채워진 뒤라야 화자 줄이 접히지 않는다.
     - 프롬프트 쪽 짝은 `translation_rules_<code>.txt` 규칙 2와 `line_split_ko.txt`
@@ -828,7 +833,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 말줄임표 표기를 도착어별로 바꾸고 싶음 | `languages.ts`의 그 언어 행 `ellipsis` 한 줄. 배선(`TextRuleOptions.ellipsis`)은 언어 중립이라 코드는 안 건드려도 된다 — §9.7, `decisions.md` §6-13 |
 | 한 줄 안에 문장 마침표가 남아 있음 (`압니다. 결혼식에`) | `srt.ts` (`enforceTextRules`의 `midLinePeriodsToCommas`) — 한글 음절 뒤 `.`만 쉼표로 바꾼다. 소수·라틴 약어는 정상. `trailingPunctuation`에 `.`가 없는 도착어는 안 고친다 — §9.7 |
 | 한 줄에 화자가 둘 (`- A. - B`) | `srt.ts` (`enforceTextRules`의 `speakerLinesSplit`) — 줄당 한 화자로 쪼갠 뒤 2줄 상한이 둘째 화자를 접는다 — §9.7 |
-| 한 줄만 대시가 붙음 (`자극제?` / `-그래`) 또는 대시 뒤 공백 없음 | `srt.ts` (`enforceTextRules`의 `speakerDashesNormalized`) — 공백을 채우고 짝 없는 줄에 대시를 붙인다. 프롬프트 쪽 유도는 `translation_rules_<code>.txt` 규칙 2 / `line_split_ko.txt` 규칙 3 — §9.7 |
+| 한 줄만 대시가 붙음 (`자극제?` / `-그래`), 대시 뒤 공백 없음, 또는 한 줄짜리 자막에 대시가 남음 | `srt.ts` (`enforceTextRules`의 `speakerDashesNormalized`) — 공백을 채우고, 짝 없는 줄에 대시를 붙이고, 줄이 하나뿐이면 대시를 뗀다. 프롬프트 쪽 유도는 `translation_rules_<code>.txt` 규칙 2 / `line_split_ko.txt` 규칙 3 — §9.7 |
 | 두 줄 자막이 한 줄로 붙어 나옴 | 먼저 **의도된 접기**인지 확인 — 이어도 `lineMaxChars` 안이고 문장 경계·따옴표 시작이 아니면 `enforceTextRules`(`linesJoined`)가 일부러 합친다(§9.7). 문장 둘인데 붙었으면 경계 판정 회귀(`srt.test.ts`). 상한을 넘는데도 붙어 나오면 `translation_rules_<code>.txt` 규칙 2(`|` 하나로 끊기) + 재조립이 `|`를 `\n`으로 바꾸는 자리 → `srt.ts` `LINE_BREAK_MARK`, `indexTranslatedBodies` |
 | 한 줄에 들어가는데 굳이 두 줄로 나옴 | `srt.ts` (`enforceTextRules`의 `linesJoined`) — 접기 예외에 걸렸을 수 있다(화자 대시, 태그 짝 안 맞음, **문장 경계**, 둘째 줄이 따옴표로 시작) 또는 호출부가 `lineMaxChars`를 안 넘김. 문장 둘이면 의도된 비접기다. 프롬프트 쪽 유도는 `translation_rules_<code>.txt` 규칙 2 — §9.7 |
 | 자막 본문에 `|`가 그대로 보임 | 재조립을 안 거친 산출물이거나(하네스 원본 등) `|`가 두 개 이상이라 2줄 상한에 걸린 경우 → `srt.ts` `indexTranslatedBodies`, `enforceTextRules` |
