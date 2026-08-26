@@ -886,7 +886,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
 | 번역이 느림/비쌈 | `constants.ts` `SERVER_CHUNK_SIZE`(flash)/`PRO_CHUNK_SIZE`(Pro)/`CONCURRENCY`/`thinkingLevelForModel`, 모델(고급/빠른). **블록당 실측 원가는 `tuning/cost-per-block.md`** — 비용이 예상과 다르면 여기부터 볼 것 |
 | 비용을 **줄이고 싶다**(어느 노브가 실제로 효과 있나) | `tuning/token-economics.md` — 비용의 67%가 thinking, 6%가 입력이라 프롬프트 토큰 절감·캐싱은 거의 무의미하다. 이미 당긴 레버와 안 당긴 레버가 우선순위로 정리돼 있음 |
 | 긴 파일에 번역권이 2장 이상 나감 | 정상 — 자막 1,200줄당 1장 올림 차감(`BLOCKS_PER_CREDIT`, `decisions.md` §6-22). 장수는 업로드 화면에서 미리 표시된다. 분모를 바꾸려면 `constants.ts`(원가 근거가 그 주석에 있음)와 `0015_credit_by_lines.sql`의 리터럴을 **같은 커밋에서** 함께 고칠 것 |
-| "파일이 너무 커요"로 거절됨 | 더 이상 없는 동작이다(2026-08-21까지 존재). 아직 뜬다면 배포된 번들이 낡았거나, polish 경로(`POLISH_MAX_BLOCKS`, 2,000블록)를 보고 있는 것이다 |
+| "파일이 너무 커요"로 거절됨 | 더 이상 없는 동작이다(2026-08-21까지 존재). 아직 뜬다면 배포된 번들이 낡았거나, polish 경로(`POLISH_MAX_BLOCKS`, 3,000블록)를 보고 있는 것이다 |
 | 특정 청크만 원문 그대로 | 그 청크 호출 실패 + sweep도 못 건짐 — `gemini.ts` 로그, `chunkRetry.ts`(1차 판단), `[sweep]` 콘솔 로그의 `stoppedBy` — §9.6·§9.65 |
 | 일부 줄만 원문 그대로 | sweep을 통과하고도 남은 줄. `[sweep] ... stopped by` 로그로 원인 구분: `no-progress`(모델이 계속 같은 실패) / `budget`(호출 상한) / `fatal`(quota·auth) — §9.65 |
 | 원문으로 남은 줄이 늘었는데 비용은 그대로 | sweep이 안 돌았다는 뜻. `leftover` 수거(`useTranslation.ts`)나 `unmatchedIndices` 배관(`srt.ts`→SSE)이 끊겼는지 확인 — §9.65 |

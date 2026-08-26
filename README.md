@@ -183,7 +183,7 @@ npm run review -- translated=.harness/<런>/meaning.srt source=samples/subtitles
 |---|---|
 | 비로그인 | `401` — 모든 모델 라우트 |
 | 크레딧 0 | `402 insufficient_credits` |
-| 2,000블록 초과 | `413 file_too_large` |
+| 규칙 적용(`/api/polish`)에서 3,000블록 초과 | `413 file_too_large` |
 | job이 없거나 만료(기본 60분) | `403 invalid_or_expired_job` |
 
 베타에서 크레딧이 떨어지면 소진 화면이 결제창 대신 **대기자 등록**을 띄웁니다. 충전은 아래 수동 지급으로 처리합니다 ([결제](#결제-featurepayments) 참조).
@@ -280,7 +280,7 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 | `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` | — | **필수.** 없으면 모델 라우트가 전부 500으로 닫힘 |
 | `NEXT_PUBLIC_SITE_URL` | `https://zamak.app` (프로덕션) | OG·메타 `metadataBase`용 캐논 오리진. 없으면 프로덕션에서 `SITE.url`, 프리뷰는 Vercel URL |
 | `NEXT_PUBLIC_BLOCKS_PER_CREDIT` | 1200 | 번역권 1장이 커버하는 자막 블록 수. 상한이 아니라 **나눗셈의 분모**다 — 더 긴 파일은 거절되지 않고 올림해서 여러 장을 쓴다(`decisions.md` §6-22). 바꾸면 `supabase/migrations/0015_credit_by_lines.sql`의 리터럴 1200도 같이 고쳐야 한다 |
-| `POLISH_MAX_BLOCKS` | 2000 | `/api/polish`가 한 파일에서 받는 블록 수. 차감이 없는 경로라 위 분모와 별개다 |
+| `POLISH_MAX_BLOCKS` | 3000 | `/api/polish`가 한 파일에서 받는 블록 수. 차감이 없는 경로라 위 분모와 별개다 (2026-08-26에 2000에서 올렸다) |
 | `JOB_VALIDITY_MINUTES` | 60 | 결제된 job이 유효한 시간 |
 | `TOSS_SECRET_KEY` / `NEXT_PUBLIC_TOSS_CLIENT_KEY` | — | **main에서는 안 읽습니다.** 결제 코드가 `feature/payments`에 있어, 그 브랜치에서 작업할 때만 필요합니다 |
 | `GLOSSARY_PROVIDER` | `openai` | 글로사리·존대관계 추출 프로바이더 (`openai`\|`gemini`). 기본은 OpenAI(GPT-5.6-luna, `decisions.md` §2-14). Gemini로 롤백하려면 `gemini` + 아래 `GLOSSARY_MODEL`을 Gemini 모델명으로 |

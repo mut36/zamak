@@ -2912,8 +2912,9 @@ begin`의 413, `WizardApp`의 file_too_large 화면이 함께 삭제됐다.)
 - `BLOCKS_PER_CREDIT` + `creditsForBlocks()` (`app/config/constants.ts`) — 정의 한 곳
 - `begin_translation_job` (`supabase/migrations/0015_credit_by_lines.sql`) —
   **과금 권위**. 1200을 리터럴로 되풀이하고, 잔액 검사가 `>= v_cost`다(부분 차감 방지)
-- `POLISH_MAX_BLOCKS`(2000) — polish는 과금 경로가 아니라 rate-limit 경로라
-  차감 분모를 따라 내려가지 않는다. 값을 그대로 보존하려고 상수를 분리했다
+- `POLISH_MAX_BLOCKS`(2026-08-26에 2000 → 3000) — polish는 과금 경로가 아니라
+  rate-limit 경로라 차감 분모를 따라 내려가지 않는다. 값을 그대로 보존하려고
+  상수를 분리했고, 그래서 이렇게 따로 올릴 수도 있었다
 - 약관 §번역권 구매와 취소·환불 — 이용자가 얼마를 내는지 정하는 조건이라 적어야 한다
 - `COPY.credits.rule / cost / shortfall` — 화면 문구
 

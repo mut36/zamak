@@ -315,12 +315,18 @@ export function creditsForBlocks(blockCount: number): number {
  * borrow back when that constant was a 2,000-block ceiling. Polish spends no
  * credits, so its only cost defence is the rate limit; letting it follow the
  * credit divisor down to 1,200 would have shrunk what the free page accepts as
- * a side effect of a pricing decision. 2,000 is the value it has always
- * enforced, kept unchanged.
+ * a side effect of a pricing decision.
+ *
+ * Raised 2,000 → 3,000 (2026-08-26): 2,000 turned away long films and multi-hour
+ * talks that the page handles fine. The ceiling is a cost defence, and the cost
+ * it defends is per-chunk model calls — but this page calls the model only for
+ * the lines that actually overflow (and, with the merge toggle on, for the
+ * candidate pairs), so a bigger file is not proportionally more expensive. The
+ * rate limit (RATE_LIMITS.polish) is still the real wall.
  */
 export const POLISH_MAX_BLOCKS = readPositiveIntEnv(
   process.env.POLISH_MAX_BLOCKS,
-  2000,
+  3000,
 );
 
 /**
