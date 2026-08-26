@@ -10,9 +10,13 @@ import { DoneStep } from '../../components/simple/DoneStep';
 import { LandingPage } from '../../components/simple/LandingPage';
 import { ProgressStep } from '../../components/simple/ProgressStep';
 import { UploadStep } from '../../components/simple/UploadStep';
+import { PolishUploadStep } from '../../components/polish/PolishUploadStep';
+import { PolishDoneStep } from '../../components/polish/PolishDoneStep';
 import { DEFAULT_MODEL, PRO_MODEL } from '../../config/constants';
 import type { EnrichCandidate } from '../../hooks/useEnrich';
 import type { CastSheet } from '../../types/glossary';
+import type { PolishSummary } from '../../lib/polish';
+import type { DownloadOption } from '../../types/translation';
 import type {
   ContentType,
   MovieInfo,
@@ -22,6 +26,34 @@ import type {
 /* ------------------------------------------------------------------ mocks -- */
 
 const CREDITS = { lite: 3, pro: 1 };
+
+/**
+ * `/polish` 완료 화면의 요약. 숫자를 전부 0이 아닌 값으로 둔 이유는 이 화면이
+ * **센 것만 적는** 규칙을 지키는지 보기 위해서다 — 0인 항목은 줄 자체가 안 뜬다.
+ * `blocksMerged`가 0이 아니므로 ".srt로만" 고지도 함께 그려진다.
+ */
+const POLISH_SUMMARY: PolishSummary = {
+  ellipsisNormalized: 4,
+  linesMerged: 1,
+  trailingPunctuationStripped: 37,
+  linesJoined: 12,
+  midLinePeriodsToCommas: 5,
+  speakerLinesSplit: 2,
+  speakerDashesNormalized: 9,
+  linesSplit: 6,
+  unsplitLines: 1,
+  timingAdjusted: 21,
+  blocksMerged: 8,
+};
+
+const POLISH_DOWNLOADS: DownloadOption[] = [
+  {
+    extension: 'srt',
+    filename: 'eternal.sunshine.2004.1080p.ko.srt',
+    content: '',
+    mime: 'application/x-subrip',
+  },
+];
 
 const MOVIE_INFO: MovieInfo = {
   title: '이터널 선샤인',
@@ -126,6 +158,9 @@ const SCREENS = [
   'done',
   'exhausted',
   'copyright',
+  'polish',
+  'polish:working',
+  'polish:done',
 ] as const;
 
 type Screen = (typeof SCREENS)[number];
@@ -178,6 +213,22 @@ export function PreviewHarness() {
             error=''
             onFile={noop}
             onNext={() => setScreen('settings')}
+          />
+        )}
+
+        {(screen === 'polish' || screen === 'polish:working') && (
+          <PolishUploadStep
+            working={screen === 'polish:working'}
+            error=''
+            onFile={noop}
+          />
+        )}
+
+        {screen === 'polish:done' && (
+          <PolishDoneStep
+            summary={POLISH_SUMMARY}
+            downloads={POLISH_DOWNLOADS}
+            onStartOver={() => setScreen('polish')}
           />
         )}
 

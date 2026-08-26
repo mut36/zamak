@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState, type DragEvent } from 'react';
+import { UploadIcon } from '../icons';
 import { COPY } from '../../i18n/simpleCopy';
 import { CPS_USER_RANGE } from '../../config/constants';
 import {
@@ -58,6 +59,8 @@ export function PolishUploadStep({
   onFile,
 }: PolishUploadStepProps) {
   const c = COPY.polish;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
   const [timingEnabled, setTimingEnabled] = useState(false);
   const [mergeEnabled, setMergeEnabled] = useState(false);
   const [choice, setChoice] = useState<BandChoice>('movie');
@@ -72,6 +75,31 @@ export function PolishUploadStep({
   // 최소 >= 최대는 "상한을 넘은 것을 상한 위로 늦춘다"는 모순이라 업로드를 막는다.
   const bandValid = band.target < band.hardMax;
   const blocked = working || (timingEnabled && !bandValid);
+
+  // 드롭도 클릭도 같은 한 곳으로 모은다 — 토글 두 개의 현재 값이 여기서만
+  // 읽히므로, 경로가 갈리면 한쪽만 토글을 빠뜨리는 버그가 생긴다.
+  const submit = (file: File) => {
+    if (blocked) return;
+    onFile(
+      file,
+      timingEnabled
+        ? { cpsTarget: band.target, cpsHardMax: band.hardMax }
+        : null,
+      mergeEnabled,
+    );
+  };
+
+  const openPicker = () => {
+    if (blocked) return;
+    inputRef.current?.click();
+  };
+
+  const handleDrop = (event: DragEvent) => {
+    event.preventDefault();
+    setOver(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file) submit(file);
+  };
 
   return (
     <div className='animate-zslide'>
@@ -195,45 +223,81 @@ export function PolishUploadStep({
         )}
       </div>
 
-      <div className='card p-[22px] flex flex-col items-center gap-3'>
-        {error && (
-          <p
-            className='text-sm text-center'
-            style={{ color: 'oklch(0.55 0.2 25)' }}
-          >
-            {error}
-          </p>
-        )}
-
-        <label
-          className={`btn btn-primary w-full text-center ${
-            blocked ? 'opacity-60' : 'cursor-pointer'
-          }`}
+      {error && (
+        <div
+          className='card p-4 mb-4 text-sm text-center'
+          style={{ color: 'oklch(0.55 0.2 25)' }}
         >
-          {working ? c.working : c.dropButton}
-          <input
-            type='file'
-            accept='.srt,.vtt,.ass,.smi'
-            className='hidden'
-            disabled={blocked}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) {
-                onFile(
-                  file,
-                  timingEnabled
-                    ? { cpsTarget: band.target, cpsHardMax: band.hardMax }
-                    : null,
-                  mergeEnabled,
-                );
-              }
-              // 같은 파일을 다시 골라도 change가 뜨도록 비운다.
-              event.target.value = '';
-            }}
-          />
-        </label>
+          {error}
+        </div>
+      )}
 
-        <p className='text-fineprint text-secondary'>{c.dropFormats}</p>
+      <div
+        className={`rounded-drop bg-surface shadow-drop p-[48px_28px] text-center transition ${
+          blocked
+            ? 'opacity-60'
+            : `cursor-pointer hover:shadow-drop-hover${over ? ' bg-accent-wash' : ''}`
+        }`}
+        onDragOver={(event) => {
+          // preventDefault가 없으면 브라우저가 파일을 그냥 열어 버린다.
+          event.preventDefault();
+          if (!blocked) setOver(true);
+        }}
+        onDragLeave={(event) => {
+          event.preventDefault();
+          setOver(false);
+        }}
+        onDrop={handleDrop}
+        onClick={openPicker}
+        role='button'
+        tabIndex={blocked ? -1 : 0}
+        onKeyDown={(event) => {
+          if (blocked) return;
+          if (event.key === 'Enter' || event.key === ' ') openPicker();
+        }}
+      >
+        <div
+          className={`drop-ico${working ? ' animate-zbreathe' : ''}`}
+          style={{ color: 'var(--ink)' }}
+        >
+          <UploadIcon strokeWidth={1.25} />
+        </div>
+
+        <h3 className='text-lead font-semibold text-ink mb-2'>
+          {working ? c.working : c.dropTitle}
+        </h3>
+        <p className='text-caption text-tertiary mb-[22px]'>{c.dropFormats}</p>
+
+        <button
+          type='button'
+          className='btn btn-primary btn-lg mt-3'
+          disabled={blocked}
+          onClick={(event) => {
+            // 드롭존 전체가 피커를 여는 버튼이라, 안쪽 버튼의 클릭이 위로
+            // 올라가면 피커가 두 번 열린다.
+            event.stopPropagation();
+            openPicker();
+          }}
+        >
+          {c.dropButton}
+        </button>
+
+        {/* ⚠️ `accept`를 다시 붙이지 말 것 — 폰에서 자막을 아예 못 고르게 된다.
+            iOS는 확장자를 UTI로 바꿔 거는데 `.srt`·`.smi`·`.ass`는 등록된 UTI가
+            없어서 파일 앱이 모든 파일을 회색으로 만든다. 거르는 일은 업로드
+            뒤 `loadSubtitleFile`이 하고, 잘못 고른 파일은 위에 이유가 뜬다.
+            `decisions.md` §1-22 — 번역 쪽 드롭존(`UploadStep`)과 같은 이유다. */}
+        <input
+          ref={inputRef}
+          type='file'
+          className='hidden'
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            // 같은 파일을 다시 골라도 change가 뜨도록 비운다.
+            event.target.value = '';
+            if (file) submit(file);
+          }}
+        />
       </div>
     </div>
   );

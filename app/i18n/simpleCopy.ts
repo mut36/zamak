@@ -397,6 +397,7 @@ export const COPY = {
     navLink: '규칙 적용',
     title: '자막 규칙 적용',
     sub: '이미 번역된 한국어 자막을 방송 표기 규칙에 맞게 다듬어 드립니다.\n번역은 하지 않고, 타임코드는 아래를 켰을 때만 손댑니다.',
+    dropTitle: '자막 파일을 여기에 놓으세요',
     dropButton: '자막 파일 선택',
     dropFormats: '지원 포맷: .srt, .vtt, .ass, .smi',
     working: '규칙을 적용하는 중…',
