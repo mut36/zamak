@@ -5,6 +5,8 @@ export interface PolishResponse {
   content: string;
   totalChunks: number;
   failedChunks: number;
+  /** 대사가 바뀌어 되돌린 블록 수. 0이 정상 — `verbatimGuard.ts` 참조. */
+  rewrittenBlocks?: number;
 }
 
 /** 서버가 거절했을 때. `code`는 배너 문구를 고르는 데 쓴다. */

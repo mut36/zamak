@@ -10,6 +10,7 @@ import {
   parseSrtBlocks,
   reassembleTranslatedChunk,
 } from '../srt';
+import { keepVerbatimBlocks } from '../verbatimGuard';
 import { runOrderedPool } from '../client/concurrency';
 import {
   FLASH_MODEL,
@@ -39,6 +40,12 @@ export interface PolishServiceResult {
   content: string;
   totalChunks: number;
   failedChunks: number;
+  /**
+   * 대사가 바뀌어 원문으로 되돌린 블록 수(`keepVerbatimBlocks`). **0이 정상**이고,
+   * 0이 아니면 모델이 줄바꿈 권한 밖의 일을 한 것이다 — 프롬프트나 모델을
+   * 건드린 뒤 이 값이 커지면 그게 회귀 신호다.
+   */
+  rewrittenBlocks: number;
 }
 
 /**
@@ -49,6 +56,11 @@ export interface PolishServiceResult {
  * 그 함수는 위치가 아니라 번호로 대조하고, 모델이 모르는 번호를 뱉으면
  * `expected` 집합이 걸러낸다. 모델이 뱉은 타임스탬프도 거기서 버려지므로
  * 타임코드는 언제나 소스에서 온다.
+ *
+ * **모델은 끊을 자리만 정한다.** 돌아온 대사가 원문과 글자 단위로 다르면 그
+ * 블록은 버리고 원문을 쓴다(`keepVerbatimBlocks`) — 안 나뉜 긴 줄이 남는 것은
+ * 이 기능이 원래 감수하는 비용이고, 대사가 바뀐 자막이 나가는 것과는 비교가
+ * 안 된다. 2026-08-26에 실제로 번역된 채 나온 사고가 있었다.
  *
  * 청크 하나가 실패하면 **그 청크만 버린다.** 해당 블록들은 원문을 유지하고
  * 나머지는 정상 처리된다 — 규칙 적용은 개선이지 필수 변환이 아니라서, 일부가
@@ -62,7 +74,7 @@ export async function splitLongLines(
 ): Promise<PolishServiceResult> {
   const blocks = parseSrtBlocks(subset);
   if (blocks.length === 0) {
-    return { content: '', totalChunks: 0, failedChunks: 0 };
+    return { content: '', totalChunks: 0, failedChunks: 0, rewrittenBlocks: 0 };
   }
 
   const systemInstruction = await composeLineSplitPrompt(targetLanguage);
@@ -93,6 +105,7 @@ export async function splitLongLines(
           ok: true,
         });
         return reassembleTranslatedChunk(chunk, text).content;
+
       } catch (error) {
         // 실패한 청크도 지연을 썼고 실제로 일어났다 — 토큰 0짜리 행을 남긴다.
         // 여기서 삼키지 않고 다시 던진다: 원문 유지 분기는 pool이 맡는다.
@@ -113,16 +126,29 @@ export async function splitLongLines(
   });
 
   let failedChunks = 0;
+  let rewrittenBlocks = 0;
   const rebuilt = results.map((result, index) => {
-    if (result !== undefined) return result;
-    failedChunks++;
-    // 원문 유지 — 이 청크의 블록들은 안 나뉜 채로 나간다.
-    return chunks[index];
+    if (result === undefined) {
+      failedChunks++;
+      // 원문 유지 — 이 청크의 블록들은 안 나뉜 채로 나간다.
+      return chunks[index];
+    }
+    // 모델이 끊을 자리 말고 대사를 건드렸으면 그 블록만 원문으로 되돌린다.
+    const checked = keepVerbatimBlocks(chunks[index], result);
+    rewrittenBlocks += checked.rejected;
+    return checked.content;
   });
+
+  if (rewrittenBlocks > 0) {
+    console.warn(
+      `[polish] ${rewrittenBlocks} blocks came back rewritten and were reverted`,
+    );
+  }
 
   return {
     content: rebuilt.join('\n\n'),
     totalChunks: chunks.length,
     failedChunks,
+    rewrittenBlocks,
   };
 }
