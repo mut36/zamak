@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { loadFragmentJoinRules } from '../prompts/loader';
-import { getEnabledTargetLang } from '../../config/languages';
+import { getPolishTargetLang } from '../../config/languages';
 import {
   formatRunsForModel,
   readJoinGroups,
@@ -39,7 +39,7 @@ export async function judgeFragmentRuns(
     return { groups: {}, totalChunks: 0, failedChunks: 0 };
   }
 
-  const lang = getEnabledTargetLang(targetLanguage);
+  const lang = getPolishTargetLang(targetLanguage);
   if (!lang) {
     throw new Error(`Unsupported target language: ${targetLanguage}`);
   }

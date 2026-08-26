@@ -184,6 +184,7 @@ npm run review -- translated=.harness/<런>/meaning.srt source=samples/subtitles
 | 비로그인 | `401` — 모든 모델 라우트 |
 | 크레딧 0 | `402 insufficient_credits` |
 | 규칙 적용(`/api/polish`)에서 3,000블록 초과 | `413 file_too_large` |
+| 규칙 적용이 모르는 언어 | `400 unsupported_language` — 현재 한국어·이탈리아어. 언어는 `/polish`가 자동 인식한다([decisions.md](docs/decisions.md) §6-29) |
 | job이 없거나 만료(기본 60분) | `403 invalid_or_expired_job` |
 
 베타에서 크레딧이 떨어지면 소진 화면이 결제창 대신 **대기자 등록**을 띄웁니다. 충전은 아래 수동 지급으로 처리합니다 ([결제](#결제-featurepayments) 참조).

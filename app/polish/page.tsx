@@ -12,7 +12,16 @@ import { useAuth } from '../hooks/useAuth';
 export default function PolishPage() {
   const router = useRouter();
   const { user, credits, loading: authLoading } = useAuth();
-  const { stage, error, summary, downloads, handleFile, reset } = usePolish();
+  const {
+    stage,
+    error,
+    summary,
+    downloads,
+    language,
+    handleFile,
+    reapply,
+    reset,
+  } = usePolish();
 
   // `/`는 비로그인에게 랜딩을 보여주는 것으로 게이트를 대신하지만, 이 라우트는
   // 그 밖에 있다. 서버 키를 쓰는 화면이므로 자체적으로 돌려보낸다.
@@ -34,6 +43,8 @@ export default function PolishPage() {
             <PolishDoneStep
               summary={summary}
               downloads={downloads}
+              language={language}
+              onReapply={reapply}
               onStartOver={reset}
             />
           ) : (

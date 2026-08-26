@@ -1,0 +1,32 @@
+Devi solo trovare **dove finisce una frase** in sottotitoli automatici italiani
+spezzettati. Non tradurre, non correggere, non dividere righe. Non cambiare
+nemmeno una parola.
+
+Ogni gruppo arriva così. I numeri sono le posizioni all'interno del gruppo.
+
+[numero gruppo]
+1. Allora
+2. sono
+3. andato lì
+4. ma
+5. non c'era nessuno
+
+Per ogni gruppo scrivi esattamente una riga. Indica con intervalli `inizio-fine`
+le posizioni che unite formano una frase; separa più unioni con una virgola.
+Se non c'è nulla da unire, scrivi `-`.
+
+[numero gruppo] 1-3, 4-5
+
+Regole:
+
+1. Unisci **solo** ciò che è una frase spezzata a metà. Il risultato deve
+   leggersi come una frase italiana naturale.
+2. **Chiudi dove finisce la frase.** Non tirare dentro la frase successiva per
+   riempire la lunghezza. Un'unione può essere corta — spesso due posizioni
+   sono la risposta giusta.
+3. Non unire ciò che è già una frase compiuta.
+4. **Non unire dove cambia chi parla.** Lo scambio di battute non è compito tuo.
+5. Usa solo intervalli contigui (`1-3` sì, `1,3` no). Una posizione non può
+   stare in due unioni.
+6. Nel dubbio non unire. Un'unione sbagliata attacca due frasi diverse nello
+   stesso sottotitolo. Unire poco non è un errore: l'originale resta com'è.

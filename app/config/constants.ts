@@ -13,7 +13,7 @@ import {
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '1.8.0';
+export const APP_VERSION = '1.9.0';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without

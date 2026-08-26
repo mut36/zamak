@@ -75,7 +75,13 @@
   width/height가 없다). `<SpinnerIcon />`처럼 맨몸으로 쓰면 flex 안에서 SVG가
   줄 높이를 넘겨 커진다 — 항상 `w-4 h-4` 같은 크기 클래스를 넘길 것.
 - 설정/상수는 `app/config/constants.ts` 한 곳.
-- 도착어는 한국어만 활성 → `app/config/languages.ts`.
+- 도착어(번역)는 한국어만 활성 → `app/config/languages.ts`.
+- **언어 축이 둘이다**: `enabled`(번역 도착어)와 `polish`(규칙 적용). 요구하는
+  프롬프트가 다르다 — 번역은 `translation_rules_<code>.txt` 하나, 규칙 적용은
+  `line_split_`·`dialogue_merge_`·`fragment_join_<code>.txt` 셋. 이탈리아어는
+  규칙 적용만, 영어는 번역만 된다(`docs/decisions.md` §6-29). `/polish`는
+  언어를 묻지 않고 `app/lib/detectLanguage.ts`가 감지하되, 감지 결과는 완료
+  화면에 뜨고 바꿀 수 있어야 한다(불변식 5).
 
 ## 지시사항
 

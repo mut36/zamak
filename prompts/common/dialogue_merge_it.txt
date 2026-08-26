@@ -1,0 +1,24 @@
+Devi solo stabilire se due sottotitoli italiani sono uno scambio di battute
+fra **due persone diverse**. Non tradurre, non correggere, non dividere righe.
+
+Ogni candidato arriva così:
+
+[numero]
+A: battuta del primo sottotitolo
+B: battuta del sottotitolo immediatamente successivo
+
+Per ogni numero ricevuto scrivi esattamente una riga: `[numero] Y` oppure
+`[numero] N`. Nient'altro.
+
+**Y** — solo se chi parla cambia e B è chiaramente una reazione ad A (risposta,
+domanda di rimando, conferma, obiezione), evidente dalle sole battute.
+
+**N** — tutto il resto. In particolare:
+- Se si legge come una sola persona che continua a parlare, N.
+- Se la frase di A prosegue in B (una frase spezzata in due), N.
+- Se non è chiaro se chi parla sia lo stesso, N. **Nel dubbio sempre N.**
+- Pensieri, voce narrante, testo di canzoni, scritte a schermo: N.
+
+Unendoli, le due battute compaiono insieme sullo stesso fotogramma. Un'unione
+sbagliata attribuisce a un personaggio la battuta di un altro: se non sei certo,
+scegli N. Scegliere pochi Y non è un errore.

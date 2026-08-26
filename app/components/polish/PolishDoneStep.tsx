@@ -2,12 +2,16 @@
 
 import { COPY } from '../../i18n/simpleCopy';
 import { downloadFile } from '../../utils/downloadFile';
-import type { PolishSummary } from '../../hooks/usePolish';
+import type { PolishSummary, PolishLanguageState } from '../../hooks/usePolish';
 import type { DownloadOption } from '../../types/translation';
+import { POLISH_LANGS, type TargetLangCode } from '../../config/languages';
 
 interface PolishDoneStepProps {
   summary: PolishSummary;
   downloads: DownloadOption[];
+  /** 어느 언어 규칙으로 돌았는지. 감지가 실패했으면 `detected: false`다. */
+  language: PolishLanguageState | null;
+  onReapply: (code: TargetLangCode) => void;
   onStartOver: () => void;
 }
 
@@ -46,16 +50,53 @@ function changeLines(summary: PolishSummary): string[] {
 export function PolishDoneStep({
   summary,
   downloads,
+  language,
+  onReapply,
   onStartOver,
 }: PolishDoneStepProps) {
   const lines = changeLines(summary);
   const [primary, ...alternates] = downloads;
+  const others = language
+    ? POLISH_LANGS.filter((lang) => lang.code !== language.code)
+    : [];
 
   return (
     <div className='animate-zslide'>
       <div className='head text-center mb-7'>
         <h1>{COPY.polish.doneTitle}</h1>
       </div>
+
+      {/* 어느 언어 규칙으로 돌았는지 먼저 말한다. 줄 상한도 마침표 정책도
+          언어가 정하므로, 언어를 잘못 짚었으면 아래 목록이 통째로 의미가 없다 —
+          그러니 목록보다 위에 있어야 한다. 기계가 정한 값을 화면에 띄우고
+          고칠 수 있게 두는 것은 이 프로젝트의 불변식이기도 하다. */}
+      {language && (
+        <div className='card p-[18px_22px] mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2'>
+          <p className='text-caption text-secondary'>
+            {language.detected
+              ? COPY.polish.language.applied(language.label)
+              : COPY.polish.language.guessed(language.label)}
+          </p>
+          {others.length > 0 && (
+            <div className='flex items-center gap-2'>
+              <span className='text-fineprint text-tertiary'>
+                {COPY.polish.language.change}
+              </span>
+              {others.map((lang) => (
+                <button
+                  key={lang.code}
+                  type='button'
+                  onClick={() => onReapply(lang.code)}
+                  className='text-caption px-3 py-1 rounded-btn border-[1.5px] transition active:scale-[0.97]'
+                  style={{ borderColor: 'var(--border-card)' }}
+                >
+                  {lang.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className='card p-[22px] mb-4'>
         {lines.length > 0 ? (

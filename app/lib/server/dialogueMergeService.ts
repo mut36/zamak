@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { loadDialogueMergeRules } from '../prompts/loader';
-import { getEnabledTargetLang } from '../../config/languages';
+import { getPolishTargetLang } from '../../config/languages';
 import {
   formatCandidatesForModel,
   readMergeVerdicts,
@@ -36,7 +36,7 @@ export async function judgeDialogueCandidates(
     return { approved: [], totalChunks: 0, failedChunks: 0 };
   }
 
-  const lang = getEnabledTargetLang(targetLanguage);
+  const lang = getPolishTargetLang(targetLanguage);
   if (!lang) {
     throw new Error(`Unsupported target language: ${targetLanguage}`);
   }

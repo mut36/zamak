@@ -12,6 +12,7 @@ import { recordChunkUsage } from '../../lib/server/chunkUsage';
 import { createClient } from '../../lib/supabase/server';
 import { parseSrtBlocks } from '../../lib/srt';
 import { FLASH_MODEL, POLISH_MAX_BLOCKS } from '../../config/constants';
+import { getPolishTargetLang } from '../../config/languages';
 
 export const maxDuration = 300;
 
@@ -135,6 +136,16 @@ export async function POST(request: NextRequest) {
   if (typeof body.targetLang !== 'string') {
     return NextResponse.json(
       { error: 'targetLang is required' },
+      { status: 400 },
+    );
+  }
+
+  // 규칙 적용을 지원하는 언어인지 여기서 거른다. 예전에는 이 검사가 없어서
+  // 프롬프트 파일이 없는 언어가 서비스 안쪽에서 500으로 터졌다 — 같은 사실인데
+  // 원인이 안 보였다. 번역 도착어 게이트와 다른 축을 본다(`TargetLang.polish`).
+  if (!getPolishTargetLang(body.targetLang)) {
+    return NextResponse.json(
+      { error: 'unsupported_language', code: 'unsupported_language' },
       { status: 400 },
     );
   }

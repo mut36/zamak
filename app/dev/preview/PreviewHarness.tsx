@@ -229,6 +229,8 @@ export function PreviewHarness() {
           <PolishDoneStep
             summary={POLISH_SUMMARY}
             downloads={POLISH_DOWNLOADS}
+            language={{ code: 'it', label: 'Italiano', detected: true }}
+            onReapply={noop}
             onStartOver={() => setScreen('polish')}
           />
         )}

@@ -4,12 +4,22 @@
 // the prompt (promptLabel/lineMaxChars/formality) and the
 // post-processing pass (trailingPunctuation + shapes[profile]).
 // Adding a language = one row here + one prompts/common/
-// translation_rules_<code>.txt file.
+// translation_rules_<code>.txt file (번역 도착어로 열 때).
+// 규칙 적용(/polish)은 축이 따로다 — `polish` 플래그 + line_split_/
+// dialogue_merge_/fragment_join_<code>.txt 세 개.
 // The source language is auto-detected by the model, so it is
 // intentionally not modeled here.
 // ============================================================
 
-export type TargetLangCode = 'ko' | 'en' | 'ja' | 'es' | 'fr' | 'zh' | 'de';
+export type TargetLangCode =
+  | 'ko'
+  | 'en'
+  | 'ja'
+  | 'es'
+  | 'fr'
+  | 'zh'
+  | 'de'
+  | 'it';
 
 /**
  * Display names for a language's grammaticalized formality axis — the thing
@@ -82,6 +92,19 @@ export interface TargetLang {
   mono: string;
   /** When false, rendered but not selectable (roadmap hint). */
   enabled: boolean;
+  /**
+   * 규칙 적용(`/polish`)이 이 언어를 다룰 수 있는가 — **번역 도착어와 다른 축**이다.
+   *
+   * 두 경로가 필요로 하는 것이 다르다. 번역은 `translation_rules_<code>.txt`
+   * 하나면 되고, 규칙 적용은 줄바꿈·합치기·잇기 프롬프트 셋이 있어야 한다.
+   * 한 플래그로 묶으면 둘 중 하나만 준비된 언어를 표현할 수 없고, 실제로
+   * 그런 언어가 양쪽에 다 있다 — 영어는 번역만 되고, 이탈리아어는 규칙
+   * 적용만 된다(2026-08-26).
+   *
+   * 이 값이 false인 언어로 `/api/polish`를 부르면 400으로 거절한다. 예전에는
+   * 프롬프트 파일이 없어 500으로 터졌다 — 같은 사실이지만 원인이 안 보였다.
+   */
+  polish: boolean;
   /** Korean name of the language, injected as the prompt's 목표 언어. */
   promptLabel: string;
   /**
@@ -150,6 +173,7 @@ export const TARGET_LANGS: TargetLang[] = [
     label: '한국어',
     mono: 'KO',
     enabled: true,
+    polish: true,
     promptLabel: '한국어',
     lineMaxChars: 18,
     formality: { formal: '존댓말', informal: '반말', mixed: '혼용' },
@@ -170,6 +194,7 @@ export const TARGET_LANGS: TargetLang[] = [
     label: 'English',
     mono: 'EN',
     enabled: true,
+    polish: false,
     promptLabel: '영어',
     lineMaxChars: 42,
     formality: null,
@@ -182,6 +207,7 @@ export const TARGET_LANGS: TargetLang[] = [
     label: '日本語',
     mono: 'JA',
     enabled: true,
+    polish: false,
     promptLabel: '일본어',
     lineMaxChars: 20,
     formality: {
@@ -198,6 +224,7 @@ export const TARGET_LANGS: TargetLang[] = [
     label: 'Español',
     mono: 'ES',
     enabled: true,
+    polish: false,
     promptLabel: '스페인어',
     lineMaxChars: 42,
     formality: T_V_AXIS('usted', 'tú'),
@@ -210,6 +237,7 @@ export const TARGET_LANGS: TargetLang[] = [
     label: 'Français',
     mono: 'FR',
     enabled: true,
+    polish: false,
     promptLabel: '프랑스어',
     lineMaxChars: 42,
     formality: T_V_AXIS('vous', 'tu'),
@@ -222,6 +250,7 @@ export const TARGET_LANGS: TargetLang[] = [
     label: '中文',
     mono: 'ZH',
     enabled: true,
+    polish: false,
     promptLabel: '중국어(간체)',
     lineMaxChars: 18,
     formality: null,
@@ -230,10 +259,33 @@ export const TARGET_LANGS: TargetLang[] = [
     shapes: uniformShapes({ target: 8, hardMax: 9 }),
   },
   {
+    /**
+     * 이탈리아어는 **규칙 적용 전용**이다(2026-08-26). 번역 도착어 목록에는
+     * 안 뜨고(`enabled: false`) `/polish`에서만 쓰인다 — 요청이 "이미
+     * 이탈리아어인 자막을 다듬는 것"이었고, 번역까지 열려면
+     * `translation_rules_it.txt`가 따로 필요하다.
+     *
+     * 라틴계 값은 스페인어·프랑스어와 같다: 42자, 문장부호 유지, T-V 존대축
+     * (Lei/tu). 읽기 속도는 아무도 안 쟀으므로 `LATIN_SHAPE` 공통값.
+     */
+    code: 'it',
+    label: 'Italiano',
+    mono: 'IT',
+    enabled: false,
+    polish: true,
+    promptLabel: '이탈리아어',
+    lineMaxChars: 42,
+    formality: T_V_AXIS('Lei', 'tu'),
+    trailingPunctuation: '',
+    ellipsis: '…',
+    shapes: uniformShapes(LATIN_SHAPE),
+  },
+  {
     code: 'de',
     label: 'Deutsch',
     mono: 'DE',
     enabled: true,
+    polish: false,
     promptLabel: '독일어',
     lineMaxChars: 42,
     formality: T_V_AXIS('Sie', 'du'),
@@ -258,6 +310,21 @@ export function getEnabledTargetLang(code: string): TargetLang | undefined {
   const lang = getTargetLang(code);
   return lang?.enabled ? lang : undefined;
 }
+
+/**
+ * 규칙 적용 경로의 게이트. 번역 게이트와 **다른 플래그**를 본다 — 두 경로가
+ * 요구하는 프롬프트가 다르기 때문이다(`TargetLang.polish` 주석 참조).
+ * `/api/polish`의 세 작업(줄바꿈·합치기·잇기)이 전부 이걸 통과해야 돈다.
+ */
+export function getPolishTargetLang(code: string): TargetLang | undefined {
+  const lang = getTargetLang(code);
+  return lang?.polish ? lang : undefined;
+}
+
+/** 규칙 적용을 지원하는 언어 전부 — 화면의 "바꾸기" 목록이 이걸 쓴다. */
+export const POLISH_LANGS: TargetLang[] = TARGET_LANGS.filter(
+  (lang) => lang.polish,
+);
 
 /** Fallback-safe lookup for display paths that must render something. */
 export function resolveTargetLang(code: string): TargetLang {

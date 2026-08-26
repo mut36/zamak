@@ -1,6 +1,6 @@
 import { loadLineSplitRules } from './loader';
 import { renderPromptTemplate } from './renderer';
-import { getEnabledTargetLang } from '../../config/languages';
+import { getPolishTargetLang } from '../../config/languages';
 
 /**
  * `/api/polish`가 시스템 인스트럭션으로 보내는 문자열.
@@ -12,7 +12,7 @@ import { getEnabledTargetLang } from '../../config/languages';
 export async function composeLineSplitPrompt(
   targetLanguage: string,
 ): Promise<string> {
-  const lang = getEnabledTargetLang(targetLanguage);
+  const lang = getPolishTargetLang(targetLanguage);
   if (!lang) {
     throw new Error(`Unsupported target language: ${targetLanguage}`);
   }
