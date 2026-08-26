@@ -13,7 +13,7 @@ import {
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '1.9.1';
+export const APP_VERSION = '1.9.2';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
@@ -405,6 +405,9 @@ export const RATE_LIMITS = {
    * 요청을 쪼갰다면 하루 5회가 파일 한두 개로 줄었을 것이다.
    */
   polish: { limit: 5, windowSeconds: 86_400 },
+  // ⚠️ 무제한 테스터(`unlimited_testers`)는 이 표의 어느 값에도 안 걸린다 —
+  //    면제는 `consume_rate_limit`(마이그레이션 0018) 안에서 일어나므로 여기
+  //    숫자를 아무리 바꿔도 그 계정에는 아무 일도 안 생긴다.
   /**
    * /api/coupons/redeem — 비밀코드 교환. 지인 배포용이라 코드가 짧고 사람이
    * 기억할 수 있는 말이므로, 무차별 대입이 실제로 가능한 유일한 입구다.

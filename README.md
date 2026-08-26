@@ -160,6 +160,11 @@ npm run review -- translated=.harness/<런>/meaning.srt source=samples/subtitles
    (fail-open, `app/lib/server/rateLimit.ts`의 근거 참조), 예외 기록은
    실패를 삼킨다. 즉 안 돌리면 가드와 모니터링만 조용히 없는 상태다.
    (`0010_signup_credit_revert.sql`은 정식 오픈 시점 항목이라 이것과 순서 무관.)
+8. `supabase/migrations/0018_unlimited_rate_limit.sql` — 무제한 테스터
+   (`unlimited_testers`, `0013`)를 **레이트 리밋에서도** 면제한다. `0013`이 면제한
+   것은 크레딧 차감뿐이라, 크레딧을 안 쓰는 경로(규칙 적용 `/api/polish` 등)에서는
+   무제한 계정도 하루 5회에 막혔다. 버킷을 가리지 않고 풀되 **호출 횟수는 계속
+   센다** — `api_rate_limits`에 남아야 사용량이 보인다.
 
 **마이그레이션과 배포는 붙여서 합니다.** `0004`는 기존 `begin_translation_job(integer)`과
 5인자 `settle_order`를 **drop하고** 새 시그니처로 다시 만듭니다. 배포용 Next.js는
