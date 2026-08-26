@@ -808,6 +808,25 @@ function readSourceBlock(raw: string): SourceBlock {
 
 /** Sequence number of one raw SRT block, or null when its header is malformed
  * (and so the block can't be addressed by number at all). */
+/**
+ * 블록 번호를 1부터 다시 매긴다 — 블록을 지우거나 합쳐서 번호가 빈 뒤에 쓴다.
+ * 번호가 비면 그 SRT를 읽는 다른 도구가 블록을 잃는다.
+ *
+ * **번호를 못 읽는 블록은 첫 줄을 건드리지 않는다.** 거기 있는 것이 번호가
+ * 아닐 수 있고(깨진 블록), 덮어쓰면 있던 정보가 사라진다. 세는 것은 계속
+ * 세므로 정상 블록의 번호는 여전히 순서대로다.
+ */
+export function renumberBlocks(blocks: readonly string[]): string[] {
+  let sequence = 0;
+  return blocks.map((raw) => {
+    sequence++;
+    if (readBlockIndex(raw) === null) return raw;
+    const lines = raw.split('\n');
+    lines[0] = String(sequence);
+    return lines.join('\n');
+  });
+}
+
 export function readBlockIndex(raw: string): number | null {
   return readSourceBlock(raw).index;
 }

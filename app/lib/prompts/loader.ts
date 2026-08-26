@@ -71,6 +71,18 @@ export function loadDialogueMergeRules(
   return loadPromptFile(`common/dialogue_merge_${language}.txt`);
 }
 
+/**
+ * 토막 자막 잇기의 판정 프롬프트(`/api/polish`의 join 경로). 합치기 프롬프트와
+ * 따로 두는 이유는 묻는 것이 다르기 때문이다 — 저쪽은 "두 화자인가", 이쪽은
+ * "한 문장이 어디서 끝나는가". 한 프롬프트에 둘을 넣으면 모델이 두 판정을
+ * 섞는다. 자리표시자가 없어 렌더 없이 그대로 쓴다.
+ */
+export function loadFragmentJoinRules(
+  language: TargetLangCode,
+): Promise<string> {
+  return loadPromptFile(`common/fragment_join_${language}.txt`);
+}
+
 export function loadTranslationPhilosophy(
   style: 'meaning' | 'cinematic',
 ): Promise<string> {

@@ -4,8 +4,10 @@ import { enforceRateLimit } from '../../lib/server/rateLimit';
 import { reportServerError } from '../../lib/server/reportError';
 import { splitLongLines } from '../../lib/server/polishService';
 import { judgeDialogueCandidates } from '../../lib/server/dialogueMergeService';
+import { judgeFragmentRuns } from '../../lib/server/fragmentJoinService';
 import type { PolishCallMeasurement } from '../../lib/server/polishService';
 import type { DialogueCandidate } from '../../lib/mergeDialogue';
+import type { FragmentRun } from '../../lib/joinFragments';
 import { recordChunkUsage } from '../../lib/server/chunkUsage';
 import { createClient } from '../../lib/supabase/server';
 import { parseSrtBlocks } from '../../lib/srt';
@@ -21,11 +23,14 @@ export const maxDuration = 300;
  * - `task` 없음/`'split'`: 상한을 넘는 줄을 나눈다(원래 동작, 하위호환).
  * - `task: 'merge'`: 후보 쌍이 정말 두 화자의 주고받음인지 판정한다. 대사는
  *   한 글자도 안 바뀌고 번호 목록만 돌아온다.
+ * - `task: 'join'`: 토막 자막의 런에서 한 문장의 경계를 판정한다. 이쪽도
+ *   돌아오는 것은 자리 번호뿐이다.
  */
 interface PolishRequest {
-  task?: 'split' | 'merge';
+  task?: 'split' | 'merge' | 'join';
   subset?: string;
   candidates?: unknown;
+  runs?: unknown;
   targetLang: string;
 }
 
@@ -63,6 +68,41 @@ function readCandidates(value: unknown): DialogueCandidate[] | null {
     });
   }
   return candidates;
+}
+
+/**
+ * `readCandidates`와 같은 이유로 형태를 확인한다 — 이 값이 프롬프트에 그대로
+ * 실리고, 돌아온 자리 번호로 **자막을 지울** 것이기 때문이다. 자리 번호는
+ * 런 안의 위치라, 런의 길이가 틀리면 엉뚱한 블록이 사라진다.
+ */
+function readRuns(value: unknown): FragmentRun[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+
+  const runs: FragmentRun[] = [];
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null) return null;
+    const r = item as Record<string, unknown>;
+    if (
+      !Number.isInteger(r.id) ||
+      !Array.isArray(r.indices) ||
+      !Array.isArray(r.lines) ||
+      r.indices.length < 2 ||
+      r.indices.length !== r.lines.length ||
+      !r.indices.every((index) => Number.isInteger(index)) ||
+      !r.lines.every((line) => typeof line === 'string' && line.trim())
+    ) {
+      return null;
+    }
+    runs.push({
+      id: r.id as number,
+      indices: r.indices as number[],
+      // 줄바꿈이 섞이면 자리 번호와 줄이 어긋나 프롬프트의 좌표계가 깨진다.
+      lines: (r.lines as string[]).map((line) =>
+        line.replace(/\s+/g, ' ').trim(),
+      ),
+    });
+  }
+  return runs;
 }
 
 export async function POST(request: NextRequest) {
@@ -109,16 +149,24 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const runs = task === 'join' ? readRuns(body.runs) : null;
+  if (task === 'join' && runs === null) {
+    return NextResponse.json({ error: 'runs are required' }, { status: 400 });
+  }
+
   if (task === 'split' && typeof body.subset !== 'string') {
     return NextResponse.json({ error: 'subset is required' }, { status: 400 });
   }
 
   // 업로드 화면이 이미 막지만 라우트는 직접 호출될 수 있으므로 여기서도 센다.
-  // 후보 쌍은 블록 두 개에서 나오므로 같은 상한을 쌍 수의 두 배로 읽는다.
+  // 판정 경로의 부하는 자막 블록 수로 환산한다 — 후보 쌍은 블록 둘, 런은
+  // 자기 길이만큼.
   const load =
     task === 'merge'
       ? candidates!.length * 2
-      : parseSrtBlocks(body.subset as string).length;
+      : task === 'join'
+        ? runs!.reduce((sum, run) => sum + run.indices.length, 0)
+        : parseSrtBlocks(body.subset as string).length;
   if (load > POLISH_MAX_BLOCKS) {
     return NextResponse.json(
       { error: 'file_too_large', code: 'file_too_large' },
@@ -151,7 +199,9 @@ export async function POST(request: NextRequest) {
     const result =
       task === 'merge'
         ? await judgeDialogueCandidates(candidates!, body.targetLang, record)
-        : await splitLongLines(body.subset as string, body.targetLang, record);
+        : task === 'join'
+          ? await judgeFragmentRuns(runs!, body.targetLang, record)
+          : await splitLongLines(body.subset as string, body.targetLang, record);
     return NextResponse.json(result);
   } catch (error) {
     console.error('Polish failed:', error);

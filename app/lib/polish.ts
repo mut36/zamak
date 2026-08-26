@@ -12,6 +12,11 @@ import {
   collectDialogueCandidates,
   type DialogueCandidate,
 } from './mergeDialogue';
+import {
+  applyFragmentJoins,
+  collectFragmentRuns,
+  type FragmentRun,
+} from './joinFragments';
 import type { TargetLang } from '../config/languages';
 import {
   MIN_SUBTITLE_DURATION_MS,
@@ -127,6 +132,13 @@ export interface PolishSummary extends TextRuleReport {
    * 않는다 — 이 화면의 기본 약속이다.
    */
   blocksMerged: number;
+  /**
+   * 토막 자막을 문장으로 이으며 **사라진 블록 수**. 묶음마다 (블록 수 - 1)이라
+   * 합쳐진 문장 수와 다르다 — 넷을 하나로 이으면 3이다.
+   *
+   * 토글이 꺼져 있으면 언제나 0이다.
+   */
+  blocksJoined: number;
 }
 
 /**
@@ -138,6 +150,14 @@ export interface PolishSummary extends TextRuleReport {
 export type DialogueJudge = (
   candidates: readonly DialogueCandidate[],
 ) => Promise<readonly number[]>;
+
+/**
+ * 토막 자막 잇기의 판정자. 런을 받아 **런 번호 → 자리 묶음들**을 돌려준다.
+ * 같은 이유로 주입받는다 — 런이 0건이면 이 함수는 아예 안 불린다.
+ */
+export type FragmentJudge = (
+  runs: readonly FragmentRun[],
+) => Promise<ReadonlyMap<number, number[][]>>;
 
 export interface PolishOutcome {
   content: string;
@@ -180,6 +200,7 @@ export async function applySubtitleRules(
   splitLongLines: (subset: string) => Promise<string>,
   timing?: PolishTimingOptions | null,
   judgeDialogue?: DialogueJudge | null,
+  judgeFragments?: FragmentJudge | null,
 ): Promise<PolishOutcome> {
   const ruleOptions = {
     trailingPunctuation: lang.trailingPunctuation,
@@ -195,7 +216,28 @@ export async function applySubtitleRules(
   // 판정하고(그 전에는 원본 줄바꿈이 남아 있다), 합쳐진 결과는 아래 상한 검사와
   // 2차 규칙을 그대로 통과해야 한다.
   let staged = first.content;
+  let blocksJoined = 0;
   let blocksMerged = 0;
+
+  // 토막 잇기가 **합치기보다 먼저**다. 이쪽은 망가진 입력을 고치는 일이고,
+  // 고쳐진 뒤라야 합치기가 보는 "짧은 한 줄짜리 블록"이 진짜 짧은 대사다 —
+  // 잇기 전에는 한 문장의 조각도 그렇게 보인다.
+  if (judgeFragments) {
+    const runs = collectFragmentRuns(staged, lang.lineMaxChars);
+    // 런이 없으면 모델을 부르지 않는다.
+    if (runs.length > 0) {
+      const groups = await judgeFragments(runs);
+      const result = applyFragmentJoins(
+        staged,
+        runs,
+        groups,
+        lang.lineMaxChars,
+      );
+      staged = result.content;
+      blocksJoined = result.joined;
+    }
+  }
+
   if (judgeDialogue) {
     const candidates = collectDialogueCandidates(staged, lang.lineMaxChars);
     // 후보가 없으면 모델을 부르지 않는다 — 상한 초과가 없을 때와 같은 약속이다.
@@ -253,6 +295,7 @@ export async function applySubtitleRules(
       linesSplit: Math.max(0, indices.length - unsplitLines),
       unsplitLines,
       blocksMerged,
+      blocksJoined,
     },
   };
 }

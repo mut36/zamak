@@ -281,6 +281,9 @@ node scripts/chunk-model.mjs N=1400 kmax=20     # 파라미터 오버라이드
 | `NEXT_PUBLIC_SITE_URL` | `https://zamak.app` (프로덕션) | OG·메타 `metadataBase`용 캐논 오리진. 없으면 프로덕션에서 `SITE.url`, 프리뷰는 Vercel URL |
 | `NEXT_PUBLIC_BLOCKS_PER_CREDIT` | 1200 | 번역권 1장이 커버하는 자막 블록 수. 상한이 아니라 **나눗셈의 분모**다 — 더 긴 파일은 거절되지 않고 올림해서 여러 장을 쓴다(`decisions.md` §6-22). 바꾸면 `supabase/migrations/0015_credit_by_lines.sql`의 리터럴 1200도 같이 고쳐야 한다 |
 | `POLISH_MAX_BLOCKS` | 3000 | `/api/polish`가 한 파일에서 받는 블록 수. 차감이 없는 경로라 위 분모와 별개다 (2026-08-26에 2000에서 올렸다) |
+| `NEXT_PUBLIC_DIALOGUE_MERGE_MAX_GAP_MS` / `_MAX_SPAN_MS` | 1000 / 5000 | 짧은 주고받음 합치기(`/polish` 토글)의 간격·합친 노출 상한 |
+| `NEXT_PUBLIC_FRAGMENT_RUN_MAX_GAP_MS` / `_MAX_BLOCKS` | 400 / 8 | 토막 자막 잇기(`/polish` 토글)의 런 판정 — 이보다 벌어지면 런을 끊고, 이보다 길면 잘라 새 런을 연다 |
+| `NEXT_PUBLIC_SUBTITLE_MAX_DURATION_MS` | 7000 | 이은 자막의 노출 상한. 넘는 묶음은 잇지 않는다(잘라 붙이지 않음) |
 | `JOB_VALIDITY_MINUTES` | 60 | 결제된 job이 유효한 시간 |
 | `TOSS_SECRET_KEY` / `NEXT_PUBLIC_TOSS_CLIENT_KEY` | — | **main에서는 안 읽습니다.** 결제 코드가 `feature/payments`에 있어, 그 브랜치에서 작업할 때만 필요합니다 |
 | `GLOSSARY_PROVIDER` | `openai` | 글로사리·존대관계 추출 프로바이더 (`openai`\|`gemini`). 기본은 OpenAI(GPT-5.6-luna, `decisions.md` §2-14). Gemini로 롤백하려면 `gemini` + 아래 `GLOSSARY_MODEL`을 Gemini 모델명으로 |

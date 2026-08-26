@@ -13,7 +13,7 @@ import {
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '1.7.1';
+export const APP_VERSION = '1.8.0';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
@@ -774,6 +774,36 @@ export const DIALOGUE_MERGE_MAX_GAP_MS = readPositiveIntEnv(
 export const DIALOGUE_MERGE_MAX_SPAN_MS = readPositiveIntEnv(
   process.env.NEXT_PUBLIC_DIALOGUE_MERGE_MAX_SPAN_MS,
   5000,
+);
+
+/**
+ * 토막 난 자동자막 잇기(`app/lib/joinFragments.ts`)의 세 게이트.
+ *
+ * RUN_MAX_GAP은 **런을 끊는 선**이다. 자동자막의 토막은 발화 도중에 잘리므로
+ * 사이가 거의 없고, 문장이 끝나면 숨을 쉬며 간격이 벌어진다. 0.4초는 대화
+ * 합치기의 1초보다 훨씬 좁다 — 저건 "대답이 이어졌나"를 보고 이건 "한 호흡이
+ * 계속되나"를 본다.
+ *
+ * RUN_MAX_BLOCKS는 한 번에 모델에게 보여줄 런의 길이 상한이다. 넘으면 거기서
+ * 끊고 다음 블록부터 새 런을 시작한다 — 프롬프트 한 덩어리가 무한정 길어지는
+ * 것을 막는 실무적 상한이지 의미상의 경계가 아니다.
+ *
+ * SUBTITLE_MAX_DURATION_MS는 합친 자막의 노출 상한(방송 자막 통상치 7초).
+ * 글자 수 천장(`lineMaxChars` × 2줄)과 함께 **거부권으로만** 쓴다: 모델이 정한
+ * 문장 묶음이 이걸 넘으면 그 묶음을 버리지, 상한에 맞춰 잘라 붙이지 않는다.
+ * 경계를 정하는 것은 문장이고 상한은 천장이라는 것이 이 기능의 설계다.
+ */
+export const FRAGMENT_RUN_MAX_GAP_MS = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_FRAGMENT_RUN_MAX_GAP_MS,
+  400,
+);
+export const FRAGMENT_RUN_MAX_BLOCKS = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_FRAGMENT_RUN_MAX_BLOCKS,
+  8,
+);
+export const SUBTITLE_MAX_DURATION_MS = readPositiveIntEnv(
+  process.env.NEXT_PUBLIC_SUBTITLE_MAX_DURATION_MS,
+  7000,
 );
 
 /**

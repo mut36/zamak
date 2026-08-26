@@ -177,6 +177,80 @@ describe('applySubtitleRules', () => {
   });
 
   // 읽기 속도 밴드(opt-in) — 이 화면에서 타임코드가 바뀔 수 있는 **유일한** 길.
+  describe('토막 자막 잇기', () => {
+    // 자동자막처럼 0.1초 간격으로 잘린 세 블록. block() 헬퍼는 1초 간격이라
+    // 여기서는 직접 쓴다.
+    const fragments = [
+      '1\n00:00:01,000 --> 00:00:01,400\n그래서',
+      '2\n00:00:01,500 --> 00:00:01,900\n내가',
+      '3\n00:00:02,000 --> 00:00:02,600\n거기 갔어',
+    ].join('\n\n');
+
+    it('판정자를 안 주면 블록 수가 절대 안 바뀐다', async () => {
+      const { content, summary } = await applySubtitleRules(
+        fragments,
+        ko,
+        never,
+      );
+
+      expect(parseSrtBlocks(content)).toHaveLength(3);
+      expect(summary.blocksJoined).toBe(0);
+    });
+
+    it('승인된 묶음을 한 줄로 잇는다', async () => {
+      const judge = vi.fn(async () => new Map([[1, [[1, 2, 3]]]]));
+
+      const { content, summary } = await applySubtitleRules(
+        fragments,
+        ko,
+        never,
+        null,
+        null,
+        judge,
+      );
+
+      expect(judge).toHaveBeenCalledOnce();
+      expect(summary.blocksJoined).toBe(2);
+      const blocks = parseSrtBlocks(content);
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]).toBe(
+        '1\n00:00:01,000 --> 00:00:02,600\n그래서 내가 거기 갔어',
+      );
+    });
+
+    it('런이 없으면 판정자를 부르지 않는다', async () => {
+      const judge = vi.fn(async () => new Map());
+      const srt = [block(1, '혼자 있는 자막'), block(3, '한참 뒤 자막')].join(
+        '\n\n',
+      );
+
+      await applySubtitleRules(srt, ko, never, null, null, judge);
+
+      expect(judge).not.toHaveBeenCalled();
+    });
+
+    it('이은 뒤에도 상한을 넘으면 줄바꿈 단계로 넘어간다', async () => {
+      // 잇기는 한 줄로 내보내고 줄바꿈은 다음 단계의 몫이라는 설계를 고정한다.
+      const wordy = [
+        '1\n00:00:01,000 --> 00:00:01,400\n스무 글자가 넘어가는',
+        '2\n00:00:01,500 --> 00:00:02,600\n아주 기다란 자막입니다',
+      ].join('\n\n');
+      const split = vi.fn(async (subset: string) => subset);
+
+      const { summary } = await applySubtitleRules(
+        wordy,
+        ko,
+        split,
+        null,
+        null,
+        async () => new Map([[1, [[1, 2]]]]),
+      );
+
+      expect(summary.blocksJoined).toBe(1);
+      expect(split).toHaveBeenCalledOnce();
+    });
+  });
+
   describe('짧은 주고받음 합치기', () => {
     const exchange = [block(1, '자극제?'), block(2, '그래')].join('\n\n');
 

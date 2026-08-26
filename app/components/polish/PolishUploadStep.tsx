@@ -17,6 +17,7 @@ interface PolishUploadStepProps {
     file: File,
     timing: PolishTimingOptions | null,
     mergeDialogue: boolean,
+    joinFragments: boolean,
   ) => void;
 }
 
@@ -49,9 +50,13 @@ const CPS_CHOICES = Array.from(
  * 토글이 꺼져 있으면 `onFile`에 `null`이 가고, 파이프라인은 타임코드를 읽지도
  * 쓰지도 않는다 — 이 화면이 원래 하던 약속 그대로다.
  *
- * 두 번째 토글(합치기)도 같은 모양이지만 파는 것이 다르다. 켜면 **블록 수가
- * 바뀌고**, 그 대가로 원본 포맷 다운로드를 잃는다. 그래서 켰을 때 설명이 아니라
- * **대가**를 먼저 보여준다(`c.merge.note`).
+ * 뒤의 두 토글(합치기·잇기)도 같은 모양이지만 파는 것이 다르다. 켜면 **블록
+ * 수가 바뀌고**, 그 대가로 원본 포맷 다운로드를 잃는다. 그래서 켰을 때 설명이
+ * 아니라 **대가**를 먼저 보여준다(`c.merge.note`·`c.join.note`).
+ *
+ * 둘을 한 토글로 묶지 않은 이유는 켤 상황이 다르기 때문이다 — 합치기는 방송
+ * 표기 규칙을 지키는 일이고, 잇기는 자동자막이라는 망가진 입력을 고치는 일이다.
+ * 묶으면 자동자막을 안 쓰는 사람이 필요 없는 판정 비용을 치른다.
  */
 export function PolishUploadStep({
   working,
@@ -63,6 +68,7 @@ export function PolishUploadStep({
   const [over, setOver] = useState(false);
   const [timingEnabled, setTimingEnabled] = useState(false);
   const [mergeEnabled, setMergeEnabled] = useState(false);
+  const [joinEnabled, setJoinEnabled] = useState(false);
   const [choice, setChoice] = useState<BandChoice>('movie');
   const [customTarget, setCustomTarget] = useState(SHAPES.movie.target);
   const [customHardMax, setCustomHardMax] = useState(SHAPES.movie.hardMax);
@@ -86,6 +92,7 @@ export function PolishUploadStep({
         ? { cpsTarget: band.target, cpsHardMax: band.hardMax }
         : null,
       mergeEnabled,
+      joinEnabled,
     );
   };
 
@@ -219,6 +226,33 @@ export function PolishUploadStep({
         {mergeEnabled && (
           <p className='animate-zslide text-fineprint text-tertiary mt-[14px]'>
             {c.merge.note}
+          </p>
+        )}
+      </div>
+
+      <div className='card p-[22px] mb-4'>
+        <button
+          type='button'
+          className='w-full flex items-center justify-between gap-3 text-left'
+          aria-pressed={joinEnabled}
+          onClick={() => setJoinEnabled((on) => !on)}
+        >
+          <span className='flex-1 min-w-0'>
+            <span className='block text-title-sm font-semibold tracking-[-0.01em]'>
+              {c.join.title}
+            </span>
+            <span className='block text-caption-sm text-tertiary mt-0.5'>
+              {c.join.desc}
+            </span>
+          </span>
+          <span className={`ztoggle${joinEnabled ? ' on' : ''}`} aria-hidden>
+            <span className='ztoggle-knob' />
+          </span>
+        </button>
+
+        {joinEnabled && (
+          <p className='animate-zslide text-fineprint text-tertiary mt-[14px]'>
+            {c.join.note}
           </p>
         )}
       </div>

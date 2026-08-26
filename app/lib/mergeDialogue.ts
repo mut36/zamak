@@ -3,6 +3,7 @@ import {
   parseBlockTiming,
   parseSrtBlocks,
   readBlockIndex,
+  renumberBlocks,
   visibleLength,
 } from './srt';
 import {
@@ -240,17 +241,5 @@ export function applyDialogueMerges(
 
   if (merged === 0) return { content: srt, merged: 0 };
 
-  // 번호를 못 읽는 블록은 첫 줄을 건드리지 않는다 — 거기 있는 것이 번호가
-  // 아닐 수 있고(깨진 블록), 덮어쓰면 있던 정보가 사라진다. 세는 것은 계속
-  // 세므로 정상 블록의 번호는 여전히 순서대로다.
-  let sequence = 0;
-  const renumbered = rebuilt.map((raw) => {
-    sequence++;
-    if (readBlockIndex(raw) === null) return raw;
-    const lines = raw.split('\n');
-    lines[0] = String(sequence);
-    return lines.join('\n');
-  });
-
-  return { content: renumbered.join('\n\n'), merged };
+  return { content: renumberBlocks(rebuilt).join('\n\n'), merged };
 }

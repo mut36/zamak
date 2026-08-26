@@ -23,6 +23,7 @@ function changeLines(summary: PolishSummary): string[] {
   const c = COPY.polish;
   const lines: string[] = [];
 
+  if (summary.blocksJoined > 0) lines.push(c.joinLine(summary.blocksJoined));
   if (summary.blocksMerged > 0) lines.push(c.mergeLine(summary.blocksMerged));
   if (summary.linesSplit > 0) lines.push(c.splitLine(summary.linesSplit));
   if (summary.linesJoined > 0) lines.push(c.joinedLine(summary.linesJoined));
@@ -101,7 +102,7 @@ export function PolishDoneStep({
           </button>
         ))}
 
-        {summary.blocksMerged > 0 && (
+        {(summary.blocksMerged > 0 || summary.blocksJoined > 0) && (
           <p className='text-fineprint text-tertiary text-center'>
             {COPY.polish.mergeSrtOnly}
           </p>

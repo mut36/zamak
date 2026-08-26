@@ -1,4 +1,5 @@
 import type { DialogueCandidate } from '../mergeDialogue';
+import type { FragmentRun } from '../joinFragments';
 
 export interface PolishResponse {
   content: string;
@@ -70,6 +71,43 @@ export async function requestDialogueMerge(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ task: 'merge', candidates, targetLang }),
+    signal,
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new PolishRefusedError(
+      typeof body.code === 'string' ? body.code : String(response.status),
+      typeof body.retry_after === 'number' ? body.retry_after : undefined,
+    );
+  }
+
+  return response.json();
+}
+
+export interface FragmentJoinResponse {
+  /** 런 번호 → 한 문장을 이루는 자리 묶음들. */
+  groups: Record<number, number[][]>;
+  totalChunks: number;
+  failedChunks: number;
+}
+
+/**
+ * 토막 자막의 런을 **한 번에** 보내 문장 경계를 받는다. 요청을 하나로 묶는
+ * 이유는 위 둘과 같다 — 레이트 리밋이 요청 단위다.
+ *
+ * 합치기와 잇기를 각각 켜면 요청은 두 번이다. 한 요청에 묶지 않은 것은 묻는
+ * 것이 다르기 때문이고(프롬프트가 다르다), 대개 둘 중 하나만 켜기 때문이다.
+ */
+export async function requestFragmentJoin(
+  runs: readonly FragmentRun[],
+  targetLang: string,
+  signal?: AbortSignal,
+): Promise<FragmentJoinResponse> {
+  const response = await fetch('/api/polish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task: 'join', runs, targetLang }),
     signal,
   });
 

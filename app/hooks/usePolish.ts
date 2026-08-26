@@ -13,6 +13,7 @@ import { resolveTargetLang } from '../config/languages';
 import { POLISH_MAX_BLOCKS } from '../config/constants';
 import {
   requestDialogueMerge,
+  requestFragmentJoin,
   requestLineSplit,
   PolishRefusedError,
 } from '../lib/client/polishApi';
@@ -44,13 +45,15 @@ export function usePolish() {
     setDownloads([]);
   }, []);
 
-  // `timing`이 null이면 타임코드를 아예 안 건드리고, `mergeDialogue`가 false면
-  // 블록 수를 안 바꾼다 — 둘 다 업로드 화면의 기본값이자 이 화면의 약속이다.
+  // `timing`이 null이면 타임코드를 아예 안 건드리고, 블록 수를 바꾸는 토글
+  // 둘(`mergeDialogue`·`joinFragments`)이 다 false면 자막 개수도 그대로다 —
+  // 전부 업로드 화면의 기본값이자 이 화면의 약속이다.
   const handleFile = useCallback(
     async (
       file: File,
       timing: PolishTimingOptions | null = null,
       mergeDialogue = false,
+      joinFragments = false,
     ) => {
       setStage('working');
       setError('');
@@ -95,6 +98,18 @@ export function usePolish() {
                 return response.approved;
               }
             : null,
+          joinFragments
+            ? async (runs) => {
+                const response = await requestFragmentJoin(runs, TARGET_LANG);
+                // JSON은 키를 문자열로 돌려준다 — 런 번호로 되돌린다.
+                return new Map(
+                  Object.entries(response.groups).map(([id, groups]) => [
+                    Number(id),
+                    groups,
+                  ]),
+                );
+              }
+            : null,
         );
 
         setSummary(outcome.summary);
@@ -104,7 +119,8 @@ export function usePolish() {
             file.name,
             TARGET_LANG,
             outcome.content,
-            outcome.summary.blocksMerged > 0,
+            outcome.summary.blocksMerged > 0 ||
+              outcome.summary.blocksJoined > 0,
           ),
         );
         setStage('done');

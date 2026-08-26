@@ -44,6 +44,7 @@ const POLISH_SUMMARY: PolishSummary = {
   unsplitLines: 1,
   timingAdjusted: 21,
   blocksMerged: 8,
+  blocksJoined: 14,
 };
 
 const POLISH_DOWNLOADS: DownloadOption[] = [
