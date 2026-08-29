@@ -388,7 +388,11 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   - 메타데이터가 프롬프트에 실리는 형식 → `translationContent.ts` (`formatMovieInfo`)
   - 도착어별 규칙 로딩 → `translationContent.ts` (`requireTargetLang`,
     `buildTranslationRules`), `loader.ts` (`loadTranslationRules`)
-  - 줄 길이 상한 → `languages.ts`의 `lineMaxChars`(ko 25 / ja 20 / zh 18 / 라틴계 42).
+  - 줄 길이 상한 → `languages.ts`의 `lineMaxChars`(ko·zh 18 / ja 20 / 라틴계 42).
+    이 상한은 **줄을 나누는 기준일 뿐 뜻을 줄이는 기준이 아니다** — 나누고도 넘치는
+    긴 줄은 그대로 나간다(`decisions.md` §9.9). 코드도 자르지 않는다:
+    `enforceTextRules`는 3줄→2줄 병합, 예산 안이면 1줄로 접기, 화자 대시·말미
+    문장부호 정리만 하고 글자 수 초과를 이유로 손대는 경로가 없다.
     **도착어별이고 콘텐츠 프로필과 무관하다** — 프로필은 노출 시간만 바꾼다
     (`decisions.md` §1-19). 그래서 프롬프트 조합은 프로필을 아예 받지 않는다
   - 이름 표기·말투가 청크마다 흔들림 → §2-C-new(연출 메모). 오용 위험이 있는
