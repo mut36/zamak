@@ -95,12 +95,15 @@ describe('collectDialogueCandidates', () => {
 });
 
 describe('readMergeVerdicts', () => {
-  it('Y만 걷고 모르는 번호와 침묵은 버린다', () => {
-    const approved = readMergeVerdicts(
-      '[1] Y\n[2] N\n[9] Y\n잡소리',
+  it('S와 D를 형태로 읽고 모르는 번호와 침묵은 버린다', () => {
+    const decisions = readMergeVerdicts(
+      '[1] S\n[2] D\n[3] N\n[9] S\n잡소리',
       new Set([1, 2, 3]),
     );
-    expect([...approved]).toEqual([1]);
+    expect([...decisions]).toEqual([
+      [1, 'same'],
+      [2, 'different'],
+    ]);
   });
 });
 
@@ -116,7 +119,7 @@ describe('applyDialogueMerges', () => {
     const { content, merged } = applyDialogueMerges(
       srt,
       candidates,
-      new Set([1]),
+      new Map([[1, 'different']]),
     );
 
     expect(merged).toBe(1);
@@ -129,8 +132,21 @@ describe('applyDialogueMerges', () => {
     expect(blocks[1]).toBe('2\n00:00:05,000 --> 00:00:06,000\n가자');
   });
 
+  it('같은 화자의 연속 발화는 대시 없이 한 줄로 합친다', () => {
+    const { content, merged } = applyDialogueMerges(
+      srt,
+      candidates,
+      new Map([[1, 'same']]),
+    );
+
+    expect(merged).toBe(1);
+    expect(parseSrtBlocks(content)[0]).toBe(
+      '1\n00:00:01,000 --> 00:00:03,000\n자극제? 그래',
+    );
+  });
+
   it('승인이 없으면 원본을 글자 그대로 돌려준다', () => {
-    const result = applyDialogueMerges(srt, candidates, new Set());
+    const result = applyDialogueMerges(srt, candidates, new Map());
     expect(result).toEqual({ content: srt, merged: 0 });
   });
 });

@@ -264,7 +264,7 @@ describe('applySubtitleRules', () => {
     });
 
     it('승인된 쌍을 대시 두 줄 한 블록으로 합친다', async () => {
-      const judge = vi.fn(async () => [1]);
+      const judge = vi.fn(async () => new Map([[1, 'different' as const]]));
 
       const { content, summary } = await applySubtitleRules(
         exchange,
@@ -289,7 +289,7 @@ describe('applySubtitleRules', () => {
         ko,
         never,
         null,
-        async () => [],
+        async () => new Map(),
       );
 
       expect(parseSrtBlocks(content)).toHaveLength(2);
@@ -299,7 +299,7 @@ describe('applySubtitleRules', () => {
     it('후보가 없으면 판정자를 부르지 않는다', async () => {
       // 상한 초과가 없을 때 모델을 안 부르는 것과 같은 약속 — 후보가 0건인
       // 파일에서 이 토글은 비용이 0이다.
-      const judge = vi.fn(async () => []);
+      const judge = vi.fn(async () => new Map());
       const srt = [
         block(1, '자극제?'),
         block(3, '한참 뒤에 나오는 대사'),
@@ -316,7 +316,7 @@ describe('applySubtitleRules', () => {
         ko,
         never,
         null,
-        async () => [1],
+        async () => new Map([[1, 'different' as const]]),
       );
 
       expect(content.split('\n')).toHaveLength(4);

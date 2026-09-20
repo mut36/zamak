@@ -6,13 +6,14 @@ import {
   formatCandidatesForModel,
   readMergeVerdicts,
   type DialogueCandidate,
+  type DialogueMergeMode,
 } from '../mergeDialogue';
 import { judgeInChunks } from './judgePool';
 import type { PolishCallMeasurement } from './polishService';
 
 export interface DialogueMergeServiceResult {
-  /** 합치라고 판정된 후보 번호. */
-  approved: number[];
+  /** 후보 번호 → 같은 화자 한 줄 / 다른 화자 대시 두 줄. */
+  decisions: Record<number, DialogueMergeMode>;
   totalChunks: number;
   failedChunks: number;
 }
@@ -33,7 +34,7 @@ export async function judgeDialogueCandidates(
   onCall?: (measurement: PolishCallMeasurement) => void,
 ): Promise<DialogueMergeServiceResult> {
   if (candidates.length === 0) {
-    return { approved: [], totalChunks: 0, failedChunks: 0 };
+    return { decisions: {}, totalChunks: 0, failedChunks: 0 };
   }
 
   const lang = getPolishTargetLang(targetLanguage);
@@ -43,16 +44,21 @@ export async function judgeDialogueCandidates(
 
   const { verdicts, totalChunks, failedChunks } = await judgeInChunks<
     DialogueCandidate,
-    number[]
+    Record<number, DialogueMergeMode>
   >({
     items: candidates,
     systemInstruction: await loadDialogueMergeRules(lang.code),
     format: formatCandidatesForModel,
-    parse: (text, chunk) => [
-      ...readMergeVerdicts(text, new Set(chunk.map((c) => c.id))),
-    ],
+    parse: (text, chunk) =>
+      Object.fromEntries(
+        readMergeVerdicts(text, new Set(chunk.map((c) => c.id))),
+      ),
     onCall,
   });
 
-  return { approved: verdicts.flat(), totalChunks, failedChunks };
+  return {
+    decisions: Object.assign({}, ...verdicts),
+    totalChunks,
+    failedChunks,
+  };
 }

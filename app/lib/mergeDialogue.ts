@@ -12,7 +12,7 @@ import {
 } from '../config/constants';
 
 /**
- * 짧은 주고받음을 한 블록으로 합치기 — **블록 수를 바꾸는 유일한 경로**.
+ * 연달아 나오는 짧은 발화를 한 블록으로 합치기.
  *
  * 기준 문서 §I.6은 한 자막에 두 화자가 오면 `- `로 갈라 한 줄에 한 화자를 두라고
  * 하고, **각 줄이 완결 문장**이며 앞뒤 자막으로 이어지지 않아야 한다고 못박는다.
@@ -43,6 +43,8 @@ export interface DialogueCandidate {
   /** 뒤 블록의 대사 한 줄. */
   second: string;
 }
+
+export type DialogueMergeMode = 'same' | 'different';
 
 /** 대사가 아닌 줄의 여는 글자 — 가사·화면 글자·설명·인용. */
 const NON_DIALOGUE_OPENER = /^[♪♫[(“"'…-]/;
@@ -149,8 +151,8 @@ export function formatCandidatesForModel(
     .join('\n\n');
 }
 
-/** `[3] Y` 한 줄. 뒤에 사족이 붙어도 앞의 판정만 읽는다. */
-const VERDICT_LINE = /^\[(\d+)[^\]]*\]\s*([YyNn])/;
+/** `[3] S|D|N` 한 줄. 뒤에 사족이 붙어도 앞의 판정만 읽는다. */
+const VERDICT_LINE = /^\[(\d+)[^\]]*\]\s*([SsDdNn])/;
 
 /**
  * 모델의 판정에서 **합치라고 한 후보 번호만** 걷는다.
@@ -161,16 +163,18 @@ const VERDICT_LINE = /^\[(\d+)[^\]]*\]\s*([YyNn])/;
 export function readMergeVerdicts(
   modelOutput: string,
   expected: ReadonlySet<number>,
-): Set<number> {
-  const approved = new Set<number>();
+): Map<number, DialogueMergeMode> {
+  const decisions = new Map<number, DialogueMergeMode>();
   for (const line of modelOutput.split('\n')) {
     const match = VERDICT_LINE.exec(line.trim());
     if (!match) continue;
     const id = Number(match[1]);
     if (!expected.has(id)) continue;
-    if (match[2].toUpperCase() === 'Y') approved.add(id);
+    const verdict = match[2].toUpperCase();
+    if (verdict === 'S') decisions.set(id, 'same');
+    if (verdict === 'D') decisions.set(id, 'different');
   }
-  return approved;
+  return decisions;
 }
 
 export interface DialogueMergeResult {
@@ -183,9 +187,8 @@ export interface DialogueMergeResult {
  * 승인된 쌍을 실제로 합친다.
  *
  * 타임코드는 **코드가 만든다**(불변식 2): 앞 블록의 시작부터 뒤 블록의 끝까지.
- * 본문은 `- 앞` / `- 뒤` 두 줄이고, 대시는 여기서 붙인다 — `enforceTextRules`의
- * 짝 채우기에 기대지 않는다. 이 함수가 만드는 블록은 처음부터 완성형이어야
- * 뒤 단계(2줄 접기 예외 등)가 화자 줄로 알아본다.
+ * 같은 화자는 공백으로 이어 한 줄, 다른 화자는 `- 앞` / `- 뒤` 두 줄로 만든다.
+ * 대시는 여기서 붙인다 — `enforceTextRules`의 짝 채우기에 기대지 않는다.
  *
  * 병합이 한 건이라도 있으면 **전체를 1부터 다시 번호 매긴다** — 번호가 비면
  * 그 SRT를 읽는 다른 도구가 블록을 잃는다. 한 건도 없으면 원본을 그대로 준다.
@@ -193,12 +196,16 @@ export interface DialogueMergeResult {
 export function applyDialogueMerges(
   srt: string,
   candidates: readonly DialogueCandidate[],
-  approvedIds: ReadonlySet<number>,
+  decisions: ReadonlyMap<number, DialogueMergeMode>,
 ): DialogueMergeResult {
-  const byFirstIndex = new Map<number, DialogueCandidate>();
+  const byFirstIndex = new Map<
+    number,
+    { candidate: DialogueCandidate; mode: DialogueMergeMode }
+  >();
   for (const candidate of candidates) {
-    if (approvedIds.has(candidate.id)) {
-      byFirstIndex.set(candidate.firstIndex, candidate);
+    const mode = decisions.get(candidate.id);
+    if (mode) {
+      byFirstIndex.set(candidate.firstIndex, { candidate, mode });
     }
   }
   if (byFirstIndex.size === 0) return { content: srt, merged: 0 };
@@ -210,7 +217,8 @@ export function applyDialogueMerges(
   for (let i = 0; i < blocks.length; i++) {
     const raw = blocks[i];
     const index = readBlockIndex(raw);
-    const candidate = index === null ? undefined : byFirstIndex.get(index);
+    const decision = index === null ? undefined : byFirstIndex.get(index);
+    const candidate = decision?.candidate;
     const next = blocks[i + 1];
 
     // 후보가 가리키는 뒤 블록이 실제로 바로 다음에 있는지 다시 확인한다 —
@@ -227,12 +235,15 @@ export function applyDialogueMerges(
       continue;
     }
 
+    const body =
+      decision.mode === 'same'
+        ? [`${candidate.first} ${candidate.second}`]
+        : [`- ${candidate.first}`, `- ${candidate.second}`];
     rebuilt.push(
       [
         '0', // 아래에서 다시 매긴다.
         formatTimingLine({ startMs: start.startMs, endMs: end.endMs }),
-        `- ${candidate.first}`,
-        `- ${candidate.second}`,
+        ...body,
       ].join('\n'),
     );
     merged++;

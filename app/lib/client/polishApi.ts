@@ -1,4 +1,4 @@
-import type { DialogueCandidate } from '../mergeDialogue';
+import type { DialogueCandidate, DialogueMergeMode } from '../mergeDialogue';
 import type { FragmentRun } from '../joinFragments';
 
 export interface PolishResponse {
@@ -51,8 +51,8 @@ export async function requestLineSplit(
 }
 
 export interface DialogueMergeResponse {
-  /** 합치라고 판정된 후보 번호. */
-  approved: number[];
+  /** 후보 번호 → 같은 화자 한 줄 / 다른 화자 대시 두 줄. */
+  decisions: Record<number, DialogueMergeMode>;
   totalChunks: number;
   failedChunks: number;
 }

@@ -111,7 +111,12 @@ export function usePolish() {
           mergeDialogue
             ? async (candidates) => {
                 const response = await requestDialogueMerge(candidates, code);
-                return response.approved;
+                return new Map(
+                  Object.entries(response.decisions).map(([id, mode]) => [
+                    Number(id),
+                    mode,
+                  ]),
+                );
               }
             : null,
           joinFragments

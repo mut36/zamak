@@ -11,6 +11,7 @@ import {
   applyDialogueMerges,
   collectDialogueCandidates,
   type DialogueCandidate,
+  type DialogueMergeMode,
 } from './mergeDialogue';
 import {
   applyFragmentJoins,
@@ -149,7 +150,7 @@ export interface PolishSummary extends TextRuleReport {
  */
 export type DialogueJudge = (
   candidates: readonly DialogueCandidate[],
-) => Promise<readonly number[]>;
+) => Promise<ReadonlyMap<number, DialogueMergeMode>>;
 
 /**
  * 토막 자막 잇기의 판정자. 런을 받아 **런 번호 → 자리 묶음들**을 돌려준다.
@@ -242,11 +243,11 @@ export async function applySubtitleRules(
     const candidates = collectDialogueCandidates(staged, lang.lineMaxChars);
     // 후보가 없으면 모델을 부르지 않는다 — 상한 초과가 없을 때와 같은 약속이다.
     if (candidates.length > 0) {
-      const approved = await judgeDialogue(candidates);
+      const decisions = await judgeDialogue(candidates);
       const result = applyDialogueMerges(
         staged,
         candidates,
-        new Set(approved),
+        decisions,
       );
       staged = result.content;
       blocksMerged = result.merged;
