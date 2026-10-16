@@ -10,7 +10,7 @@ SRT·VTT·SMI·ASS 자막을 Gemini로 번역하는 웹 애플리케이션입니
 
 ## Features
 
-- **AI 자막 번역** — 빠른번역(Gemini 3.6 Flash)과 고급번역(Gemini 3.1 Pro Preview) 중 선택
+- **AI 자막 번역** — 빠른번역(Gemini 3.8 Flash)과 고급번역(Gemini 3.1 Pro Preview) 중 선택
 - **키 입력 없이 바로 번역** — 모든 요청이 서버 키(`GOOGLE_GENAI_API_KEY`)로 동작합니다. 사용자가 API 키를 다루는 화면은 없습니다
 - **Google 로그인 + 크레딧** — 베타 가입 시 번역권 3편 자동 지급. 모델을 호출하는 모든 라우트가 로그인을 요구하고, 크레딧은 파일 단위로 차감됩니다
 - **번역권 충전** — 베타에는 없습니다. 토스페이먼츠 연동은 완성돼 있지만 가맹점 심사가 남아서 `feature/payments` 브랜치에 보관 중입니다 ([결제](#결제-featurepayments) 참조)
@@ -252,7 +252,7 @@ NEXT_PUBLIC_CHUNK_SIZE=100 npm run harness -- file=samples/subtitles/full-movie.
 
 | 모델 | 용도 | RPM | TPM | RPD |
 |---|---|---|---|---|
-| `gemini-3.6-flash` | 빠른번역 | 2,000 | 3,000,000 | 100,000 |
+| `gemini-3.8-flash` | 빠른번역 | ? | ? | ? |
 | `gemini-3.5-flash-lite` | analyze/enrich/summarize | 10,000 | 10,000,000 | 350,000 |
 | `gemini-3.1-pro-preview` | 고급번역 | 1,000 | 5,000,000 | 50,000 |
 

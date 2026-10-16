@@ -13,7 +13,7 @@ import {
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '1.9.3';
+export const APP_VERSION = '1.9.4';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
@@ -429,7 +429,7 @@ export const AUX_MODEL = process.env.AUX_MODEL || 'gemini-3.5-flash-lite';
  * Translation models offered in the UI (빠른번역 / 고급번역). Kept as an
  * array so request validation still works and adding a model later is one line.
  */
-export const FLASH_MODEL = 'gemini-3.6-flash' as const;
+export const FLASH_MODEL = 'gemini-3.8-flash' as const;
 export const PRO_MODEL = 'gemini-3.1-pro-preview' as const;
 
 export const ALLOWED_MODELS = [FLASH_MODEL, PRO_MODEL] as const;

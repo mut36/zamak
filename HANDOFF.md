@@ -192,7 +192,7 @@ main = 9936527 (feat/landing 미머지)
 | THINKING_LEVEL — flash | **LOW** | 실측 `thoughts=0`. lean 프롬프트가 HIGH와 같은 정확도를 5.1배 싸게 낸다 (`token-economics.md` §3) |
 | PRO_THINKING_LEVEL | **HIGH** | 대표 전문 검수 결과 LOW·MEDIUM은 품질 차이 없고 HIGH가 압도적. 장편 300초 타임아웃 통과 확인(최장청크 141.5s, 여유 2.1배 — `decisions.md` §2-16) |
 | 크레딧 상한 | 2,000블록 | `MAX_BLOCKS_PER_CREDIT`. 업로드 시점(`useWizard.ts`)과 서버(`api/translation/begin`) 두 곳에서 막는다 |
-| 모델 | 빠른번역 `gemini-3.6-flash` / 고급번역 `gemini-3.1-pro-preview` | 보조 라우트는 `gemini-3.5-flash-lite`, 글로사리는 `gpt-5.6-luna`(`decisions.md` §2-14) |
+| 모델 | 빠른번역 `gemini-3.8-flash` / 고급번역 `gemini-3.1-pro-preview` | 보조 라우트는 `gemini-3.5-flash-lite`, 글로사리는 `gpt-5.6-luna`(`decisions.md` §2-14) |
 | 편당 실측 원가 (상한 2,000블록) | flash **~460원** / Pro **~2,670원** | `tuning/cost-per-block.md`. 판매가와 직접 비교 금지 — VAT·PG 수수료 뺀 실수취액으로 계산할 것(`decisions.md` §1-17) |
 | Gemini 등급 | **유료 Tier 2** (2026-07-26 승급) | flash 2,000 RPM / 3M TPM / 100K RPD. pro 1,000 / 5M / 50K, flash-lite 10,000 / 10M / 350K (`gemini-limits.md` §2-1) |
 

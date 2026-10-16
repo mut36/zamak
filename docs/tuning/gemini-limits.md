@@ -3,7 +3,7 @@
 청크 크기(B)와 동시성(K)을 계산으로 정하기 위한 입력값. **추측 금지 — 공식 문서에서 조회한 값만.**
 빈칸은 비워두고, 문서에 없거나 애매하면 `?`와 함께 메모를 남길 것.
 
-- 대상 모델(빠른번역): `gemini-3.6-flash` — `app/config/constants.ts`의 `FLASH_MODEL`
+- 대상 모델(빠른번역): `gemini-3.8-flash` — `app/config/constants.ts`의 `FLASH_MODEL` (2026-10-16 교체. 아래 flash 수치는 전부 3.6 기준 — 3.8 재조회 전)
 - 대상 모델(고급번역): `gemini-3.1-pro-preview` — `PRO_MODEL` (2026-07-25 추가)
 - 대상 모델(보조): `gemini-3.5-flash-lite` — `AUX_MODEL` (analyze/enrich/summarize)
 - 조회일: 2026-07-20 (§1~6, 대표 조회) / 2026-07-21 (§7-1 인프라, §6 thinking 실측) / 2026-07-25 (§1·§4 세 모델 갱신, 대표 조회) / 2026-07-26 (§2 rate limit — 유료 **Tier 2** 승급 후 세 모델 재조회) / 2026-08-03 (§2-1 flash 재조회 — AI Studio 표 스크린샷, 아래 각주 참고)

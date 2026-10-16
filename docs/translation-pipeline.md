@@ -410,7 +410,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
   설정 `app/config/constants.ts`
 - **품질 레버**:
   - 번역 모델 → UI에서 **고급번역** (`PRO_MODEL` = `gemini-3.1-pro-preview`) /
-    **빠른번역** (`FLASH_MODEL` = `gemini-3.6-flash`). 허용 목록은
+    **빠른번역** (`FLASH_MODEL` = `gemini-3.8-flash`, 2026-10-16 3.6에서 교체). 허용 목록은
     `constants.ts` `ALLOWED_MODELS`. 하니스 기본은 `TRANSLATION_MODEL`(env
     `NEXT_PUBLIC_TRANSLATION_MODEL`, 기본 flash)
   - thinking 수준 → `thinkingLevelForModel(model)`: flash는
