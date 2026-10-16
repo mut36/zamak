@@ -189,7 +189,7 @@ main = 9936527 (feat/landing 미머지)
 | B — flash (`SERVER_CHUNK_SIZE`) | **100** | 재번호 드리프트 + 마커 오염(2026-07-25 하네스) 경험적 안전선. 계산상 최적 아님 (`chunk-size-model.md` §5·§8, `decisions.md` §2-3-3) |
 | B — Pro (`PRO_CHUNK_SIZE`) | **250** | HIGH thinking 비용 절감. B≈120에서 113 tok/블록 → 250에서 40으로 2.4배 절감. `chunkSizeForModel(model)`이 분기 (`decisions.md` §2-15) |
 | K (동시성) | **16** | B=200까진 과분했지만 B=100에서 크레딧 상한 파일은 `⌈2000/100⌉=20 > 16` — **2웨이브**. 1웨이브 규칙은 이미 폐기됨(§4-2), 회귀 아님. Pro는 B=250이라 8청크로 1웨이브 |
-| THINKING_LEVEL — flash | **LOW** | 실측 `thoughts=0`. lean 프롬프트가 HIGH와 같은 정확도를 5.1배 싸게 낸다 (`token-economics.md` §3) |
+| THINKING_LEVEL — flash | **MEDIUM** (2026-10-16~, 이전 LOW) | 실측 `thoughts=0`. lean 프롬프트가 HIGH와 같은 정확도를 5.1배 싸게 낸다 (`token-economics.md` §3) |
 | PRO_THINKING_LEVEL | **HIGH** | 대표 전문 검수 결과 LOW·MEDIUM은 품질 차이 없고 HIGH가 압도적. 장편 300초 타임아웃 통과 확인(최장청크 141.5s, 여유 2.1배 — `decisions.md` §2-16) |
 | 크레딧 상한 | 2,000블록 | `MAX_BLOCKS_PER_CREDIT`. 업로드 시점(`useWizard.ts`)과 서버(`api/translation/begin`) 두 곳에서 막는다 |
 | 모델 | 빠른번역 `gemini-3.8-flash` / 고급번역 `gemini-3.1-pro-preview` | 보조 라우트는 `gemini-3.5-flash-lite`, 글로사리는 `gpt-5.6-luna`(`decisions.md` §2-14) |

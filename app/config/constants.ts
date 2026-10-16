@@ -13,7 +13,7 @@ import {
  * one hardcoded copy sits next to every other constant — a test pins it to
  * package.json.
  */
-export const APP_VERSION = '1.9.4';
+export const APP_VERSION = '1.9.5';
 
 /**
  * How long a finished translation stays downloadable. The beta ships without
@@ -468,7 +468,9 @@ function readThinkingLevelEnv(
  * spends them once per request, so this looked like our largest cost lever.
  * Measurement said otherwise: on real 200-block chunks both MINIMAL and LOW
  * report thoughts=0 (docs/tuning/gemini-limits.md §6). LOW therefore costs what
- * MINIMAL costs while deliberating more, which is why it is the default.
+ * MINIMAL costs while deliberating more, which was the default until
+ * 2026-10-16. Raised to MEDIUM with the gemini-3.8-flash swap by founder call
+ * (docs/decisions.md §2-4) — on 3.6 MEDIUM cost ~3x LOW; 3.8 is unmeasured.
  *
  * The model does not allow disabling thinking outright, and thinkingBudget: 0
  * is silently ignored — thinkingLevel is the knob it honours.
@@ -478,7 +480,7 @@ function readThinkingLevelEnv(
  */
 export const THINKING_LEVEL: ThinkingLevelName = readThinkingLevelEnv(
   'THINKING_LEVEL',
-  'LOW',
+  'MEDIUM',
 );
 
 /**

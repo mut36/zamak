@@ -414,7 +414,7 @@ Netflix 한국어 Timed Text 규칙(참조 번역)과 ZAMAK 준수/갭 대조는
     `constants.ts` `ALLOWED_MODELS`. 하니스 기본은 `TRANSLATION_MODEL`(env
     `NEXT_PUBLIC_TRANSLATION_MODEL`, 기본 flash)
   - thinking 수준 → `thinkingLevelForModel(model)`: flash는
-    `THINKING_LEVEL`(기본 LOW), Pro는 `PRO_THINKING_LEVEL`(기본 **HIGH**,
+    `THINKING_LEVEL`(기본 **MEDIUM**, 2026-10-16 LOW에서 상향 — `docs/decisions.md` §2-4), Pro는 `PRO_THINKING_LEVEL`(기본 **HIGH**,
     0.18.0 — `docs/decisions.md` §2-15, 체크리스트 `docs/TODO.md`). 둘 다 env,
     변경 시 dev 서버 재시작. 로그에 `thinking=`로 찍힘. ⚠️ flash와 달리 pro는
     MINIMAL을 설정할 수 없고(API가 거부) LOW도 `thoughts=0`이 아니다 —
