@@ -20,6 +20,9 @@
 -- docs/tuning/cost-per-block.md의 표를 그대로 옮겼다. 단가가 바뀌면 아래
 -- rates를 **다섯 곳 모두** 고친다. 모르는 모델은 단가가 null로 남고 `단가없음`
 -- 열에 호출 수가 찍힌다 — 조용히 0원으로 세지 않는다.
+-- 단가가 기간에 따라 바뀌면 [시작, 끝) 행을 나눈다(KST 날짜 기준). 기간이
+-- 겹치면 행이 두 번 세지니 겹치지 않게 할 것. 예: gemini-3.8-flash는
+-- 2026-12-31까지 할인가, 2027-01-01부터 정가.
 -- thinking은 출력 단가로 과금된다(cost-per-block.md §비용식).
 -- 1 USD = 1,688원은 환율이 아니라 실청구액 역산치다.
 --
@@ -48,11 +51,13 @@
 with 조건 as (
   select '2026-08-01'::date as 월
 ),
-rates(model, in_per_1m, out_per_1m) as (
+rates(model, 시작, 끝, in_per_1m, out_per_1m) as (
   values
-    ('gemini-3.6-flash',        1.50, 7.50),   -- 빠른번역
-    ('gemini-3.1-pro-preview',  2.00, 12.00),  -- 고급번역
-    ('gpt-5.6-luna',            1.00, 6.00)    -- 연출 메모 (기본 provider)
+    ('gemini-3.8-flash',        date '-infinity',  date '2027-01-01', 0.75, 3.75),   -- 빠른번역 (2026년 말까지 할인가)
+    ('gemini-3.8-flash',        date '2027-01-01', date 'infinity',   1.50, 7.50),
+    ('gemini-3.6-flash',        date '-infinity',  date 'infinity',   1.50, 7.50),   -- 2026-10-16 이전 빠른번역
+    ('gemini-3.1-pro-preview',  date '-infinity',  date 'infinity',   2.00, 12.00),  -- 고급번역
+    ('gpt-5.6-luna',            date '-infinity',  date 'infinity',   1.00, 6.00)    -- 연출 메모 (기본 provider)
 ),
 행 as (
   select
@@ -69,6 +74,8 @@ rates(model, in_per_1m, out_per_1m) as (
   from public.translation_chunk_usage u
   join 조건 c on true
   left join rates r on r.model = u.model
+  and (u.created_at at time zone 'Asia/Seoul')::date >= r.시작
+  and (u.created_at at time zone 'Asia/Seoul')::date <  r.끝
 )
 select
   au.email                                                        as 계정,
@@ -91,11 +98,13 @@ order by 월_달러 desc, 누적_달러 desc;
 
 -- ═══════════════════════════════════ 1. 누적 — 지금까지 전부 ════════════════
 
-with rates(model, in_per_1m, out_per_1m) as (
+with rates(model, 시작, 끝, in_per_1m, out_per_1m) as (
   values
-    ('gemini-3.6-flash',        1.50, 7.50),   -- 빠른번역
-    ('gemini-3.1-pro-preview',  2.00, 12.00),  -- 고급번역
-    ('gpt-5.6-luna',            1.00, 6.00)    -- 연출 메모 (기본 provider)
+    ('gemini-3.8-flash',        date '-infinity',  date '2027-01-01', 0.75, 3.75),   -- 빠른번역 (2026년 말까지 할인가)
+    ('gemini-3.8-flash',        date '2027-01-01', date 'infinity',   1.50, 7.50),
+    ('gemini-3.6-flash',        date '-infinity',  date 'infinity',   1.50, 7.50),   -- 2026-10-16 이전 빠른번역
+    ('gemini-3.1-pro-preview',  date '-infinity',  date 'infinity',   2.00, 12.00),  -- 고급번역
+    ('gpt-5.6-luna',            date '-infinity',  date 'infinity',   1.00, 6.00)    -- 연출 메모 (기본 provider)
 )
 select
   min(u.created_at at time zone 'Asia/Seoul')::date  as 첫호출,
@@ -111,15 +120,19 @@ select
   round(sum((u.prompt_tokens * r.in_per_1m
     + (u.thoughts_tokens + u.output_tokens) * r.out_per_1m) / 1000000.0)::numeric * 1688, 0) as 원
 from public.translation_chunk_usage u
-left join rates r on r.model = u.model;
+left join rates r on r.model = u.model
+  and (u.created_at at time zone 'Asia/Seoul')::date >= r.시작
+  and (u.created_at at time zone 'Asia/Seoul')::date <  r.끝;
 
 
 -- 1-b. 누적을 모델·단계별로. "메모와 규칙 적용이 전체의 몇 %인가"는 여기서만 보인다.
-with rates(model, in_per_1m, out_per_1m) as (
+with rates(model, 시작, 끝, in_per_1m, out_per_1m) as (
   values
-    ('gemini-3.6-flash',        1.50, 7.50),
-    ('gemini-3.1-pro-preview',  2.00, 12.00),
-    ('gpt-5.6-luna',            1.00, 6.00)
+    ('gemini-3.8-flash',        date '-infinity',  date '2027-01-01', 0.75, 3.75),   -- 2026년 말까지 할인가
+    ('gemini-3.8-flash',        date '2027-01-01', date 'infinity',   1.50, 7.50),
+    ('gemini-3.6-flash',        date '-infinity',  date 'infinity',   1.50, 7.50),   -- 2026-10-16 이전 빠른번역
+    ('gemini-3.1-pro-preview',  date '-infinity',  date 'infinity',   2.00, 12.00),
+    ('gpt-5.6-luna',            date '-infinity',  date 'infinity',   1.00, 6.00)
 )
 select
   u.model                                            as 모델,
@@ -134,6 +147,8 @@ select
     + (u.thoughts_tokens + u.output_tokens) * r.out_per_1m) / 1000000.0)::numeric * 1688, 0) as 원
 from public.translation_chunk_usage u
 left join rates r on r.model = u.model
+  and (u.created_at at time zone 'Asia/Seoul')::date >= r.시작
+  and (u.created_at at time zone 'Asia/Seoul')::date <  r.끝
 group by 1, 2
 order by 달러 desc nulls last;
 
@@ -143,11 +158,13 @@ order by 달러 desc nulls last;
 -- 한 달에 한 줄, 최근 달이 위. 누적과 달리 여기서만 "이번 달이 지난 달보다
 -- 많은가"가 보인다.
 
-with rates(model, in_per_1m, out_per_1m) as (
+with rates(model, 시작, 끝, in_per_1m, out_per_1m) as (
   values
-    ('gemini-3.6-flash',        1.50, 7.50),
-    ('gemini-3.1-pro-preview',  2.00, 12.00),
-    ('gpt-5.6-luna',            1.00, 6.00)
+    ('gemini-3.8-flash',        date '-infinity',  date '2027-01-01', 0.75, 3.75),   -- 2026년 말까지 할인가
+    ('gemini-3.8-flash',        date '2027-01-01', date 'infinity',   1.50, 7.50),
+    ('gemini-3.6-flash',        date '-infinity',  date 'infinity',   1.50, 7.50),   -- 2026-10-16 이전 빠른번역
+    ('gemini-3.1-pro-preview',  date '-infinity',  date 'infinity',   2.00, 12.00),
+    ('gpt-5.6-luna',            date '-infinity',  date 'infinity',   1.00, 6.00)
 )
 select
   to_char(date_trunc('month', u.created_at at time zone 'Asia/Seoul'), 'YYYY-MM') as 월,
@@ -163,16 +180,20 @@ select
     + (u.thoughts_tokens + u.output_tokens) * r.out_per_1m) / 1000000.0)::numeric * 1688, 0) as 원
 from public.translation_chunk_usage u
 left join rates r on r.model = u.model
+  and (u.created_at at time zone 'Asia/Seoul')::date >= r.시작
+  and (u.created_at at time zone 'Asia/Seoul')::date <  r.끝
 group by 1
 order by 1 desc;
 
 
 -- 2-b. 월 × 모델. 어느 달에 무엇이 튀었는지.
-with rates(model, in_per_1m, out_per_1m) as (
+with rates(model, 시작, 끝, in_per_1m, out_per_1m) as (
   values
-    ('gemini-3.6-flash',        1.50, 7.50),
-    ('gemini-3.1-pro-preview',  2.00, 12.00),
-    ('gpt-5.6-luna',            1.00, 6.00)
+    ('gemini-3.8-flash',        date '-infinity',  date '2027-01-01', 0.75, 3.75),   -- 2026년 말까지 할인가
+    ('gemini-3.8-flash',        date '2027-01-01', date 'infinity',   1.50, 7.50),
+    ('gemini-3.6-flash',        date '-infinity',  date 'infinity',   1.50, 7.50),   -- 2026-10-16 이전 빠른번역
+    ('gemini-3.1-pro-preview',  date '-infinity',  date 'infinity',   2.00, 12.00),
+    ('gpt-5.6-luna',            date '-infinity',  date 'infinity',   1.00, 6.00)
 )
 select
   to_char(date_trunc('month', u.created_at at time zone 'Asia/Seoul'), 'YYYY-MM') as 월,
@@ -185,5 +206,7 @@ select
     + (u.thoughts_tokens + u.output_tokens) * r.out_per_1m) / 1000000.0)::numeric * 1688, 0) as 원
 from public.translation_chunk_usage u
 left join rates r on r.model = u.model
+  and (u.created_at at time zone 'Asia/Seoul')::date >= r.시작
+  and (u.created_at at time zone 'Asia/Seoul')::date <  r.끝
 group by 1, 2, 3
 order by 1 desc, 달러 desc nulls last;
