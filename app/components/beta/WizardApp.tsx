@@ -72,6 +72,7 @@ export function WizardApp() {
     runtimeMinutes,
     uploadCredits,
     enrichStatus,
+    enrichError,
     enrichCandidates,
     castSheet,
     directorNote,
@@ -84,6 +85,7 @@ export function WizardApp() {
     toneText,
     setToneText,
     searchWork,
+    skipWorkPick,
     confirmWorkPick,
     workConfirmed,
     autoMatched,
@@ -202,6 +204,8 @@ export function WizardApp() {
               toneText={toneText}
               onToneText={setToneText}
               onConfirm={confirmWorkPick}
+              onSkip={skipWorkPick}
+              searchError={enrichError}
             />
           )}
 

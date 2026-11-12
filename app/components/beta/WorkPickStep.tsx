@@ -16,6 +16,10 @@ interface WorkPickStepProps {
   onSelect: (i: number) => void;
   onSearch: (q: string) => void;
   searching: boolean;
+  /** Set when the lookup itself failed (not merely found nothing). */
+  searchError: string;
+  /** Continue without work info — the only exit when nothing matches. */
+  onSkip: () => void;
   // other branch
   otherType: string;
   onOtherType: (t: string) => void;
@@ -35,6 +39,8 @@ export function WorkPickStep({
   onSelect,
   onSearch,
   searching,
+  searchError,
+  onSkip,
   otherType,
   onOtherType,
   toneText,
@@ -70,6 +76,7 @@ export function WorkPickStep({
           onSelect={onSelect}
           onSearch={onSearch}
           searching={searching}
+          searchError={searchError}
         />
       ) : (
         <OtherBranch
@@ -81,7 +88,7 @@ export function WorkPickStep({
       )}
     </div>
 
-      <div className='fixed bottom-0 left-0 right-0 z-40 flex justify-center p-4 glass-nav glass-bar backdrop-blur-[20px] backdrop-saturate-[180%]'>
+      <div className='fixed bottom-0 left-0 right-0 z-40 flex justify-center items-center gap-5 p-4 glass-nav glass-bar backdrop-blur-[20px] backdrop-saturate-[180%]'>
         <button
           type='button'
           disabled={!canConfirm}
@@ -91,6 +98,15 @@ export function WorkPickStep({
         >
           {c.confirm}
         </button>
+        {contentType === 'movie' && (
+          <button
+            type='button'
+            onClick={onSkip}
+            className='text-body text-secondary underline underline-offset-4'
+          >
+            {c.skip}
+          </button>
+        )}
       </div>
     </>
   );
@@ -104,12 +120,14 @@ function MovieBranch({
   onSelect,
   onSearch,
   searching,
+  searchError,
 }: {
   candidates: EnrichCandidate[];
   selectedIndex: number;
   onSelect: (i: number) => void;
   onSearch: (q: string) => void;
   searching: boolean;
+  searchError: string;
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -126,6 +144,8 @@ function MovieBranch({
           <SpinnerIcon className='w-5 h-5 text-accent' />
           <span className='text-sm text-nav'>{COPY.info.searching}</span>
         </div>
+      ) : searchError ? (
+        <div className='card p-6 mb-4 text-sm text-secondary'>{c.searchError}</div>
       ) : (
         <div className='flex flex-col gap-2.5 mb-4'>
           {candidates.map((candidate, i) => (

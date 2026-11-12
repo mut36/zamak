@@ -150,6 +150,7 @@ const SCREENS = [
   'upload:uploading',
   'workPick',
   'workPick:searching',
+  'workPick:error',
   'workPick:other',
   'settings',
   'settings:confirm',
@@ -244,6 +245,8 @@ export function PreviewHarness() {
             onSelect={setSelectedIndex}
             onSearch={noop}
             searching={screen === 'workPick:searching'}
+            searchError={screen === 'workPick:error' ? 'TMDB 402' : ''}
+            onSkip={noop}
             otherType={otherType}
             onOtherType={setOtherType}
             toneText={toneText}

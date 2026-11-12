@@ -710,16 +710,36 @@ export function useWizard(
   // empty year, since the user is searching by a new title and the file's
   // originally-guessed year no longer applies.
   const searchWork = useCallback(
-    (query: string) => {
+    async (query: string) => {
       // A fresh search always replaces `candidates` with a new list, so any
       // prior selection into the old list must be cleared here — otherwise
       // the same index can point at a different, never-clicked film in the
       // new list and render as pre-selected.
       setSelectedIndex(-1);
-      enrich(query, '');
+      const { result } = await enrich(query, '');
+      // A single match comes back as an already-resolved work with an empty
+      // candidate list — leaving it on the picker showed nothing to pick and
+      // a dead confirm button. Hand it to the settings screen's confirm
+      // banner instead, same as runEnrich's single-match path.
+      if (result) {
+        applyEnrichResult(result);
+        setAutoMatched(true);
+        setWorkConfirmed(false);
+        setScreen('settings');
+      }
     },
-    [enrich],
+    [enrich, applyEnrichResult],
   );
+
+  // Movie branch exit when nothing matches (or the search itself is down):
+  // continue with the filename-guessed title and no work info. Clears any
+  // previously resolved work, since "without work info" has to mean that.
+  const skipWorkPick = useCallback(() => {
+    applyEnrichResult(null);
+    setAutoMatched(false);
+    setWorkConfirmed(true);
+    setScreen('settings');
+  }, [applyEnrichResult]);
 
   const confirmWorkPick = useCallback(() => {
     if (contentType === 'movie') {
@@ -779,6 +799,7 @@ export function useWizard(
     confirmWork,
     goWorkPick,
     searchWork,
+    skipWorkPick,
     confirmWorkPick,
     handleFile,
     handleTranslate,
